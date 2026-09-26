@@ -42,6 +42,19 @@
     .panel-content[hidden] { display: none; }
     .results-content-scrollable { overflow: auto; scrollbar-gutter: stable; }
     .editor-surface:focus-within, .results-surface:focus-within { border-color: var(--active-border); box-shadow: var(--focus-glow), 0 12px 42px #00000012, inset 0 1px #ffffff08; }
+    .detached-query-window-root { width: 100%; height: 100dvh; min-height: 0; padding: 10px; overflow: hidden; background: var(--page); }
+    .detached-query-window-root > .editor-surface { width: 100%; height: 100%; min-height: 0; flex: 1; }
+    .detached-query-window-root > .editor-surface.is-collapsed { height: auto; flex: 0 0 auto; }
+    .detached-query-window-root .editor-main-column { overflow: hidden; }
+    .detached-query-window-root .editor-frame { min-height: 0; }
+    .detached-query-placeholder { flex: 1; }
+    .detached-query-placeholder .editor-heading-actions { padding-right: 0; }
+    .detached-query-name { overflow: hidden; max-width: min(34vw, 360px); text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-size: 13px; font-weight: 630; }
+    .detached-query-status { align-items: center; gap: 8px; margin-inline: auto; color: var(--text-soft); font-size: 9px; }
+    .detached-query-placeholder-content { display: flex; min-height: 0; flex: 1; align-items: center; justify-content: center; gap: 14px; padding: 28px; color: var(--muted); }
+    .detached-query-placeholder-content > svg { width: 30px; height: 30px; flex: none; color: var(--signal-accent); }
+    .detached-query-placeholder-content strong { color: var(--text-soft); font-size: 12px; }
+    .detached-query-placeholder-content p { max-width: 390px; margin: 5px 0 0; color: var(--muted); font-size: 10px; line-height: 1.55; }
     .editor-heading { position: relative; display: flex; min-height: 54px; flex: none; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 15px; border-bottom: 1px solid var(--line); background: var(--panel-header); }
     .editor-file-heading, .editor-heading-actions { display: flex; min-width: 0; align-items: center; gap: 11px; }
     .editor-heading-actions { padding-right: 42px; }

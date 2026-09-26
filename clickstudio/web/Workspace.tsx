@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { ProfilePipeline, QueryDocument, QueryProfile, Result, Run, RunKind, Script } from '../shared/types';
 import { DEFAULT_LIMITS } from '../shared/types';
 import { exportCsv, recommendChart } from '../shared/results';
@@ -17,6 +18,7 @@ import { Button, cx, Icon, terminal } from './components/ui';
 import { ExecutionBar, RailButton } from './components/WorkspaceChrome';
 import { WorkspaceDocumentTabs } from './components/WorkspaceDocumentTabs';
 import { WorkspaceQueryPanel } from './components/WorkspaceQueryPanel';
+import { DetachedQueryPlaceholder } from './components/DetachedQueryPlaceholder';
 import { WorkspaceResultsPanel } from './components/WorkspaceResultsPanel';
 import { WorkspacePanelSplitter } from './components/WorkspacePanelSplitter';
 import { checkpoint, closeDraft, draftFromDocument, MAX_TABS, newDraft, reopenDraft, type Draft } from './workspace-state';
@@ -62,6 +64,7 @@ import {
 } from './workspace-helpers';
 import { useWorkspaceNotifications, WORKSPACE_TOAST_TIMEOUT_MS } from './useWorkspaceNotifications';
 import { useWorkspaceViewState } from './useWorkspaceViewState';
+import { useDetachedQueryEditor } from './useDetachedQueryEditor';
 
 type WorkspaceProps = Readonly<{
     connection: Connected;
@@ -620,6 +623,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         setResultsCollapsed,
         hasOutput: Boolean(run || requestedResultsView === 'sqlmap'),
     });
+    const detachedEditor = useDetachedQueryEditor({ activeName: active.name, experience, panels, editorRef: editor, copy: copy.common, setError, setNotice });
 
 
     const openDocument = (document: QueryDocument) => {
@@ -725,6 +729,34 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         runDisabled: !trusted || Boolean(busy) || unsupportedParameters,
         expert: experience === 'expert',
     } satisfies InspectorPaneProps;
+
+    const queryPanel = <WorkspaceQueryPanel
+        state={{ active, connection, schema, copy, experience, dark, nativeParserEnabled, nativeParserStatus,
+            trusted, unsupportedParameters, parameters, busy, inspector, demoMode, view }}
+        actions={{
+            onPatch: patch,
+            onToggleSqlMap: () => {
+                setView(current => current === 'sqlmap' ? 'results' : 'sqlmap');
+                setResultsCollapsed(false);
+            },
+            onOpenAssistant: () => showInspector('assistant'),
+            onSave: saveDraft,
+            onFormat: formatActiveSql,
+            onRun: execute,
+            runActionTitle,
+            onConnectionAction: () => !demoMode && !connection.manifest
+                ? testConnectionActionRef.current()
+                : trustActionRef.current(),
+            onNativeParserStatus: setNativeParserStatus,
+            onNativeParseSnapshot: setNativeParseSnapshot,
+            onOpenDetached: detachedEditor.openEditor,
+            onDockDetached: detachedEditor.dockEditor,
+        }}
+        panels={panels}
+        viewState={viewState}
+        editorRef={editor}
+        detached={Boolean(detachedEditor.detached)}
+    />;
 
     return <div className={cx('workspace-root', experience === 'expert' && 'is-expert', experience === 'beginner' && 'is-beginner')}>
         <OverlayPortal><div className="toast-stack">
@@ -867,45 +899,9 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
                         panels.canSplitPanels && 'has-panel-split',
                     )}
                 >
-                    <WorkspaceQueryPanel
-                        state={{
-                            active,
-                            connection,
-                            schema,
-                            copy,
-                            experience,
-                            dark,
-                            nativeParserEnabled,
-                            nativeParserStatus,
-                            trusted,
-                            unsupportedParameters,
-                            parameters,
-                            busy,
-                            inspector,
-                            demoMode,
-                            view,
-                        }}
-                        actions={{
-                            onPatch: patch,
-                            onToggleSqlMap: () => {
-                                setView(current => current === 'sqlmap' ? 'results' : 'sqlmap');
-                                setResultsCollapsed(false);
-                            },
-                            onOpenAssistant: () => showInspector('assistant'),
-                            onSave: saveDraft,
-                            onFormat: formatActiveSql,
-                            onRun: execute,
-                            runActionTitle,
-                            onConnectionAction: () => !demoMode && !connection.manifest
-                                ? testConnectionActionRef.current()
-                                : trustActionRef.current(),
-                            onNativeParserStatus: setNativeParserStatus,
-                            onNativeParseSnapshot: setNativeParseSnapshot,
-                        }}
-                        panels={panels}
-                        viewState={viewState}
-                        editorRef={editor}
-                    />
+                    {detachedEditor.detached
+                        ? <DetachedQueryPlaceholder name={active.name} copy={copy.common} collapsed={queryCollapsed} onFocus={detachedEditor.focusEditor} onDock={detachedEditor.dockEditor}/>
+                        : queryPanel}
 
                     <WorkspacePanelSplitter panels={panels}/>
 
@@ -973,5 +969,6 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
             setNotice('Import complete. The destination schema was refreshed.');
         }}/>
         <ExecutionBar run={run} failedAttempt={Boolean(failedQueryError)} eventState={eventState} onCancel={() => void cancel()} cancelling={cancelling} scriptRunning={script?.status === 'running'} copy={copy.common} helpButton={<HelpButton copy={copy.common} open={helpPanelOpen} onOpen={openHelp}/>}/>
+        {detachedEditor.detached && createPortal(queryPanel, detachedEditor.detached.container)}
     </div>;
 }

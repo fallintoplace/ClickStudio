@@ -48,6 +48,8 @@ export type WorkspaceQueryPanelActions = Readonly<{
     onConnectionAction: () => Promise<void>;
     onNativeParserStatus: (status: NativeParserStatus) => void;
     onNativeParseSnapshot: (snapshot?: NativeParseSnapshot) => void;
+    onOpenDetached: () => void;
+    onDockDetached: () => void;
 }>;
 
 export function WorkspaceQueryPanel({
@@ -56,12 +58,14 @@ export function WorkspaceQueryPanel({
     panels,
     viewState,
     editorRef,
+    detached = false,
 }: {
     state: WorkspaceQueryPanelState;
     actions: WorkspaceQueryPanelActions;
     panels: WorkspacePanelController;
     viewState: WorkspaceViewState;
     editorRef: RefObject<EditorHandle | null>;
+    detached?: boolean;
 }) {
     const {
         active,
@@ -144,7 +148,10 @@ export function WorkspaceQueryPanel({
                         >{copy.common.builtInFormatter}</Button>
                     </div>
                 </>}
-                {!panels.compactViewport && <Button variant="ghost" className="panel-window-button" aria-label={queryFloating ? 'Dock query panel' : 'Pop out query panel'} title={queryFloating ? 'Dock query panel' : 'Pop out query panel'} onClick={() => togglePanelFloating('query')}><Icon name={queryFloating ? 'dock' : 'popout'}/></Button>}
+                {!detached && !panels.compactViewport && <Button variant="ghost" className="panel-window-button" aria-label={queryFloating ? 'Dock query panel' : 'Pop out query panel'} title={queryFloating ? 'Dock query panel' : 'Pop out query panel'} onClick={() => togglePanelFloating('query')}><Icon name={queryFloating ? 'dock' : 'popout'}/></Button>}
+                {detached
+                    ? <Button variant="ghost" className="panel-window-button" aria-label={copy.common.dockQueryEditor} title={copy.common.dockQueryEditor} onClick={actions.onDockDetached}><Icon name="dock"/></Button>
+                    : !panels.compactViewport && <Button variant="ghost" className="panel-window-button" aria-label={copy.common.openQueryInNewWindow} title={copy.common.openQueryInNewWindow} onClick={actions.onOpenDetached}><Icon name="newWindow"/></Button>}
                 {queryFloating && <Button variant="ghost" className="panel-window-button" aria-label={queryMode === 'maximized' ? 'Restore query panel' : 'Maximize query panel'} title={queryMode === 'maximized' ? 'Restore query panel' : 'Maximize query panel'} onClick={() => togglePanelMaximized('query')}><Icon name={queryMode === 'maximized' ? 'restore' : 'maximize'}/></Button>}
                 <Button variant="ghost" className="panel-collapse-button" aria-label={panels.queryCollapsed ? copy.common.expandQuery : copy.common.collapseQuery} aria-expanded={!panels.queryCollapsed} aria-controls="sql-editor-content" title={panels.queryCollapsed ? copy.common.expandQuery : copy.common.collapseQuery} onClick={() => panels.setQueryCollapsed(value => !value)}><Icon className="panel-toggle-icon" name="chevron"/></Button>
             </div>

@@ -140,6 +140,14 @@ export interface Copy {
         more: string;
         localDraft: string;
         query: string;
+        openQueryInNewWindow: string;
+        detachedQueryStatus: string;
+        detachedQueryDescription: string;
+        focusQueryEditor: string;
+        dockQueryEditor: string;
+        queryWindowBlocked: string;
+        queryWindowOpened: string;
+        queryWindowDocked: string;
         format: string;
         parserUnavailable: string;
         retryParser: string;
