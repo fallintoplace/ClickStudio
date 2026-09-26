@@ -766,7 +766,7 @@ test('Charts sample the full retained range and report the sampled row count', a
     await results.getByRole('tab', { name: 'Chart', exact: true }).click();
     await expect(results.locator('.chart-bar')).toHaveCount(240);
     await expect(results.locator('.chart-footer')).toContainText('240 sampled rows from 350 retained rows');
-    await expect(results.locator('.chart-x-labels span').last()).toHaveText('row-350');
+    await expect(results.locator('.chart-x-labels text').last()).toHaveText('row-350');
     expect(Number(await results.locator('.chart-bar').last().getAttribute('y'))).toBeCloseTo(40, 0);
 });
 

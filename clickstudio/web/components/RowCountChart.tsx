@@ -34,12 +34,13 @@ export function RowCountChart({ result, chart, suggestion, onChart, copy, locale
     const max = Math.max(0, ...counts);
     const min = 0;
     const range = max || 1;
-    const plotTop = 40, plotBottom = 190;
-    const y = (value: number) => plotBottom - (value / range) * (plotBottom - plotTop);
+    const plotLeft = 80, plotRight = 732, plotWidth = plotRight - plotLeft;
+    const plotTop = 40, plotMiddle = 115, plotBottom = 190, plotHeight = plotBottom - plotTop;
+    const y = (value: number) => plotBottom - (value / range) * plotHeight;
     const timeMin = allTimePoints[0]?.timestamp ?? 0;
     const timeMax = allTimePoints.at(-1)?.timestamp ?? timeMin;
-    const xTime = (timestamp: number) => 32 + (timeMax === timeMin ? 350 : ((timestamp - timeMin) / (timeMax - timeMin)) * 700);
-    const xCategory = (index: number, length: number) => 32 + (length <= 1 ? 350 : index * (700 / (length - 1)));
+    const xTime = (timestamp: number) => plotLeft + (timeMax === timeMin ? .5 : (timestamp - timeMin) / (timeMax - timeMin)) * plotWidth;
+    const xCategory = (index: number, length: number) => plotLeft + (length <= 1 ? .5 : index / (length - 1)) * plotWidth;
     const bars = categoryData ?? [];
     const axisValueCount = timeAxis ? timeTicks.length : bars.length;
     const labelIndexes = axisValueCount <= 3
@@ -48,8 +49,9 @@ export function RowCountChart({ result, chart, suggestion, onChart, copy, locale
     const axisLabels = timeAxis
         ? labelIndexes.map(index => timeTicks[index]?.label ?? '')
         : labelIndexes.map(index => categoryData?.[index]?.label ?? '');
+    const axisLabelPositions = labelIndexes.map(index => timeAxis ? xTime(timeTicks[index]?.timestamp ?? timeMin) : xCategory(index, bars.length));
     const valueFormatter = new Intl.NumberFormat(locale, { notation: 'compact', maximumFractionDigits: 1 });
-    const barWidth = Math.max(4, Math.min(32, 680 / Math.max(1, bars.length) * .64));
+    const barWidth = Math.max(4, Math.min(32, plotWidth / Math.max(1, bars.length) * .64));
     const hasRows = result.rows.length > 0;
     const noTimeValues = timeAxis && !series.length;
     const dimensionName = result.columns[xIndex]?.name ?? '';
@@ -99,10 +101,10 @@ export function RowCountChart({ result, chart, suggestion, onChart, copy, locale
             : noTimeValues
                 ? <div className="chart-empty">{copy.noValidTimeValues}</div>
                 : <div className="chart-canvas">
-                    <div className="chart-axis-labels"><span>{valueFormatter.format(max)}</span><span>{valueFormatter.format(max / 2)}</span><span>{valueFormatter.format(min)}</span></div>
                     <svg viewBox="0 0 760 230" role="img" aria-label={chartAriaLabel}>
-                        {[40, 115, 190].map(value => <line key={value} x1="32" x2="732" y1={value} y2={value} className="chart-gridline"/>)}
-                        <line x1="32" x2="732" y1={plotBottom} y2={plotBottom} className="chart-zero-line"/>
+                        {[plotTop, plotMiddle, plotBottom].map(value => <line key={value} x1={plotLeft} x2={plotRight} y1={value} y2={value} className="chart-gridline"/>)}
+                        {[{ value: max, position: plotTop }, { value: max / 2, position: plotMiddle }, { value: min, position: plotBottom }].map(tick => <text key={`${tick.position}-${tick.value}`} className="chart-y-tick-label" x={plotLeft - 24} y={tick.position} textAnchor="end" dominantBaseline="middle">{valueFormatter.format(tick.value)}</text>)}
+                        <line x1={plotLeft} x2={plotRight} y1={plotBottom} y2={plotBottom} className="chart-zero-line"/>
                         {timeAxis
                             ? series.map((item, seriesIndex) => <g key={item.key} style={{ '--series-color': seriesColor(seriesIndex) } as CSSProperties}>
                                 {item.points.length > 1 && <polyline points={item.points.map(point => `${xTime(point.timestamp)},${y(point.count)}`).join(' ')} className="chart-line"/>}
@@ -112,8 +114,8 @@ export function RowCountChart({ result, chart, suggestion, onChart, copy, locale
                                 const valueY = y(group.count), top = Math.min(plotBottom, valueY), height = Math.max(1, plotBottom - valueY);
                                 return <rect key={group.key} x={xCategory(index, bars.length) - barWidth / 2} y={top} width={barWidth} height={height} rx="3" className="chart-bar" style={{ '--series-color': seriesColor(0), animationDelay: `${index * 25}ms` } as CSSProperties}><title>{chartText(copy.categoryBarTooltip, { category: group.label, count: formatCount(group.count, locale) })}</title></rect>;
                             })}
+                        <g className="chart-x-labels">{axisLabels.map((label, index) => <text key={`${label}-${index}`} x={axisLabelPositions[index]} y="218" textAnchor={axisLabels.length === 1 ? 'middle' : index === 0 ? 'start' : index === axisLabels.length - 1 ? 'end' : 'middle'}>{label}</text>)}</g>
                     </svg>
-                    <div className="chart-x-labels">{axisLabels.map((label, index) => <span key={`${label}-${index}`}>{label}</span>)}</div>
                 </div>}
         <div className="chart-footer">
             <span className="chart-legend">{(timeAxis ? series : [{ key: 'rows', label: copy.rowsLabel }]).map((item, index) => <span key={item.key}><span className="chart-legend-dot" style={{ backgroundColor: seriesColor(index) }}/>{item.label}</span>)}</span>

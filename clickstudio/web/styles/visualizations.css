@@ -234,16 +234,15 @@
     .chart-measures label { display: inline-flex; min-width: 0; grid-auto-flow: column; align-items: center; gap: 4px; color: var(--text-soft); font-size: 8px; }
     .chart-measures input { width: 11px; height: 11px; margin: 0; accent-color: var(--accent); }
     .chart-measures label > span { width: 7px; height: 7px; flex: none; border-radius: 2px; background: var(--series-color); }
-    .chart-canvas { position: relative; display: grid; height: min(250px, 45vh); grid-template-columns: 42px minmax(0, 1fr); align-items: stretch; margin: 12px 0 0; padding: 8px 12px 0 0; border: 1px solid var(--line); border-radius: 11px; background: radial-gradient(ellipse at 50% 0, color-mix(in srgb, var(--accent) 5%, transparent), transparent 65%), var(--panel-raised); }
-    .chart-axis-labels { display: flex; flex-direction: column; justify-content: space-between; padding: 18px 7px 37px 0; color: var(--muted); font-family: var(--font-mono); font-size: 8px; text-align: right; }
-    .chart-canvas svg { width: 100%; height: calc(100% - 25px); overflow: visible; }
+    .chart-canvas { position: relative; display: block; height: min(250px, 45vh); margin: 12px 0 0; padding: 8px 12px 0; border: 1px solid var(--line); border-radius: 11px; background: radial-gradient(ellipse at 50% 0, color-mix(in srgb, var(--accent) 5%, transparent), transparent 65%), var(--panel-raised); }
+    .chart-canvas svg { display: block; width: 100%; height: 100%; overflow: visible; }
+    .chart-y-tick-label, .chart-x-labels text { fill: var(--muted); font-family: var(--font-mono); font-size: 8px; }
     .chart-gridline { stroke: var(--line-bright); stroke-dasharray: 3 5; stroke-width: 1; opacity: .55; }
     .chart-zero-line { stroke: color-mix(in srgb, var(--text-soft) 62%, var(--line)); stroke-width: 1.5; }
     .chart-line { fill: none; stroke: var(--series-color, var(--accent)); stroke-linecap: round; stroke-linejoin: round; stroke-width: 3; filter: drop-shadow(0 0 5px color-mix(in srgb, var(--series-color, var(--accent)) 40%, transparent)); stroke-dasharray: 1400; animation: drawLine 1.1s ease both; }
     .chart-area-fill { fill: var(--series-color, var(--accent)); opacity: .11; }
     .chart-point { fill: var(--panel); stroke: var(--series-color, var(--accent)); stroke-width: 2; }
     .chart-bar { fill: var(--series-color, var(--accent)); stroke: color-mix(in srgb, var(--series-color, var(--accent)) 65%, white); stroke-width: 1; opacity: .88; transform-box: fill-box; transform-origin: bottom; animation: barRise .48s cubic-bezier(.18,.75,.25,1) both; }
-    .chart-x-labels { position: absolute; right: 13px; bottom: 9px; left: 54px; display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-family: var(--font-mono); font-size: 8px; }
     .chart-footer { display: flex; justify-content: space-between; gap: 12px; margin-top: 9px; color: var(--muted); font-size: 8px; }
     .chart-footer > span:first-child { display: inline-flex; align-items: center; gap: 7px; color: var(--text-soft); }
     .chart-legend { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 9px; }

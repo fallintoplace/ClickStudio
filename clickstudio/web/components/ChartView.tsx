@@ -89,13 +89,15 @@ export function ChartView({ result, loading, chart, onChart, copy, locale }: { r
     }));
     const values = plotSeries.flatMap(series => series.points.flatMap(point => point.value === null ? [] : [point.value]));
     const min = Math.min(0, ...values), max = Math.max(0, ...values), range = max - min || 1;
-    const plotTop = 40, plotBottom = 190, zeroY = plotBottom - ((0 - min) / range) * (plotBottom - plotTop);
-    const y = (value: number) => plotBottom - ((value - min) / range) * (plotBottom - plotTop);
-    const x = (index: number) => 32 + index * (700 / Math.max(1, chartRows.length - 1));
+    const plotLeft = 80, plotRight = 732, plotWidth = plotRight - plotLeft;
+    const plotTop = 40, plotMiddle = 115, plotBottom = 190, plotHeight = plotBottom - plotTop;
+    const zeroY = plotBottom - ((0 - min) / range) * plotHeight;
+    const y = (value: number) => plotBottom - ((value - min) / range) * plotHeight;
+    const x = (index: number) => chartRows.length <= 1 ? (plotLeft + plotRight) / 2 : plotLeft + index * (plotWidth / (chartRows.length - 1));
     const rowSummary = chartRows.length < result.rows.length
         ? chartText(chartCopy.sampledRowsSummary, { sampled: formatCount(chartRows.length, locale), rows: formatCount(result.rows.length, locale) })
         : chartText(measureIndexes.length === 1 ? chartCopy.retainedRowsAcrossOneMeasure : chartCopy.retainedRowsAcrossManyMeasures, { rows: formatCount(chartRows.length, locale), measures: formatCount(measureIndexes.length, locale) });
-    const barWidth = Math.max(1, Math.min(28, (680 / Math.max(1, chartRows.length)) * .68 / measureIndexes.length));
+    const barWidth = Math.max(1, Math.min(28, (plotWidth / Math.max(1, chartRows.length)) * .68 / measureIndexes.length));
     const collator = new Intl.Collator(locale, { numeric: true, sensitivity: 'base' });
     const heatmap = chartKind === 'heatmap' && groupByIndex !== undefined
         ? prepareHeatmap(result.rows, xIndex, groupByIndex, yIndex)
@@ -113,8 +115,20 @@ export function ChartView({ result, loading, chart, onChart, copy, locale }: { r
     const scatterMaxY = Math.max(...scatterPoints.map(point => point.y), 0);
     const scatterRangeX = scatterMaxX - scatterMinX || 1;
     const scatterRangeY = scatterMaxY - scatterMinY || 1;
-    const scatterX = (value: number) => 32 + ((value - scatterMinX) / scatterRangeX) * 700;
-    const scatterY = (value: number) => plotBottom - ((value - scatterMinY) / scatterRangeY) * (plotBottom - plotTop);
+    const scatterX = (value: number) => scatterMinX === scatterMaxX ? (plotLeft + plotRight) / 2 : plotLeft + ((value - scatterMinX) / scatterRangeX) * plotWidth;
+    const scatterY = (value: number) => scatterMinY === scatterMaxY ? plotMiddle : plotBottom - ((value - scatterMinY) / scatterRangeY) * plotHeight;
+    const chartYTicks = chartKind === 'scatter'
+        ? scatterMinY === scatterMaxY
+            ? [{ value: scatterMinY, position: plotMiddle }]
+            : [{ value: scatterMaxY, position: plotTop }, { value: (scatterMinY + scatterMaxY) / 2, position: plotMiddle }, { value: scatterMinY, position: plotBottom }]
+        : min === max
+            ? [{ value: min, position: plotBottom }]
+            : [{ value: max, position: plotTop }, { value: (min + max) / 2, position: plotMiddle }, { value: min, position: plotBottom }];
+    const chartXTicks = chartKind === 'scatter'
+        ? scatterMinX === scatterMaxX
+            ? [{ label: compactNumber.format(scatterMinX), position: (plotLeft + plotRight) / 2 }]
+            : [{ label: compactNumber.format(scatterMinX), position: plotLeft }, { label: compactNumber.format((scatterMinX + scatterMaxX) / 2), position: (plotLeft + plotRight) / 2 }, { label: compactNumber.format(scatterMaxX), position: plotRight }]
+        : [...new Set([0, Math.floor((chartRows.length - 1) / 2), chartRows.length - 1])].map(index => ({ label: plotSeries[0]?.points[index]?.label ?? '', position: x(index) }));
     const suggestionReason = chartKind === 'heatmap'
         ? chartCopy.heatmapReturnedRows
         : result.rows.length === 1
@@ -171,10 +185,11 @@ export function ChartView({ result, loading, chart, onChart, copy, locale }: { r
                         </table><div className="heatmap-caption">{chartText(chartCopy.heatmapCaption, { measure: result.columns[yIndex]?.name ?? '', rows: formatCount(heatmapYLabels.length, locale), columns: formatCount(heatmapXLabels.length, locale), note: result.completeness === 'truncated' ? chartCopy.heatmapTruncatedNote : chartCopy.heatmapCompleteNote })}</div></div>
                 : chartKind === 'scatter' && (xIndex === yIndex || !numericIndexes.includes(xIndex) || !numericIndexes.includes(yIndex)) ? <div className="chart-empty">{chartCopy.scatterNeedsTwoNumeric}</div>
                     : !values.length ? <div className="chart-empty">{chartCopy.chooseNumericMeasure}</div>
-                    : <div className="chart-canvas"><div className="chart-axis-labels"><span>{formatCount(max, locale)}</span><span>{formatCount((min + max) / 2, locale)}</span><span>{formatCount(min, locale)}</span></div>
+                    : <div className="chart-canvas">
                         <svg viewBox="0 0 760 230" role="img" aria-label={chartText(chartCopy.chartComparing, { type: chartTypeLabel(chartKind, chartCopy).toLocaleLowerCase(locale), x: result.columns[xIndex]?.name ?? '', y: result.columns[yIndex]?.name ?? '' })}>
-                            {[40, 115, 190].map(value => <line key={value} x1="32" x2="732" y1={value} y2={value} className="chart-gridline"/>)}
-                            {chartKind !== 'scatter' && <line x1="32" x2="732" y1={zeroY} y2={zeroY} className="chart-zero-line"/>}
+                            {[plotTop, plotMiddle, plotBottom].map(value => <line key={value} x1={plotLeft} x2={plotRight} y1={value} y2={value} className="chart-gridline"/>)}
+                            {chartYTicks.map(tick => <text key={`${tick.position}-${tick.value}`} className="chart-y-tick-label" x={plotLeft - 24} y={tick.position} textAnchor="end" dominantBaseline="middle">{compactNumber.format(tick.value)}</text>)}
+                            {chartKind !== 'scatter' && <line x1={plotLeft} x2={plotRight} y1={zeroY} y2={zeroY} className="chart-zero-line"/>}
                             {chartKind === 'scatter' ? scatterPoints.map((point, index) => <circle key={index} cx={scatterX(point.x)} cy={scatterY(point.y)} r="3.5" className="chart-point" style={{ fill: seriesColor(0), stroke: seriesColor(0) }}><title>{`${result.columns[xIndex]?.name}: ${formatCount(point.x, locale)} · ${result.columns[yIndex]?.name}: ${formatCount(point.y, locale)}`}</title></circle>)
                                 : chartKind === 'line' ? plotSeries.map(series => {
                                     const segments = splitChartSegments(series.points);
@@ -188,9 +203,8 @@ export function ChartView({ result, loading, chart, onChart, copy, locale }: { r
                                     const groupOffset = (seriesIndex - (plotSeries.length - 1) / 2) * barWidth;
                                     return [<rect key={`${series.columnIndex}-${point.index}`} x={x(point.index) + groupOffset - barWidth / 2} y={top} width={barWidth} height={height} rx="3" className="chart-bar" style={{ '--series-color': series.color, animationDelay: `${point.index * 20}ms` } as CSSProperties}/>];
                                 }))}
-                        </svg><div className="chart-x-labels">{chartKind === 'scatter'
-                            ? <><span>{formatCount(scatterMinX, locale)}</span><span>{formatCount((scatterMinX + scatterMaxX) / 2, locale)}</span><span>{formatCount(scatterMaxX, locale)}</span></>
-                            : <><span>{plotSeries[0]?.points[0]?.label}</span><span>{plotSeries[0]?.points[Math.floor((plotSeries[0]?.points.length ?? 1) / 2)]?.label}</span><span>{plotSeries[0]?.points.at(-1)?.label}</span></>}</div>
+                            <g className="chart-x-labels">{chartXTicks.map((tick, index) => <text key={`${tick.position}-${tick.label}`} x={tick.position} y="218" textAnchor={chartXTicks.length === 1 ? 'middle' : index === 0 ? 'start' : index === chartXTicks.length - 1 ? 'end' : 'middle'}>{tick.label}</text>)}</g>
+                        </svg>
                     </div>}
         <div className="chart-footer"><span className="chart-legend">{chartKind === 'heatmap'
             ? <><span className="chart-legend-dot"/>{result.columns[yIndex]?.name}</>
