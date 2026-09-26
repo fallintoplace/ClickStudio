@@ -12,6 +12,7 @@
     .results-tabs button[aria-selected="true"] { background: var(--active-surface); color: var(--text); box-shadow: var(--active-inset); }
     .suggested-dot { display: inline-block; width: 5px; height: 5px; margin-left: 5px; border-radius: 50%; background: var(--accent); vertical-align: 2px; box-shadow: 0 0 7px var(--accent); }
     .result-grid-wrap { display: flex; min-height: 0; flex: 1; flex-direction: column; }
+    .result-grid-wrap.is-pending-previous-result { filter: blur(2px); opacity: .62; transition: filter .2s ease, opacity .2s ease; }
     .result-summary-row { display: flex; flex: none; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 14px; color: var(--muted); font-size: 9px; }
     .result-summary-row strong { color: var(--text-soft); font-weight: 650; }
     .result-summary-row i { padding: 0 5px; color: var(--line-bright); font-style: normal; }
