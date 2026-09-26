@@ -1,9 +1,10 @@
-import type { ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import type { Run, Script } from '../../shared/types';
 import { Button, cx, formatBytes, formatCount, Icon, Status, terminal } from './ui';
 import type { IconName } from './ui';
 import type { RunEventState } from '../workspace-types';
 import type { Copy } from '../i18n';
+import { OverlayPortal } from './OverlayPortal';
 
 export type RunAction = {
     id: string;
@@ -12,6 +13,79 @@ export type RunAction = {
     title?: string;
     onSelect: () => void;
 };
+
+function DisabledRunAction({ action, label }: { action: RunAction; label: string }) {
+    const tooltipId = `run-action-${action.id}-reason`;
+    const anchorRef = useRef<HTMLSpanElement>(null);
+    const tooltipRef = useRef<HTMLSpanElement>(null);
+    const closeTimeout = useRef<number | null>(null);
+    const [hovered, setHovered] = useState(false);
+    const [focused, setFocused] = useState(false);
+    const open = hovered || focused;
+
+    const cancelClose = () => {
+        if (closeTimeout.current !== null) {
+            window.clearTimeout(closeTimeout.current);
+            closeTimeout.current = null;
+        }
+    };
+    const scheduleClose = () => {
+        cancelClose();
+        closeTimeout.current = window.setTimeout(() => {
+            setHovered(false);
+            closeTimeout.current = null;
+        }, 140);
+    };
+    const showTooltip = () => {
+        cancelClose();
+        setHovered(true);
+    };
+
+    useEffect(() => () => {
+        if (closeTimeout.current !== null) window.clearTimeout(closeTimeout.current);
+    }, []);
+
+    useLayoutEffect(() => {
+        if (!open) return;
+        const anchor = anchorRef.current;
+        const tooltip = tooltipRef.current;
+        if (!anchor || !tooltip) return;
+
+        const positionTooltip = () => {
+            const anchorRect = anchor.getBoundingClientRect();
+            const tooltipRect = tooltip.getBoundingClientRect();
+            const margin = 12;
+            const gap = 8;
+            const maxLeft = Math.max(margin, window.innerWidth - tooltipRect.width - margin);
+            const left = Math.min(Math.max(anchorRect.right - tooltipRect.width, margin), maxLeft);
+            const above = anchorRect.top - tooltipRect.height - gap;
+            const maxTop = Math.max(margin, window.innerHeight - tooltipRect.height - margin);
+            const top = above >= margin ? above : Math.min(anchorRect.bottom + gap, maxTop);
+
+            tooltip.style.left = `${left}px`;
+            tooltip.style.top = `${top}px`;
+            tooltip.dataset.positioned = 'true';
+        };
+
+        positionTooltip();
+        window.addEventListener('resize', positionTooltip);
+        window.addEventListener('scroll', positionTooltip, true);
+        return () => {
+            window.removeEventListener('resize', positionTooltip);
+            window.removeEventListener('scroll', positionTooltip, true);
+            tooltip.dataset.positioned = 'false';
+        };
+    }, [open, action.title]);
+
+    return <>
+        <span ref={anchorRef} className="run-option-tooltip-anchor" role="group" tabIndex={0} aria-describedby={tooltipId} aria-label={`${action.label}: ${action.title}`} onMouseEnter={showTooltip} onMouseLeave={scheduleClose} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}>
+            <Button data-testid={`run-action-${action.id}`} aria-label={action.label} variant="secondary" className="run-option-button" disabled title={undefined} onClick={action.onSelect}>{label}</Button>
+        </span>
+        <OverlayPortal>
+            <span ref={tooltipRef} id={tooltipId} className={cx('run-option-tooltip', open && 'is-visible')} data-positioned="false" role="tooltip" onMouseEnter={showTooltip} onMouseLeave={scheduleClose}>{action.title}</span>
+        </OverlayPortal>
+    </>;
+}
 
 export function RunActionGroup({ runLabel, running, disabled, onRun, actions, copy }: {
     runLabel: string;
@@ -29,11 +103,7 @@ export function RunActionGroup({ runLabel, running, disabled, onRun, actions, co
         const label = isExplainAction ? action.label.replace(/^[^\s]+\s+/, '') : action.label;
         if (!action.disabled || !action.title)
             return <Button key={action.id} data-testid={`run-action-${action.id}`} aria-label={action.label} variant="secondary" className="run-option-button" disabled={action.disabled} title={action.title ?? action.label} onClick={action.onSelect}>{label}</Button>;
-        const tooltipId = `run-action-${action.id}-reason`;
-        return <span key={action.id} className="run-option-tooltip-anchor" role="group" tabIndex={0} aria-describedby={tooltipId} aria-label={`${action.label}: ${action.title}`}>
-            <Button data-testid={`run-action-${action.id}`} aria-label={action.label} variant="secondary" className="run-option-button" disabled title={undefined} onClick={action.onSelect}>{label}</Button>
-            <span id={tooltipId} className="run-option-tooltip" role="tooltip">{action.title}</span>
-        </span>;
+        return <DisabledRunAction key={action.id} action={action} label={label}/>;
     };
     return <div className="run-action-group" role="group" aria-label={copy.runActions}>
         <Button variant="primary" className="run-query-button" data-testid="run-statement" aria-label={runLabel} onClick={onRun} disabled={disabled}><Icon name="play"/>{running ? copy.running : copy.run}</Button>
