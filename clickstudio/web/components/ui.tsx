@@ -33,7 +33,7 @@ const iconPaths = {
     close: <path d="m6 6 12 12M18 6 6 18"/>,
     play: <path d="m8 5 11 7-11 7V5Z"/>,
     chevron: <path d="m8 10 4 4 4-4"/>,
-    popout: <><rect x="4" y="6" width="13" height="13" rx="2"/><path d="M13 4h7v7M20 4l-9 9"/></>,
+    floatPanel: <><rect x="3" y="8" width="13" height="12" rx="2"/><path d="M3 12h13"/><rect x="9" y="3" width="12" height="12" rx="2"/><path d="M9 7h12"/></>,
     newWindow: <><rect x="3" y="5" width="18" height="15" rx="2"/><path d="M3 9h18M13 3h8v8M21 3l-9 9"/></>,
     dock: <><rect x="4" y="5" width="16" height="14" rx="2"/><path d="m15 9-5 5m0 0h4m-4 0v-4"/></>,
     maximize: <path d="M5 9V5h4m6 0h4v4m0 6v4h-4m-6 0H5v-4"/>,

@@ -350,12 +350,12 @@ test('Desktop workspace panels float, resize, maximize, and dock without losing 
     const queryPanel = page.locator('.editor-surface');
     const editor = page.locator('#sql-editor-content .cm-content');
 
-    const queryPopout = page.getByRole('button', { name: 'Pop out query panel', exact: true });
-    const queryPopoutBox = await queryPopout.boundingBox();
-    expect(queryPopoutBox).not.toBeNull();
-    expect(queryPopoutBox!.width).toBeGreaterThanOrEqual(34);
-    expect(queryPopoutBox!.height).toBeGreaterThanOrEqual(34);
-    await queryPopout.click();
+    const queryFloat = page.getByRole('button', { name: 'Float query panel', exact: true });
+    const queryFloatBox = await queryFloat.boundingBox();
+    expect(queryFloatBox).not.toBeNull();
+    expect(queryFloatBox!.width).toBeGreaterThanOrEqual(34);
+    expect(queryFloatBox!.height).toBeGreaterThanOrEqual(34);
+    await queryFloat.click();
     await expect(queryPanel).toHaveClass(/is-floating/);
     await expect(editor).toContainText('SELECT');
 
@@ -394,7 +394,7 @@ test('Desktop workspace panels float, resize, maximize, and dock without losing 
     await expect(queryPanel).not.toHaveClass(/is-floating/);
     await expect(editor).toContainText('SELECT');
 
-    await page.getByRole('button', { name: 'Pop out output panel', exact: true }).click();
+    await page.getByRole('button', { name: 'Float output panel', exact: true }).click();
     await expect(results).toHaveClass(/is-floating/);
     await expect(results.getByRole('table', { name: 'Retained query rows' })).toBeVisible();
     await page.getByRole('button', { name: 'Dock output panel', exact: true }).click();

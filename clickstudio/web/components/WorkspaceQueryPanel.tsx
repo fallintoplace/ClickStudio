@@ -148,7 +148,7 @@ export function WorkspaceQueryPanel({
                         >{copy.common.builtInFormatter}</Button>
                     </div>
                 </>}
-                {!detached && !panels.compactViewport && <Button variant="ghost" className="panel-window-button" aria-label={queryFloating ? 'Dock query panel' : 'Pop out query panel'} title={queryFloating ? 'Dock query panel' : 'Pop out query panel'} onClick={() => togglePanelFloating('query')}><Icon name={queryFloating ? 'dock' : 'popout'}/></Button>}
+                {!detached && !panels.compactViewport && <Button variant="ghost" className="panel-window-button" aria-label={queryFloating ? 'Dock query panel' : 'Float query panel'} title={queryFloating ? 'Dock query panel' : 'Float query panel'} onClick={() => togglePanelFloating('query')}><Icon name={queryFloating ? 'dock' : 'floatPanel'}/></Button>}
                 {detached
                     ? <Button variant="ghost" className="panel-window-button" aria-label={copy.common.dockQueryEditor} title={copy.common.dockQueryEditor} onClick={actions.onDockDetached}><Icon name="dock"/></Button>
                     : !panels.compactViewport && <Button variant="ghost" className="panel-window-button" aria-label={copy.common.openQueryInNewWindow} title={copy.common.openQueryInNewWindow} onClick={actions.onOpenDetached}><Icon name="newWindow"/></Button>}
