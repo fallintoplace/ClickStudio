@@ -103,7 +103,7 @@ export function isRun(value: unknown): value is Run {
         && typeof value.requestedBy === 'string'
         && typeof value.executedAs === 'string'
         && isRecord(value.permissionSnapshot)
-        && value.permissionSnapshot.readonly === true
+        && typeof value.permissionSnapshot.readonly === 'boolean'
         && typeof value.permissionSnapshot.role === 'string'
         && value.retryPolicy === 'never'
         && isOptionalString(value.traceId)

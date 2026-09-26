@@ -56,7 +56,7 @@ export interface Connection {
     host: string;
     database: string;
     username: string;
-    readonly: true;
+    readonly: boolean;
     limits: Limits;
     manifest?: Manifest;
 }
@@ -184,7 +184,7 @@ export interface Run {
     requestedBy: string;
     executedAs: string;
     permissionSnapshot: {
-        readonly: true;
+        readonly: boolean;
         role: string;
     };
     retryPolicy: 'never';

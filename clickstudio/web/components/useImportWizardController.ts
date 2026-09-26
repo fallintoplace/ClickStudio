@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Schema } from '../../shared/types';
 import { useImportJobPolling } from './useImportJobPolling';
 import { api, isFrontendDemoPreview, message, post, RequestError } from '../api';
+import { CLICKHOUSE_CLOUD_CONNECTION_ID } from '../cloud-connection';
 import { DEMO_IMPORT_SAMPLE_CSV } from '../demo-import-data';
 import {
     MAX_FILE_BYTES,
@@ -29,8 +30,14 @@ export type ImportWizardControllerOptions = {
     onImported: () => void;
 };
 
+function importUnavailableReason(connectionId: string) {
+    if (connectionId === 'playground') return 'File imports are disabled on the public read-only ClickHouse Playground connection.';
+    if (connectionId === CLICKHOUSE_CLOUD_CONNECTION_ID) return 'File import is not available for this Cloud connection yet. Use SQL to create tables and insert data.';
+    return 'File imports are disabled in sample data. This workspace never writes to a database.';
+}
+
 export function useImportWizardController({ open, connectionId, trusted, demoMode, onClose, onImported }: ImportWizardControllerOptions) {
-    const browserDemoImport = demoMode && isFrontendDemoPreview;
+    const browserDemoImport = demoMode && isFrontendDemoPreview && connectionId === 'demo';
     const importConnectionId = browserDemoImport ? 'demo' : connectionId;
     const dialogRef = useRef<HTMLDialogElement>(null);
     const onImportedRef = useRef(onImported);
@@ -96,9 +103,7 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
 
         if (demoMode && !browserDemoImport) {
             setRecoveryState('ready');
-            setImportUnavailable(connectionId === 'playground'
-                ? 'File imports are disabled on the public read-only ClickHouse Playground connection.'
-                : 'File imports are disabled in sample data. This workspace never writes to a database.');
+            setImportUnavailable(importUnavailableReason(connectionId));
             return () => { current = false; controller.abort(); };
         }
         if (!trusted) {

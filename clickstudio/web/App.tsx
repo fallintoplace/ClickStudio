@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, message, post } from './api';
 import { Button, cx, Icon, SelectControl } from './components/ui';
+import { CloudConnectionDialog } from './components/CloudConnectionDialog';
+import { CLICKHOUSE_CLOUD_CONNECTION_ID, disconnectClickHouseCloud } from './cloud-connection';
 import { Workspace } from './Workspace';
 import { experienceOptions, getCopy, localeOptions, resolveLocale, themeAppearance, themeOptions, type ExperienceLevel, type Locale, type Theme } from './i18n';
 import { RadioGroup } from '@clickhouse/click-ui/RadioGroup';
@@ -37,6 +39,7 @@ function App() {
     const [token, setToken] = useState('');
     const [busy, setBusy] = useState(false);
     const [connectionPicker, setConnectionPicker] = useState(false);
+    const [cloudDialogOpen, setCloudDialogOpen] = useState(false);
     const [connectionActionBusy, setConnectionActionBusy] = useState(false);
     const trustActionRef = useRef<() => Promise<void>>(async () => undefined);
     const testConnectionActionRef = useRef<() => Promise<void>>(async () => undefined);
@@ -45,9 +48,13 @@ function App() {
     const hasPreviewSourceSwitcher = Boolean(session?.demo && connections.some(item => item.id === 'playground'));
     const isSampleData = Boolean(session?.demo && connection?.dataSource === 'fixture');
     const isPlayground = Boolean(session?.demo && connection?.id === 'playground');
+    const isCloudConnection = connection?.id === CLICKHOUSE_CLOUD_CONNECTION_ID;
     const otherConnections = connection ? connections.filter(item => item.id !== connection.id && (hasPreviewSourceSwitcher || !session?.demo || experience === 'expert')) : [];
     const sourceChoices = hasPreviewSourceSwitcher
-        ? connections.filter(item => item.id === 'demo' || item.id === 'playground').sort((left, right) => left.id === 'playground' ? -1 : right.id === 'playground' ? 1 : 0)
+        ? connections.filter(item => item.id === 'demo' || item.id === 'playground' || item.id === CLICKHOUSE_CLOUD_CONNECTION_ID).sort((left, right) => {
+            const rank = (id: string) => id === 'playground' ? 0 : id === 'demo' ? 1 : 2;
+            return rank(left.id) - rank(right.id);
+        })
         : otherConnections;
     const dark = themeAppearance[theme].dark;
     const selectConnection = useCallback((id: string) => {
@@ -56,6 +63,23 @@ function App() {
         url.searchParams.set('connection', id);
         window.history.replaceState(window.history.state, '', url);
     }, []);
+
+    const disconnectCloud = () => {
+        disconnectClickHouseCloud();
+        setConnections(current => current.filter(item => item.id !== CLICKHOUSE_CLOUD_CONNECTION_ID));
+        if (isCloudConnection) {
+            const fallback = connections.find(item => item.id === 'playground') ?? connections[0];
+            if (fallback) selectConnection(fallback.id);
+        }
+        setConnectionPicker(false);
+    };
+
+    const connectCloud = (connected: Connected) => {
+        setConnections(current => [...current.filter(item => item.id !== connected.id), connected]);
+        selectConnection(connected.id);
+        setConnectionPicker(false);
+        setCloudDialogOpen(false);
+    };
 
     useEffect(() => {
         document.documentElement.dataset.theme = theme;
@@ -108,9 +132,11 @@ function App() {
     if (!session.principal) return <main className="auth-screen"><form className="auth-card animate-enter" onSubmit={event => { event.preventDefault(); void login(); }}><Brand theme={theme}/><span className="eyebrow mt-8">{copy.auth.privateWorkspace}</span><h1>{copy.auth.title}</h1><p>{copy.auth.description}</p><label className="field-label">{copy.auth.token}<input className="field-input mt-2" type="password" autoComplete="current-password" value={token} onChange={event => setToken(event.target.value)} autoFocus/></label>{sessionError && <div className="callout callout-error">{sessionError}</div>}<Button variant="primary" type="submit" disabled={busy || !token} className="mt-4 w-full">{busy ? copy.auth.opening : copy.auth.open}<span className="button-arrow">↗</span></Button><div className="auth-footnote"><Icon name="lock"/> {copy.auth.credentialsNotice}</div></form></main>;
 
     const connectionNeedsTest = Boolean(connection && !session.demo && !connection.manifest);
-    const connectionStatus = connection?.trusted
-        ? connectionNeedsTest ? 'Retest needed' : 'Read-only'
-        : connection?.manifest ? 'Review needed' : 'Test needed';
+    const connectionStatus = isCloudConnection
+        ? 'Connected · read/write'
+        : connection?.trusted
+            ? connectionNeedsTest ? 'Retest needed' : 'Read-only'
+            : connection?.manifest ? 'Review needed' : 'Test needed';
 
     return <div className="application" data-experience={experience}>
         <header className="topbar">
@@ -118,9 +144,9 @@ function App() {
             <div className="topbar-divider"/>
             <div className="connection-wrap">
                 <button className="connection-trigger" type="button" aria-haspopup="dialog" aria-expanded={connectionPicker} aria-controls="connection-menu" onClick={() => setConnectionPicker(value => !value)}>
-                    <span className={cx('connection-env', isSampleData && 'is-demo', isPlayground && 'is-playground')} title={isSampleData ? 'Sample rows are generated in this browser.' : isPlayground ? 'SQL runs on ClickHouse Playground from this browser.' : undefined}><span className={cx('status-light', isSampleData || !connection?.trusted ? 'is-warning' : 'is-trusted')}/>{isSampleData ? 'SAMPLE DATA' : isPlayground ? 'PLAYGROUND' : 'LIVE CONNECTION'}</span>
+                    <span className={cx('connection-env', isSampleData && 'is-demo', isPlayground && 'is-playground', isCloudConnection && 'is-cloud')} title={isSampleData ? 'Sample rows are generated in this browser.' : isPlayground ? 'SQL runs on ClickHouse Playground from this browser.' : undefined}><span className={cx('status-light', isSampleData || !connection?.trusted ? 'is-warning' : 'is-trusted')}/>{isSampleData ? 'SAMPLE DATA' : isPlayground ? 'PLAYGROUND' : isCloudConnection ? 'CLICKHOUSE CLOUD' : 'LIVE CONNECTION'}</span>
                     {isPlayground && <span className="connection-quick-status is-ready">{copy.common.readOnly}</span>}
-                    {!session.demo && <span className={cx('connection-quick-status', connection?.trusted && !connectionNeedsTest ? 'is-ready' : 'is-review')}>{connectionStatus}</span>}
+                    {(!session.demo || isCloudConnection) && <span className={cx('connection-quick-status', connection?.trusted && !connectionNeedsTest ? 'is-ready' : 'is-review')}>{connectionStatus}</span>}
                     <strong title={connection?.name}>{connection ? isPlayground ? 'ClickHouse' : connectionLabel(connection, session.demo) : 'Choose connection'}</strong>
                     <span className="connection-database">{connection?.database ?? '—'} <Icon name="chevron"/></span>
                 </button>
@@ -128,14 +154,16 @@ function App() {
                     <div className="connection-menu-current">
                         <span className="connection-menu-heading">{hasPreviewSourceSwitcher ? 'Current data source' : 'Current connection'}</span>
                         <strong>{connectionLabel(connection, session.demo)}</strong>
-                        <small>{isSampleData ? 'Generated sample data · SQL stays in this browser' : isPlayground ? `${connection.host} · public read-only access` : session.demo ? 'Local sample data' : `Database: ${connection.database} · Server: ${connection.host}`}</small>
+                        <small>{isSampleData ? 'Generated sample data · SQL stays in this browser' : isPlayground ? `${connection.host} · public read-only access` : isCloudConnection ? `${connection.host} · ${connection.database} · user credentials held in this tab` : session.demo ? 'Local sample data' : `Database: ${connection.database} · Server: ${connection.host}`}</small>
                     </div>
                     <p className={cx('connection-menu-note', isSampleData ? 'is-sample' : isPlayground || connection.trusted && !connectionNeedsTest ? 'is-ready' : 'is-review')} role="status">
-                        {isSampleData ? 'Sample rows are generated for the preview. SQL is not sent to a database.' : isPlayground ? 'Queries run against the public ClickHouse SQL Playground directly from your browser. Access is read only.' : session.demo ? 'This demo uses sample data. Your SQL is not sent to a real database.' : connectionNeedsTest ? connection.trusted ? 'Read-only access is on, but this server needs a fresh capability check.' : 'Test this connection to discover its ClickHouse features.' : connection.trusted ? 'Read-only access is on. Queries can read data but cannot change it.' : 'Connection tested. Turn on read-only access when you are ready to query.'}
+                        {isSampleData ? 'Sample rows are generated for the preview. SQL is not sent to a database.' : isPlayground ? 'Queries run against the public ClickHouse SQL Playground directly from your browser. Access is read only.' : isCloudConnection ? 'SQL runs on your ClickHouse Cloud service through this site over HTTPS. Your Cloud user decides which read and write operations are allowed.' : session.demo ? 'This demo uses sample data. Your SQL is not sent to a real database.' : connectionNeedsTest ? connection.trusted ? 'Read-only access is on, but this server needs a fresh capability check.' : 'Test this connection to discover its ClickHouse features.' : connection.trusted ? 'Read-only access is on. Queries can read data but cannot change it.' : 'Connection tested. Turn on read-only access when you are ready to query.'}
                     </p>
-                    {(!session.demo || !connection.trusted) && <Button variant={!session.demo && connection.trusted ? 'ghost' : 'primary'} className="connection-menu-action" disabled={connectionActionBusy} onClick={() => void runConnectionAction(connectionNeedsTest)}>
-                        {connectionActionBusy ? connectionNeedsTest ? 'Testing…' : 'Saving…' : session.demo ? 'Start exploring' : connectionNeedsTest ? connection.trusted ? 'Retest connection' : 'Test connection' : connection.trusted ? 'Turn off read-only access' : 'Trust connection'}
-                    </Button>}
+                    {isCloudConnection
+                        ? <Button variant="ghost" className="connection-menu-action" onClick={disconnectCloud}>Disconnect ClickHouse Cloud</Button>
+                        : (!session.demo || !connection.trusted) && <Button variant={!session.demo && connection.trusted ? 'ghost' : 'primary'} className="connection-menu-action" disabled={connectionActionBusy} onClick={() => void runConnectionAction(connectionNeedsTest)}>
+                            {connectionActionBusy ? connectionNeedsTest ? 'Testing…' : 'Saving…' : session.demo ? 'Start exploring' : connectionNeedsTest ? connection.trusted ? 'Retest connection' : 'Test connection' : connection.trusted ? 'Turn off read-only access' : 'Trust connection'}
+                        </Button>}
                     {sourceChoices.length > 0 && <div className="connection-switch-list">
                         <span className="connection-menu-heading">{hasPreviewSourceSwitcher ? 'Choose data source' : 'Switch connection'}</span>
                         {sourceChoices.map(item => <button key={item.id} type="button" aria-pressed={item.id === connection.id} onClick={() => { selectConnection(item.id); setConnectionPicker(false); }}>
@@ -143,6 +171,7 @@ function App() {
                             <span className="connection-choice-arrow" aria-hidden="true">{item.id === connection.id ? '✓' : '›'}</span>
                         </button>)}
                     </div>}
+                    {hasPreviewSourceSwitcher && <Button variant="secondary" className="connection-menu-action cloud-connect-trigger" onClick={() => { setConnectionPicker(false); setCloudDialogOpen(true); }}>{isCloudConnection ? 'Change Cloud service' : 'Connect ClickHouse Cloud'}</Button>}
                 </div>}
             </div>
             <div className="topbar-spacer"/>
@@ -192,6 +221,7 @@ function App() {
             </div>
         </header>
         {connection ? <Workspace key={connection.id} connection={connection} connectionLabel={connectionLabel(connection, session.demo)} connections={connections} onSelectConnection={selectConnection} onRefreshConnections={async () => { const latest = await api<Connected[]>('/connections'); setConnections(latest); }} trustActionRef={trustActionRef} testConnectionActionRef={testConnectionActionRef} demoMode={session.demo} experience={experience} nativeParserEnabled={parserMode === 'wasm'} dark={dark} copy={copy} locale={locale}/> : <div className="empty-connection"><Icon name="schema"/><h1>{copy.app.name}</h1><p>No connection profiles are configured for this workspace.</p></div>}
+        {cloudDialogOpen && <CloudConnectionDialog onClose={() => setCloudDialogOpen(false)} onConnect={connectCloud}/>}
     </div>;
 }
 

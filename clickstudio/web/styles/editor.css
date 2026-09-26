@@ -74,7 +74,7 @@
     .editor-workspace-layout { display: grid; min-width: 0; min-height: 0; flex: 1; grid-template-columns: minmax(0, 1fr) 184px; overflow: hidden; }
     .workspace-root.is-beginner .editor-workspace-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
     .editor-main-column { display: flex; min-width: 0; min-height: 0; flex-direction: column; overflow: auto; }
-    .editor-control-rail { display: flex; min-width: 0; min-height: 0; flex-direction: column; gap: 9px; overflow: auto; padding: 10px; border-left: 1px solid var(--line); background: color-mix(in srgb, var(--control-well) 82%, transparent); }
+    .editor-control-rail { display: flex; min-width: 0; min-height: 0; flex-direction: column; gap: 9px; overflow: auto; padding: 10px; border-left: 1px solid var(--line); background: color-mix(in srgb, var(--control-well) 82%, transparent); box-shadow: inset 0 -16px 18px -14px color-mix(in srgb, var(--text) 28%, transparent); }
     .editor-rail-status { display: flex; flex: none; align-items: center; justify-content: space-between; gap: 6px; padding: 2px 2px 7px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 8px; }
     .editor-rail-status .editor-mode-label { gap: 6px; color: var(--text-soft); font-size: 9px; }
     .file-type-icon { display: grid; width: 32px; height: 32px; flex: none; place-items: center; border: 1px solid color-mix(in srgb, var(--signal-accent) 28%, var(--line)); border-radius: var(--radius-control); background: color-mix(in srgb, var(--signal-accent) 8%, var(--panel)); color: var(--signal-accent); font-family: var(--font-mono); font-size: 8px; font-weight: 800; letter-spacing: .03em; }

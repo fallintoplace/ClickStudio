@@ -1,9 +1,10 @@
 import { nativeExplorerFixture } from '../shared/native-explorer-fixtures.js';
-import type { Json, QueryDocument, Result, ResultPage, Run, Schema, Script } from '../shared/types.js';
+import type { QueryDocument, Result, ResultPage, Run, Schema, Script } from '../shared/types.js';
 import { splitSql } from '../shared/sql.js';
 import { sqlForRunKind } from '../shared/explain-plan.js';
 import { isResult, isRun } from '../shared/run-wire.js';
 import { loadPlaygroundSchema, PLAYGROUND_CONNECTION, PLAYGROUND_CONNECTION_ID, queryPlayground, queryPlaygroundQueryTree } from './playground.js';
+import { CLICKHOUSE_CLOUD_CONNECTION_ID, getClickHouseCloudConnection, loadClickHouseCloudSchema, runClickHouseCloudSql, CloudRequestError } from './cloud-connection.js';
 import { demoMergeTreePartRows } from '../shared/demo-fixtures.js';
 import { parseMergeTreeParts } from '../shared/parts.js';
 import {
@@ -324,7 +325,7 @@ export class DemoPreviewApi {
         const parameters = Object.fromEntries(Object.entries(record(input.parameters)).filter((entry): entry is [string, string] => typeof entry[1] === 'string'));
         const document: QueryDocument = {
             id: previous?.id ?? id ?? crypto.randomUUID(), owner, name: typeof input.name === 'string' ? input.name : 'Untitled.sql',
-            connectionId: input.connectionId === PLAYGROUND_CONNECTION_ID ? PLAYGROUND_CONNECTION_ID : 'demo',
+            connectionId: input.connectionId === PLAYGROUND_CONNECTION_ID || input.connectionId === CLICKHOUSE_CLOUD_CONNECTION_ID ? input.connectionId : 'demo',
             sql: typeof input.sql === 'string' ? input.sql : DEMO_PREVIEW_SQL,
             revision: (previous?.revision ?? 0) + 1, createdAt: previous?.createdAt ?? timestamp, updatedAt: timestamp,
             parameters,
@@ -353,7 +354,12 @@ export class DemoPreviewApi {
         const body = record(options.body);
 
         if (pathname === '/session') return { principal: { id: owner, role: 'owner' }, requiresLogin: false, demo: true };
-        if (pathname === '/connections' && method === 'GET') return [connection(this.trusted), PLAYGROUND_CONNECTION];
+        if (pathname === '/connections' && method === 'GET') {
+            const cloud = getClickHouseCloudConnection();
+            return [connection(this.trusted), PLAYGROUND_CONNECTION, ...(cloud ? [cloud] : [])];
+        }
+        if (parts[0] === 'connections' && parts[1] === CLICKHOUSE_CLOUD_CONNECTION_ID && parts[2] === 'schema' && method === 'GET')
+            return await loadClickHouseCloudSchema();
         if (parts[0] === 'connections' && parts[1] === 'demo' && parts[2] === 'schema') return this.demoSchema();
         if (parts[0] === 'connections' && parts[1] === 'demo' && parts[2] === 'native-explorer' && method === 'POST') {
             if (!this.trusted) throw new Error('Trust this connection before inspecting native metadata.');
@@ -426,6 +432,39 @@ export class DemoPreviewApi {
                     sequence: ++this.sequence, resultExpiresAt, resultState: 'reopenable',
                     requestedBy: owner, executedAs: PLAYGROUND_CONNECTION.username,
                     permissionSnapshot: { readonly: true, role: 'public demo' }, retryPolicy: 'never',
+                };
+                const result: Result = {
+                    runId, queryId: response.queryId, columns: response.columns, rows: response.rows,
+                    completeness: response.truncated ? 'truncated' : 'complete', createdAt: finishedAt, expiresAt: resultExpiresAt,
+                };
+                this.runs.set(run.id, run);
+                this.results.set(run.id, result);
+                this.persist();
+                return run;
+            }
+            if (body.connectionId === CLICKHOUSE_CLOUD_CONNECTION_ID) {
+                const cloud = getClickHouseCloudConnection();
+                if (!cloud) throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before running SQL.', 401);
+                const sql = typeof body.sql === 'string' ? body.sql : '';
+                const executionSql = sqlForRunKind(sql, requestedKind);
+                const startedAt = now();
+                const runId = crypto.randomUUID();
+                const resultExpiresAt = expiresAt();
+                const response = await runClickHouseCloudSql(executionSql);
+                const finishedAt = now();
+                const status = response.truncated ? 'truncated' as const : 'succeeded' as const;
+                const run: Run = {
+                    dataSource: 'clickhouse', id: runId, queryId: response.queryId, owner,
+                    connectionId: CLICKHOUSE_CLOUD_CONNECTION_ID, sql, kind: requestedKind, parameters: {},
+                    limits: { ...cloud.limits },
+                    tags: { workspace: 'clickstudio', source: 'ClickHouse Cloud', execution: 'Vercel function' },
+                    status, createdAt: startedAt, startedAt, finishedAt, elapsedMs: response.elapsedMs,
+                    rowCount: response.rows.length, bytes: response.bytes, columns: response.columns,
+                    warnings: response.truncated ? ['The result reached the 1,000-row display limit and may be incomplete.'] : [],
+                    sequence: ++this.sequence, resultExpiresAt, resultState: 'reopenable',
+                    requestedBy: owner, executedAs: cloud.username,
+                    permissionSnapshot: { readonly: cloud.readonly, role: 'ClickHouse Cloud user' },
+                    retryPolicy: 'never', serverVersion: cloud.manifest?.serverVersion,
                 };
                 const result: Result = {
                     runId, queryId: response.queryId, columns: response.columns, rows: response.rows,
