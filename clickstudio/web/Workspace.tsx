@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import type { ProfilePipeline, QueryDocument, QueryProfile, Result, Run, RunKind, Script } from '../shared/types';
 import { DEFAULT_LIMITS } from '../shared/types';
 import { exportCsv, recommendChart } from '../shared/results';
-import { formatSql, parameterNames, selectedStatement, splitSql } from '../shared/sql';
+import { formatSql, lexSql, parameterNames, selectedStatement, splitSql } from '../shared/sql';
 import { api, download, isFrontendDemoPreview, message, post } from './api';
 import { PLAYGROUND_CONNECTION_ID } from './playground';
 import type { EditorHandle } from './components/SqlEditor';
@@ -83,6 +83,15 @@ type WorkspaceProps = Readonly<{
     copy: Copy;
     locale: Locale;
 }>;
+
+function isSchemaChangingSql(sql: string) {
+    try {
+        const firstWord = lexSql(sql).find(token => token.kind === 'word')?.text.toUpperCase();
+        return firstWord === 'CREATE' || firstWord === 'ALTER' || firstWord === 'DROP' || firstWord === 'RENAME';
+    } catch {
+        return false;
+    }
+}
 
 export function Workspace({ connection, connectionLabel, connections, onSelectConnection, onRefreshConnections, trustActionRef, testConnectionActionRef, demoMode, experience, nativeParserEnabled, dark, copy, locale }: WorkspaceProps) {
     const key = workspaceStateKey(connection.id);
@@ -389,6 +398,8 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
             }
             pendingExecution.acceptRun(payload.clientRequestId, created.id);
             setRunForRun(created.id, created, true);
+            if (created.status === 'succeeded' && connection.dataSource === 'clickhouse' && connection.readonly === false && isSchemaChangingSql(statement!.sql))
+                void loadSchema(true);
             setPage(0); setView(kind === 'explain' ? 'indexes' : kind === 'plan' ? 'plan' : kind === 'pipeline' ? 'pipeline' : kind === 'analyze' ? 'runtime' : 'results');
             patch({ activeRunId: created.id, scriptId: undefined, runIds: [...new Set([...active.runIds, created.id])] });
             editor.current?.focus();
