@@ -19,6 +19,7 @@ import { ExecutionBar, RailButton } from './components/WorkspaceChrome';
 import { WorkspaceDocumentTabs } from './components/WorkspaceDocumentTabs';
 import { WorkspaceQueryPanel } from './components/WorkspaceQueryPanel';
 import { DetachedQueryPlaceholder } from './components/DetachedQueryPlaceholder';
+import { DetachedResultsPlaceholder } from './components/DetachedResultsPlaceholder';
 import { WorkspaceResultsPanel } from './components/WorkspaceResultsPanel';
 import { WorkspacePanelSplitter } from './components/WorkspacePanelSplitter';
 import { checkpoint, closeDraft, draftFromDocument, MAX_TABS, newDraft, reopenDraft, type Draft } from './workspace-state';
@@ -65,6 +66,7 @@ import {
 import { useWorkspaceNotifications, WORKSPACE_TOAST_TIMEOUT_MS } from './useWorkspaceNotifications';
 import { useWorkspaceViewState } from './useWorkspaceViewState';
 import { useDetachedQueryEditor } from './useDetachedQueryEditor';
+import { useDetachedResultsPanel } from './useDetachedResultsPanel';
 
 type WorkspaceProps = Readonly<{
     connection: Connected;
@@ -624,6 +626,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         hasOutput: Boolean(run || requestedResultsView === 'sqlmap'),
     });
     const detachedEditor = useDetachedQueryEditor({ activeName: active.name, experience, panels, editorRef: editor, copy: copy.common, setError, setNotice });
+    const detachedResults = useDetachedResultsPanel({ activeName: active.name, resultsTitle: viewState.resultsTitle, experience, panels, copy: copy.common, setError, setNotice });
 
 
     const openDocument = (document: QueryDocument) => {
@@ -756,6 +759,18 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         viewState={viewState}
         editorRef={editor}
         detached={Boolean(detachedEditor.detached)}
+    />;
+
+    const resultsPanel = <WorkspaceResultsPanel
+        state={{ active, connection, copy, locale, run, failedAttempt: failedQueryError, script, history, page, resultPage, profile, pipeline, flamegraph, profilesByRun, pipelinesByRun, nativeParserEnabled, nativeParserStatus, nativeParseSnapshot, trusted, busy, execution: pendingExecution.execution, retainedExecutionResult: pendingExecution.retainedExecutionResult, cancelling, experience }}
+        actions={{
+            onSelectView: nextView => { setView(nextView); if (nextView === 'insights') void perform(loadProfile, 'save'); },
+            onSelectScriptRun: runId => { if (active.scriptId) scriptFollowRef.current = { scriptId: active.scriptId, enabled: false }; update(active.id, draft => ({ ...draft, activeRunId: runId })); setPage(0); setView('results'); },
+            onOpenDetached: detachedResults.openResults, onDockDetached: detachedResults.dockResults, onCancel: () => void cancel(), onPage: setPage, onPatch: patch,
+            onLoadProfile: () => void perform(loadProfile, 'save'), onLoadPipeline: () => void perform(loadPipeline, 'save'), onLoadFlamegraph: () => void perform(loadFlamegraph, 'save'),
+            onRevealRange: (from, to) => editor.current?.revealRange(from, to),
+        }}
+        panels={panels} viewState={viewState} detached={Boolean(detachedResults.detached)}
     />;
 
     return <div className={cx('workspace-root', experience === 'expert' && 'is-expert', experience === 'beginner' && 'is-beginner')}>
@@ -905,55 +920,17 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
 
                     <WorkspacePanelSplitter panels={panels}/>
 
-                    <WorkspaceResultsPanel
-                        state={{
-                            active,
-                            connection,
-                            copy,
-                            locale,
-                            run,
-                            failedAttempt: failedQueryError,
-                            script,
-                            history,
-                            page,
-                            resultPage,
-                            profile,
-                            pipeline,
-                            flamegraph,
-                            profilesByRun,
-                            pipelinesByRun,
-                            nativeParserEnabled,
-                            nativeParserStatus,
-                            nativeParseSnapshot,
-                            trusted,
-                            busy,
-                            execution: pendingExecution.execution,
-                            retainedExecutionResult: pendingExecution.retainedExecutionResult,
-                            cancelling,
-                            experience,
-                        }}
-                        actions={{
-                            onSelectView: nextView => {
-                                setView(nextView);
-                                if (nextView === 'insights') void perform(loadProfile, 'save');
-                            },
-                            onSelectScriptRun: runId => {
-                                if (active.scriptId) scriptFollowRef.current = { scriptId: active.scriptId, enabled: false };
-                                update(active.id, draft => ({ ...draft, activeRunId: runId }));
-                                setPage(0);
-                                setView('results');
-                            },
-                            onCancel: () => void cancel(),
-                            onPage: setPage,
-                            onPatch: patch,
-                            onLoadProfile: () => void perform(loadProfile, 'save'),
-                            onLoadPipeline: () => void perform(loadPipeline, 'save'),
-                            onLoadFlamegraph: () => void perform(loadFlamegraph, 'save'),
-                            onRevealRange: (from, to) => editor.current?.revealRange(from, to),
-                        }}
-                        panels={panels}
-                        viewState={viewState}
-                    />
+                    {detachedResults.detached
+                        ? <DetachedResultsPlaceholder
+                            title={viewState.resultsTitle}
+                            eyebrow={viewState.resultsEyebrow}
+                            queryName={active.name}
+                            copy={copy.common}
+                            collapsed={resultsCollapsed}
+                            onFocus={detachedResults.focusResults}
+                            onDock={detachedResults.dockResults}
+                        />
+                        : resultsPanel}
                 </div>
             </main>
 
@@ -970,5 +947,6 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         }}/>
         <ExecutionBar run={run} failedAttempt={Boolean(failedQueryError)} eventState={eventState} onCancel={() => void cancel()} cancelling={cancelling} scriptRunning={script?.status === 'running'} copy={copy.common} helpButton={<HelpButton copy={copy.common} open={helpPanelOpen} onOpen={openHelp}/>}/>
         {detachedEditor.detached && createPortal(queryPanel, detachedEditor.detached.container)}
+        {detachedResults.detached && createPortal(resultsPanel, detachedResults.detached.container)}
     </div>;
 }

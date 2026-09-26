@@ -47,12 +47,21 @@
     .detached-query-window-root > .editor-surface.is-collapsed { height: auto; flex: 0 0 auto; }
     .detached-query-window-root .editor-main-column { overflow: hidden; }
     .detached-query-window-root .editor-frame { min-height: 0; }
+    .detached-results-window-root { display: flex; width: 100%; height: 100dvh; min-height: 0; padding: 10px; overflow: hidden; background: var(--page); }
+    .detached-results-window-root > .results-surface { width: 100%; height: 100%; min-height: 0; flex: 1; }
+    .detached-results-window-root > .results-surface.is-collapsed { height: auto; flex: 0 0 auto; }
     .detached-query-placeholder { flex: 1; }
     .detached-query-placeholder .editor-heading-actions { padding-right: 0; }
     .detached-query-name { overflow: hidden; max-width: min(34vw, 360px); text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-size: 13px; font-weight: 630; }
     .detached-query-status { align-items: center; gap: 8px; margin-inline: auto; color: var(--text-soft); font-size: 9px; }
     .detached-query-placeholder-content { display: flex; min-height: 0; flex: 1; align-items: center; justify-content: center; gap: 14px; padding: 28px; color: var(--muted); }
     .detached-query-placeholder-content > svg { width: 30px; height: 30px; flex: none; color: var(--signal-accent); }
+    .detached-results-placeholder { min-height: 0; flex: 1; }
+    .detached-results-actions { min-width: 0; }
+    .detached-results-query { overflow: hidden; max-width: min(28vw, 280px); color: var(--muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+    .detached-results-placeholder-content, .detached-results-empty { display: flex; min-height: 0; flex: 1; align-items: center; justify-content: center; gap: 12px; padding: 24px; color: var(--muted); font-size: 10px; }
+    .detached-results-placeholder-content > svg, .detached-results-empty > svg { width: 28px; height: 28px; flex: none; color: var(--signal-accent); }
+    .detached-results-placeholder-content p { max-width: 420px; margin: 4px 0 0; line-height: 1.5; }
     .detached-query-placeholder-content strong { color: var(--text-soft); font-size: 12px; }
     .detached-query-placeholder-content p { max-width: 390px; margin: 5px 0 0; color: var(--muted); font-size: 10px; line-height: 1.55; }
     .editor-heading { position: relative; display: flex; min-height: 54px; flex: none; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 15px; border-bottom: 1px solid var(--line); background: var(--panel-header); }

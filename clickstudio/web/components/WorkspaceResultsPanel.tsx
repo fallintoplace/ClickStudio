@@ -53,6 +53,8 @@ export type WorkspaceResultsPanelState = Readonly<{
 export type WorkspaceResultsPanelActions = Readonly<{
     onSelectView: (view: ResultsView) => void;
     onSelectScriptRun: (runId: string) => void;
+    onOpenDetached: () => void;
+    onDockDetached: () => void;
     onCancel: () => void;
     onPage: (page: number) => void;
     onPatch: (values: Partial<Draft>) => void;
@@ -67,11 +69,13 @@ export function WorkspaceResultsPanel({
     actions,
     panels,
     viewState,
+    detached = false,
 }: {
     state: WorkspaceResultsPanelState;
     actions: WorkspaceResultsPanelActions;
     panels: WorkspacePanelController;
     viewState: WorkspaceViewState;
+    detached?: boolean;
 }) {
     const {
         active,
@@ -140,7 +144,7 @@ export function WorkspaceResultsPanel({
     const failureSql = failedAttempt?.statementSql ?? (run?.status === 'failed' ? run.sql : undefined);
     const failurePreview = failureError ? failureMessagePreview(failureError.message) : undefined;
 
-    if (!run && !execution && !failedAttempt && visibleResultsView !== 'sqlmap') return null;
+    if (!run && !execution && !failedAttempt && visibleResultsView !== 'sqlmap' && !detached) return null;
 
     return <section
         ref={resultsPanelRef}
@@ -167,12 +171,20 @@ export function WorkspaceResultsPanel({
             </div>
             <div className="results-actions">
                 {run && resultTabs.length > 1 && <div className="results-tabs" role="tablist" aria-label={copy.common.workspaceOutput}>{resultTabs.map(tab => <button key={tab} role="tab" aria-selected={visibleResultsView === tab} type="button" onClick={() => actions.onSelectView(tab)}>{resultsTabLabel(tab, copy.common)}{tab === 'chart' && retainedSnapshot && <span className="suggested-dot"/>}</button>)}</div>}
-                {!panels.compactViewport && <Button variant="ghost" className="panel-window-button" aria-label={resultsFloating ? 'Dock output panel' : 'Pop out output panel'} title={resultsFloating ? 'Dock output panel' : 'Pop out output panel'} onClick={() => togglePanelFloating('results')}><Icon name={resultsFloating ? 'dock' : 'popout'}/></Button>}
-                {resultsFloating && <Button variant="ghost" className="panel-window-button" aria-label={resultsMode === 'maximized' ? 'Restore output panel' : 'Maximize output panel'} title={resultsMode === 'maximized' ? 'Restore output panel' : 'Maximize output panel'} onClick={() => togglePanelMaximized('results')}><Icon name={resultsMode === 'maximized' ? 'restore' : 'maximize'}/></Button>}
+                {detached
+                    ? <Button variant="ghost" className="panel-window-button" aria-label={copy.common.dockResultsPanel} title={copy.common.dockResultsPanel} onClick={actions.onDockDetached}><Icon name="dock"/></Button>
+                    : <>
+                        {!panels.compactViewport && <>
+                            <Button variant="ghost" className="panel-window-button" aria-label={copy.common.openResultsInNewWindow} title={copy.common.openResultsInNewWindow} onClick={actions.onOpenDetached}><Icon name="newWindow"/></Button>
+                            <Button variant="ghost" className="panel-window-button" aria-label={resultsFloating ? 'Dock output panel' : 'Float output panel'} title={resultsFloating ? 'Dock output panel' : 'Float output panel'} onClick={() => togglePanelFloating('results')}><Icon name={resultsFloating ? 'dock' : 'popout'}/></Button>
+                        </>}
+                        {resultsFloating && <Button variant="ghost" className="panel-window-button" aria-label={resultsMode === 'maximized' ? 'Restore output panel' : 'Maximize output panel'} title={resultsMode === 'maximized' ? 'Restore output panel' : 'Maximize output panel'} onClick={() => togglePanelMaximized('results')}><Icon name={resultsMode === 'maximized' ? 'restore' : 'maximize'}/></Button>}
+                    </>}
                 <Button variant="ghost" className="panel-collapse-button" aria-label={`${panels.resultsCollapsed ? copy.common.expand : copy.common.collapse} ${resultsPanelLabel}`} aria-expanded={!panels.resultsCollapsed} aria-controls="query-results-content" title={panels.resultsCollapsed ? copy.common.expandOutput : copy.common.collapseOutput} onClick={() => panels.setResultsCollapsed(value => !value)}><Icon className="panel-toggle-icon" name="chevron"/></Button>
             </div>
         </div>
         <div id="query-results-content" className={cx('panel-content results-content', ['insights', 'indexes', 'plan', 'pipeline', 'runtime'].includes(visibleResultsView) && 'results-content-scrollable')} hidden={panels.resultsCollapsed}>
+            {detached && !run && !execution && !failedAttempt && visibleResultsView !== 'sqlmap' && <div className="detached-results-empty"><Icon name="chart"/><span>{copy.common.detachedResultsEmpty}</span></div>}
             {visibleResultsView === 'sqlmap' && <SqlFlowView copy={copy.common} sql={sqlMapStatement?.sql ?? active.sql} sourceOffset={sqlMapStatement?.from ?? 0} parseResult={sqlMapParseStatement?.result} parserEnabled={nativeParserEnabled} parserStatus={nativeParserStatus} parseDurationMs={nativeParseSnapshot?.elapsedMs} connectionId={connection.id} parameters={active.parameters} analyzerAvailable={queryTreeAvailable} analyzerUnavailableReason={queryTreeUnavailableReason} onRevealRange={actions.onRevealRange}/>}
             {failureError && visibleResultsView !== 'sqlmap' && <div className="result-failure callout callout-error" data-testid="query-failure" role="alert">
                 <div className="result-failure-heading"><span className="status-light is-error"/><div><strong>{copy.common.statusFailed} · {failureError.code}</strong><span>{failurePreview}</span></div></div>

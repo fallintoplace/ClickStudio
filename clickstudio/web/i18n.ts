@@ -148,6 +148,15 @@ export interface Copy {
         queryWindowBlocked: string;
         queryWindowOpened: string;
         queryWindowDocked: string;
+        openResultsInNewWindow: string;
+        detachedResultsStatus: string;
+        detachedResultsDescription: string;
+        focusResultsPanel: string;
+        dockResultsPanel: string;
+        resultsWindowBlocked: string;
+        resultsWindowOpened: string;
+        resultsWindowDocked: string;
+        detachedResultsEmpty: string;
         format: string;
         parserUnavailable: string;
         retryParser: string;
