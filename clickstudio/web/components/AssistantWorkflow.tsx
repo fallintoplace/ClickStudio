@@ -1,5 +1,6 @@
-import { useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useLayoutEffect, useRef, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { AssistantChat, AssistantChatTurn } from '../assistant-chat-state';
+import { AssistantChatHistory } from './AssistantChatHistory';
 import { ScrollEdgeFrame } from './ScrollEdgeShadows';
 import { Button, cx, Icon } from './ui';
 
@@ -85,8 +86,6 @@ export function AssistantWorkflow(props: AssistantWorkflowProps) {
         editorProposalId, busy, error, trusted, runId, includeRun, onIncludeRun, cancelable, phase, notice, onAskAI, onCancelRequest,
         schemaReady, schemaLoading, schemaStatus, onRefreshSchema, onDecideProposal, onRunQuery, runDisabled } = props;
     const transcriptViewport = useRef<HTMLDivElement>(null);
-    const [renaming, setRenaming] = useState(false);
-    const [renameValue, setRenameValue] = useState('');
     const activeChat = chats.find(chat => chat.id === activeChatId);
 
     useLayoutEffect(() => {
@@ -101,28 +100,8 @@ export function AssistantWorkflow(props: AssistantWorkflowProps) {
             if (!busy && question.trim()) ask();
         }
     };
-    const deleteChat = () => {
-        const title = activeChat?.title || 'this chat';
-        if (window.confirm(`Delete “${title}” and its conversation?`)) onDeleteChat(activeChatId);
-    };
-    const startRename = () => {
-        setRenameValue(activeChat?.title ?? 'New chat');
-        setRenaming(true);
-    };
-
     return <section className="assistant-panel animate-enter" aria-label="Ask AI">
-        {renaming
-            ? <form className="assistant-chat-rename" aria-label="Rename conversation" onSubmit={event => { event.preventDefault(); if (!renameValue.trim()) return; onRenameChat(activeChatId, renameValue); setRenaming(false); }}>
-                <label className="assistant-chat-rename-input"><span className="sr-only">Conversation name</span><input autoFocus aria-label="Conversation name" value={renameValue} maxLength={80} onChange={event => setRenameValue(event.target.value)} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); setRenaming(false); } }}/></label>
-                <Button variant="primary" type="submit" disabled={!renameValue.trim()}>Save name</Button>
-                <Button variant="ghost" onClick={() => setRenaming(false)}>Cancel</Button>
-            </form>
-            : <div className="assistant-chat-toolbar">
-                <label className="assistant-chat-select-wrap"><span className="sr-only">Chat history</span><select className="assistant-chat-select" aria-label="Chat history" value={activeChatId} onChange={event => onSelectChat(event.target.value)}>
-                    {[...chats].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)).map(chat => <option key={chat.id} value={chat.id}>{chat.title}</option>)}
-                </select><Icon name="chevron"/></label>
-                <div className="assistant-chat-actions"><Button variant="ghost" className="assistant-rename-button" onClick={startRename} aria-label="Rename conversation" title="Rename conversation">Rename</Button><Button variant="secondary" onClick={onNewChat}><Icon name="plus"/>New chat</Button><Button variant="ghost" onClick={deleteChat} aria-label="Delete current chat">Delete</Button></div>
-            </div>}
+        <AssistantChatHistory chats={chats} activeChatId={activeChatId} onNewChat={onNewChat} onSelectChat={onSelectChat} onRenameChat={onRenameChat} onDeleteChat={onDeleteChat}/>
         {storageError && <div className="assistant-feedback callout callout-error" role="alert">{storageError}</div>}
         <div id={`assistant-chat-panel-${activeChatId}`} className="assistant-chat-panel" role="region" aria-label={`Conversation: ${activeChat?.title ?? 'New chat'}`}>
             <ScrollEdgeFrame<HTMLDivElement> className="assistant-transcript-frame">{ref => <div ref={element => { transcriptViewport.current = element; ref(element); }} className={cx('assistant-transcript', !turns.length && 'is-empty')} role="log" aria-label="Chat messages" aria-live="polite" aria-relevant="additions text">

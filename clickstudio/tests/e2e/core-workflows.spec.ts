@@ -1015,21 +1015,28 @@ test('Ask AI keeps chat history when SQL changes and sends prior messages with f
     await page.getByRole('button', { name: 'New chat', exact: true }).click();
     await expect(page.locator('.assistant-empty-chat')).toBeVisible();
     await expect(page.getByText('Answer to Show the old question', { exact: true })).toHaveCount(0);
-    const chatHistory = page.getByRole('combobox', { name: 'Chat history' });
-    await chatHistory.selectOption({ label: 'Show the old question' });
+    const chatHistory = page.getByRole('button', { name: 'Chat history: New chat', exact: true });
+    await chatHistory.click();
+    await page.getByRole('button', { name: 'Show the old question', exact: true }).click();
     await expect(page.getByText('Answer to Show the old question', { exact: true })).toBeVisible();
     await expect(page.getByText('Answer to And now?', { exact: true })).toBeVisible();
-    await page.getByRole('button', { name: 'Rename conversation', exact: true }).click();
-    const conversationName = page.getByRole('textbox', { name: 'Conversation name', exact: true });
+    await page.getByRole('button', { name: 'Chat history: Show the old question', exact: true }).click();
+    await page.getByRole('button', { name: 'Actions for Show the old question', exact: true }).click();
+    await page.getByRole('button', { name: 'Rename', exact: true }).click();
+    const conversationName = page.getByRole('textbox', { name: 'New name for Show the old question', exact: true });
     await conversationName.fill('Flight delay analysis');
-    await page.getByRole('button', { name: 'Save name', exact: true }).click();
-    await expect(chatHistory.locator('option:checked')).toHaveText('Flight delay analysis');
-    await chatHistory.selectOption({ label: 'New chat' });
-    await chatHistory.selectOption({ label: 'Flight delay analysis' });
+    await page.getByRole('button', { name: 'Save conversation name', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Chat history: Flight delay analysis', exact: true })).toBeVisible();
+    const chatHistoryPanel = page.getByRole('region', { name: 'Chat history', exact: true });
+    await chatHistoryPanel.getByRole('button', { name: 'New chat', exact: true }).click();
+    await page.getByRole('button', { name: 'Chat history: New chat', exact: true }).click();
+    await page.getByRole('button', { name: 'Flight delay analysis', exact: true }).click();
     await expect(page.getByText('Answer to Show the old question', { exact: true })).toBeVisible();
     await expect(page.getByRole('region', { name: 'Conversation: Flight delay analysis' })).toBeVisible();
     page.once('dialog', dialog => dialog.accept());
-    await page.getByRole('button', { name: 'Delete current chat', exact: true }).click();
+    await page.getByRole('button', { name: 'Chat history: Flight delay analysis', exact: true }).click();
+    await page.getByRole('button', { name: 'Actions for Flight delay analysis', exact: true }).click();
+    await page.getByRole('button', { name: 'Delete', exact: true }).click();
     await expect(page.locator('.assistant-empty-chat')).toBeVisible();
 });
 
@@ -1075,13 +1082,15 @@ test('Ask AI keeps a custom conversation name after its first message', async ({
     await trust(page);
     await useAdvancedMode(page);
     await page.getByTestId('open-ai').click();
-    await page.getByRole('button', { name: 'Rename conversation', exact: true }).click();
-    await page.getByRole('textbox', { name: 'Conversation name', exact: true }).fill('Flight lookup');
-    await page.getByRole('button', { name: 'Save name', exact: true }).click();
+    await page.getByRole('button', { name: 'Chat history: New chat', exact: true }).click();
+    await page.getByRole('button', { name: 'Actions for New chat', exact: true }).click();
+    await page.getByRole('button', { name: 'Rename', exact: true }).click();
+    await page.getByRole('textbox', { name: 'New name for New chat', exact: true }).fill('Flight lookup');
+    await page.getByRole('button', { name: 'Save conversation name', exact: true }).click();
     await page.getByRole('textbox', { name: 'Ask AI', exact: true }).fill('Find a flight');
     await page.getByRole('button', { name: 'Send', exact: true }).click();
     await expect(page.getByText('Custom title kept', { exact: true })).toBeVisible();
-    await expect(page.getByRole('combobox', { name: 'Chat history' }).locator('option:checked')).toHaveText('Flight lookup');
+    await expect(page.getByRole('button', { name: 'Chat history: Flight lookup', exact: true })).toBeVisible();
 });
 
 test('Scripts show each statement outcome and open that statement’s retained result', async ({ page }) => {
