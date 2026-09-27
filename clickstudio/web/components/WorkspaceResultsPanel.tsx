@@ -145,6 +145,13 @@ export function WorkspaceResultsPanel({
     const failureError = failedAttempt?.error ?? (run?.status === 'failed' ? run.error : undefined);
     const failureSql = failedAttempt?.statementSql ?? (run?.status === 'failed' ? run.sql : undefined);
     const failurePreview = failureError ? failureMessagePreview(failureError.message) : undefined;
+    const resultProvenance = visibleResultsView !== 'sqlmap' && !execution
+        ? failedAttempt && run
+            ? { detail: 'Latest attempt failed', description: 'The latest attempt failed. Showing the previous result.' }
+            : !failedAttempt && staleResult
+                ? { detail: 'SQL or parameters changed', description: 'SQL or bound parameters changed since this run. Rerun to refresh the result.' }
+                : undefined
+        : undefined;
 
     if (!run && !execution && !failedAttempt && visibleResultsView !== 'sqlmap' && !detached) return null;
 
@@ -170,6 +177,17 @@ export function WorkspaceResultsPanel({
                     : panels.resultsCollapsed && execution && visibleResultsView !== 'sqlmap'
                     ? <span className="result-execution-header"><span className="loading-orbit" aria-hidden="true"/>{copy.common.statusRunning}</span>
                     : !failureError && !execution && run && visibleResultsView !== 'sqlmap' && <Status run={run} copy={copy.common}/>}
+                {resultProvenance && <span
+                    className="result-provenance-header"
+                    role="status"
+                    aria-live="polite"
+                    aria-label={resultProvenance.description}
+                    title={resultProvenance.description}
+                >
+                    <span className="status-light is-warning" aria-hidden="true"/>
+                    <strong>Previous result</strong>
+                    <small>{resultProvenance.detail}</small>
+                </span>}
             </div>
             <div className="results-actions">
                 {run && resultTabs.length > 1 && <div className="results-tabs" role="tablist" aria-label={copy.common.workspaceOutput}>{resultTabs.map(tab => <button key={tab} role="tab" aria-selected={visibleResultsView === tab} type="button" onClick={() => actions.onSelectView(tab)}>{resultsTabLabel(tab, copy.common)}{tab === 'chart' && retainedSnapshot && <span className="suggested-dot"/>}</button>)}</div>}
@@ -201,8 +219,6 @@ export function WorkspaceResultsPanel({
                 <pre className="result-execution-sql is-preview">{executionSqlPreview}</pre>
                 {execution.sql.length > 180 && <details className="result-execution-details"><summary>{copy.common.expandQuery}</summary><pre className="result-execution-sql is-full">{execution.sql}</pre></details>}
             </div>}
-            {visibleResultsView !== 'sqlmap' && !execution && failedAttempt && run && <div className="result-provenance" aria-live="polite"><span className="status-light is-warning"/><span><strong>Previous result</strong><small>Latest attempt failed</small></span></div>}
-            {visibleResultsView !== 'sqlmap' && !execution && !failedAttempt && staleResult && <div className="result-provenance" aria-live="polite"><span className="status-light is-warning"/><span><strong>Result from previous execution</strong><small>SQL or bound parameters changed since this run. Rerun to refresh the result.</small></span></div>}
             {visibleResultsView === 'results' && script && <ScriptResults script={script} runs={history} activeRunId={run?.id} onSelectRun={actions.onSelectScriptRun} onCancel={actions.onCancel} cancelDisabled={cancelling} cancelAfterCurrentStatement={connection.id === CLICKHOUSE_CLOUD_CONNECTION_ID}/>}
             {resultsRun && visibleResultsView === 'results' && (!execution || showPreviousResult) && <ResultGrid key={resultsRun.id} run={resultsRun} page={resultsPage} pageIndex={resultsPageIndex} loading={!resultsPage && resultsRun.resultState === 'reopenable'} onPage={actions.onPage} showPagination={!showPreviousResult} previousRun={showPreviousResult || staleResult || Boolean(failedAttempt && run)} obscured={showPreviousResult}/>}
             {run && visibleResultsView === 'indexes' && <ExplainIndexesView analysis={explainIndexAnalysis} loading={!retainedSnapshot && run.resultState === 'reopenable'} copy={copy.common}/>}
