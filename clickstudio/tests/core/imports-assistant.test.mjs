@@ -193,7 +193,31 @@ test('SQL-focused context allows a starter dataset when its source is absent', (
     assert.doesNotMatch(rules, /read-only/i);
     assert.doesNotMatch(built.payload.instructions, /SELECT\/WITH only/i);
     assert.match(built.payload.instructions, /fixed list of SQL statement types/i);
-    assert.match(built.payload.instructions, /label the rows as examples/i);
+    assert.match(built.payload.instructions, /If a requested source table is absent.*do not query or claim data from the missing source/i);
+    assert.match(built.payload.instructions, /label them as examples/i);
+});
+test('SQL context preserves all columns and rows when copying a known source table', () => {
+    const f = aiFixture();
+    const copySchema = {
+        ...schema,
+        tables: [{ database: 'default', name: 'geography', engine: 'MergeTree' }],
+        columns: [
+            { database: 'default', table: 'geography', name: 'country', type: 'String' },
+            { database: 'default', table: 'geography', name: 'place', type: 'String' },
+            { database: 'default', table: 'geography', name: 'latitude', type: 'Float64' },
+            { database: 'default', table: 'geography', name: 'longitude', type: 'Float64' },
+        ],
+    };
+    const built = buildContext({
+        ...f.input,
+        action: 'ask',
+        question: 'Create geography_copy from geography with all rows and columns.',
+        schema: copySchema,
+    });
+    const context = JSON.parse(built.payload.context);
+    assert.match(built.payload.instructions, /CREATE TABLE target AS SELECT \* FROM source statement/i);
+    assert.match(built.payload.instructions, /do not answer with a standalone SELECT, choose a subset/i);
+    assert.deepEqual(context.schema.map(column => column.name), ['country', 'place', 'latitude', 'longitude']);
 });
 test('Write SQL proposals can be applied to the draft without running them', async () => {
     for (const sql of [
