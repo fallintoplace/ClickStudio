@@ -173,6 +173,7 @@ export interface Run {
     finishedAt?: string;
     elapsedMs: number;
     rowCount: number;
+    writtenRows?: number;
     bytes: number;
     columns: Column[];
     progress?: Progress;

@@ -90,6 +90,7 @@ export function isRun(value: unknown): value is Run {
         && isOptionalString(value.finishedAt)
         && isFiniteNumber(value.elapsedMs)
         && isFiniteNumber(value.rowCount)
+        && (value.writtenRows === undefined || (isSafeInteger(value.writtenRows) && value.writtenRows >= 0))
         && isFiniteNumber(value.bytes)
         && Array.isArray(value.columns)
         && value.columns.every(isColumn)

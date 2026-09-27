@@ -6,7 +6,7 @@ export const CLICKHOUSE_CLOUD_CONNECTION_ID = 'clickhouse-cloud';
 
 export type CloudCredentials = { host: string; database: string; username: string; password: string };
 export type SavedCloudConnectionProfile = Pick<CloudCredentials, 'host' | 'database' | 'username'>;
-export type CloudQueryResult = { queryId: string; columns: Column[]; rows: Row[]; elapsedMs: number; bytes: number; truncated: boolean };
+export type CloudQueryResult = { queryId: string; columns: Column[]; rows: Row[]; elapsedMs: number; bytes: number; truncated: boolean; writtenRows?: number };
 type CloudConnectionState = { credentials: CloudCredentials; connection: Connection & { trusted: boolean } };
 
 const CLOUD_PROFILE_STORAGE_KEY = 'clickstudio:cloud-connection-profile:v1';

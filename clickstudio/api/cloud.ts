@@ -183,6 +183,12 @@ function isReadQuery(sql: string) {
     return ['SELECT', 'WITH', 'SHOW', 'DESCRIBE', 'DESC', 'EXPLAIN'].includes(first ?? '');
 }
 
+function safeRowCount(value: unknown): number | undefined {
+    if (typeof value !== 'string' || !/^\d+$/.test(value)) return undefined;
+    const count = Number(value);
+    return Number.isSafeInteger(count) ? count : undefined;
+}
+
 async function runSql(credentials: CloudCredentials, url: string, sql: string, sessionId?: string) {
     const statement = sql.trim();
     if (!statement || statement.length > MAX_SQL_LENGTH)
@@ -201,7 +207,16 @@ async function runSql(credentials: CloudCredentials, url: string, sql: string, s
                 abort_signal: AbortSignal.timeout(48_000),
                 clickhouse_settings: clickhouseSettings,
             });
-            return { queryId: result.query_id || queryId, columns: [] as Column[], rows: [] as Row[], elapsedMs: performance.now() - startedAt, bytes: 0, truncated: false };
+            const writtenRows = safeRowCount(result.summary?.written_rows);
+            return {
+                queryId: result.query_id || queryId,
+                columns: [] as Column[],
+                rows: [] as Row[],
+                elapsedMs: performance.now() - startedAt,
+                bytes: 0,
+                truncated: false,
+                ...(writtenRows === undefined ? {} : { writtenRows }),
+            };
         }
 
         const result = await client.query({
