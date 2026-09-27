@@ -59,7 +59,7 @@
     .object-back-button span { color: var(--explorer-signal); font-size: 20px; line-height: 1; }
     .object-back-button:hover, .object-back-button:focus-visible { color: var(--text); outline: none; }
     .object-explorer-section.is-detail-mode { padding-top: 4px; }
-    .object-explorer-section.is-detail-mode .object-details { max-height: none; flex: 1; padding: 8px 2px 12px; border-top: 0; }
+    .object-explorer-section.is-detail-mode .object-details { align-content: start; max-height: none; flex: 1; padding: 8px 2px 12px; border-top: 0; }
     .is-object-drawer .inspector-header { min-height: 52px; padding: 8px 12px; }
     .is-object-drawer .inspector-header .eyebrow { display: none; }
     .is-object-drawer .inspector-content { overflow: hidden; }
