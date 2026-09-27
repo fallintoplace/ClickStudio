@@ -29,7 +29,7 @@ async function beginInCompactMode(page: Page) {
     await trustCurrentConnection(page);
 }
 
-test('Compact opens on SQL and can run a query without opening AI', async ({ page }) => {
+test('Standard opens on SQL and can run a query without opening AI', async ({ page }) => {
     let contextRequests = 0;
     page.on('request', request => {
         if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/assistant/context') contextRequests++;
@@ -68,7 +68,7 @@ test('Compact opens on SQL and can run a query without opening AI', async ({ pag
     await expect(page.locator('.parser-switch')).toBeVisible();
     await expect(results.locator('.results-tabs')).toBeVisible();
     await expect(page.getByRole('tablist', { name: 'SQL documents', exact: true }).getByRole('tab')).toHaveCount(1);
-    await page.getByText('Compact', { exact: true }).click();
+    await page.getByText('Standard', { exact: true }).click();
     await expect(page.locator('.execution-bar code')).toHaveText(queryId);
     await expect(results.getByRole('table', { name: 'Retained query rows', exact: true })).toBeVisible();
     await expect(results.locator('.results-tabs')).toHaveCount(0);
@@ -76,7 +76,7 @@ test('Compact opens on SQL and can run a query without opening AI', async ({ pag
     await expect(page.locator('.parser-switch')).toHaveCount(0);
 });
 
-test('Compact shows a single document tab and keeps tabs for multiple queries', async ({ page }) => {
+test('Standard shows a single document tab and keeps tabs for multiple queries', async ({ page }) => {
     await beginInCompactMode(page);
     await expect(page.locator('.document-tabs.is-compact-single')).toBeVisible();
     await openBlankSql(page);
@@ -93,7 +93,7 @@ test('Compact shows a single document tab and keeps tabs for multiple queries', 
     await expect(page.locator('.restore-sql-trigger')).toHaveCount(0);
 });
 
-test('Switching to Advanced keeps the same AI question, query and run evidence', async ({ page }) => {
+test('Switching to Experimental keeps the same AI question, query and run evidence', async ({ page }) => {
     const generations: Record<string, unknown>[] = [];
     const runRequests: Record<string, unknown>[] = [];
     let proposalBaseSql = '';
@@ -157,7 +157,7 @@ test('Switching to Advanced keeps the same AI question, query and run evidence',
 
     await expect(page.locator('.cm-content')).toContainText(generatedSql);
     await expect(page.locator('.execution-bar code')).toHaveText(queryId);
-    await page.getByText('Compact', { exact: true }).click();
+    await page.getByText('Standard', { exact: true }).click();
     await expect(page.getByTestId('open-ai')).toHaveCount(0);
     await expect(results.locator('.results-tabs')).toHaveCount(0);
     await expect(results.getByRole('table', { name: 'Retained query rows', exact: true })).toBeVisible();
@@ -167,7 +167,7 @@ test('Switching to Advanced keeps the same AI question, query and run evidence',
     await expect(results.getByRole('tab', { name: 'Insights', exact: true })).toHaveAttribute('aria-selected', 'true');
 });
 
-test('Advanced editor, insights, pipeline and AI copilot stay read-only until a user runs SQL', async ({ page }) => {
+test('Experimental editor, insights, pipeline and AI copilot stay read-only until a user runs SQL', async ({ page }) => {
     const runRequests: unknown[] = [];
     const assistantRequests: Record<string, unknown>[] = [];
     page.on('request', request => {

@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { trust } from './helpers.js';
 
-test('Advanced mode gives the editor the full work area before the first run', async ({ page }) => {
+test('Experimental mode gives the editor the full work area before the first run', async ({ page }) => {
     await trust(page);
 
     const content = page.locator('.workspace-content');
@@ -192,7 +192,7 @@ test('EXPLAIN PIPELINE opens an interactive ClickHouse operator graph', async ({
     await expect(controls.getByLabel('Zoom level')).toHaveText(zoomBeforeEditorFocus);
 });
 
-test('Advanced panels stay reachable through Ask AI and More', async ({ page }) => {
+test('Experimental panels stay reachable through Ask AI and More', async ({ page }) => {
     await trust(page);
     await page.getByRole('button', { name: 'More workspace panels', exact: true }).click();
     await page.getByRole('menuitem', { name: 'Runs', exact: true }).click();

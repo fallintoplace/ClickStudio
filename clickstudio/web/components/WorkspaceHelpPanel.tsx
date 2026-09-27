@@ -283,7 +283,7 @@ export function WorkspaceHelpPanel({ examples, sourceLabel, copy, locale, open, 
                                         <span className="workspace-help-guide-index">04</span>
                                         <span className="eyebrow">REVIEW</span>
                                         <h4>{copy.results} and execution status</h4>
-                                        <p>Inspect each script statement and its run in Results, then switch to {copy.chart}, SQL map, or {copy.insights} in Advanced mode. Cancel a running query from the execution bar.</p>
+                                        <p>Inspect each script statement and its run in Results, then switch to {copy.chart}, SQL map, or {copy.insights} in Experimental mode. Cancel a running query from the execution bar.</p>
                                     </article>
                                 </div>
                             </div>

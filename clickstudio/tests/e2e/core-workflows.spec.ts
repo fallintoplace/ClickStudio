@@ -90,9 +90,9 @@ test('Run evidence stays with its draft through tab and mode switches', async ({
     await page.getByRole('tab').filter({ hasText: 'Getting started.sql' }).click();
     await expect(results.getByRole('table', { name: 'Retained query rows' })).toBeVisible();
     await expect(page.locator('.execution-bar code')).toHaveText(firstQueryId);
-    await page.getByText('Compact', { exact: true }).click();
+    await page.getByText('Standard', { exact: true }).click();
     await expect(page.locator('.execution-bar code')).toHaveText(firstQueryId);
-    await page.getByText('Advanced', { exact: true }).click();
+    await page.getByText('Experimental', { exact: true }).click();
     await expect(page.locator('.execution-bar code')).toHaveText(firstQueryId);
     await expect(page.getByRole('group', { name: 'Workspace layouts' })).toHaveCount(0);
     await expect(page.getByRole('navigation', { name: 'Workspace browser' })).toBeVisible();
@@ -403,7 +403,7 @@ test('Query and result panels collapse to their headings', async ({ page }) => {
     await page.setViewportSize({ width: 1905, height: 1280 });
     await trust(page);
     const results = await runQuery(page);
-    await page.getByText('Compact', { exact: true }).click();
+    await page.getByText('Standard', { exact: true }).click();
     const queryPanel = page.locator('.editor-surface');
     const resultsPanel = results;
 
@@ -526,7 +526,7 @@ test('Native parser can be retried after a temporary worker failure', async ({ p
     await expect.poll(() => page.evaluate(() => Number(window.__parserParseCount ?? 0))).toBeGreaterThan(0);
 });
 
-test('Advanced parser inspector shows native AST, UTF-8 semantic highlights, and expected tokens', async ({ page }) => {
+test('Experimental parser inspector shows native AST, UTF-8 semantic highlights, and expected tokens', async ({ page }) => {
     const sql = "SELECT '🙂', uniqExact(user_id) FROM events";
     const functionPrefix = "SELECT '🙂', ";
     const parserResponse = {

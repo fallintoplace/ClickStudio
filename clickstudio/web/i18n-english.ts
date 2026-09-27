@@ -11,8 +11,8 @@ export const english: Copy = {
         clickhouseYellowAccent: 'ClickHouse yellow accent',
         darkTheme: 'Dark theme',
         lightTheme: 'Light theme',
-        beginner: 'Compact',
-        expert: 'Advanced',
+        beginner: 'Standard',
+        expert: 'Experimental',
     },
     auth: {
         privateWorkspace: 'Private workspace',

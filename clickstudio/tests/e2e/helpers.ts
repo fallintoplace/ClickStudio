@@ -34,7 +34,7 @@ export async function trust(page: Page) {
 }
 
 export async function useAdvancedMode(page: Page) {
-    await page.getByText('Advanced', { exact: true }).click();
+    await page.getByText('Experimental', { exact: true }).click();
     await expect(page.locator('.workspace-root')).toHaveClass(/is-expert/);
 }
 
