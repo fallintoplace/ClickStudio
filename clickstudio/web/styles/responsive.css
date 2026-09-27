@@ -110,6 +110,17 @@
     .results-tabs button { padding: 7px 6px; font-size: 8px; }
     .is-drawer { top: 60px; }
     .drawer-backdrop { top: 60px; }
+    .workspace-root.has-assistant-dock .workspace-layout { grid-template-columns: 44px minmax(0, 1fr) minmax(275px, min(38vw, 360px)); }
+    .workspace-root.has-assistant-dock .workspace-layout > .icon-rail { grid-column: 1; grid-row: 1; }
+    .workspace-root.has-assistant-dock .workspace-layout > .workspace-main { grid-column: 2; grid-row: 1; }
+    .workspace-root.has-assistant-dock .workspace-layout > .inspector-pane.is-docked-assistant { display: flex; grid-column: 3; grid-row: 1; }
+}
+
+@media (max-width: 720px) {
+    .workspace-root.has-assistant-dock .workspace-layout { grid-template-columns: 44px minmax(0, 1fr); grid-template-rows: minmax(520px, 1fr) minmax(300px, 40vh); }
+    .workspace-root.has-assistant-dock .workspace-layout > .icon-rail { grid-column: 1; grid-row: 1 / span 2; }
+    .workspace-root.has-assistant-dock .workspace-layout > .workspace-main { grid-column: 2; grid-row: 1; }
+    .workspace-root.has-assistant-dock .workspace-layout > .inspector-pane.is-docked-assistant { grid-column: 2; grid-row: 2; min-height: 300px; border-top: 1px solid var(--line-bright); border-left: 0; }
 }
 
 @media (max-width: 560px) {

@@ -84,6 +84,7 @@ export type InspectorPaneProps = {
     runDisabled: (sql: string) => boolean;
     expert?: boolean;
     drawer?: boolean;
+    docked?: boolean;
     onClose?: () => void;
 };
 
@@ -98,14 +99,14 @@ const inspectorTabs = [
     { id: 'assistant', icon: 'assistant' },
 ] as const satisfies readonly { id: Inspector; icon: IconName }[];
 
-export function InspectorPane({ comparisonProfiles, comparisonPipelines, copy, inspector, setInspector, connection, schema, schemaLoading, schemaError, search, setSearch, history, documents, revisions, revisionsDocumentId, revisionLoading, revisionError, currentRevision, unsavedDraft, canRestoreRevision, run, profile, pipeline, onRefreshSchema, onRefreshHistory, onInsert, onOpenSqlDraft, onOpenImport, onExportResult, exportDisabled, onOpenRun, onOpenDocument, onLoadProfile, onLoadPipeline, onOpenGraph, connectionId, sql, trusted, runId, onRefreshDocuments, onRefreshRevisions, onRestoreRevision, assistantQuestion, onAssistantQuestion, assistantChats, activeAssistantChatId, assistantTurns, assistantChatStorageError, onNewAssistantChat, onSelectAssistantChat, onRenameAssistantChat, onDeleteAssistantChat, assistantProposal, assistantBusy, assistantCancelable, assistantPhase, assistantError, assistantNotice, nativeParserEnabled, nativeParserStatus, nativeParseSnapshot, onRetryParser, includeRun, onIncludeRun, onAskAI, onCancelAssistantRequest, onDecideProposal, onRunQuery, runDisabled, expert = false, drawer = false, onClose }: InspectorPaneProps) {
+export function InspectorPane({ comparisonProfiles, comparisonPipelines, copy, inspector, setInspector, connection, schema, schemaLoading, schemaError, search, setSearch, history, documents, revisions, revisionsDocumentId, revisionLoading, revisionError, currentRevision, unsavedDraft, canRestoreRevision, run, profile, pipeline, onRefreshSchema, onRefreshHistory, onInsert, onOpenSqlDraft, onOpenImport, onExportResult, exportDisabled, onOpenRun, onOpenDocument, onLoadProfile, onLoadPipeline, onOpenGraph, connectionId, sql, trusted, runId, onRefreshDocuments, onRefreshRevisions, onRestoreRevision, assistantQuestion, onAssistantQuestion, assistantChats, activeAssistantChatId, assistantTurns, assistantChatStorageError, onNewAssistantChat, onSelectAssistantChat, onRenameAssistantChat, onDeleteAssistantChat, assistantProposal, assistantBusy, assistantCancelable, assistantPhase, assistantError, assistantNotice, nativeParserEnabled, nativeParserStatus, nativeParseSnapshot, onRetryParser, includeRun, onIncludeRun, onAskAI, onCancelAssistantRequest, onDecideProposal, onRunQuery, runDisabled, expert = false, drawer = false, docked = false, onClose }: InspectorPaneProps) {
     const visibleDocuments = documents.filter(document => document.connectionId === connectionId && !document.deletedAt);
     const [selectedRevisionNumber, setSelectedRevisionNumber] = useState<number>();
     const [referenceTarget, setReferenceTarget] = useState<{ name: string; type: string }>();
     const firstRevisionNumber = revisions[0]?.revision;
     useEffect(() => { setSelectedRevisionNumber(currentRevision ?? firstRevisionNumber); }, [revisionsDocumentId, currentRevision, firstRevisionNumber]);
     const selectedRevision = revisions.find(revision => revision.revision === selectedRevisionNumber) ?? revisions[0];
-    const closeButton = drawer && <Button variant="ghost" className="icon-only" aria-label="Close inspector" onClick={onClose}><Icon name="close"/></Button>;
+    const closeButton = (drawer || docked) && <Button variant="ghost" className="icon-only" aria-label="Close inspector" onClick={onClose}><Icon name="close"/></Button>;
     const title = inspector === 'schema' ? copy.objects : inspector === 'reference' ? copy.reference : inspector === 'documents' ? copy.queries : inspectorLabel(inspector);
 
     const objectDrawer = drawer && inspector === 'schema';
@@ -113,7 +114,7 @@ export function InspectorPane({ comparisonProfiles, comparisonPipelines, copy, i
     const openReference = (name: string, type: string) => { setReferenceTarget({ name, type }); setInspector('reference'); };
     const clearReferenceTarget = useCallback(() => setReferenceTarget(undefined), []);
 
-    return <aside className={cx('inspector-pane', expert && 'is-expert-browser', expert && (inspector === 'schema' || inspector === 'reference' || inspector === 'documents') && 'is-browser-tab-selected', drawer && 'is-drawer animate-drawer', objectDrawer && 'is-object-drawer')}>
+    return <aside className={cx('inspector-pane', expert && 'is-expert-browser', expert && (inspector === 'schema' || inspector === 'reference' || inspector === 'documents') && 'is-browser-tab-selected', drawer && 'is-drawer animate-drawer', docked && 'is-docked-assistant', objectDrawer && 'is-object-drawer')}>
         <header className="inspector-header"><div><span className="eyebrow">{expert ? copy.browse : copy.workspaceInspector}</span><h2>{title}</h2></div>{closeButton}</header>
         {expert ? <nav className="inspector-tabs is-browser-tabs" aria-label={copy.workspaceBrowser}>
             <button type="button" aria-label={copy.objects} aria-pressed={inspector === 'schema'} onClick={() => setInspector('schema')}><Icon name="schema"/><span>{copy.objects}</span></button>

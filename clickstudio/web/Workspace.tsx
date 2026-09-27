@@ -601,6 +601,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         if (next === 'profile') void perform(loadProfile, 'save');
         if (next === 'pipeline') void perform(loadPipeline, 'save');
     };
+    const assistantDocked = drawerOpen && inspector === 'assistant' && (experience === 'beginner' || compactViewport);
 
     const trustConnection = () => perform(async () => {
         if (!trusted && !demoMode && !window.confirm(`Check these connection details before continuing:\n\nConnection: ${connectionLabel}\nServer: ${connection.host}\nDatabase: ${connection.database}\nUser: ${connection.username}\nAccess: read-only\n\nAllow read-only access so you can run queries?`)) return;
@@ -826,7 +827,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
             {storageError && <div className="toast toast-error" role="alert">Local draft storage could not save changes: {storageError}</div>}
         </div></OverlayPortal>
 
-        <div className="workspace-layout">
+        <div className={cx('workspace-layout', assistantDocked && 'has-assistant-dock')}>
             <aside className="icon-rail" aria-label="Workspace tools">
                 <span className="rail-separator"/>
                 <RailButton icon="schema" label={copy.common.objects} active={inspector === 'schema' && drawerOpen} onClick={() => showInspector('schema')}/>
@@ -848,7 +849,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
                 {experience === 'expert' && <><span className="rail-separator"/><button className="rail-icon-button rail-icon-muted" type="button" title="Export local drafts" onClick={() => download('clickstudio-local-drafts.json', workspace)}><Icon name="settings"/></button></>}
             </aside>
 
-            {experience === 'expert' && <InspectorPane {...inspectorProps}/>}
+            {experience === 'expert' && !assistantDocked && <InspectorPane {...inspectorProps}/>}
 
             <main className="workspace-main">
                 <WorkspaceDocumentTabs
@@ -986,7 +987,8 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
                 </div>
             </main>
 
-            {drawerOpen && (experience === 'beginner' || compactViewport) && <OverlayPortal><><button className="drawer-backdrop" type="button" aria-label="Close panel" onClick={() => setDrawerOpen(false)}/><InspectorPane {...inspectorProps} drawer onClose={() => setDrawerOpen(false)} onInsert={value => { editor.current?.insert(value); setDrawerOpen(false); }} onOpenDocument={document => { openDocument(document); setDrawerOpen(false); }}/></></OverlayPortal>}
+            {assistantDocked && <InspectorPane {...inspectorProps} docked onClose={() => { setDrawerOpen(false); setInspector('schema'); }}/>}
+            {drawerOpen && (experience === 'beginner' || compactViewport) && !assistantDocked && <OverlayPortal><><button className="drawer-backdrop" type="button" aria-label="Close panel" onClick={() => setDrawerOpen(false)}/><InspectorPane {...inspectorProps} drawer onClose={() => setDrawerOpen(false)} onInsert={value => { editor.current?.insert(value); setDrawerOpen(false); }} onOpenDocument={document => { openDocument(document); setDrawerOpen(false); }}/></></OverlayPortal>}
         </div>
         {observabilityOpen && <OverlayPortal><ObservabilityExplorer connectionId={connection.id} connectionLabel={connectionLabel} trusted={trusted} queryLog={connection.manifest?.queryLog} replication={connection.manifest?.replication} onClose={() => setObservabilityOpen(false)}/></OverlayPortal>}
         <ImportWizard open={importOpen} connectionId={connection.id} trusted={trusted} demoMode={demoMode} onClose={() => setImportOpen(false)} onImported={() => {
