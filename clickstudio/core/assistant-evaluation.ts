@@ -1,4 +1,3 @@
-import { guardSql } from './guards.js';
 import type { AssistantAction, AssistantEvaluationReport, Proposal, ProposalContent, ProposalQuality, ProposalQualityCheck, Schema } from '../shared/types.js';
 import { lexSql } from '../shared/sql.js';
 
@@ -61,18 +60,12 @@ export function evaluateProposal(content: ProposalContent, action: AssistantActi
         checks.push({ id: 'contract', status: 'pass', message: inspectOnly ? 'Inspect-only playbook returned no replacement SQL.' : flexible && content.sql === null ? 'The request was answered without replacement SQL.' : 'The playbook returned an applicable SQL proposal.' });
 
     if (content.sql === null) {
-        checks.push({ id: 'safety', status: 'pass', message: 'No SQL was returned, so there is no executable proposal to gate.' });
+        checks.push({ id: 'safety', status: 'pass', message: 'No SQL was returned, so there is no draft to review or run.' });
         checks.push({ id: 'grounding', status: 'pass', message: 'No table references were introduced.' });
         checks.push({ id: 'semantic', status: content.clarification || flexible ? 'pass' : 'warn', message: content.clarification ? 'The response asks for clarification instead of guessing.' : flexible ? 'The request was answered without returning SQL.' : 'No SQL was returned and no clarification was recorded.' });
     }
     else {
-        try {
-            guardSql(content.sql);
-            checks.push({ id: 'safety', status: 'pass', message: 'One bounded read-only statement passed the SQL safety gate.' });
-        }
-        catch (error) {
-            checks.push({ id: 'safety', status: 'fail', message: error instanceof Error ? error.message : 'The proposed SQL failed the safety gate.' });
-        }
+        checks.push({ id: 'safety', status: 'pass', message: 'The SQL stays in the draft until the user reviews and runs it.' });
         const references = referencedTables(content.sql), known = knownTableSet(context), unknown = references.filter(table => !known.has(table));
         if (!references.length)
             checks.push({ id: 'grounding', status: 'pass', message: 'The proposal does not introduce a table reference that needs schema grounding.' });

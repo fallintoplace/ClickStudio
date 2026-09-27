@@ -3,7 +3,6 @@ import type { Json, Proposal, Result, Schema, SchemaColumn, SchemaTable } from '
 import { buildContext, PROMPT_VERSION, validateAssistantConversation, validateProposal, type PreparedContext } from '../../core/assistant.js';
 import { evaluateProposal } from '../../core/assistant-evaluation.js';
 import { AppError } from '../../core/errors.js';
-import { guardSql } from '../../core/guards.js';
 import { OpenAIDriver } from '../../server/openai.js';
 
 const MAX_BODY_BYTES = 300_000;
@@ -157,7 +156,6 @@ async function post(request: Request): Promise<Response> {
         const response = await driver.propose(context, signal);
         signal.throwIfAborted();
         const content = validateProposal(response.content);
-        if (content.sql !== null) guardSql(content.sql);
         const proposal: Proposal = {
             ...content,
             id: randomUUID(), owner: 'vercel-session', connectionId, action: 'ask', createdAt: new Date().toISOString(),

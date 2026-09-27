@@ -186,7 +186,28 @@ test('Sending twice returns the same proposal and makes one model request', asyn
 test('Review lane cannot return applicable SQL even if model proposes it', async () => { const f = aiFixture(), c = f.ai.prepare(owner, { ...f.input, action: 'review' }), p = await f.ai.propose(owner, c.id, true); assert.equal(p.sql, null); assert.throws(() => f.ai.decide(owner, p.id, 'accepted', 'local', 'SELECT 2'), { code: 'REVIEW_ONLY' }); });
 test('Proposal cannot be applied to changed SQL or another connection', async () => { const f = aiFixture(), c = f.ai.prepare(owner, f.input), p = await f.ai.propose(owner, c.id, true); assert.throws(() => f.ai.decide(owner, p.id, 'accepted', 'second', 'SELECT 2'), { code: 'CONNECTION_MISMATCH' }); assert.throws(() => f.ai.decide(owner, p.id, 'accepted', 'local', 'SELECT 3'), { code: 'DRAFT_CHANGED' }); });
 test('Accepting proposal records a decision, never creates a run', async () => { const f = aiFixture(), c = f.ai.prepare(owner, f.input), p = await f.ai.propose(owner, c.id, true); f.ai.decide(owner, p.id, 'accepted', 'local', 'SELECT 2'); assert.equal(f.store.list('runs').length, 0); });
-test('Unsafe generated SQL fails the quality gate and cannot be accepted', async () => { const f = aiFixture({ ...proposal, sql: 'DROP TABLE default.events' }), c = f.ai.prepare(owner, f.input), p = await f.ai.propose(owner, c.id, true); assert.equal(p.quality.status, 'fail'); assert.throws(() => f.ai.decide(owner, p.id, 'accepted', 'local', 'SELECT 2'), { code: 'AI_PROPOSAL_UNSAFE' }); });
+test('SQL-focused context allows a starter dataset when its source is absent', () => {
+    const f = aiFixture();
+    const built = buildContext({ ...f.input, action: 'ask', question: 'Create a geography table with sample city rows.' });
+    const rules = JSON.parse(built.payload.context).workspaceRules;
+    assert.doesNotMatch(rules, /read-only/i);
+    assert.doesNotMatch(built.payload.instructions, /SELECT\/WITH only/i);
+    assert.match(built.payload.instructions, /fixed list of SQL statement types/i);
+    assert.match(built.payload.instructions, /label the rows as examples/i);
+});
+test('Write SQL proposals can be applied to the draft without running them', async () => {
+    for (const sql of [
+        'CREATE TABLE default.geography_copy (city String) ENGINE = MergeTree ORDER BY city',
+        "INSERT INTO default.geography_copy VALUES ('Warsaw')",
+    ]) {
+        const f = aiFixture({ ...proposal, sql });
+        const c = f.ai.prepare(owner, f.input);
+        const p = await f.ai.propose(owner, c.id, true);
+        assert.equal(p.quality.status, 'pass');
+        f.ai.decide(owner, p.id, 'accepted', 'local', 'SELECT 2');
+        assert.equal(f.store.list('runs').length, 0);
+    }
+});
 test('AssistantService grounds generated SQL against the prepared schema', async () => { const f = aiFixture({ ...proposal, sql: 'SELECT * FROM default.events' }), c = f.ai.prepare(owner, f.input), p = await f.ai.propose(owner, c.id, true); assert.equal(p.quality.checks.find(check => check.id === 'grounding').status, 'pass'); });
 test('Evaluation report counts accepted and rejected proposals without exposing SQL', async () => { const f = aiFixture(), first = f.ai.prepare(owner, f.input), firstProposal = await f.ai.propose(owner, first.id, true); f.ai.decide(owner, firstProposal.id, 'accepted', 'local', 'SELECT 2'); const second = f.ai.prepare(owner, f.input), secondProposal = await f.ai.propose(owner, second.id, true); f.ai.decide(owner, secondProposal.id, 'rejected', 'local', 'SELECT 2'); const report = f.ai.evaluation(owner); assert.equal(report.total, 2); assert.equal(report.accepted, 1); assert.equal(report.rejected, 1); assert.equal(report.acceptanceRate, 50); assert.equal(report.latest[0].score, 100); assert.equal(Object.hasOwn(report.latest[0], 'sql'), false); });
 test('Static semantic checks warn on schema references that need execution evidence', () => { const quality = evaluateProposal({ ...proposal, sql: 'SELECT * FROM missing_table' }, 'generate', { schema: { truncated: false, tables: [{ database: 'default', name: 'events' }] } }); assert.equal(quality.status, 'warn'); assert.equal(quality.checks.find(check => check.id === 'grounding').status, 'warn'); });
