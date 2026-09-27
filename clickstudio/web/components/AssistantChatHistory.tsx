@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { AssistantChat } from '../assistant-chat-state';
+import { OverlayPortal } from './OverlayPortal';
 import { Button, Icon } from './ui';
 
 export type AssistantChatHistoryProps = {
@@ -16,9 +17,12 @@ export function AssistantChatHistory({ chats, activeChatId, onNewChat, onSelectC
     const historyTriggerRef = useRef<HTMLButtonElement>(null);
     const selectButtonsRef = useRef(new Map<string, HTMLButtonElement>());
     const actionButtonsRef = useRef(new Map<string, HTMLButtonElement>());
+    const deleteButtonsRef = useRef(new Map<string, HTMLButtonElement>());
+    const deleteDialogRef = useRef<HTMLElement>(null);
     const [historyOpen, setHistoryOpen] = useState(false);
     const [actionsChatId, setActionsChatId] = useState<string | null>(null);
     const [renamingChatId, setRenamingChatId] = useState<string | null>(null);
+    const [pendingDeleteChat, setPendingDeleteChat] = useState<AssistantChat | null>(null);
     const [renameValue, setRenameValue] = useState('');
     const [search, setSearch] = useState('');
     const activeChat = chats.find(chat => chat.id === activeChatId);
@@ -28,7 +32,7 @@ export function AssistantChatHistory({ chats, activeChatId, onNewChat, onSelectC
     useEffect(() => {
         if (!historyOpen) return;
         const closeOnOutsidePointer = (event: PointerEvent) => {
-            if (event.target instanceof Node && !historyRef.current?.contains(event.target)) {
+            if (!pendingDeleteChat && event.target instanceof Node && !historyRef.current?.contains(event.target)) {
                 setHistoryOpen(false);
                 setActionsChatId(null);
                 setRenamingChatId(null);
@@ -36,7 +40,7 @@ export function AssistantChatHistory({ chats, activeChatId, onNewChat, onSelectC
         };
         document.addEventListener('pointerdown', closeOnOutsidePointer);
         return () => document.removeEventListener('pointerdown', closeOnOutsidePointer);
-    }, [historyOpen]);
+    }, [historyOpen, pendingDeleteChat]);
 
     const focusHistoryTrigger = () => window.requestAnimationFrame(() => historyTriggerRef.current?.focus());
     const closeHistory = () => {
@@ -85,16 +89,53 @@ export function AssistantChatHistory({ chats, activeChatId, onNewChat, onSelectC
         setRenameValue('');
         window.requestAnimationFrame(() => selectButtonsRef.current.get(chatId)?.focus());
     };
-    const deleteChat = (chatId: string, title: string) => {
-        if (window.confirm(`Delete “${title}” and its conversation?`)) onDeleteChat(chatId);
+    const requestDeleteChat = (chatId: string) => {
+        const chat = chats.find(item => item.id === chatId);
+        if (chat) setPendingDeleteChat(chat);
+    };
+    const cancelDeleteChat = () => {
+        const chatId = pendingDeleteChat?.id;
+        setPendingDeleteChat(null);
+        window.requestAnimationFrame(() => {
+            const deleteButton = chatId ? deleteButtonsRef.current.get(chatId) : undefined;
+            if (deleteButton?.isConnected) deleteButton.focus();
+            else historyTriggerRef.current?.focus();
+        });
+    };
+    const confirmDeleteChat = () => {
+        if (!pendingDeleteChat) return;
+        onDeleteChat(pendingDeleteChat.id);
         setActionsChatId(null);
+        setPendingDeleteChat(null);
         focusHistoryTrigger();
+    };
+    const handleDeleteDialogKeyDown = (event: ReactKeyboardEvent<HTMLElement>) => {
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            event.stopPropagation();
+            cancelDeleteChat();
+            return;
+        }
+        if (event.key !== 'Tab') return;
+        const controls = [...(deleteDialogRef.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? [])];
+        const first = controls[0], last = controls.at(-1), active = document.activeElement;
+        if (event.shiftKey && active === first) {
+            event.preventDefault();
+            last?.focus();
+        } else if (!event.shiftKey && active === last) {
+            event.preventDefault();
+            first?.focus();
+        } else if (!controls.some(control => control === active)) {
+            event.preventDefault();
+            (event.shiftKey ? last : first)?.focus();
+        }
     };
 
     return <div
         className="assistant-chat-toolbar"
-        onKeyDown={handleKeyDown}
+        onKeyDown={event => { if (!pendingDeleteChat) handleKeyDown(event); }}
         onBlur={event => {
+            if (pendingDeleteChat) return;
             const nextFocus = event.relatedTarget;
             if (!(nextFocus instanceof Node) || !historyRef.current?.contains(nextFocus)) closeHistory();
         }}
@@ -150,7 +191,7 @@ export function AssistantChatHistory({ chats, activeChatId, onNewChat, onSelectC
                             </div>}
                         <div id={`assistant-chat-actions-${chat.id}`} className="assistant-chat-row-actions" role="group" aria-label={`Actions for ${chat.title}`} hidden={actionsChatId !== chat.id || renamingChatId === chat.id}>
                             <Button variant="ghost" onClick={() => startRename(chat.id, chat.title)}>Rename</Button>
-                            <Button variant="danger" onClick={() => deleteChat(chat.id, chat.title)}>Delete</Button>
+                            <button type="button" className="button-base button-danger" ref={element => { if (element) deleteButtonsRef.current.set(chat.id, element); else deleteButtonsRef.current.delete(chat.id); }} onClick={() => requestDeleteChat(chat.id)}>Delete</button>
                         </div>
                     </li>)}
                     {!visibleChats.length && <li className="assistant-chat-history-empty">No matching chats.</li>}
@@ -158,5 +199,17 @@ export function AssistantChatHistory({ chats, activeChatId, onNewChat, onSelectC
             </div>
         </div>
         <Button variant="secondary" className="assistant-new-chat-button" onClick={() => { closeHistory(); setSearch(''); onNewChat(); focusHistoryTrigger(); }}><Icon name="plus"/>New chat</Button>
+        {pendingDeleteChat && <OverlayPortal>
+            <div className="assistant-chat-delete-layer" onClick={event => { if (event.target === event.currentTarget) cancelDeleteChat(); }}>
+                <section ref={deleteDialogRef} role="alertdialog" aria-modal="true" aria-labelledby="assistant-chat-delete-title" aria-describedby="assistant-chat-delete-description" tabIndex={-1} className="assistant-chat-delete-dialog" onKeyDown={handleDeleteDialogKeyDown}>
+                    <h2 id="assistant-chat-delete-title">Delete this conversation?</h2>
+                    <p id="assistant-chat-delete-description">“{pendingDeleteChat.title}” and its messages will be removed from this browser. This can’t be undone.</p>
+                    <div className="assistant-chat-delete-actions">
+                        <Button variant="secondary" autoFocus onClick={cancelDeleteChat}>Cancel</Button>
+                        <Button variant="danger" onClick={confirmDeleteChat}>Delete conversation</Button>
+                    </div>
+                </section>
+            </div>
+        </OverlayPortal>}
     </div>;
 }

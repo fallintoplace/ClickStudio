@@ -1033,10 +1033,17 @@ test('Ask AI keeps chat history when SQL changes and sends prior messages with f
     await page.getByRole('button', { name: 'Flight delay analysis', exact: true }).click();
     await expect(page.getByText('Answer to Show the old question', { exact: true })).toBeVisible();
     await expect(page.getByRole('region', { name: 'Conversation: Flight delay analysis' })).toBeVisible();
-    page.once('dialog', dialog => dialog.accept());
     await page.getByRole('button', { name: 'Chat history: Flight delay analysis', exact: true }).click();
     await page.getByRole('button', { name: 'Actions for Flight delay analysis', exact: true }).click();
     await page.getByRole('button', { name: 'Delete', exact: true }).click();
+    const deleteConfirmation = page.getByRole('alertdialog', { name: 'Delete this conversation?', exact: true });
+    await expect(deleteConfirmation).toBeVisible();
+    await deleteConfirmation.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expect(deleteConfirmation).toHaveCount(0);
+    await expect(page.getByRole('region', { name: 'Conversation: Flight delay analysis', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Delete', exact: true }).click();
+    await expect(deleteConfirmation).toBeVisible();
+    await deleteConfirmation.getByRole('button', { name: 'Delete conversation', exact: true }).click();
     await expect(page.locator('.assistant-empty-chat')).toBeVisible();
 });
 
