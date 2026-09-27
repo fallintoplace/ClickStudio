@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import { createClient } from '@clickhouse/client';
 import { loadConfig } from '../../server/config.js';
 import { ClickHouseDriver } from '../../server/clickhouse.js';
 import { MemoryStore } from '../../core/store.js';
@@ -31,4 +32,40 @@ test('LIVE ClickHouse: typed values, bounds, scripts and explicit cancellation',
     assert.equal((await service.wait(owner, slow.id)).status, 'cancelled');
     const duplicate = input('SELECT 1');
     assert.equal(service.submit(owner, duplicate).id, service.submit(owner, duplicate).id);
+});
+
+test('LIVE ClickHouse: MergeTree CTAS copies every source column and row', { skip: !enabled }, async () => {
+    const config = loadConfig();
+    const profile = config.profiles[0]!;
+    const database = `\`${profile.database.replaceAll('`', '``')}\``;
+    const suffix = randomUUID().replaceAll('-', '');
+    const source = `${database}.\`clickstudio_copy_source_${suffix}\``;
+    const target = `${database}.\`clickstudio_copy_target_${suffix}\``;
+    const client = createClient({ url: profile.url, username: process.env.CLICKHOUSE_ADMIN_USER ?? 'default', password: process.env.CLICKHOUSE_ADMIN_PASSWORD ?? '', request_timeout: 30_000 });
+    try {
+        await client.command({ query: `CREATE TABLE ${source} (country String, place String, latitude Float64, longitude Float64) ENGINE = MergeTree ORDER BY country` });
+        await client.insert({
+            table: source,
+            format: 'JSONEachRow',
+            values: [
+                { country: 'Poland', place: 'Warsaw', latitude: 52.2297, longitude: 21.0122 },
+                { country: 'Japan', place: 'Tokyo', latitude: 35.6762, longitude: 139.6503 },
+            ],
+        });
+        await client.command({ query: `CREATE TABLE ${target} ENGINE = MergeTree ORDER BY tuple() AS SELECT * FROM ${source}` });
+        const rows = await client.query({ query: `SELECT * FROM ${target} ORDER BY country`, format: 'JSONEachRow' }).json<Record<string, unknown>>();
+        assert.deepEqual(rows, [
+            { country: 'Japan', place: 'Tokyo', latitude: 35.6762, longitude: 139.6503 },
+            { country: 'Poland', place: 'Warsaw', latitude: 52.2297, longitude: 21.0122 },
+        ]);
+    } finally {
+        try {
+            await Promise.all([
+                client.command({ query: `DROP TABLE IF EXISTS ${target}` }),
+                client.command({ query: `DROP TABLE IF EXISTS ${source}` }),
+            ]);
+        } finally {
+            await client.close();
+        }
+    }
 });

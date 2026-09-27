@@ -215,7 +215,8 @@ test('SQL context preserves all columns and rows when copying a known source tab
         schema: copySchema,
     });
     const context = JSON.parse(built.payload.context);
-    assert.match(built.payload.instructions, /CREATE TABLE target AS SELECT \* FROM source statement/i);
+    assert.match(built.payload.instructions, /CREATE TABLE target ENGINE = MergeTree ORDER BY tuple\(\) AS SELECT \* FROM source statement/i);
+    assert.match(built.payload.instructions, /Do not omit the ENGINE clause/i);
     assert.match(built.payload.instructions, /do not answer with a standalone SELECT, choose a subset/i);
     assert.deepEqual(context.schema.map(column => column.name), ['country', 'place', 'latitude', 'longitude']);
 });

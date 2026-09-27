@@ -105,7 +105,7 @@ test('Vercel assistant returns a requested table proposal with example geography
 test('Vercel assistant instructs a full table copy when the source is present', async () => {
     const priorKey = process.env.OPENAI_API_KEY;
     const priorFetch = globalThis.fetch;
-    const sql = 'CREATE TABLE default.geography_copy AS SELECT * FROM default.geography';
+    const sql = 'CREATE TABLE default.geography_copy ENGINE = MergeTree ORDER BY tuple() AS SELECT * FROM default.geography';
     const content = JSON.stringify({
         sql,
         summary: 'Copies every geography column and row into geography_copy.',
@@ -119,7 +119,8 @@ test('Vercel assistant instructs a full table copy when the source is present', 
     globalThis.fetch = async (_input, init) => {
         const payload = JSON.parse(String(init?.body)) as { instructions?: string };
         assert.match(payload.instructions ?? '', /copy a named source table.*all rows and columns/i);
-        assert.match(payload.instructions ?? '', /CREATE TABLE target AS SELECT \* FROM source statement/i);
+        assert.match(payload.instructions ?? '', /CREATE TABLE target ENGINE = MergeTree ORDER BY tuple\(\) AS SELECT \* FROM source statement/i);
+        assert.match(payload.instructions ?? '', /Do not omit the ENGINE clause/i);
         assert.match(payload.instructions ?? '', /do not answer with a standalone SELECT/i);
         return Response.json({ id: 'resp_table_copy', status: 'completed', output_text: content, output: [] });
     };
