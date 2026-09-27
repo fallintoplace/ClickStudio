@@ -5,6 +5,7 @@ import { evaluateProposal } from '../../core/assistant-evaluation.js';
 import { AppError } from '../../core/errors.js';
 import { guardSql } from '../../core/guards.js';
 import { OpenAIDriver } from '../../server/openai.js';
+import { selectAssistantReferenceDocs } from '../../shared/reference-data.js';
 
 const MAX_BODY_BYTES = 300_000;
 const MAX_REQUESTS_PER_DAY = 20;
@@ -142,7 +143,9 @@ async function post(request: Request): Promise<Response> {
             ? field(body.error, 'Selected run error', 3_000, true)
             : undefined;
         const serverVersion = typeof body.serverVersion === 'string' ? body.serverVersion.slice(0, 128) : undefined;
+        const documentation = selectAssistantReferenceDocs(question, sql, { schema, database, evidenceSql });
         const built = buildContext({ connectionId, database, action: 'ask', question, sql, schema, result, evidenceSql, error, serverVersion,
+            documentation,
             sensitiveColumns: (process.env.AI_SENSITIVE_COLUMNS ?? 'password,token,secret,api_key').split(',').map(name => name.trim()) });
         const ip = request.headers.get('x-real-ip')?.trim() || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
         if (!allowRequest(ip)) return fail('AI_RATE_LIMIT', 'This network has reached the temporary assistant request limit. Try again later.', 429);

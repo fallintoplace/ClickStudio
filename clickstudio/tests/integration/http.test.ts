@@ -129,6 +129,27 @@ test('Assistant context falls back to the bundled ClickHouse documentation', asy
     assert.match(context.referenceDocs[0]?.serverVersion ?? '', /^(?:Offline docs |Demo catalog)/);
 });
 
+test('Assistant context selects documentation from the included run SQL', async (t) => {
+    const s = await start();
+    t.after(() => s.stop());
+    await s.call('/connections/demo/trust', { trusted: true, confirmation: 'demo' });
+    const run = await (await s.call('/runs', {
+        clientRequestId: randomUUID(), connectionId: 'demo', sql: 'SELECT arrayProduct(range(1, 101)) AS product',
+    })).json() as Run;
+    await s.runs.wait(owner, run.id);
+
+    const response = await s.call('/assistant/context', {
+        connectionId: 'demo', action: 'ask', question: 'Why does this result return zero?',
+        sql: 'SELECT 1', runId: run.id, includeResult: true,
+    });
+    assert.equal(response.status, 201);
+    const prepared = await response.json() as { payload: { context: string }; evidenceSql: string | null };
+    const context = JSON.parse(prepared.payload.context) as { evidenceSql: string; referenceDocs: Array<{ name: string }> };
+    assert.match(prepared.evidenceSql ?? '', /arrayProduct/);
+    assert.match(context.evidenceSql, /arrayProduct/);
+    assert.ok(context.referenceDocs.some(entry => entry.name === 'arrayProduct integer input overflow'));
+});
+
 test('Voice sessions require trust and keep the provider behind the server', async (t) => {
     const calls: unknown[] = [];
     const s = await start(undefined, { available: true, model: 'test-voice', createSession: async input => { calls.push(input); return { sdp: 'answer-sdp', model: 'test-voice' }; } });

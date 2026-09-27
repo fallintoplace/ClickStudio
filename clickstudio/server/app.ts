@@ -55,8 +55,8 @@ const body = (req: Request) => record(req.body), id = (req: Request, name = 'id'
 function boolean(v: unknown, name: string) { requireThat(typeof v === 'boolean', 400, 'INVALID_REQUEST', `${name} must be a boolean`); return v; }
 function principal(res: Response): Principal { return res.locals.principal as Principal; }
 function number(v: unknown, fallback: number) { return v === undefined ? fallback : Number(v); }
-async function assistantReferenceDocs(driver: Driver, p: Principal, connectionId: string, question: string, sql: string, schema: Schema, database: string): Promise<ClickHouseDocumentationEntry[]> {
-    const candidates = selectAssistantReferenceDocs(question, sql, { schema, database });
+async function assistantReferenceDocs(driver: Driver, p: Principal, connectionId: string, question: string, sql: string, schema: Schema, database: string, evidenceSql?: string): Promise<ClickHouseDocumentationEntry[]> {
+    const candidates = selectAssistantReferenceDocs(question, sql, { schema, database, evidenceSql });
     const nativeAvailable = driver.connection(p, connectionId).manifest?.documentation.available === true;
     return Promise.all(candidates.map(async candidate => {
         if (!nativeAvailable) return candidate;
@@ -331,13 +331,12 @@ export function createApp(config: Config, overrides: {
         canWrite(p);
         requireThat(authorized(p, connectionId), 403, 'WORKSPACE_UNTRUSTED', 'Trust this connection before sharing context');
         const action = choice(v.action, ASSISTANT_ACTIONS, 400, 'ASSISTANT_ACTION', 'Unknown assistant action'), sql = text(v.sql, 'SQL', 200000, true), question = text(v.question, 'question', 4000, true), schema: Schema = await driver.schema(connectionId);
-        const connection = driver.connection(p, connectionId), documentation = await assistantReferenceDocs(driver, p, connectionId, question, sql, schema, connection.database);
-        let run: Run | undefined;
+        const connection = driver.connection(p, connectionId); let run: Run | undefined;
         if (v.runId) {
             run = runs.get(p, identifier(v.runId, 'runId'));
             requireThat(run.connectionId === connectionId, 409, 'CONNECTION_MISMATCH', 'Selected evidence belongs to another connection');
         }
-        const result = v.includeResult === true && run ? runs.result(p, run.id) : undefined;
+        const documentation = await assistantReferenceDocs(driver, p, connectionId, question, sql, schema, connection.database, run?.sql), result = v.includeResult === true && run ? runs.result(p, run.id) : undefined;
         const context = ai.prepare(p, { connectionId, database: connection.database, action, question, sql, schema, result, evidenceSql: run?.sql, error: run?.error?.message,
             serverVersion: connection.manifest?.serverVersion, rules: v.rules === undefined ? undefined : text(v.rules, 'workspace rules', 4000, true), documentation,
             sensitiveColumns: config.sensitiveColumns, image: v.image === undefined ? undefined : text(v.image, 'image', 2900000) });
@@ -353,13 +352,13 @@ export function createApp(config: Config, overrides: {
         requireThat(authorized(p, connectionId), 403, 'WORKSPACE_UNTRUSTED', 'Trust this connection before sharing context');
         const question = text(v.question, 'question', 4000), sql = text(v.sql, 'SQL', 200000, true);
         const schema = await driver.schema(connectionId), connection = driver.connection(p, connectionId);
-        const documentation = await assistantReferenceDocs(driver, p, connectionId, question, sql, schema, connection.database);
         let run: Run | undefined;
         if (v.includeRun === true) {
             requireThat(Boolean(v.runId), 400, 'RUN_REQUIRED', 'Select a completed run before including its context');
             run = runs.get(p, identifier(v.runId, 'runId'));
             requireThat(run.connectionId === connectionId, 409, 'CONNECTION_MISMATCH', 'Selected evidence belongs to another connection');
         }
+        const documentation = await assistantReferenceDocs(driver, p, connectionId, question, sql, schema, connection.database, run?.sql);
         const result = run?.resultState === 'reopenable' ? runs.result(p, run.id) : undefined;
         const context = ai.prepare(p, { connectionId, database: connection.database, action: 'ask', question, sql, schema, result,
             evidenceSql: run?.sql, error: run?.error?.message, serverVersion: connection.manifest?.serverVersion,

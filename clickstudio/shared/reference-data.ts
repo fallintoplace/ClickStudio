@@ -23,6 +23,9 @@ const CURATED_REFERENCE: readonly ClickHouseDocumentationEntry[] = [
     { name: 'quantile', type: 'Aggregate Function', description: 'Computes an approximate quantile. Use a level such as `0.95` for the 95th percentile; choose an exact variant when exact results are required.\n\n```sql\nSELECT quantile(0.95)(duration_ms) AS p95_ms\nFROM request_log\n```', serverVersion: 'Demo catalog', origin: 'bundled' },
     { name: 'quantileExact', type: 'Aggregate Function', description: 'Computes an exact quantile by retaining values for the calculation. This can use substantially more memory than approximate quantile functions.\n\n```sql\nSELECT quantileExact(0.5)(duration_ms) AS median_ms\nFROM request_log\n```', serverVersion: 'Demo catalog', origin: 'bundled' },
     { name: 'arrayJoin', type: 'Function', description: 'Expands an array into multiple rows. Each source row can produce one output row for every array element.\n\n```sql\nSELECT arrayJoin([\'docs\', \'blog\']) AS section\n```', serverVersion: 'Demo catalog', origin: 'bundled' },
+    { name: 'arrayProduct', type: 'Function', description: 'Returns the product of array elements as Float64. This return type does not guarantee that integer inputs are multiplied as floating-point values; see the version-qualified integer accumulation note when a large product is unexpectedly zero.', serverVersion: 'Demo catalog', origin: 'bundled', source: 'https://clickhouse.com/docs/sql-reference/functions/array-functions#arrayproduct' },
+    { name: 'arrayProduct integer input overflow', type: 'Function', description: 'Version-sensitive implementation detail: current ClickHouse source accumulates integer arrayProduct inputs using the corresponding arraySum accumulator type, then converts the product to Float64. For unsigned integer inputs this accumulator can be UInt64, so multiplication can wrap before conversion. In `arrayProduct(range(1, 101))`, the product 100! is divisible by 2^64, so UInt64 wraparound yields 0. Cast elements before multiplication to avoid integer accumulation: `arrayProduct(arrayMap(x -> toFloat64(x), range(1, 101)))`. Verify this behavior against the connected server version.', serverVersion: 'Current source; verify server version', origin: 'bundled', source: 'https://github.com/ClickHouse/ClickHouse/blob/master/src/Functions/array/arrayAggregation.cpp' },
+    { name: 'range', type: 'Function', description: 'Returns an integer array from the start value up to, but not including, the end value. For example, `range(1, 101)` contains the integers 1 through 100.', serverVersion: 'Demo catalog', origin: 'bundled', source: 'https://clickhouse.com/docs/sql-reference/functions/array-functions#range' },
     { name: 'toStartOfInterval', type: 'Function', description: 'Rounds a date or time down to the start of an interval, which is useful for time-bucketed analysis.\n\n```sql\nSELECT\n    toStartOfInterval(event_time, INTERVAL 15 MINUTE) AS bucket,\n    count() AS events\nFROM events\nGROUP BY bucket\nORDER BY bucket\n```', serverVersion: 'Demo catalog', origin: 'bundled' },
     { name: 'JSONExtractString', type: 'Function', description: 'Reads a string field from JSON text. For repeated access to large JSON payloads, consider extracting fields into typed columns.\n\n```sql\nSELECT JSONExtractString(\'{"campaign":"spring"}\', \'campaign\') AS campaign\n```', serverVersion: 'Demo catalog', origin: 'bundled' },
     { name: 'max_threads', type: 'Setting', description: 'Limits the maximum number of query-processing threads. The effective value can also depend on user profiles and server configuration. Apply a query-level value with `SETTINGS`.\n\n```sql\nSELECT count()\nFROM events\nSETTINGS max_threads = 4\n```', serverVersion: 'Demo catalog', origin: 'bundled' },
@@ -83,7 +86,7 @@ export function findBundledReference(name: string, type: string) {
 
 const ASSISTANT_REFERENCE_LIMIT = 4;
 const assistantStopWords = new Set([
-    'about', 'after', 'all', 'also', 'and', 'are', 'as', 'at', 'be', 'before', 'between', 'by', 'can', 'clickhouse', 'data', 'does', 'explain', 'for', 'from', 'give', 'how', 'into', 'is', 'it', 'me', 'more', 'of', 'on', 'or', 'please', 'query', 'show', 'sql', 'that', 'the', 'this', 'to', 'use', 'using', 'what', 'when', 'where', 'which', 'why', 'with', 'would',
+    'about', 'after', 'all', 'also', 'and', 'are', 'as', 'at', 'be', 'before', 'between', 'by', 'can', 'clickhouse', 'data', 'does', 'explain', 'for', 'from', 'give', 'how', 'into', 'is', 'it', 'me', 'more', 'of', 'on', 'or', 'please', 'query', 'result', 'results', 'return', 'returns', 'show', 'sql', 'that', 'the', 'this', 'to', 'use', 'using', 'what', 'when', 'where', 'which', 'why', 'with', 'would', 'zero', 'zeros',
 ]);
 const sqlStopWords = new Set([
     'add', 'after', 'all', 'alter', 'and', 'as', 'asc', 'between', 'by', 'case', 'create', 'cross', 'database', 'deduplication', 'delete', 'desc', 'distinct', 'drop', 'else', 'end', 'except', 'exists', 'explain', 'false', 'fetch', 'final', 'from', 'full', 'function', 'global', 'group', 'having', 'ilike', 'in', 'inner', 'insert', 'intersect', 'into', 'is', 'join', 'left', 'like', 'limit', 'local', 'natural', 'not', 'null', 'offset', 'on', 'optimize', 'or', 'order', 'outer', 'over', 'partition', 'prewhere', 'query', 'rename', 'replace', 'right', 'select', 'settings', 'table', 'then', 'to', 'true', 'truncate', 'union', 'update', 'use', 'using', 'values', 'when', 'where', 'with',
@@ -114,7 +117,7 @@ function words(value: string) {
     }) ?? [];
 }
 
-export function selectAssistantReferenceDocs(question: string, sql: string, options: { schema?: Schema; database?: string; limit?: number } = {}): ClickHouseDocumentationEntry[] {
+export function selectAssistantReferenceDocs(question: string, sql: string, options: { schema?: Schema; database?: string; evidenceSql?: string; limit?: number } = {}): ClickHouseDocumentationEntry[] {
     const selected = new Map<string, { entry: ClickHouseDocumentationEntry; score: number }>();
     const add = (entry: ClickHouseDocumentationEntry, score: number) => {
         const key = referenceId(entry), previous = selected.get(key);
@@ -125,13 +128,18 @@ export function selectAssistantReferenceDocs(question: string, sql: string, opti
             if (accept(entry)) add(entry, score);
     };
 
-    const searchableSql = sql.slice(0, 20000)
-        .replace(/--[^\n]*/g, ' ')
-        .replace(/\/\*[\s\S]*?\*\//g, ' ')
-        .replace(/'(?:''|\\.|[^'])*'/g, ' ')
-        .replace(/"(?:""|\\.|[^"])*"/g, ' ');
+    const searchableSql = [sql, options.evidenceSql]
+        .filter((value): value is string => typeof value === 'string')
+        .map(value => value.slice(0, 20000)
+            .replace(/--[^\n]*/g, ' ')
+            .replace(/\/\*[\s\S]*?\*\//g, ' ')
+            .replace(/'(?:''|\\.|[^'])*'/g, ' ')
+            .replace(/"(?:""|\\.|[^"])*"/g, ' '))
+        .join('\n');
     const functionNames = [...searchableSql.matchAll(/\b([A-Za-z_][A-Za-z0-9_]*)\s*\(/g)].map(match => match[1] ?? '');
     for (const name of functionNames) addExact(name, 100);
+    if (functionNames.some(name => normalizedReferenceName(name) === 'arrayproduct') || /\barrayproduct\b/i.test(question))
+        addExact('arrayProduct integer input overflow', 110);
 
     const relations = [...searchableSql.matchAll(/\b(?:FROM|JOIN|INTO|UPDATE|TABLE)\s+((?:`?[A-Za-z_][\w]*`?\.)?`?[A-Za-z_][\w]*`?)/gi)]
         .map(match => (match[1] ?? '').replaceAll('`', '').split('.'));
