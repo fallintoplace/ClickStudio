@@ -208,7 +208,8 @@
     .market-chart-badges > span:first-child { border-color: color-mix(in srgb, var(--green) 28%, var(--line)); color: var(--green); }
     .market-range-presets button { min-height: 27px; padding: 0 9px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--muted); font-size: 8px; cursor: pointer; transition: border-color .15s ease, color .15s ease, background .15s ease; }
     .market-range-presets button:hover, .market-range-presets button[aria-pressed="true"] { border-color: color-mix(in srgb, var(--accent) 46%, var(--line)); background: color-mix(in srgb, var(--accent) 9%, var(--panel)); color: var(--accent); }
-    .market-chart-canvas { min-width: 0; overflow-x: auto; border: 1px solid var(--line); border-radius: 9px; background: color-mix(in srgb, var(--panel) 82%, transparent); scrollbar-gutter: stable; }
+    .market-chart-canvas-frame { min-width: 0; border: 1px solid var(--line); border-radius: 9px; background: color-mix(in srgb, var(--panel) 82%, transparent); }
+    .market-chart-canvas { min-width: 0; max-width: 100%; overflow-x: auto; border-radius: inherit; background: transparent; scrollbar-gutter: stable; }
     .market-chart-canvas svg { display: block; width: 100%; min-width: 780px; height: auto; aspect-ratio: 1280 / 720; }
     .market-pane-label { fill: var(--text-soft); font-family: var(--font-sans); font-size: 11px; font-weight: 650; letter-spacing: .02em; }
     .market-pane-empty { fill: var(--muted); font-family: var(--font-sans); font-size: 10px; }
@@ -256,7 +257,8 @@
     .chart-number-card > strong { max-width: 100%; overflow: hidden; color: var(--text); font-family: var(--font-mono); font-size: clamp(28px, 5vw, 48px); font-weight: 650; letter-spacing: -.055em; text-overflow: ellipsis; white-space: nowrap; }
     .chart-number-card > span:not(.eyebrow) { color: var(--text-soft); font-size: 10px; }
     .chart-number-card > small { color: var(--muted); font-size: 8px; }
-    .heatmap-scroll { max-width: 100%; margin-top: 12px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-raised); }
+    .heatmap-scroll-frame { max-width: 100%; margin-top: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-raised); }
+    .heatmap-scroll { max-width: 100%; overflow: auto; border-radius: inherit; background: transparent; }
     .heatmap-grid { min-width: max-content; border-collapse: separate; border-spacing: 3px; padding: 7px; }
     .heatmap-corner, .heatmap-axis-label { min-height: 25px; padding: 3px 5px; color: var(--muted); font-family: var(--font-mono); font-size: 8px; text-align: center; white-space: nowrap; }
     .heatmap-corner { font-family: var(--font-sans); text-align: left; }

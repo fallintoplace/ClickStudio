@@ -2,6 +2,7 @@ import { useMemo, useState, type SyntheticEvent } from 'react';
 import type { ExplainPlan, ExplainPlanNode, ExplainPlanProperty } from '../../shared/explain-plan';
 import type { Json, ProfilePipeline, ProfilePipelineNode } from '../../shared/types';
 import { PipelineGraph } from './PipelineGraph';
+import { ScrollEdgeFrame } from './ScrollEdgeShadows';
 import type { Copy } from '../i18n';
 
 const MAX_PROPERTY_TEXT = 12_000;
@@ -85,7 +86,7 @@ export function ExplainPlanView({ plan, loading, copy }: { plan?: ExplainPlan; l
     const graph = useMemo(() => plan ? planGraph(plan, copy.planUnknownStep, copy.planDepthLimit) : undefined, [plan, copy.planDepthLimit, copy.planUnknownStep]);
     if (loading) return <div className="pipeline-graph-empty" role="status">{copy.planLoading}</div>;
     if (!plan) return <div className="pipeline-graph-empty" role="status">{copy.planNoOutput}</div>;
-    return <div className="explain-plan-view">
+    return <ScrollEdgeFrame<HTMLDivElement> className="explain-plan-view-frame">{ref => <div ref={ref} className="explain-plan-view">
         <header className="explain-plan-heading">
             <h3>{copy.logicalPlan}</h3>
             <div className="explain-plan-heading-actions">
@@ -124,5 +125,5 @@ export function ExplainPlanView({ plan, loading, copy }: { plan?: ExplainPlan; l
             : <ul className="explain-plan-tree" aria-label={copy.logicalPlan}>
                 <PlanNode node={plan.root} propertyLabel={copy.planProperties} unknownStep={copy.planUnknownStep} depthLimit={copy.planDepthLimit}/>
             </ul>}
-    </div>;
+    </div>}</ScrollEdgeFrame>;
 }

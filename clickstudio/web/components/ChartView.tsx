@@ -5,6 +5,7 @@ import type { Draft } from '../workspace-state';
 import type { Copy, Locale } from '../i18n';
 import { CandlestickChart } from './CandlestickChart';
 import { RowCountChart } from './RowCountChart';
+import { ScrollEdgeFrame } from './ScrollEdgeShadows';
 import { chartKindOptions, chartText, chartTypeLabel, formatCount, seriesColor, splitChartSegments } from './chart-helpers';
 
 export function ChartView({ result, loading, chart, onChart, copy, locale }: { result?: Result; loading: boolean; chart: Draft['chart']; onChart: (chart: Draft['chart']) => void; copy: Copy; locale: Locale }) {
@@ -39,7 +40,7 @@ export function ChartView({ result, loading, chart, onChart, copy, locale }: { r
         };
         const candleColumns = (selected: number | undefined) => <><option value="">—</option>{numericIndexes.map(index => <option value={index} key={index} disabled={index !== selected && [candle.open, candle.high, candle.low, candle.close].includes(index)}>{result.columns[index]?.name}</option>)}</>;
         const optionalColumns = (selected: number | undefined) => <><option value="">—</option>{numericIndexes.map(index => <option value={index} key={index} disabled={index !== selected && [candle.open, candle.high, candle.low, candle.close].includes(index)}>{result.columns[index]?.name}</option>)}</>;
-        return <div className="chart-workspace animate-enter">
+        return <ScrollEdgeFrame<HTMLDivElement> className="chart-workspace-frame">{ref => <div ref={ref} className="chart-workspace animate-enter">
             <div className="chart-title-row"><div><span className="eyebrow">{chartCopy.visualExploration}</span><h3>{chart.title === 'Query result' ? chartCopy.candlestickType : chart.title}</h3><p>{chartCopy.returnedData}. {chartCopy.candlestickDisplayNote}</p></div><div className="chart-controls">
                 <label>{chartCopy.type}<select value="candlestick" onChange={event => updateKind(event.target.value)}>{chartKindOptions.map(option => <option key={option.value} value={option.value} disabled={option.value === 'candlestick' && !canChooseCandlestick}>{chartTypeLabel(option.value, chartCopy)}</option>)}</select></label>
                 <label>{chartCopy.xAxis}<select value={candleX} onChange={event => onChart({ ...chart, kind: 'candlestick', x: Number(event.target.value), ys: [], candlestick: { ...candle } })}>{result.columns.map((column, index) => <option value={index} key={index}>{column.name}</option>)}</select></label>
@@ -47,7 +48,7 @@ export function ChartView({ result, loading, chart, onChart, copy, locale }: { r
                 {(['bid', 'ask', 'spread', 'quoteActivity'] as const).map(field => <label key={field}>{field === 'bid' || field === 'ask' ? field.toUpperCase() : field === 'spread' ? chartCopy.spreadBps : chartCopy.quoteActivity}<select value={candle[field] ?? ''} onChange={event => patchCandle(field, event.target.value)}>{optionalColumns(candle[field])}</select></label>)}
             </div></div>
             {!activeCandleValid ? <div className="chart-empty" role="status">{chartCopy.noValidCandles}</div> : <CandlestickChart result={result} config={candle} x={candleX} copy={chartCopy} locale={locale}/>}
-        </div>;
+        </div>}</ScrollEdgeFrame>;
     }
     if (!numericIndexes.length) return <RowCountChart result={result} chart={chart} suggestion={suggestion} onChart={onChart} copy={chartCopy} locale={locale}/>;
     const chartKind = chart.kind === 'table'
@@ -137,7 +138,7 @@ export function ChartView({ result, loading, chart, onChart, copy, locale }: { r
                 ? chartCopy.reasonTimeMeasure
                 : chartCopy.reasonDimensionMeasure;
     const chartTitle = chart.title === 'Query result' ? chartCopy.queryResult : chart.title || result.columns[yIndex]?.name || chartCopy.queryResult;
-    return <div className="chart-workspace animate-enter">
+    return <ScrollEdgeFrame<HTMLDivElement> className="chart-workspace-frame">{ref => <div ref={ref} className="chart-workspace animate-enter">
         <div className="chart-title-row"><div><span className="eyebrow">{chartCopy.visualExploration}</span><h3>{chartTitle}</h3><p>{suggestionReason}{chartKind === 'heatmap' ? '' : ` ${chartCopy.sampledForDisplay}`}</p></div><div className="chart-controls">
             {chartKind !== 'number' && <label>{chartKind === 'scatter' ? chartCopy.xAxisMeasure : chartCopy.xAxis}<select value={xIndex} onChange={event => {
                 const nextX = Number(event.target.value);
@@ -168,7 +169,7 @@ export function ChartView({ result, loading, chart, onChart, copy, locale }: { r
             : chartKind === 'heatmap'
                 ? heatmapTooLarge ? <div className="chart-empty">{chartCopy.tooManyHeatmapLabels}</div>
                     : !heatmap || groupByIndex === undefined || heatmap.present.size === 0 ? <div className="chart-empty">{chartCopy.heatmapNeedsDimensions}</div>
-                        : <div className="heatmap-scroll"><table className="heatmap-grid" aria-label={chartText(chartCopy.heatmapTableAria, { measure: result.columns[yIndex]?.name ?? '', groupBy: result.columns[groupByIndex]?.name ?? '', xAxis: result.columns[xIndex]?.name ?? '' })}>
+                        : <ScrollEdgeFrame<HTMLDivElement> className="heatmap-scroll-frame">{ref => <div ref={ref} className="heatmap-scroll"><table className="heatmap-grid" aria-label={chartText(chartCopy.heatmapTableAria, { measure: result.columns[yIndex]?.name ?? '', groupBy: result.columns[groupByIndex]?.name ?? '', xAxis: result.columns[xIndex]?.name ?? '' })}>
                             <thead><tr><th className="heatmap-corner" scope="col">{result.columns[groupByIndex]?.name} / {result.columns[xIndex]?.name}</th>
                             {heatmapXLabels.map(label => <th className="heatmap-axis-label" scope="col" key={`x-${label}`}>{label}</th>)}</tr></thead>
                             <tbody>{heatmapYLabels.map(yLabel => <tr key={`y-${yLabel}`}><th className="heatmap-axis-label heatmap-row-label" scope="row" title={yLabel}>{yLabel}</th>{heatmapXLabels.map(xLabel => {
@@ -182,7 +183,7 @@ export function ChartView({ result, loading, chart, onChart, copy, locale }: { r
                                 const displayNumber = value === undefined ? '·' : compactNumber.format(value);
                                 return <td className="heatmap-cell" key={`${yLabel}-${xLabel}`} title={`${result.columns[groupByIndex]?.name}: ${yLabel} · ${result.columns[xIndex]?.name}: ${xLabel} · ${result.columns[yIndex]?.name}: ${cellDescription}`} aria-label={`${yLabel}, ${xLabel}: ${cellDescription}`} style={{ backgroundColor: missing || value === undefined ? 'var(--panel)' : `color-mix(in srgb, var(--accent) ${Math.round(intensity * 78)}%, var(--panel-raised))`, color: intensity > .55 ? 'var(--accent-ink)' : 'var(--text-soft)' }}>{missing ? '·' : displayNumber}</td>;
                             })}</tr>)}</tbody>
-                        </table><div className="heatmap-caption">{chartText(chartCopy.heatmapCaption, { measure: result.columns[yIndex]?.name ?? '', rows: formatCount(heatmapYLabels.length, locale), columns: formatCount(heatmapXLabels.length, locale), note: result.completeness === 'truncated' ? chartCopy.heatmapTruncatedNote : chartCopy.heatmapCompleteNote })}</div></div>
+                        </table><div className="heatmap-caption">{chartText(chartCopy.heatmapCaption, { measure: result.columns[yIndex]?.name ?? '', rows: formatCount(heatmapYLabels.length, locale), columns: formatCount(heatmapXLabels.length, locale), note: result.completeness === 'truncated' ? chartCopy.heatmapTruncatedNote : chartCopy.heatmapCompleteNote })}</div></div>}</ScrollEdgeFrame>
                 : chartKind === 'scatter' && (xIndex === yIndex || !numericIndexes.includes(xIndex) || !numericIndexes.includes(yIndex)) ? <div className="chart-empty">{chartCopy.scatterNeedsTwoNumeric}</div>
                     : !values.length ? <div className="chart-empty">{chartCopy.chooseNumericMeasure}</div>
                     : <div className="chart-canvas">
@@ -211,5 +212,5 @@ export function ChartView({ result, loading, chart, onChart, copy, locale }: { r
             : chartKind === 'line' || chartKind === 'bar'
                 ? measureIndexes.map((index, seriesIndex) => <span key={index}><span className="chart-legend-dot" style={{ backgroundColor: seriesColor(seriesIndex) }}/>{result.columns[index]?.name}</span>)
                 : <><span className="chart-legend-dot" style={{ backgroundColor: seriesColor(0) }}/>{result.columns[yIndex]?.name}</>}</span><span>{chartKind === 'number' ? result.rows.length === 1 ? chartCopy.oneValue : chartText(chartCopy.retainedRows, { rows: formatCount(result.rows.length, locale) }) : chartKind === 'heatmap' ? chartText(chartCopy.populatedCells, { cells: formatCount(heatmap?.cells.size ?? 0, locale), rows: formatCount(result.rows.length, locale) }) : chartKind === 'scatter' ? chartText(chartCopy.plottedPoints, { points: formatCount(scatterPoints.length, locale) }) : rowSummary} <i>·</i> {result.completeness === 'truncated' ? chartCopy.retainedPrefixOnly : chartCopy.completeQueryResult}</span></div>
-    </div>;
+    </div>}</ScrollEdgeFrame>;
 }

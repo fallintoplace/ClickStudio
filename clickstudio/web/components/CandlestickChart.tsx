@@ -3,6 +3,7 @@ import { area, axisBottom, axisLeft, bisector, brushX, curveMonotoneX, extent, l
 import { chartNumber, chartTimestamp, MAX_CHART_RENDER_POINTS } from '../../shared/results';
 import type { CandlestickConfig, Column, Json, Result } from '../../shared/types';
 import type { Copy, Locale } from '../i18n';
+import { ScrollEdgeFrame } from './ScrollEdgeShadows';
 
 interface Candle {
     time: number;
@@ -242,9 +243,9 @@ export function CandlestickChart({ result, config, x, copy, locale }: Props) {
                 {(['1d', '3d', 'all'] as const).map(preset => <button type="button" key={preset} aria-pressed={rangePreset === preset} onClick={() => setPreset(preset)}>{preset === '1d' ? copy.oneDayRange : preset === '3d' ? copy.threeDayRange : copy.allRange}</button>)}
             </div>
         </div>
-        <div className="market-chart-canvas"><svg ref={svgRef} viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label={`${copy.candlestickType} · ${candles.length} ${copy.candlesLabel}`}>
+        <ScrollEdgeFrame<HTMLDivElement> className="market-chart-canvas-frame">{ref => <div ref={ref} className="market-chart-canvas"><svg ref={svgRef} viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label={`${copy.candlestickType} · ${candles.length} ${copy.candlesLabel}`}>
             <title>{copy.candlestickType}: {tooltipLabel}</title>
-        </svg></div>
+        </svg></div>}</ScrollEdgeFrame>
         <div className="market-chart-legend">
             <span><i className="market-legend-candle-up"/>{copy.priceLabel}</span>
             {config.bid !== undefined && config.ask !== undefined && <span><i className="market-legend-bidask"/>{copy.bidAskLabel}</span>}

@@ -1,4 +1,5 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from 'react';
+import type { RefCallback } from 'react';
 import { EditorState, Compartment, StateEffect, StateField } from '@codemirror/state';
 import { Decoration, EditorView, hoverTooltip, keymap, lineNumbers, highlightActiveLine, drawSelection, rectangularSelection, type DecorationSet } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, indentWithTab, indentSelection } from '@codemirror/commands';
@@ -14,7 +15,7 @@ import { hasSqlComments, quoteIdentifier } from '../../shared/sql';
 import { activeStatementIndex, CLICKHOUSE_KEYWORDS, completionTarget, matchingNames, tableAliases as aliasesFor } from '../../shared/editor-tools';
 import { appendSqlSnippet, clickhouseSnippetCompletions, sqlEditorTools, sqlStatementOutline } from './editor-tools';
 import { clickHouseNativeParser } from '../clickhouse-native-parser';
-import { ScrollEdgeShadows, useScrollEdges } from './ScrollEdgeShadows';
+import { ScrollEdgeFrame } from './ScrollEdgeShadows';
 const keywordCompletions = [...new Set(CLICKHOUSE_KEYWORDS.split(' '))].map(label => ({ label, type: 'keyword' }));
 const clickhouse = SQLDialect.define({ keywords: CLICKHOUSE_KEYWORDS, types: 'String UInt8 UInt16 UInt32 UInt64 UInt128 UInt256 Int8 Int16 Int32 Int64 Int128 Int256 Float32 Float64 Date Date32 DateTime DateTime64 Nullable Array Tuple Map Decimal LowCardinality UUID JSON', builtin: 'count sum avg min max uniq uniqExact quantile median toDate toDateTime toStartOfDay toStartOfHour now today numbers arrayJoin arrayMap arrayFilter multiIf ifNull coalesce', doubleQuotedStrings: false, hashComments: true });
 const clickhouseFunctions = [
@@ -176,7 +177,7 @@ export interface SqlEditorProps {
 }
 export const SqlEditor = forwardRef<EditorHandle, SqlEditorProps>(function SqlEditor(props, ref) {
     const element = useRef<HTMLDivElement>(null), view = useRef<EditorView | undefined>(undefined), current = useRef(props), language = useRef(new Compartment()), theme = useRef(new Compartment());
-    const { ref: setScrollViewport, edges } = useScrollEdges<HTMLElement>();
+    const setScrollViewport = useRef<RefCallback<HTMLElement> | null>(null);
     const nativeDiagnostics = useRef<NativeDiagnostic[]>([]), validationRevision = useRef(0);
     current.current = props;
     const schemaIndex = useMemo(() => indexSchema(props.schema), [props.schema]), schemaIndexRef = useRef(schemaIndex);
@@ -211,7 +212,7 @@ export const SqlEditor = forwardRef<EditorHandle, SqlEditorProps>(function SqlEd
                     current.current.onChange(update.state.doc.toString()); if (update.selectionSet) {
                     const s = update.state.selection.main;
                     current.current.onSelection(s.from, s.to);
-                } })] }) }); view.current = editor; setScrollViewport(editor.scrollDOM); return () => { setScrollViewport(null); editor.destroy(); view.current = undefined; }; }, [languageExtension, setScrollViewport]);
+                } })] }) }); view.current = editor; setScrollViewport.current?.(editor.scrollDOM); return () => { setScrollViewport.current?.(null); editor.destroy(); view.current = undefined; }; }, [languageExtension]);
     useEffect(() => { const v = view.current; if (v && v.state.doc.toString() !== props.value) {
         const { from, to } = current.current;
         v.dispatch({ changes: { from: 0, to: v.state.doc.length, insert: props.value }, selection: { anchor: Math.min(from, props.value.length), head: Math.min(to, props.value.length) } });
@@ -340,5 +341,8 @@ export const SqlEditor = forwardRef<EditorHandle, SqlEditorProps>(function SqlEd
             };
         },
     }), [applyDiagnostics]);
-    return <div className="sql-editor" ref={element}><ScrollEdgeShadows edges={edges}/></div>;
+    return <ScrollEdgeFrame<HTMLElement> className="sql-editor-scroll-frame">{setViewport => {
+        setScrollViewport.current = setViewport;
+        return <div className="sql-editor" ref={element}/>;
+    }}</ScrollEdgeFrame>;
 });

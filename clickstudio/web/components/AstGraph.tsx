@@ -1,7 +1,8 @@
 import { hierarchy, tree } from 'd3';
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { buildNativeAstTree, type NativeAstTreeNode } from '../../shared/native-ast';
 import type { Copy } from '../i18n';
+import { ScrollEdgeFrame } from './ScrollEdgeShadows';
 
 const nodeWidth = 220;
 const nodeHeight = 72;
@@ -81,6 +82,7 @@ export function AstGraph({ ast, copy }: { ast: unknown; copy: Copy['common'] }) 
     const [selectedId, setSelectedId] = useState<string>();
     const [zoom, setZoom] = useState(1);
     const graphViewport = useRef<HTMLDivElement>(null);
+    const setGraphViewport = useCallback((viewport: HTMLDivElement | null) => { graphViewport.current = viewport; }, []);
 
     useEffect(() => {
         setExpanded(root ? initialExpanded(root) : new Set());
@@ -157,7 +159,7 @@ export function AstGraph({ ast, copy }: { ast: unknown; copy: Copy['common'] }) 
             <button type="button" aria-label={copy.pipelineZoomIn} title={copy.pipelineZoomIn} disabled={zoom >= 2.5} onClick={() => setZoom(current => Math.min(2.5, current * 1.2))}>+</button>
             <button type="button" className="pipeline-zoom-fit" aria-label={copy.pipelineFit} title={copy.pipelineFit} onClick={fitGraph}>{copy.pipelineFit}</button>
         </div>
-        <div ref={graphViewport} className="pipeline-graph-scroll ast-graph-scroll overflow-auto" role="region" aria-label={copy.sqlFlowNativeAst}>
+        <ScrollEdgeFrame<HTMLDivElement> className="pipeline-graph-viewport-frame" onViewport={setGraphViewport}>{ref => <div ref={ref} className="pipeline-graph-scroll ast-graph-scroll overflow-auto" role="region" aria-label={copy.sqlFlowNativeAst}>
             <svg className="pipeline-graph-svg ast-graph-svg" width={Math.round(graphWidth * zoom)} height={Math.round(graphHeight * zoom)} viewBox={`0 0 ${graphWidth} ${graphHeight}`} role="group" aria-label={copy.sqlAstGraphHint}>
                 <g className="ast-graph-edges" aria-hidden="true">
                     {layout.links.map((link, index) => {
@@ -193,7 +195,7 @@ export function AstGraph({ ast, copy }: { ast: unknown; copy: Copy['common'] }) 
                     </g>;
                 })}
             </svg>
-        </div>
+        </div>}</ScrollEdgeFrame>
         <div className="pipeline-node-inspector ast-node-inspector" aria-live="polite" aria-label={copy.sqlAstSelectedNode}>
             <div className="pipeline-node-inspector-main">
                 <span className="eyebrow">{copy.sqlAstSelectedNode.toUpperCase()}</span>

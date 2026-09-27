@@ -1,4 +1,5 @@
 import { useCallback, useLayoutEffect, useState } from 'react';
+import type { ReactNode, RefCallback } from 'react';
 
 export type ScrollEdges = Readonly<{ top: boolean; bottom: boolean; left: boolean; right: boolean }>;
 
@@ -58,6 +59,24 @@ export function useScrollEdges<T extends HTMLElement>() {
     }, [viewport]);
 
     return { ref, edges };
+}
+
+export function ScrollEdgeFrame<T extends HTMLElement>({ className, hidden, onViewport, children }: {
+    className?: string;
+    hidden?: boolean;
+    onViewport?: RefCallback<T>;
+    children: (ref: RefCallback<T>) => ReactNode;
+}) {
+    const { ref, edges } = useScrollEdges<T>();
+    const setViewport = useCallback((element: T | null) => {
+        ref(element);
+        onViewport?.(element);
+    }, [onViewport, ref]);
+
+    return <div className={['scroll-edge-frame', className].filter(Boolean).join(' ')} hidden={hidden}>
+        {children(setViewport)}
+        <ScrollEdgeShadows edges={edges}/>
+    </div>;
 }
 
 export function ScrollEdgeShadows({ edges }: { edges: ScrollEdges }) {

@@ -15,6 +15,7 @@ import { PipelineGraph } from './PipelineGraph';
 import { SqlFlowView } from './SqlFlowView';
 import { Button, cx, Icon, Status } from './ui';
 import { ScriptResults } from './WorkspaceChrome';
+import { ScrollEdgeFrame } from './ScrollEdgeShadows';
 import { resultsTabLabel } from '../workspace-helpers';
 
 function failureMessagePreview(message: string) {
@@ -183,7 +184,7 @@ export function WorkspaceResultsPanel({
                 <Button variant="ghost" className="panel-collapse-button" aria-label={`${panels.resultsCollapsed ? copy.common.expand : copy.common.collapse} ${resultsPanelLabel}`} aria-expanded={!panels.resultsCollapsed} aria-controls="query-results-content" title={panels.resultsCollapsed ? copy.common.expandOutput : copy.common.collapseOutput} onClick={() => panels.setResultsCollapsed(value => !value)}><Icon className="panel-toggle-icon" name="chevron"/></Button>
             </div>
         </div>
-        <div id="query-results-content" className={cx('panel-content results-content', ['insights', 'indexes', 'plan', 'pipeline', 'runtime'].includes(visibleResultsView) && 'results-content-scrollable')} hidden={panels.resultsCollapsed}>
+        <ScrollEdgeFrame<HTMLDivElement> className="results-content-frame" hidden={panels.resultsCollapsed}>{ref => <div id="query-results-content" ref={ref} className={cx('panel-content results-content', ['insights', 'indexes', 'plan', 'pipeline', 'runtime'].includes(visibleResultsView) && 'results-content-scrollable')} hidden={panels.resultsCollapsed}>
             {detached && !run && !execution && !failedAttempt && visibleResultsView !== 'sqlmap' && <div className="detached-results-empty"><Icon name="chart"/><span>{copy.common.detachedResultsEmpty}</span></div>}
             {visibleResultsView === 'sqlmap' && <SqlFlowView copy={copy.common} sql={sqlMapStatement?.sql ?? active.sql} sourceOffset={sqlMapStatement?.from ?? 0} parseResult={sqlMapParseStatement?.result} parserEnabled={nativeParserEnabled} parserStatus={nativeParserStatus} parseDurationMs={nativeParseSnapshot?.elapsedMs} connectionId={connection.id} parameters={active.parameters} analyzerAvailable={queryTreeAvailable} analyzerUnavailableReason={queryTreeUnavailableReason} onRevealRange={actions.onRevealRange}/>}
             {failureError && visibleResultsView !== 'sqlmap' && <div className="result-failure callout callout-error" data-testid="query-failure" role="alert">
@@ -214,7 +215,7 @@ export function WorkspaceResultsPanel({
                 : run && visibleResultsView === 'chart' && <ChartView result={retainedSnapshot} loading={!retainedSnapshot && run.resultState === 'reopenable'} chart={active.chart} onChart={chart => actions.onPatch({ chart })} copy={copy} locale={locale}/>}
             {run && visibleResultsView === 'map' && <GeoView result={retainedSnapshot} loading={!retainedSnapshot && run.resultState === 'reopenable'} locale={locale}/>}
             {run && visibleResultsView === 'insights' && <InsightsView comparison={{ connectionId: connection.id, trusted, history, initialRun: run, profiles: profilesByRun, pipelines: pipelinesByRun, queryLogAvailable: connection.manifest?.queryLog.available === true }} run={run} profile={profile} pipeline={pipeline} pipelineAvailable={Boolean(trusted && connection.manifest?.pipeline.available)} flamegraph={flamegraph} flamegraphCapability={trusted ? connection.manifest?.traceLog : { available: false, reason: 'Trust this connection to inspect profiler samples.' }} onLoad={actions.onLoadProfile} onLoadPipeline={actions.onLoadPipeline} onLoadFlamegraph={actions.onLoadFlamegraph} loading={busy === 'save'}/>}
-        </div>
+        </div>}</ScrollEdgeFrame>
         {resultsMode === 'floating' && !panels.resultsCollapsed && <PanelResizeHandles onResize={(edge, event) => startPanelResize('results', edge, event)}/>}
     </section>;
 }

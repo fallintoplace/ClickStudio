@@ -16,7 +16,7 @@ import type {
 import type { Draft } from '../workspace-state';
 import { PanelResizeHandles, panelTargetIsInteractive, type WorkspacePanelController } from '../useWorkspacePanels';
 import type { WorkspaceViewState } from '../useWorkspaceViewState';
-import { ScrollEdgeShadows, useScrollEdges } from './ScrollEdgeShadows';
+import { ScrollEdgeFrame } from './ScrollEdgeShadows';
 import { SqlEditor, type EditorHandle } from './SqlEditor';
 import { Button, cx, Icon } from './ui';
 import { RunActionGroup } from './WorkspaceChrome';
@@ -91,7 +91,6 @@ function SqlProposalDiff({ proposal, currentSql, busy, onDecision }: {
     const removed = rows.filter(row => row.kind === 'removed').length;
     const stale = proposal.baseSql !== currentSql;
     const unsafe = proposal.quality?.status === 'fail';
-    const { ref: diffScrollRef, edges } = useScrollEdges<HTMLPreElement>();
     return <section className="sql-proposal-diff" role="region" aria-live="polite" aria-label="SQL proposal review" data-testid="sql-proposal-diff">
         <header className="sql-proposal-diff-heading">
             <div className="sql-proposal-diff-title"><span className="eyebrow">SQL PROPOSAL</span><span className="sql-proposal-review-status">Needs review</span></div>
@@ -99,10 +98,7 @@ function SqlProposalDiff({ proposal, currentSql, busy, onDecision }: {
         </header>
         <div className="sql-proposal-change-summary"><span>What this changes</span><p>{proposal.summary}</p></div>
         {stale && <div className="callout callout-error" role="alert">Your SQL draft changed after this proposal was created. Reject it and ask again before applying.</div>}
-        <div className="scroll-edge-frame sql-proposal-diff-scroll-frame">
-            <pre ref={diffScrollRef} className="sql-proposal-diff-code" aria-label="Line-by-line SQL changes"><code>{rows.map((row, index) => <span className={`sql-proposal-diff-line is-${row.kind}`} key={`${row.kind}-${index}`}><span className="sql-proposal-diff-gutter">{row.oldLine ?? ''} {row.newLine ?? ''}</span><span className="sql-proposal-diff-sign">{row.kind === 'added' ? '+' : row.kind === 'removed' ? '−' : ' '}</span><span>{row.text || ' '}</span></span>)}</code></pre>
-            <ScrollEdgeShadows edges={edges}/>
-        </div>
+        <ScrollEdgeFrame<HTMLPreElement> className="sql-proposal-diff-scroll-frame">{ref => <pre ref={ref} className="sql-proposal-diff-code" aria-label="Line-by-line SQL changes"><code>{rows.map((row, index) => <span className={`sql-proposal-diff-line is-${row.kind}`} key={`${row.kind}-${index}`}><span className="sql-proposal-diff-gutter">{row.oldLine ?? ''} {row.newLine ?? ''}</span><span className="sql-proposal-diff-sign">{row.kind === 'added' ? '+' : row.kind === 'removed' ? '−' : ' '}</span><span>{row.text || ' '}</span></span>)}</code></pre>}</ScrollEdgeFrame>
         <footer className="sql-proposal-diff-footer"><span>{unsafe ? 'This proposal failed the read-only SQL safety check.' : 'Applying updates your draft only. Press Run when you are ready to execute it.'}</span><div><Button variant="secondary" onClick={() => onDecision('rejected')} disabled={busy}>Reject</Button><Button variant="primary" onClick={() => onDecision('accepted')} disabled={busy || stale || unsafe}>Apply to draft</Button></div></footer>
     </section>;
 }

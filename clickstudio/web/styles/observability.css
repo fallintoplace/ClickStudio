@@ -38,7 +38,8 @@
     .workload-chart-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--muted); font-size: 8px; }
     .workload-chart-legend i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 7px color-mix(in srgb, var(--accent) 50%, transparent); }
     .workload-chart-legend i.is-error { margin-left: 4px; background: var(--red); box-shadow: none; }
-    .workload-scatter-scroll { max-width: 100%; overflow-x: auto; border: 1px solid color-mix(in srgb, var(--line) 70%, transparent); border-radius: 7px; background: color-mix(in srgb, var(--page) 35%, transparent); }
+    .workload-scatter-frame { max-width: 100%; border: 1px solid color-mix(in srgb, var(--line) 70%, transparent); border-radius: 7px; background: color-mix(in srgb, var(--page) 35%, transparent); }
+    .workload-scatter-scroll { max-width: 100%; overflow-x: auto; border-radius: inherit; background: transparent; }
     .workload-scatter-svg { display: block; width: 100%; min-width: 690px; height: auto; }
     .workload-axis line { stroke: color-mix(in srgb, var(--line-bright) 46%, transparent); stroke-width: 1; stroke-dasharray: 2 4; }
     .workload-axis text { fill: var(--muted); font-family: var(--font-mono); font-size: 9px; }
@@ -100,7 +101,8 @@
     .flamegraph-summary > span { display: inline-flex; align-items: center; gap: 7px; font-family: var(--font-mono); }
     .flamegraph-summary small { color: var(--muted); font-size: 8px; }
     .flamegraph-signal { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 65%, transparent); }
-    .flamegraph-canvas { max-width: 100%; overflow: auto; border: 1px solid color-mix(in srgb, var(--accent) 21%, var(--line)); border-radius: 9px; background: radial-gradient(ellipse at 50% 0, color-mix(in srgb, var(--accent) 8%, transparent), transparent 60%), var(--panel); }
+    .flamegraph-canvas-frame { max-width: 100%; border: 1px solid color-mix(in srgb, var(--accent) 21%, var(--line)); border-radius: 9px; background: radial-gradient(ellipse at 50% 0, color-mix(in srgb, var(--accent) 8%, transparent), transparent 60%), var(--panel); }
+    .flamegraph-canvas { max-width: 100%; overflow: auto; border-radius: inherit; background: transparent; }
     .flamegraph-svg { display: block; width: 100%; min-width: 700px; height: auto; }
     .flamegraph-node rect { fill: color-mix(in srgb, var(--accent) 24%, var(--panel-raised)); stroke: color-mix(in srgb, var(--accent) 43%, var(--line-bright)); stroke-width: 1; cursor: pointer; transition: fill .15s ease, stroke .15s ease; }
     .flamegraph-node.depth-2 rect { fill: color-mix(in srgb, var(--accent) 19%, var(--panel-raised)); }

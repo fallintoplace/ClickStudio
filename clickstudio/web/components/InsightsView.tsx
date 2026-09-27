@@ -5,6 +5,7 @@ import { PipelineGraph } from './PipelineGraph';
 import { FlamegraphView } from './FlamegraphView';
 import { Button, formatBytes, Icon, terminal } from './ui';
 import type { IconName } from './ui';
+import { ScrollEdgeFrame } from './ScrollEdgeShadows';
 import { useState } from 'react';
 
 export function InsightsView({ comparison, run, profile, pipeline, pipelineAvailable, flamegraph, flamegraphCapability, onLoad, onLoadPipeline, onLoadFlamegraph, loading }: { comparison?: RunComparisonProps; run: Run; profile?: QueryProfile; pipeline?: ProfilePipeline; pipelineAvailable: boolean; flamegraph?: FlamegraphSnapshot; flamegraphCapability?: Capability; onLoad: () => void; onLoadPipeline: () => void; onLoadFlamegraph: () => void; loading: boolean }) {
@@ -28,7 +29,7 @@ export function InsightsView({ comparison, run, profile, pipeline, pipelineAvail
     const selectedTraceType = flamegraph?.series[traceType] ? traceType : traceTypes[0];
     const totalSamples = flamegraph ? flamegraph.samples.CPU + flamegraph.samples.Real : 0;
     const flamegraphAvailable = flamegraphCapability?.available === true;
-    return <div className="insights-view animate-enter">
+    return <ScrollEdgeFrame<HTMLDivElement> className="insights-view-frame">{ref => <div ref={ref} className="insights-view animate-enter">
         <div className="insights-mode-tabs" role="tablist" aria-label="Execution insight views">
             <button id="insights-overview-tab" type="button" role="tab" aria-selected={tab === 'overview'} aria-controls="insights-overview-panel" onClick={() => setTab('overview')}>Overview</button>
             <button id="insights-flamegraph-tab" type="button" role="tab" aria-selected={tab === 'flamegraph'} aria-controls="insights-flamegraph-panel" onClick={() => setTab('flamegraph')}>CPU profile</button>
@@ -64,5 +65,5 @@ export function InsightsView({ comparison, run, profile, pipeline, pipelineAvail
                                     ? <><FlamegraphView key={`${run.id}:${selectedTraceType}`} series={flamegraph.series[selectedTraceType]!}/>{flamegraph.truncated && <p className="observability-footnote">The flamegraph was bounded to the most frequent sampled stacks.</p>}</>
                                     : <div className="observability-empty"><strong>No {traceType === 'CPU' ? 'CPU' : 'wall-clock'} samples were recorded.</strong><p>Choose the other sample type if it is available.</p></div>}
         </section>
-    </div>;
+    </div>}</ScrollEdgeFrame>;
 }

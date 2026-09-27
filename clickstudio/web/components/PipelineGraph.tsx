@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useId, useRef, type CSSProperties, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useMemo, useState, useId, useRef, type CSSProperties, type KeyboardEvent } from 'react';
 import type { ReactNode } from 'react';
 import type { ProfilePipeline, ProfilePipelineNode } from '../../shared/types';
 import {
@@ -19,6 +19,7 @@ import {
     type PipelineGraphKind,
 } from './pipeline-graph-model';
 import type { Copy } from '../i18n';
+import { ScrollEdgeFrame } from './ScrollEdgeShadows';
 
 export function PipelineGraph({ pipeline, heading, subheading, graphKind = 'execution', onSelectNode, renderSelection, initialSelectedId, copy }: {
     pipeline: ProfilePipeline;
@@ -38,6 +39,9 @@ export function PipelineGraph({ pipeline, heading, subheading, graphKind = 'exec
     const [selectedId, setSelectedId] = useState<string | undefined>(firstNodeId);
     const [zoom, setZoom] = useState(1);
     const graphViewport = useRef<HTMLDivElement>(null);
+    const setGraphViewport = useCallback((element: HTMLDivElement | null) => {
+        graphViewport.current = element;
+    }, []);
     const graphWidth = Math.max(480, layout.width);
     const graphHeight = Math.max(160, layout.height);
     useEffect(() => {
@@ -154,7 +158,7 @@ export function PipelineGraph({ pipeline, heading, subheading, graphKind = 'exec
                 <span>{copy?.pipelineFit ?? 'Fit graph'}</span>
             </button>
         </div>
-        <div ref={graphViewport} className="pipeline-graph-scroll overflow-auto" role="region" aria-label={viewportLabel}>
+        <ScrollEdgeFrame<HTMLDivElement> className="pipeline-graph-viewport-frame" onViewport={setGraphViewport}>{ref => <div ref={ref} className="pipeline-graph-scroll overflow-auto" role="region" aria-label={viewportLabel}>
             <svg className="pipeline-graph-svg" width={Math.round(graphWidth * zoom)} height={Math.round(graphHeight * zoom)} viewBox={`0 0 ${graphWidth} ${graphHeight}`} role="group" aria-label={labels.svg}>
                 <defs>
                     <pattern id={gridId} width="32" height="32" patternUnits="userSpaceOnUse"><path d="M 32 0 H 0 V 32" className="pipeline-graph-grid-line"/></pattern>
@@ -210,7 +214,7 @@ export function PipelineGraph({ pipeline, heading, subheading, graphKind = 'exec
                     </g>;
                 })}
             </svg>
-        </div>
+        </div>}</ScrollEdgeFrame>
         {selected && <div className={`pipeline-node-inspector${graphKind === 'explain-plan' ? ' is-plan' : ''}${graphKind === 'index-analysis' ? ' is-index-analysis' : ''}`} aria-live="polite" aria-label={terminology.details}>
             <div className="pipeline-node-inspector-main"><span className="eyebrow">{terminology.selected.toUpperCase()}</span><strong>{graphKind === 'sql-flow' ? sqlFlowNodeLabel(selected, copy) : selected.label}</strong>{graphKind === 'explain-plan' || graphKind === 'index-analysis' ? renderSelection?.(selected) : <><small>{graphKind === 'sql-flow' ? sqlFlowNodeKind(selected.kind, copy) : selected.kind} <i>·</i> {graphKind === 'sql-flow' ? sqlFlowNodeStatus(selected.status, copy) : selected.status === 'planned' ? copy?.plannedStatus ?? selected.status : selected.status}</small>{sqlFlowNodeDetail(selected, graphKind === 'sql-flow' ? copy : undefined) && sqlFlowNodeDetail(selected, graphKind === 'sql-flow' ? copy : undefined) !== selected.label && <p>{sqlFlowNodeDetail(selected, graphKind === 'sql-flow' ? copy : undefined)}</p>}</>}</div>
             {graphKind !== 'explain-plan' && graphKind !== 'index-analysis' && <div className="pipeline-node-facts">

@@ -3,6 +3,7 @@ import { countRowsByCategory, countRowsOverTime, numericType, recommendChart, te
 import type { Result } from '../../shared/types';
 import type { Draft } from '../workspace-state';
 import type { Copy, Locale } from '../i18n';
+import { ScrollEdgeFrame } from './ScrollEdgeShadows';
 import { chartText, formatCount, seriesColor } from './chart-helpers';
 
 export function RowCountChart({ result, chart, suggestion, onChart, copy, locale }: {
@@ -68,7 +69,7 @@ export function RowCountChart({ result, chart, suggestion, onChart, copy, locale
         ? groupByIndex === undefined ? copy.rowsOverTime : chartText(copy.rowsOverTimeBy, { dimension: groupName })
         : chartText(copy.rowsBy, { dimension: dimensionName });
 
-    return <div className="chart-workspace animate-enter">
+    return <ScrollEdgeFrame<HTMLDivElement> className="chart-workspace-frame">{ref => <div ref={ref} className="chart-workspace animate-enter">
         <div className="chart-title-row">
             <div>
                 <span className="eyebrow">{copy.visualExploration}</span>
@@ -124,5 +125,5 @@ export function RowCountChart({ result, chart, suggestion, onChart, copy, locale
                 : chartText(copy.categorySummary, { categories: formatCount(bars.length, locale), rows: formatCount(result.rows.length, locale) })}
                 <i>·</i> {result.completeness === 'truncated' ? copy.retainedPrefixOnly : copy.completeQueryResult}</span>
         </div>
-    </div>;
+    </div>}</ScrollEdgeFrame>;
 }

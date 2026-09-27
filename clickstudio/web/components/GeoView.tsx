@@ -5,6 +5,7 @@ import { nativeGeoColumns, nativeGeoType, prepareGeoFeatures, recommendGeo, type
 import { geoHueForValue } from '../geo-color';
 import type { Column, Result } from '../../shared/types';
 import type { Locale } from '../i18n';
+import { ScrollEdgeFrame } from './ScrollEdgeShadows';
 
 const WIDTH = 960;
 const HEIGHT = 470;
@@ -224,7 +225,7 @@ export function GeoView({ result, loading, locale }: { result?: Result; loading:
     if (!recommendation || !config) return <div className="chart-empty">Return a native ClickHouse geometry column or named longitude/latitude columns to open Map.</div>;
     const coordinateModeAvailable = numericColumns.length >= 2;
     const measureOptions = numericColumns.filter(index => config.source.mode !== 'coordinates' || (index !== config.source.longitude && index !== config.source.latitude));
-    return <div className="geo-workspace animate-enter">
+    return <ScrollEdgeFrame<HTMLDivElement> className="geo-workspace-frame">{ref => <div ref={ref} className="geo-workspace animate-enter">
         <div className="geo-title-row">
             <div><span className="eyebrow">CLICKHOUSE GEO</span><h3>Spatial explorer</h3><p>{config.reason}. Geometry is rendered from the bounded retained result, without extra SQL or external map services.</p></div>
             <div className="chart-controls geo-controls">
@@ -244,5 +245,5 @@ export function GeoView({ result, loading, locale }: { result?: Result; loading:
         </div>
         {!prepared?.features.length ? <div className="chart-empty">No returned rows contain valid longitude/latitude geometry for this selection.</div>
             : <MapCanvas prepared={prepared} columns={columns} measureIndex={config.measure} completeness={result.completeness} locale={locale}/>}
-    </div>;
+    </div>}</ScrollEdgeFrame>;
 }

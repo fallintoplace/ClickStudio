@@ -4,6 +4,7 @@ import { buildSqlFlow } from '../sql-flow';
 import { AnalyzerTreeView } from './AnalyzerTreeView';
 import { AstGraph } from './AstGraph';
 import { PipelineGraph } from './PipelineGraph';
+import { ScrollEdgeFrame } from './ScrollEdgeShadows';
 import type { Copy } from '../i18n';
 
 type StructureView = 'flow' | 'ast' | 'analyzer';
@@ -34,7 +35,7 @@ export function SqlFlowView({ copy, sql, sourceOffset, parseResult, parserEnable
             : parserStatus === 'unavailable' ? copy.sqlFlowParserUnavailable
                 : parseResult?.error?.message ?? parseResult?.ast_error ?? copy.sqlAstUnavailable;
 
-    return <section className="sql-flow-view" aria-label={copy.visualizeSqlStructure}>
+    return <ScrollEdgeFrame<HTMLElement> className="sql-flow-view-frame">{ref => <section ref={ref} className="sql-flow-view" aria-label={copy.visualizeSqlStructure}>
         <header className="sql-flow-heading">
             <div>
                 <span className="eyebrow">{copy.sqlStructure.toUpperCase()}</span>
@@ -57,5 +58,5 @@ export function SqlFlowView({ copy, sql, sourceOffset, parseResult, parserEnable
             }}/>} 
             <AnalyzerTreeView active={view === 'analyzer'} available={analyzerAvailable} unavailableReason={analyzerUnavailableReason} connectionId={connectionId} sql={sql} parameters={parameters} copy={copy}/>
         </>}
-    </section>;
+    </section>}</ScrollEdgeFrame>;
 }

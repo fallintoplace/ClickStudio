@@ -4,6 +4,7 @@ import type { WorkloadSnapshot, WorkloadWindow } from '../../shared/workload';
 import type { Capability } from '../../shared/types';
 import { loadWorkload } from '../observability-provider';
 import { message } from '../api';
+import { ScrollEdgeFrame } from './ScrollEdgeShadows';
 import { Button, formatBytes, Icon } from './ui';
 
 const windows: Array<{ value: WorkloadWindow; label: string }> = [
@@ -81,7 +82,7 @@ export function WorkloadExplorer({ connectionId, capability, trusted }: { connec
             </div>
             <div className="workload-scatter-card">
                 <div className="workload-section-heading"><div><span className="eyebrow">RECENT EXECUTIONS</span><strong>Duration vs. peak memory</strong></div><span className="workload-chart-legend"><i/>Successful <i className="is-error"/>Failed · Bubble size: rows read</span></div>
-                {snapshot.points.length ? <div className="workload-scatter-scroll"><svg className="workload-scatter-svg" viewBox={`0 0 ${chartWidth} ${chartHeight}`} role="group" aria-label="Recent query execution duration plotted against memory usage">
+                {snapshot.points.length ? <ScrollEdgeFrame<HTMLDivElement> className="workload-scatter-frame">{ref => <div ref={ref} className="workload-scatter-scroll"><svg className="workload-scatter-svg" viewBox={`0 0 ${chartWidth} ${chartHeight}`} role="group" aria-label="Recent query execution duration plotted against memory usage">
                     {chart.x.ticks(5).map(tick => <g key={`x-${tick}`} className="workload-axis"><line x1={chart.x(tick)} x2={chart.x(tick)} y1={margin.top} y2={chartHeight - margin.bottom}/><text x={chart.x(tick)} y={chartHeight - margin.bottom + 22} textAnchor="middle">{Math.round(tick)} ms</text></g>)}
                     {chart.y.ticks(4).map(tick => <g key={`y-${tick}`} className="workload-axis"><line x1={margin.left} x2={chartWidth - margin.right} y1={chart.y(tick)} y2={chart.y(tick)}/><text x={margin.left - 10} y={chart.y(tick) + 3} textAnchor="end">{formatBytes(tick)}</text></g>)}
                     {snapshot.points.map(point => {
@@ -90,7 +91,7 @@ export function WorkloadExplorer({ connectionId, capability, trusted }: { connec
                             <title>{`${point.at} · ${point.durationMs} ms · ${formatBytes(point.memory)} · ${count(point.readRows)} rows read · ${point.queryId}`}</title>
                         </circle>;
                     })}
-                </svg></div> : <div className="observability-state">No query executions in this time window.</div>}
+                </svg></div>}</ScrollEdgeFrame> : <div className="observability-state">No query executions in this time window.</div>}
             </div>
             <div className="workload-browser">
                 <section className="workload-family-list" aria-label="Query families">

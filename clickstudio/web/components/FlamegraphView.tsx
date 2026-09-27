@@ -2,6 +2,7 @@ import { hierarchy, partition } from 'd3';
 import type { HierarchyRectangularNode } from 'd3';
 import { useMemo, useState, type KeyboardEvent } from 'react';
 import type { FlamegraphFrame, FlamegraphSeries } from '../../shared/flamegraph';
+import { ScrollEdgeFrame } from './ScrollEdgeShadows';
 
 const width = 1120;
 const height = 390;
@@ -29,7 +30,7 @@ export function FlamegraphView({ series }: { series: FlamegraphSeries }) {
 
     return <div className="flamegraph-view">
         <div className="flamegraph-summary"><span><i className="flamegraph-signal"/>{series.type === 'CPU' ? 'CPU samples' : 'Wall-clock samples'} · <strong>{series.samples.toLocaleString()}</strong></span><small>Each bar’s width shows its share of samples. Click a frame to inspect it.</small></div>
-        <div className="flamegraph-canvas" role="group" aria-label={`${series.type} flamegraph`}>
+        <ScrollEdgeFrame<HTMLDivElement> className="flamegraph-canvas-frame">{ref => <div ref={ref} className="flamegraph-canvas" role="group" aria-label={`${series.type} flamegraph`}>
             <svg viewBox={`0 0 ${width} ${height}`} className="flamegraph-svg" role="group" aria-label={`${series.type} samples by call stack`}>
                 {nodes.map(node => {
                     const x = node.x0, y = height - node.y1, rectWidth = Math.max(0, node.x1 - node.x0), rectHeight = Math.max(0, node.y1 - node.y0);
@@ -43,7 +44,7 @@ export function FlamegraphView({ series }: { series: FlamegraphSeries }) {
                     </g>;
                 })}
             </svg>
-        </div>
+        </div>}</ScrollEdgeFrame>
         <div className="flamegraph-detail" aria-live="polite">
             {selected ? <><span className="eyebrow">SELECTED FRAME</span><strong>{selected.name}</strong><div><span>{selected.samples.toLocaleString()} samples</span><span>{series.samples ? (selected.samples / series.samples * 100).toFixed(1) : '0.0'}% of this profile</span><span>{selected.children.length.toLocaleString()} child frames</span>{selected.location && <code>{selected.location}</code>}</div></> : <p>Select a frame to see its sample share and source location.</p>}
         </div>
