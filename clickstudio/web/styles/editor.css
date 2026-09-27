@@ -125,11 +125,9 @@
     .run-explain-actions { display: grid; min-width: 0; width: 100%; flex: none; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; gap: 3px; padding: 4px; border: 1px solid var(--line); border-radius: var(--radius-compact); background: color-mix(in srgb, var(--panel-raised) 58%, transparent); }
     .run-explain-label { grid-column: 1 / -1; padding: 2px 4px 4px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 8px; font-weight: 760; letter-spacing: .1em; }
     .run-explain-actions .run-option-button { min-height: 30px; padding-inline: 4px; font-size: 8px; }
-    .run-option-tooltip-anchor { position: relative; display: flex; min-width: 0; width: 100%; flex: none; }
-    .run-option-tooltip-anchor > .run-option-button { width: 100%; justify-content: center; }
-    .run-option-tooltip-anchor:focus-visible { border-radius: 8px; outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent); outline-offset: 3px; }
-    .run-option-tooltip { position: fixed; z-index: var(--z-tooltip); top: 0; left: 0; width: max-content; max-width: min(300px, calc(100vw - 32px)); padding: 8px 10px; border: 1px solid var(--line-bright); border-radius: 8px; background: var(--panel-raised); color: var(--text-soft); box-shadow: var(--shadow); font-size: 9px; line-height: 1.5; white-space: normal; opacity: 0; visibility: hidden; pointer-events: none; transform: translateY(4px); transition: opacity .14s ease, transform .14s ease, visibility .14s ease; }
-    .run-option-tooltip.is-visible[data-positioned="true"] { opacity: 1; visibility: visible; pointer-events: auto; transform: translateY(0); }
+    .run-option-disabled-anchor { position: relative; display: flex; min-width: 0; width: 100%; flex: none; }
+    .run-option-disabled-anchor > .run-option-button { width: 100%; justify-content: center; }
+    .run-option-disabled-anchor:focus-visible { border-radius: 8px; outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent); outline-offset: 3px; }
     .sql-ai-button { color: var(--violet); }
     .sql-ai-button[aria-pressed="true"] { border-color: color-mix(in srgb, var(--violet) 25%, transparent); background: color-mix(in srgb, var(--violet) 8%, transparent); }
     .sql-map-button { gap: 6px; color: var(--accent); }
