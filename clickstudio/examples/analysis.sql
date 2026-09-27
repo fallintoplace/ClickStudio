@@ -1,7 +1,7 @@
 -- ClickStudio live-query examples.
 --
--- Run the current statement with Ctrl/Cmd+Enter.
--- Run the whole file with Ctrl/Cmd+Shift+Enter or the Run script action.
+-- Use Run statement for the current statement.
+-- Use Run script to execute the whole file.
 -- The active statements are read-only. The parameter example stays commented so
 -- the whole file works without extra editor state.
 

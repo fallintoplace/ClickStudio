@@ -278,7 +278,6 @@ export function WorkspaceHelpPanel({ examples, sourceLabel, copy, locale, open, 
                                         <span className="eyebrow">EXECUTE</span>
                                         <h4>{copy.runStatement} or {copy.runScript}</h4>
                                         <p>{copy.runStatement} runs the selected SQL or the statement at the cursor. {copy.runScript} runs every statement and stops at the first error.</p>
-                                        <div className="workspace-help-shortcuts" role="group" aria-label="SQL keyboard shortcuts"><span><kbd>⌘ / Ctrl + Enter</kbd><small>Run statement</small></span><span><kbd>⌘ / Ctrl + Shift + Enter</kbd><small>Run script</small></span></div>
                                     </article>
                                     <article className="workspace-help-guide-card">
                                         <span className="workspace-help-guide-index">04</span>

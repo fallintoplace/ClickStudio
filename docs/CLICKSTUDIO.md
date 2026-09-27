@@ -81,16 +81,9 @@ The editor supports:
 - multi-statement scripts;
 - named ClickHouse parameters;
 - SQL formatting and validation;
-- command palette navigation;
 - query history;
 - saved revisions;
 - retained execution evidence.
-
-Keyboard shortcuts:
-
-- **Ctrl/Cmd+Enter** - run the selection or current statement;
-- **Ctrl/Cmd+Shift+Enter** - run the script;
-- **Ctrl/Cmd+K** or **Ctrl/Cmd+P** - open the command palette.
 
 ## Schema and object exploration
 

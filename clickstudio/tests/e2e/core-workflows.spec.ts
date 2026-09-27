@@ -99,10 +99,10 @@ test('Run evidence stays with its draft through tab and mode switches', async ({
     expect(runRequests).toBe(2);
 });
 
-test('Keyboard Run submits the live CodeMirror document before React catches up', async ({ page }) => {
+test('Run button submits the live CodeMirror document before React catches up', async ({ page }) => {
     await trust(page);
     await useAdvancedMode(page);
-    const sql = 'SELECT 42 AS keyboard_snapshot';
+    const sql = 'SELECT 42 AS button_snapshot';
     await replaceSql(page, 'SELECT 1 AS previous_draft');
 
     const submitted = page.waitForRequest(request => request.method() === 'POST' && new URL(request.url()).pathname === '/api/runs');
@@ -112,18 +112,19 @@ test('Keyboard Run submits the live CodeMirror document before React catches up'
         document.execCommand('selectAll');
         if (!document.execCommand('insertText', false, currentSql))
             throw new Error('Could not update the CodeMirror document synchronously.');
-        const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
         content.dispatchEvent(new KeyboardEvent('keydown', {
-            key: 'Enter', code: 'Enter', bubbles: true, cancelable: true,
-            metaKey: isMac, ctrlKey: !isMac,
+            key: 'ArrowRight', code: 'ArrowRight', bubbles: true, cancelable: true,
         }));
+        const runButton = document.querySelector<HTMLButtonElement>('[data-testid="run-statement"]');
+        if (!runButton) throw new Error('Run statement button is missing.');
+        runButton.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     }, sql);
     const request = await submitted;
     expect((request.postDataJSON() as { sql: string }).sql).toBe(sql);
     await expect(page.locator('.execution-bar')).toHaveAttribute('data-run-status', 'succeeded');
 });
 
-test('Two keyboard Run events in one task submit only one request', async ({ page }) => {
+test('Two Run button clicks in one task submit only one request', async ({ page }) => {
     await trust(page);
     await useAdvancedMode(page);
     await replaceSql(page, 'SELECT 42 AS single_submission');
@@ -132,18 +133,51 @@ test('Two keyboard Run events in one task submit only one request', async ({ pag
     page.on('request', request => {
         if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/runs') runRequests++;
     });
-    await page.locator('.cm-content').evaluate(element => {
-        const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
-        const shortcut = () => new KeyboardEvent('keydown', {
-            key: 'Enter', code: 'Enter', bubbles: true, cancelable: true,
-            metaKey: isMac, ctrlKey: !isMac,
-        });
-        element.dispatchEvent(shortcut());
-        element.dispatchEvent(shortcut());
+    await page.evaluate(() => {
+        const runButton = document.querySelector<HTMLButtonElement>('[data-testid="run-statement"]');
+        if (!runButton) throw new Error('Run statement button is missing.');
+        const click = () => runButton.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+        click();
+        click();
     });
     await expect(page.locator('.execution-bar')).toHaveAttribute('data-run-status', 'succeeded');
     await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
     expect(runRequests).toBe(1);
+});
+
+test('SQL editor keyboard commands do not execute statements or scripts', async ({ page }) => {
+    await trust(page);
+    await useAdvancedMode(page);
+    await replaceSql(page, 'SELECT 42 AS button_only');
+
+    let runRequests = 0, scriptRequests = 0;
+    page.on('request', request => {
+        const path = new URL(request.url()).pathname;
+        if (request.method() === 'POST' && path === '/api/runs') runRequests++;
+        if (request.method() === 'POST' && path === '/api/scripts') scriptRequests++;
+    });
+    await page.locator('.cm-content').evaluate(element => {
+        const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
+        for (const shiftKey of [false, true])
+            element.dispatchEvent(new KeyboardEvent('keydown', {
+                key: 'Enter', code: 'Enter', bubbles: true, cancelable: true,
+                metaKey: isMac, ctrlKey: !isMac, shiftKey,
+            }));
+    });
+    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+    expect(runRequests).toBe(0);
+    expect(scriptRequests).toBe(0);
+});
+
+test('SQL tabs rename by double-click without an F2 command', async ({ page }) => {
+    await trust(page);
+    await useAdvancedMode(page);
+    const tab = page.getByRole('tab', { name: 'Getting started.sql', exact: true });
+    await tab.focus();
+    await page.keyboard.press('F2');
+    await expect(page.getByRole('textbox', { name: 'Rename Getting started.sql', exact: true })).toHaveCount(0);
+    await tab.getByText('Getting started.sql', { exact: true }).dblclick();
+    await expect(page.getByRole('textbox', { name: 'Rename Getting started.sql', exact: true })).toBeVisible();
 });
 
 test('A running query shows its submitted SQL and keeps previous rows until it ends', async ({ page }) => {

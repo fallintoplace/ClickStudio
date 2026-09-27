@@ -66,8 +66,6 @@ The repository includes copy-pasteable examples that match the bundled local set
 - [`clickstudio/examples/import.csv`](clickstudio/examples/import.csv) can be imported into `default.import_events`.
 - [`clickstudio/examples/connections.json`](clickstudio/examples/connections.json) shows the multi-connection configuration format.
 
-In the editor, **Ctrl/Cmd+Enter** runs the selection or current statement. **Ctrl/Cmd+Shift+Enter** runs the script. **Ctrl/Cmd+K** or **Ctrl/Cmd+P** opens the command palette.
-
 ## Highlights
 
 - Run read-only SQL and inspect typed, paginated results.

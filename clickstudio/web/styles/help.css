@@ -281,10 +281,6 @@
     .workspace-help-assistant-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 10px; border-top: 1px solid var(--help-border); }
     .workspace-help-assistant-footer > span { color: var(--muted); font-size: var(--help-text-small); line-height: 1.5; }
     .workspace-help-assistant-footer .button-base { flex: none; }
-    .workspace-help-shortcuts { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 2px; color: var(--muted); font-size: var(--help-text-meta); }
-    .workspace-help-shortcuts > span { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-    .workspace-help-shortcuts kbd { padding: 3px 6px; border: 1px solid var(--help-border-strong); border-radius: 5px; background: var(--help-code-surface); color: var(--text-soft); font-family: var(--font-mono); }
-    .workspace-help-shortcuts small { color: var(--muted); font-size: var(--help-text-meta); }
     .workspace-help-monitoring-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 10px; }
     .workspace-help-monitoring-actions .button-base { flex: none; }
     .workspace-help-monitoring-preview { display: grid; gap: 9px; margin-top: 12px; padding: 12px; border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--help-border)); border-radius: var(--help-radius-card); background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 5%, var(--help-surface)), var(--help-surface) 58%); }

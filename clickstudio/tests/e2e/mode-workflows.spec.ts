@@ -207,9 +207,22 @@ test('Advanced editor, insights, pipeline and AI copilot stay read-only until a 
     await expect(results.getByRole('region', { name: 'Scrollable operator graph', exact: true })).toBeVisible();
     await page.getByTestId('open-ai').click();
     await expect(page.locator('.assistant-task-picker')).toHaveCount(0);
-    await page.getByRole('textbox', { name: 'Ask AI', exact: true }).fill('Why is this query slow?');
+    const question = page.getByRole('textbox', { name: 'Ask AI', exact: true });
+    await question.fill('Why is this query slow?');
+    const aiShortcutRequest = page.waitForRequest(request => {
+        const path = new URL(request.url()).pathname;
+        return request.method() === 'POST' && path.startsWith('/api/assistant/');
+    }, { timeout: 200 }).then(() => true, () => false);
+    await question.evaluate(element => {
+        const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
+        element.dispatchEvent(new KeyboardEvent('keydown', {
+            key: 'Enter', code: 'Enter', bubbles: true, cancelable: true,
+            metaKey: isMac, ctrlKey: !isMac,
+        }));
+    });
+    expect(await aiShortcutRequest).toBe(false);
     await page.getByRole('checkbox', { name: /Include latest run/ }).check();
-    await page.getByRole('button', { name: 'Ask AI', exact: true }).click();
+    await page.locator('.assistant-panel').getByRole('button', { name: 'Ask AI', exact: true }).click();
     await expect(page.getByText('The fixture has no measured performance data.', { exact: true })).toBeVisible();
     expect(assistantRequests).toHaveLength(1);
     expect(assistantRequests[0]).toMatchObject({ action: 'ask', question: 'Why is this query slow?', runId: activeRunId, includeRun: true });

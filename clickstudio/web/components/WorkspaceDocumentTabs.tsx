@@ -78,11 +78,6 @@ export function WorkspaceDocumentTabs({
                 onClick={() => onActivate(draft.id)}
                 onKeyDown={event => {
                     if (event.target !== event.currentTarget) return;
-                    if (event.key === 'F2') {
-                        event.preventDefault();
-                        beginTabRename(draft);
-                        return;
-                    }
                     if (event.key === 'Enter' || event.key === ' ') {
                         event.preventDefault();
                         onActivate(draft.id);
@@ -122,7 +117,7 @@ export function WorkspaceDocumentTabs({
                     />
                     : <span
                         className="document-tab-name"
-                        title={`Double-click to rename ${draft.name} · F2`}
+                        title={`Double-click to rename ${draft.name}`}
                         onDoubleClick={event => {
                             event.stopPropagation();
                             beginTabRename(draft);
