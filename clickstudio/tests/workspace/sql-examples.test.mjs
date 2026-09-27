@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PLAYGROUND_STARTER_SQL } from '../../.workspace-build/web/playground.js';
 import { sqlExamplesFor } from '../../.workspace-build/web/sql-examples.js';
+import { ONTIME_FLIGHT_DELAY_EXAMPLE } from '../../.workspace-build/shared/assistant-examples.js';
 import { hasSqlExampleTranslation, localizeSqlExample } from '../../.workspace-build/web/sql-examples-locales.js';
 
 test('SQL example catalogs match the selected Playground or fixture source', () => {
@@ -47,6 +48,16 @@ test('Playground examples use ClickHouse-owned datasets with chart-ready result 
     }
     assert.match(byId.get('nyc-taxi-fare-distance')?.sql ?? '', /LIMIT 240\s*$/);
     assert.match(byId.get('stock-jnj-history')?.description ?? '', /historical/i);
+});
+
+test('The Playground flight example uses the same SQL included in Ask AI context', () => {
+    const example = sqlExamplesFor({ id: 'playground', dataSource: 'clickhouse' })
+        .find(item => item.id === ONTIME_FLIGHT_DELAY_EXAMPLE.id);
+
+    assert.ok(example);
+    assert.equal(example.name, ONTIME_FLIGHT_DELAY_EXAMPLE.name);
+    assert.equal(example.dataset, ONTIME_FLIGHT_DELAY_EXAMPLE.dataset);
+    assert.equal(example.sql, ONTIME_FLIGHT_DELAY_EXAMPLE.sql);
 });
 
 test('new Playground examples have unique read-only queries and valid chart column indexes', () => {

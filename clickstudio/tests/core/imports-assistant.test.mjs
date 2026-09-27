@@ -4,6 +4,7 @@ import { parseCsv, parseInput, ImportService } from '../../.core-build/core/impo
 import { AssistantService, buildContext } from '../../.core-build/core/assistant.js';
 import { evaluateProposal, runAssistantBenchmarks } from '../../.core-build/core/assistant-evaluation.js';
 import { selectAssistantReferenceDocs } from '../../.core-build/shared/reference-data.js';
+import { ONTIME_FLIGHT_DELAY_EXAMPLE, selectAssistantExamples } from '../../.core-build/shared/assistant-examples.js';
 import { MemoryStore } from '../../.core-build/core/store.js';
 import { exportCsv, chartNumber, filterRows, sampleChartRows, MAX_CHART_RENDER_POINTS } from '../../.core-build/shared/results.js';
 import { owner, other, schema } from './helpers.mjs';
@@ -151,6 +152,95 @@ test('Assistant context includes bounded documentation and shows its source in t
     assert.ok(ctx.summary.some(item => item.includes('ClickHouse docs sent: Function doc-0')));
     assert.ok(ctx.summary.some(item => item.includes('bounded to 4 of 5')));
     assert.match(ctx.payload.instructions, /reference documentation/);
+});
+test('Assistant selects the flight sample only for a matching Playground ask or generation request', () => {
+    const selected = selectAssistantExamples({ connectionId: 'playground', action: 'ask', question: 'Show flights by airport', sql: 'SELECT 1' });
+    assert.deepEqual(selected.map(example => example.id), [ONTIME_FLIGHT_DELAY_EXAMPLE.id]);
+    assert.deepEqual(selected[0].tables, [{ database: 'ontime', table: 'ontime' }]);
+    assert.equal(selectAssistantExamples({ connectionId: 'playground', action: 'generate', question: 'airline delays', sql: '' }).length, 1);
+    assert.deepEqual(selectAssistantExamples({ connectionId: 'playground', action: 'ask', question: 'Summarize customer reviews', sql: 'SELECT 1' }), []);
+    assert.deepEqual(selectAssistantExamples({ connectionId: 'local', action: 'ask', question: 'Show flights by airport', sql: 'SELECT 1' }), []);
+    assert.deepEqual(selectAssistantExamples({ connectionId: 'playground', action: 'review', question: 'Show flights by airport', sql: 'SELECT 1' }), []);
+});
+test('Assistant selects a flight sample from the current SQL when the question is generic', () => {
+    const selected = selectAssistantExamples({ connectionId: 'playground', action: 'ask', question: 'Explain this query', sql: 'SELECT Year FROM ontime.ontime' });
+    assert.deepEqual(selected.map(example => example.id), [ONTIME_FLIGHT_DELAY_EXAMPLE.id]);
+});
+test('Assistant selects the flight sample from selected-run SQL and delay wording', () => {
+    const fromRun = selectAssistantExamples({
+        connectionId: 'playground', action: 'ask', question: 'Why did this fail?', sql: 'SELECT 1',
+        evidenceSql: 'SELECT DepDelay FROM ontime.ontime',
+    });
+    const fromQuestion = selectAssistantExamples({
+        connectionId: 'playground', action: 'ask', question: 'How did departure delays change by month?', sql: 'SELECT 1',
+    });
+    assert.deepEqual(fromRun.map(example => example.id), [ONTIME_FLIGHT_DELAY_EXAMPLE.id]);
+    assert.deepEqual(fromQuestion.map(example => example.id), [ONTIME_FLIGHT_DELAY_EXAMPLE.id]);
+});
+test('Assistant keeps curated flight examples separate from live schema and prioritizes their available columns', () => {
+    const column = (database, table, name) => ({ database, table, name, type: 'String', defaultKind: '', comment: '' });
+    const flightSchema = {
+        ...schema,
+        connectionId: 'playground',
+        tables: [...schema.tables, { database: 'ontime', name: 'ontime', engine: 'MergeTree' }],
+        columns: [column('github', 'events', 'event_id'), column('ontime', 'ontime', 'Origin'), column('ontime', 'ontime', 'Dest'), column('ontime', 'ontime', 'FlightDate')],
+    };
+    const ctx = buildContext({ connectionId: 'playground', database: 'github', sql: 'SELECT 1', action: 'ask', question: 'Find flights by origin and destination', schema: flightSchema });
+    const context = JSON.parse(ctx.payload.context);
+    assert.deepEqual(context.curatedExamples.map(example => example.id), [ONTIME_FLIGHT_DELAY_EXAMPLE.id]);
+    assert.deepEqual(context.curatedExamples[0].sourceTables, [{ database: 'ontime', table: 'ontime' }]);
+    assert.deepEqual(context.schema.map(({ database, table, name }) => `${database}.${table}.${name}`), [
+        'ontime.ontime.Origin', 'ontime.ontime.Dest', 'ontime.ontime.FlightDate', 'github.events.event_id',
+    ]);
+    assert.ok(ctx.summary.some(item => item.includes('columns from example table ontime.ontime when present')));
+    assert.deepEqual(flightSchema.tables.map(table => `${table.database}.${table.name}`), ['default.events', 'ontime.ontime']);
+    assert.match(ctx.payload.instructions, /separate from the live schema/);
+    assert.match(ctx.payload.instructions, /schemaIncomplete is true/);
+
+    const sampleOnly = buildContext({
+        connectionId: 'playground', database: 'github', sql: 'SELECT 1', action: 'ask', question: 'Show flights',
+        schema: { ...schema, connectionId: 'playground' },
+    });
+    const sampleOnlyContext = JSON.parse(sampleOnly.payload.context);
+    assert.equal(sampleOnlyContext.curatedExamples.length, 1);
+    assert.equal(sampleOnlyContext.schema.some(column => column.database === 'ontime'), false);
+});
+test('Assistant prioritizes matching example columns ahead of the active database column cap', () => {
+    const githubColumns = Array.from({ length: 250 }, (_, index) => ({
+        database: 'github', table: 'events', name: 'field_' + index, type: 'String', defaultKind: '', comment: '',
+    }));
+    const flightColumns = ['Origin', 'Dest', 'FlightDate'].map(name => ({
+        database: 'ontime', table: 'ontime', name, type: 'String', defaultKind: '', comment: '',
+    }));
+    const wideSchema = { ...schema, connectionId: 'playground', columns: [...githubColumns, ...flightColumns] };
+    const ctx = buildContext({ connectionId: 'playground', database: 'github', sql: 'SELECT 1', action: 'ask', question: 'Show flights', schema: wideSchema });
+    const context = JSON.parse(ctx.payload.context);
+    assert.equal(context.schema.length, 250);
+    assert.deepEqual(context.schema.slice(0, 3).map(column => column.name), ['Origin', 'Dest', 'FlightDate']);
+    assert.equal(context.schemaIncomplete, true);
+});
+test('Assistant still filters sensitive columns from a prioritized example table', () => {
+    const flightSchema = {
+        ...schema,
+        connectionId: 'playground',
+        columns: [
+            { database: 'ontime', table: 'ontime', name: 'Origin', type: 'String', defaultKind: '', comment: '' },
+            { database: 'ontime', table: 'ontime', name: 'api_key', type: 'String', defaultKind: '', comment: '' },
+        ],
+    };
+    const ctx = buildContext({ connectionId: 'playground', database: 'github', sql: 'SELECT 1', action: 'ask', question: 'Show flights', schema: flightSchema, sensitiveColumns: ['api_key'] });
+    const context = JSON.parse(ctx.payload.context);
+    assert.deepEqual(context.schema.map(column => column.name), ['Origin']);
+    assert.ok(!ctx.payload.context.includes('api_key'));
+});
+test('Assistant drops optional example context before exceeding the context byte limit', () => {
+    const ctx = buildContext({
+        connectionId: 'playground', database: 'github', action: 'ask', question: 'Show flights',
+        sql: 'SELECT ' + 'x'.repeat(59_500), schema,
+    });
+    const context = JSON.parse(ctx.payload.context);
+    assert.ok(Buffer.byteLength(ctx.payload.context) <= 60_000);
+    assert.equal(context.curatedExamples.length, 0);
 });
 test('Credential-like literals in SQL are refused for AI sharing', () => assert.throws(() => buildContext({ connectionId: 'local', sql: "SELECT 'hello' -- password='dont-share'", action: 'generate', question: 'Explain', schema }), { code: 'CREDENTIAL_LIKE_CONTEXT' }));
 test('CSV exports protect formula-like cells and escape quotes', () => { const csv = exportCsv({ columns: [{ name: 'x', type: 'String' }], rows: [['=1+1'], ['a"b']] }); assert.ok(csv.includes("'=1+1")); assert.ok(csv.includes('"a""b"')); });

@@ -1,4 +1,5 @@
 import type { ChartConfig, Connection, Schema } from '../shared/types.js';
+import { ONTIME_FLIGHT_DELAY_EXAMPLE } from '../shared/assistant-examples.js';
 import { DEMO_PREVIEW_STARTERS } from './demo-preview.js';
 import { GEO_HELP_EXAMPLES } from './help-demos.js';
 import { PLAYGROUND_CONNECTION_ID, PLAYGROUND_STARTER_SQL } from './playground.js';
@@ -58,16 +59,9 @@ ORDER BY minute`,
         chart: { kind: 'line', x: 0, ys: [1, 2, 3], title: 'Frontend latency percentiles' },
     },
     {
-        id: 'ontime-flight-delay-operations', name: 'Flight Delay Operations', category: 'operations', dataset: 'US flights', featuredOrder: 3,
-        description: 'Spot seasonal departure-delay risk across nine years of US flight operations.',
-        sql: `SELECT
-    Year AS year,
-    Month AS month,
-    round(100.0 * countIf(DepDelay > 10) / count(), 1) AS delayed_pct
-FROM ontime.ontime
-WHERE Year BETWEEN 2000 AND 2008
-GROUP BY year, month
-ORDER BY year, month`,
+        id: ONTIME_FLIGHT_DELAY_EXAMPLE.id, name: ONTIME_FLIGHT_DELAY_EXAMPLE.name, category: 'operations', dataset: ONTIME_FLIGHT_DELAY_EXAMPLE.dataset, featuredOrder: 3,
+        description: ONTIME_FLIGHT_DELAY_EXAMPLE.description,
+        sql: ONTIME_FLIGHT_DELAY_EXAMPLE.sql,
         chart: { kind: 'heatmap', x: 1, groupBy: 0, ys: [2], title: 'Departure delay rate by month' },
     },
     {
