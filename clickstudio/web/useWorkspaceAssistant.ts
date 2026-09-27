@@ -93,9 +93,9 @@ export function useDefaultAssistantRunContext(
             if (includeRun) setIncludeRun(false);
             return;
         }
-        if (defaultedRunIdRef.current === runId) return;
+        if (assistantBusy || defaultedRunIdRef.current === runId) return;
         defaultedRunIdRef.current = runId;
-        if (!assistantBusy) setIncludeRun(true);
+        setIncludeRun(true);
     }, [assistantBusy, includeRun, runId, setIncludeRun]);
 }
 

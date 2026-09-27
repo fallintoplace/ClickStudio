@@ -239,12 +239,6 @@
     .assistant-chat-composer { display: grid; min-width: 0; gap: 4px; padding: 8px; border: 1px solid var(--line-bright); border-radius: 11px; background: var(--panel-raised); box-shadow: 0 5px 16px #0002; }
     .assistant-composer-context { display: grid; min-width: 0; gap: 5px; }
     .assistant-context-note { margin: 0; color: var(--muted); font-size: 8px; line-height: 1.45; }
-    .assistant-include-run { display: flex; min-width: 0; align-items: flex-start; gap: 7px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--page); color: var(--text-soft); font-size: 8px; cursor: pointer; }
-    .assistant-include-run input { flex: none; margin: 2px 0 0; accent-color: var(--accent); }
-    .assistant-include-run-copy { display: grid; min-width: 0; gap: 2px; line-height: 1.4; }
-    .assistant-include-run-copy strong { color: var(--text-soft); font-size: 8px; font-weight: 700; }
-    .assistant-include-run-copy small { color: var(--muted); font-size: 7px; line-height: 1.4; }
-    .assistant-include-run:has(input:disabled) { color: var(--muted); cursor: not-allowed; }
     .assistant-question-frame { min-width: 0; }
     .assistant-question-frame .field-textarea { display: block; box-sizing: border-box; width: 100%; min-height: 58px; max-height: 150px; resize: vertical; padding: 8px 2px; border: 0; border-radius: 0; outline: 0; background: transparent; color: var(--text); font-size: 9px; line-height: 1.5; }
     .assistant-question-frame .field-textarea:focus { box-shadow: none; }

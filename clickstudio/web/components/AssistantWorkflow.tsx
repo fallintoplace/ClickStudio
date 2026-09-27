@@ -24,9 +24,6 @@ export type AssistantWorkflowProps = {
     error: string;
     notice: string;
     trusted: boolean;
-    runId?: string;
-    includeRun: boolean;
-    onIncludeRun: (include: boolean) => void;
     onAskAI: () => void;
     onCancelRequest: () => void;
     schemaReady: boolean;
@@ -91,7 +88,7 @@ function AssistantOutput({ mode, sql, turn, busy, editorProposalId, onDecideProp
 
 export function AssistantWorkflow(props: AssistantWorkflowProps) {
     const { mode, sql, question, onQuestionChange, chats, activeChatId, turns, storageError, onNewChat, onSelectChat, onRenameChat, onDeleteChat,
-        editorProposalId, busy, error, trusted, runId, includeRun, onIncludeRun, cancelable, phase, notice, onAskAI, onCancelRequest,
+        editorProposalId, busy, error, trusted, cancelable, phase, notice, onAskAI, onCancelRequest,
         schemaReady, schemaLoading, schemaStatus, onRefreshSchema, onDecideProposal, onRunQuery, runDisabled } = props;
     const transcriptViewport = useRef<HTMLDivElement>(null);
     const activeChat = chats.find(chat => chat.id === activeChatId);
@@ -127,11 +124,7 @@ export function AssistantWorkflow(props: AssistantWorkflowProps) {
             {!schemaReady && trusted && <div className="assistant-feedback callout assistant-schema-refresh"><span>{schemaStatus || 'Load the ClickHouse schema before asking the assistant.'}</span><Button variant="secondary" disabled={schemaLoading} onClick={onRefreshSchema}>{schemaLoading ? 'Loading…' : 'Refresh schema'}</Button></div>}
             <div className="assistant-chat-composer">
                 <div className="assistant-composer-context">
-                    <p className="assistant-context-note">Every message includes the SQL in your editor and available tables and columns from this connection.</p>
-                    <label className="assistant-include-run">
-                        <input type="checkbox" checked={includeRun} onChange={event => onIncludeRun(event.target.checked)} disabled={!runId} aria-describedby="assistant-include-run-help"/>
-                        <span className="assistant-include-run-copy"><strong>Also include latest query run</strong><small id="assistant-include-run-help">{runId ? 'Adds its SQL, saved result rows, and any error.' : 'Run a query first to include its SQL, rows, and any error.'}</small></span>
-                    </label>
+                    <p className="assistant-context-note">Messages include the current SQL and schema. When a run has finished, its SQL, saved rows, and any error are included too.</p>
                 </div>
                 <ScrollEdgeFrame<HTMLTextAreaElement> className="assistant-question-frame">{ref => <textarea ref={ref} id="assistant-question" className="field-textarea" aria-label="Ask AI" value={question} onChange={event => onQuestionChange(event.target.value)} onKeyDown={sendOnEnter} placeholder="Message… (Enter to send)" rows={2}/>}</ScrollEdgeFrame>
                 <div className="assistant-composer-footer"><span>Shift+Enter for a new line</span>{busy ? cancelable ? <Button variant="danger" onClick={onCancelRequest} aria-label="Stop assistant response" title="Stop generating">Stop</Button> : <Button variant="secondary" disabled>{phase === 'deciding' ? 'Applying…' : 'Working…'}</Button> : <Button variant="primary" disabled={!trusted || !schemaReady || !question.trim()} onClick={ask}><Icon name="send"/>Send</Button>}</div>

@@ -252,8 +252,6 @@ test('Experimental insights and AI requests do not execute SQL', async ({ page }
     await expect(page.locator('.assistant-task-picker')).toHaveCount(0);
     const question = page.getByRole('textbox', { name: 'Ask AI', exact: true });
     await question.fill('Why is this query slow?');
-    const includeRun = page.getByRole('checkbox', { name: /Also include latest query run/ });
-    await expect(includeRun).toBeChecked();
     const assistantRequest = page.waitForRequest(request => {
         const path = new URL(request.url()).pathname;
         return request.method() === 'POST' && path === '/api/assistant/sql';
