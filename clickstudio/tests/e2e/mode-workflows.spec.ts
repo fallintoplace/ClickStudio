@@ -9,7 +9,7 @@ async function beginInCompactMode(page: Page) {
     await expect(page.getByRole('textbox', { name: 'SQL editor', exact: true })).toBeVisible();
     await expect(page.getByTestId('open-ai')).toBeVisible();
     await expect(page.getByTestId('format-sql')).toBeVisible();
-    await expect(page.getByTestId('run-action-script')).toBeVisible();
+    await expect(page.getByTestId('run-button')).toHaveCount(1);
     await expect(page.getByTestId('save-query')).toHaveCount(0);
     await expect(page.locator('.draft-status')).toHaveCount(0);
     await expect(page.locator('.restore-sql-trigger')).toHaveCount(0);
@@ -17,7 +17,6 @@ async function beginInCompactMode(page: Page) {
     await expect(page.locator('.editor-control-rail')).toHaveCount(0);
     await expect(page.locator('.editor-heading-tools')).toHaveCount(0);
     await expect(page.locator('.parser-switch')).toHaveCount(0);
-    await expect(page.getByTestId('run-statement')).toBeVisible();
     await expect(page.getByTestId('new-sql')).toBeVisible();
     await expect(page.locator('.document-tabs.is-compact-single')).toBeVisible();
     const tab = page.getByRole('tablist', { name: 'SQL documents', exact: true }).getByRole('tab');
@@ -45,14 +44,14 @@ test('Standard exposes assignment actions and can run a query without opening AI
     await expect(editor).toContainText('SELECT');
     await expect(page.getByTestId('open-ai')).toBeVisible();
     await expect(page.getByTestId('format-sql')).toBeVisible();
-    await expect(page.getByTestId('run-action-script')).toBeVisible();
+    await expect(page.getByTestId('run-button')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Import', exact: true })).toBeVisible();
     const exportButton = page.getByRole('button', { name: 'Export', exact: true });
     await expect(exportButton).toBeDisabled();
     await expect(page.locator('.editor-control-rail')).toHaveCount(0);
     await expect(page.getByRole('textbox', { name: 'Describe your data question', exact: true })).toHaveCount(0);
 
-    const runQuery = page.getByTestId('run-statement');
+    const runQuery = page.getByTestId('run-button');
     if (await runQuery.isDisabled()) {
         await page.getByRole('button', { name: 'Start exploring', exact: true }).click();
         await expect(runQuery).toBeEnabled();
@@ -156,7 +155,7 @@ test('Switching to Experimental keeps the AI chat, query and run evidence', asyn
     await page.getByRole('button', { name: 'Apply to draft', exact: true }).click();
     await expect(page.locator('.cm-content')).toContainText(generatedSql);
     expect(runRequests).toHaveLength(0);
-    await page.getByTestId('run-statement').click();
+    await page.getByTestId('run-button').click();
 
     const results = page.getByRole('region', { name: 'Query results', exact: true });
     await expect(results.locator('[data-run-status="succeeded"]')).toBeVisible();
@@ -187,7 +186,7 @@ test('Switching to Experimental keeps the AI chat, query and run evidence', asyn
 test('Standard can run a script and open its statement results', async ({ page }) => {
     await beginInCompactMode(page);
     await replaceSql(page, 'SELECT 1; SELECT 2;');
-    await expect(page.getByTestId('run-action-script')).toBeEnabled();
+    await expect(page.getByTestId('run-button')).toBeEnabled();
     await runScript(page);
 
     const results = page.getByRole('region', { name: 'Query results', exact: true });
@@ -234,7 +233,7 @@ test('Experimental insights and AI requests do not execute SQL', async ({ page }
     await expect(editor).toBeVisible();
     const startedRun = page.waitForResponse(response =>
         response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/runs');
-    await page.getByTestId('run-statement').click();
+    await page.getByTestId('run-button').click();
     const activeRunId = runIdentity(await (await startedRun).json()).id;
     const results = page.getByRole('region', { name: 'Query results', exact: true });
     await expect(results.locator('[data-run-status="succeeded"]')).toBeVisible();

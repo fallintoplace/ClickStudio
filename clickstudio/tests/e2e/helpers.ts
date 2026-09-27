@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 
-export const runStatementButton = (page: Page) => page.getByTestId('run-statement');
+export const runButton = (page: Page) => page.getByTestId('run-button');
 
 export function jsonRecord(value: unknown, label = 'JSON value'): Record<string, unknown> {
     if (typeof value !== 'object' || value === null || Array.isArray(value))
@@ -39,7 +39,7 @@ export async function openWorkspacePanel(page: Page, panel: WorkspacePanel) {
 export async function trust(page: Page) {
     await page.goto('/');
     await trustCurrentConnection(page);
-    await expect(runStatementButton(page)).toBeEnabled();
+    await expect(runButton(page)).toBeEnabled();
 }
 
 export async function useAdvancedMode(page: Page) {
@@ -58,5 +58,5 @@ export async function trustCurrentConnection(page: Page) {
 }
 
 export async function runScript(page: Page) {
-    await page.getByTestId('run-action-script').click();
+    await page.getByTestId('run-button').click();
 }

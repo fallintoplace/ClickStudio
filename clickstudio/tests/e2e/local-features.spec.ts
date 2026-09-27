@@ -17,7 +17,7 @@ async function resultPage(page: Page, transform: (result: Result) => Result) {
     });
 }
 async function run(page: Page) {
-    await page.getByTestId('run-statement').click();
+    await page.getByTestId('run-button').click();
     const results = page.getByRole('region', { name: 'Query results', exact: true });
     await expect(results.getByRole('table', { name: 'Retained query rows' })).toBeVisible();
     return results;

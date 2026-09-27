@@ -276,8 +276,8 @@ export function WorkspaceHelpPanel({ examples, sourceLabel, copy, locale, open, 
                                     <article className="workspace-help-guide-card">
                                         <span className="workspace-help-guide-index">03</span>
                                         <span className="eyebrow">EXECUTE</span>
-                                        <h4>{copy.runStatement} or {copy.runScript}</h4>
-                                        <p>{copy.runStatement} runs the selected SQL or the statement at the cursor. {copy.runScript} runs every statement and stops at the first error.</p>
+                                        <h4>{copy.run}</h4>
+                                        <p>{copy.run} executes all SQL in the editor and stops after the first error. Select SQL to run only that selection.</p>
                                     </article>
                                     <article className="workspace-help-guide-card">
                                         <span className="workspace-help-guide-index">04</span>

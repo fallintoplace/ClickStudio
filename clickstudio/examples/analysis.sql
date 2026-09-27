@@ -1,7 +1,7 @@
 -- ClickStudio live-query examples.
 --
--- Use Run statement for the current statement.
--- Use Run script to execute the whole file.
+-- Use Run to execute all SQL, or select SQL to run only that selection.
+-- Multi-statement scripts stop at the first error.
 -- The active statements are read-only. The parameter example stays commented so
 -- the whole file works without extra editor state.
 

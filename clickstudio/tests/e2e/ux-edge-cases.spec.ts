@@ -8,7 +8,7 @@ test('An empty truncated retained result does not claim the query matched no row
         await route.fulfill({ response, json: { ...result, rows: [], totalRows: 0, nextOffset: null, completeness: 'truncated' } });
     });
     await trust(page);
-    await page.getByTestId('run-statement').click();
+    await page.getByTestId('run-button').click();
     const results = page.getByRole('region', { name: 'Query results' });
     await expect(results.getByText(/No rows fit in the retained result\./)).toBeVisible();
     await expect(results.getByText('This query returned zero rows.')).toHaveCount(0);
@@ -20,7 +20,7 @@ test('Switching between result and chart views keeps the same execution selected
         if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/runs') runs++;
     });
     await trust(page);
-    await page.getByTestId('run-statement').click();
+    await page.getByTestId('run-button').click();
     const results = page.getByRole('region', { name: 'Query results' });
     await expect(results.getByRole('table', { name: 'Retained query rows' })).toBeVisible();
     await results.getByRole('tab', { name: 'Chart', exact: true }).click();

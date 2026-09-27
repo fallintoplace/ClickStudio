@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { openBlankSql, runStatementButton, trust } from './helpers.js';
+import { openBlankSql, runButton, trust } from './helpers.js';
 
 function countRuns(page: Page) {
     let count = 0;
@@ -12,7 +12,7 @@ function countRuns(page: Page) {
 test('A no-match row filter stays local and can be cleared without rerunning SQL', async ({ page }) => {
     const runs = countRuns(page);
     await trust(page);
-    await runStatementButton(page).click();
+    await runButton(page).click();
     const results = page.getByRole('region', { name: 'Query results' });
     await expect(results.getByRole('table', { name: 'Retained query rows' })).toBeVisible();
     const filter = results.getByRole('searchbox', { name: 'Filter current page' });
@@ -63,7 +63,7 @@ test('Retained-result pagination reaches the end without rerunning SQL', async (
         } });
     });
     await trust(page);
-    await runStatementButton(page).click();
+    await runButton(page).click();
     const results = page.getByRole('region', { name: 'Query results', exact: true });
     await expect(results.getByRole('table', { name: 'Retained query rows' })).toBeVisible();
     await expect(results.locator('tbody tr')).toHaveCount(200);

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { trust, openWorkspacePanel, runStatementButton } from './helpers.js';
+import { trust, openWorkspacePanel, runButton } from './helpers.js';
 
 test('Materialized views have selectable dependency edges and refresh details', async ({ page }, info) => {
     await trust(page);
@@ -41,7 +41,7 @@ test('Run comparison selects two retained runs without executing another query',
         await page.locator('.cm-content').click();
         await page.keyboard.press('ControlOrMeta+a'); await page.keyboard.insertText(sql);
         const submitted = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/runs');
-        await runStatementButton(page).click();
+        await runButton(page).click();
         const next = await (await submitted).json() as { queryId: string };
         await expect(page.locator('.execution-bar code')).toHaveText(next.queryId);
         await expect(page.locator('.execution-bar')).toHaveAttribute('data-run-status', 'succeeded');

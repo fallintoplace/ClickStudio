@@ -19,7 +19,7 @@ async function switchConnection(page: Page, name: string) {
 test('Run, chart, save and reload preserve the same execution evidence', async ({ page }) => {
     const runs = countRunRequests(page);
     await trust(page);
-    await page.getByTestId('run-statement').click();
+    await page.getByTestId('run-button').click();
     const results = page.getByRole('region', { name: 'Query results' });
     await expect(results.locator('[data-run-status="succeeded"]')).toBeVisible();
     await expect(results.getByRole('cell', { name: '2026-01-01', exact: true })).toBeVisible();
@@ -38,7 +38,7 @@ test('Run, chart, save and reload preserve the same execution evidence', async (
 
 test('Switching connections never reuses another connection\'s result', async ({ page }) => {
     await trust(page);
-    await page.getByTestId('run-statement').click();
+    await page.getByTestId('run-button').click();
     await expect(page.getByRole('region', { name: 'Query results' }).locator('[data-run-status="succeeded"]')).toBeVisible();
     await switchConnection(page, 'Another sample');
     await trustCurrentConnection(page);
@@ -57,7 +57,7 @@ test('Closing and reopening a result tab does not execute SQL again', async ({ p
     await page.keyboard.insertText('SELECT {value:UInt64}');
     await expect(editor).toContainText('SELECT {value:UInt64}');
     await page.getByRole('textbox', { name: 'value:UInt64', exact: true }).fill('9007199254740993');
-    await page.getByTestId('run-statement').click();
+    await page.getByTestId('run-button').click();
     const results = page.getByRole('region', { name: 'Query results' });
     await expect(results.locator('[data-run-status="succeeded"]')).toBeVisible();
     const queryId = await page.locator('.execution-bar code').innerText();

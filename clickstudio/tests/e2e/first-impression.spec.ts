@@ -16,22 +16,22 @@ test('Experimental mode gives the editor the full work area before the first run
     await expect(browser.getByRole('button', { name: 'Queries', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Ask AI', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Save revision', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Run statement', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Run', exact: true })).toBeVisible();
 });
 
-test('Run, script, and explain actions stay visible beside the primary Run button', async ({ page }) => {
+test('One Run button and the explain actions stay visible in Experimental mode', async ({ page }) => {
     await trust(page);
     const actions = page.getByRole('group', { name: 'Run actions', exact: true });
-    const runScript = actions.getByRole('button', { name: /^Run script/ });
-    await expect(actions.getByRole('button', { name: 'Run statement', exact: true })).toBeVisible();
-    await expect(runScript).toBeVisible();
+    const run = actions.getByRole('button', { name: 'Run', exact: true });
+    await expect(run).toBeVisible();
+    await expect(actions.getByRole('button', { name: 'Run script', exact: true })).toHaveCount(0);
     await expect(actions.getByRole('button', { name: 'EXPLAIN INDEXES', exact: true })).toBeVisible();
     await expect(actions.getByRole('button', { name: 'EXPLAIN PLAN', exact: true })).toBeVisible();
     await expect(actions.getByRole('button', { name: 'EXPLAIN PIPELINE', exact: true })).toBeVisible();
     await expect(actions.getByRole('button', { name: 'EXPLAIN ANALYZE', exact: true })).toBeVisible();
-    await expect(runScript).toBeEnabled();
-    await runScript.focus();
-    await expect(runScript).toBeFocused();
+    await expect(run).toBeEnabled();
+    await run.focus();
+    await expect(run).toBeFocused();
 });
 
 test('EXPLAIN INDEXES opens an interactive index graph and keeps the raw result available', async ({ page }) => {

@@ -30,7 +30,7 @@ async function mockLiveWorkspace(page: Page, respondToSchema: (route: Route) => 
     await page.route('**/api/runs**', route => route.fulfill({ json: [] }));
     await page.route('**/api/documents**', route => route.fulfill({ json: [] }));
     await page.goto('/');
-    await expect(page.getByTestId('run-statement')).toBeEnabled();
+    await expect(page.getByTestId('run-button')).toBeEnabled();
     return { get schemaRequests() { return schemaRequests; } };
 }
 

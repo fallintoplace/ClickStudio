@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import type { QueryDocument, Run } from '../../shared/types.js';
-import { openWorkspacePanel, runStatementButton, trust } from './helpers.js';
+import { openWorkspacePanel, runButton, trust } from './helpers.js';
 
 async function replaceSql(page: Page, sql: string) {
     await page.locator('.cm-content').click();
@@ -91,7 +91,7 @@ test('Chart snapshot loads while a save is still in progress', async ({ page }) 
         await route.continue();
     });
     await trust(page);
-    await runStatementButton(page).click();
+    await runButton(page).click();
     const results = page.getByRole('region', { name: 'Query results', exact: true });
     await expect(results.getByRole('table', { name: 'Retained query rows' })).toBeVisible();
     try {

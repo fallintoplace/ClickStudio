@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { openBlankSql, openWorkspacePanel, runIdentity, runScript, runStatementButton, trust, trustCurrentConnection, useAdvancedMode } from './helpers.js';
+import { openBlankSql, openWorkspacePanel, runIdentity, runScript, runButton, trust, trustCurrentConnection, useAdvancedMode } from './helpers.js';
 
 declare global {
     interface Window {
@@ -26,7 +26,7 @@ async function runQuery(page: Page) {
         const request = response.request();
         return request.method() === 'POST' && new URL(response.url()).pathname === '/api/runs';
     });
-    await runStatementButton(page).click();
+    await runButton(page).click();
     const run = runIdentity(await (await runResponse).json());
     await expect(page.locator('.execution-bar code')).toHaveText(run.queryId);
     const results = page.getByRole('region', { name: 'Query results', exact: true });
@@ -115,8 +115,8 @@ test('Run button submits the live CodeMirror document before React catches up', 
         content.dispatchEvent(new KeyboardEvent('keydown', {
             key: 'ArrowRight', code: 'ArrowRight', bubbles: true, cancelable: true,
         }));
-        const runButton = document.querySelector<HTMLButtonElement>('[data-testid="run-statement"]');
-        if (!runButton) throw new Error('Run statement button is missing.');
+        const runButton = document.querySelector<HTMLButtonElement>('[data-testid="run-button"]');
+        if (!runButton) throw new Error('Run button is missing.');
         runButton.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     }, sql);
     const request = await submitted;
@@ -134,8 +134,8 @@ test('Two Run button clicks in one task submit only one request', async ({ page 
         if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/runs') runRequests++;
     });
     await page.evaluate(() => {
-        const runButton = document.querySelector<HTMLButtonElement>('[data-testid="run-statement"]');
-        if (!runButton) throw new Error('Run statement button is missing.');
+        const runButton = document.querySelector<HTMLButtonElement>('[data-testid="run-button"]');
+        if (!runButton) throw new Error('Run button is missing.');
         const click = () => runButton.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
         click();
         click();
@@ -184,7 +184,7 @@ test('A running query shows its submitted SQL and keeps previous rows until it e
     await trust(page);
     await page.getByRole('textbox', { name: 'SQL document name', exact: true }).fill('Running query.sql');
     const previousRun = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/runs');
-    await runStatementButton(page).click();
+    await runButton(page).click();
     await previousRun;
 
     const results = page.getByRole('region', { name: 'Query results', exact: true });
@@ -207,7 +207,7 @@ test('A running query shows its submitted SQL and keeps previous rows until it e
     try {
         const submittedSql = 'SELECT fixture_slow';
         await replaceSql(page, submittedSql);
-        await runStatementButton(page).click();
+        await runButton(page).click();
         await runRequest;
 
         const progress = results.locator('.result-execution-progress');
@@ -261,7 +261,7 @@ test('The execution indicator clears when run submission fails', async ({ page }
     try {
         const submittedSql = 'SELECT fixture_submit_failure';
         await replaceSql(page, submittedSql);
-        await runStatementButton(page).click();
+        await runButton(page).click();
         await runRequest;
         const progress = page.locator('.result-execution-progress');
         await expect(progress).toBeVisible();
@@ -295,7 +295,7 @@ test('A failed query stays in Results beside the previous success until retry', 
         const submittedSql = 'SELECT * FROM missing_table';
         await replaceSql(page, submittedSql);
         const failedResponse = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/runs');
-        await runStatementButton(page).click();
+        await runButton(page).click();
         await failedResponse;
 
         const failure = results.getByTestId('query-failure');
@@ -319,7 +319,7 @@ test('A failed query stays in Results beside the previous success until retry', 
 
         await replaceSql(page, 'SELECT 1');
         const retryResponse = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/runs');
-        await runStatementButton(page).click();
+        await runButton(page).click();
         await retryResponse;
         await expect(failure).toHaveCount(0);
         await expect(page.locator('.execution-bar')).toHaveAttribute('data-run-status', 'succeeded');
@@ -349,7 +349,7 @@ test('A failed saved run shows its error in Results', async ({ page }) => {
     try {
         await replaceSql(page, 'SELECT * FROM missing_table');
         const submitted = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/runs');
-        await runStatementButton(page).click();
+        await runButton(page).click();
         await submitted;
 
         const results = page.getByRole('region', { name: 'Query results', exact: true });
@@ -1196,7 +1196,7 @@ test('Selecting an earlier script statement stops automatic following while late
 test('Cancelling a long-running query reaches a terminal cancelled state', async ({ page }) => {
     await trust(page);
     await replaceSql(page, 'SELECT fixture_slow');
-    await runStatementButton(page).click();
+    await runButton(page).click();
     const cancel = page.locator('.execution-bar').getByRole('button', { name: 'Cancel', exact: true });
     await expect(cancel).toBeVisible();
     await cancel.click();
@@ -1214,7 +1214,7 @@ test('Cancellation stays available while execution profile loading is pending', 
         await trust(page);
         await replaceSql(page, 'SELECT fixture_slow');
         const started = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/runs');
-        await runStatementButton(page).click();
+        await runButton(page).click();
         const run = runIdentity(await (await started).json());
         const cancel = page.locator('.execution-bar').getByRole('button', { name: 'Cancel', exact: true });
         await expect(cancel).toBeVisible();

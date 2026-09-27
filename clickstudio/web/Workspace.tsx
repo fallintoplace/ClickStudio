@@ -352,8 +352,8 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
 
     const execute = (wholeScript = false, kind: RunKind = 'query', sqlOverride?: string) => performExecution(async () => {
         if (!trusted) throw new Error('Review and trust this read only connection before running SQL.');
-        if (wholeScript && connection.manifest?.scripts.available === false)
-            throw new Error(connection.manifest.scripts.reason ?? 'Scripts are unavailable on this connection.');
+        if (wholeScript && connection.manifest?.scripts.available !== true)
+            throw new Error(connection.manifest?.scripts.reason ?? 'Scripts are unavailable on this connection.');
         if (kind === 'explain' && connection.manifest?.explain.available === false)
             throw new Error(connection.manifest.explain.reason ?? 'EXPLAIN is unavailable on this connection.');
         const explainPlan = connection.manifest?.explainPlan ?? connection.manifest?.explain;
@@ -367,8 +367,10 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
             throw new Error(explainAnalyze.reason ?? 'EXPLAIN ANALYZE is unavailable on this connection.');
         const editorSnapshot = editor.current?.snapshot() ?? { sql: active.sql, from: active.from, to: active.to };
         const explicitStatements = sqlOverride === undefined ? undefined : splitSql(sqlOverride);
-        if (explicitStatements && explicitStatements.length !== 1)
-            throw new Error('An assistant proposal must contain exactly one SQL statement to run directly.');
+        if (explicitStatements && !wholeScript && explicitStatements.length !== 1)
+            throw new Error('A directly run query must contain exactly one SQL statement.');
+        if (wholeScript && explicitStatements && explicitStatements.length === 0)
+            throw new Error('Write or select a SQL statement before running it.');
         const statement = wholeScript ? undefined : explicitStatements?.[0] ?? selectedStatement(editorSnapshot.sql, editorSnapshot.from, editorSnapshot.to);
         if (!wholeScript && !statement) throw new Error('Write or select a SQL statement before running it.');
         const executionSql = sqlOverride ?? editorSnapshot.sql;
@@ -376,7 +378,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
             throw new Error(connection.manifest.parameters.reason ?? 'Query parameters are unavailable on this connection.');
         const payload = {
             clientRequestId: crypto.randomUUID(), connectionId: connection.id, documentId: active.serverId,
-            sql: wholeScript ? editorSnapshot.sql : statement!.sql, parameters: active.parameters,
+            sql: wholeScript ? sqlOverride ?? editorSnapshot.sql : statement!.sql, parameters: active.parameters,
             parentRunId: active.parentRunId, kind, limits: { rows: connection.limits.rows || DEFAULT_LIMITS.rows, seconds: connection.limits.seconds || DEFAULT_LIMITS.seconds },
             tags: { workspace: 'clickstudio', experience },
             ...(wholeScript || sqlOverride !== undefined ? {} : { sourceFrom: statement!.from, sourceTo: statement!.to }),

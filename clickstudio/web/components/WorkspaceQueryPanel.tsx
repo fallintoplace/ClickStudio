@@ -14,6 +14,7 @@ import type {
     WorkspaceRunCapabilityAction,
 } from '../workspace-types';
 import type { Draft } from '../workspace-state';
+import { safeStatementCount } from '../workspace-helpers';
 import { PanelResizeHandles, panelTargetIsInteractive, type WorkspacePanelController } from '../useWorkspacePanels';
 import type { WorkspaceViewState } from '../useWorkspaceViewState';
 import { ScrollEdgeFrame } from './ScrollEdgeShadows';
@@ -48,7 +49,7 @@ export type WorkspaceQueryPanelActions = Readonly<{
     onDecideAssistantProposal: (decision: 'accepted' | 'rejected') => void;
     onSave: () => Promise<void>;
     onFormat: (formatter: WorkspaceFormatter) => Promise<void>;
-    onRun: (wholeScript?: boolean, kind?: RunKind) => Promise<void>;
+    onRun: (wholeScript?: boolean, kind?: RunKind, sqlOverride?: string) => Promise<void>;
     runActionTitle: (capability: WorkspaceRunCapability | undefined, action: WorkspaceRunCapabilityAction) => string | undefined;
     onConnectionAction: () => Promise<void>;
     onNativeParserStatus: (status: NativeParserStatus) => void;
@@ -150,6 +151,19 @@ export function WorkspaceQueryPanel({
         startPanelDrag,
         startPanelResize,
     } = panels;
+    const selectedSql = active.to > active.from ? active.sql.slice(active.from, active.to) : undefined;
+    const sqlToRun = selectedSql ?? active.sql;
+    const statementsToRun = safeStatementCount(sqlToRun);
+    const runRequiresScript = statementsToRun !== undefined && statementsToRun > 1;
+    const runDisabled = !trusted || Boolean(busy) || unsupportedParameters || (runRequiresScript && !connection.manifest?.scripts.available);
+    const runTitle = runRequiresScript ? actions.runActionTitle(connection.manifest?.scripts, 'script') : undefined;
+    const runSql = () => {
+        const snapshot = editorRef.current?.snapshot() ?? active;
+        const selection = snapshot.to > snapshot.from ? snapshot.sql.slice(snapshot.from, snapshot.to) : undefined;
+        const sql = selection ?? snapshot.sql;
+        const count = safeStatementCount(sql);
+        return actions.onRun(count !== undefined && count > 1, 'query', selection);
+    };
     return <section
         ref={queryPanelRef}
         className={cx('editor-surface', panels.queryCollapsed && 'is-collapsed', queryFloating && 'is-floating', queryMode === 'maximized' && 'is-maximized', activeFloatingPanel === 'query' && queryFloating && 'is-front')}
@@ -173,8 +187,7 @@ export function WorkspaceQueryPanel({
                 {experience === 'beginner' && <>
                     <Button variant="ghost" className="sql-ai-button" data-testid="open-ai" aria-label={copy.common.askAi} aria-pressed={inspector === 'assistant'} onClick={actions.onOpenAssistant}><Icon name="assistant"/>{copy.common.askAi}</Button>
                     <Button variant="ghost" className="toolbar-small standard-format-button" data-testid="format-sql" aria-label={copy.common.formatSql} title={copy.common.formatSql} onClick={() => void actions.onFormat('builtin')}>{copy.common.format}</Button>
-                    <Button variant="primary" className="run-query-button compact-run-button" data-testid="run-statement" aria-label={copy.common.runStatement} onClick={() => void actions.onRun()} disabled={!trusted || Boolean(busy) || unsupportedParameters}><Icon name="play"/>{busy === 'run' || busy === 'script' ? copy.common.running : copy.common.run}</Button>
-                    <Button variant="secondary" className="toolbar-small standard-run-script-button" data-testid="run-action-script" aria-label={copy.common.runScript} title={actions.runActionTitle(connection.manifest?.scripts, 'script')} onClick={() => void actions.onRun(true)} disabled={!trusted || Boolean(busy) || unsupportedParameters || !connection.manifest?.scripts.available}>{copy.common.runScript}</Button>
+                    <Button variant="primary" className="run-query-button compact-run-button" data-testid="run-button" aria-label={copy.common.run} title={runTitle} onClick={() => void runSql()} disabled={runDisabled}><Icon name="play"/>{busy === 'run' || busy === 'script' ? copy.common.running : copy.common.run}</Button>
                 </>}
                 {experience === 'expert' && <>
                     {nativeParserEnabled && nativeParserStatus === 'unavailable' && <>
@@ -228,8 +241,7 @@ export function WorkspaceQueryPanel({
                 {experience === 'expert' && <aside className="editor-control-rail" aria-label={copy.common.runActions}>
                     <div className="editor-rail-status"><div className="editor-mode-label"><span className="editor-language-dot"/>{copy.common.clickhouseSql}</div><span>{statementCount === undefined ? copy.common.incompleteSql : (statementCount === 1 ? copy.common.oneStatement : copy.common.manyStatements).replace('{count}', String(statementCount))}</span></div>
                     <div className="editor-actions">
-                        <RunActionGroup copy={copy.common} runLabel={copy.common.runStatement} running={busy === 'run' || busy === 'script'} disabled={!trusted || Boolean(busy) || unsupportedParameters} onRun={() => void actions.onRun()} actions={[
-                            { id: 'script', label: copy.common.runScript, disabled: !trusted || Boolean(busy) || unsupportedParameters || !connection.manifest?.scripts.available, title: actions.runActionTitle(connection.manifest?.scripts, 'script'), onSelect: () => void actions.onRun(true) },
+                        <RunActionGroup copy={copy.common} runLabel={copy.common.run} runTitle={runTitle} running={busy === 'run' || busy === 'script'} disabled={runDisabled} onRun={() => void runSql()} actions={[
                             { id: 'explain', label: copy.common.explain, disabled: !trusted || Boolean(busy) || unsupportedParameters || !connection.manifest?.explain.available, title: actions.runActionTitle(connection.manifest?.explain, 'explain'), onSelect: () => void actions.onRun(false, 'explain') },
                             { id: 'explain-plan', label: copy.common.explainPlan, disabled: !trusted || Boolean(busy) || unsupportedParameters || !(connection.manifest?.explainPlan ?? connection.manifest?.explain)?.available, title: actions.runActionTitle(connection.manifest?.explainPlan ?? connection.manifest?.explain, 'explain-plan'), onSelect: () => void actions.onRun(false, 'plan') },
                             { id: 'explain-pipeline', label: copy.common.explainPipeline, disabled: !trusted || Boolean(busy) || unsupportedParameters || !(connection.manifest?.explainPipeline ?? connection.manifest?.pipeline)?.available, title: actions.runActionTitle(connection.manifest?.explainPipeline ?? connection.manifest?.pipeline, 'explain-pipeline'), onSelect: () => void actions.onRun(false, 'pipeline') },
