@@ -157,6 +157,7 @@ export function WorkspaceQueryPanel({
     const runRequiresScript = statementsToRun !== undefined && statementsToRun > 1;
     const runDisabled = !trusted || Boolean(busy) || unsupportedParameters || (runRequiresScript && !connection.manifest?.scripts.available);
     const runTitle = runRequiresScript ? actions.runActionTitle(connection.manifest?.scripts, 'script') : undefined;
+    const standardFormatter = nativeParserEnabled && nativeParserStatus === 'ready' ? 'wasm' : 'builtin';
     const runSql = () => {
         const snapshot = editorRef.current?.snapshot() ?? active;
         const selection = snapshot.to > snapshot.from ? snapshot.sql.slice(snapshot.from, snapshot.to) : undefined;
@@ -186,7 +187,7 @@ export function WorkspaceQueryPanel({
             <div className="editor-heading-actions">
                 {experience === 'beginner' && <>
                     <Button variant="ghost" className="sql-ai-button" data-testid="open-ai" aria-label={copy.common.askAi} aria-pressed={inspector === 'assistant'} onClick={actions.onOpenAssistant}><Icon name="assistant"/>{copy.common.askAi}</Button>
-                    <Button variant="ghost" className="toolbar-small standard-format-button" data-testid="format-sql" aria-label={copy.common.formatSql} title={copy.common.formatSql} onClick={() => void actions.onFormat('builtin')}>{copy.common.format}</Button>
+                    <Button variant="ghost" className="toolbar-small standard-format-button" data-testid="format-sql" aria-label={copy.common.formatSql} title={copy.common.formatSql} onClick={() => void actions.onFormat(standardFormatter)}>{copy.common.format}</Button>
                     <Button variant="primary" className="run-query-button compact-run-button" data-testid="run-button" aria-label={copy.common.run} title={runTitle} onClick={() => void runSql()} disabled={runDisabled}><Icon name="play"/>{busy === 'run' || busy === 'script' ? copy.common.running : copy.common.run}</Button>
                 </>}
                 {experience === 'expert' && <>
