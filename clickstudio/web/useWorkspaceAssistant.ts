@@ -120,6 +120,7 @@ export function useWorkspaceAssistant({
         storageError: assistantChatStorageError,
         updateChat,
         selectChat,
+        renameChat,
         createChat,
         deleteChat,
     } = useAssistantChats(connectionId);
@@ -248,7 +249,7 @@ export function useWorkspaceAssistant({
         setQuestionDrafts(current => ({ ...current, [chatId]: '' }));
         updateChat(chatId, chat => ({
             ...chat,
-            title: chat.turns.length ? chat.title : chatTitle(question),
+            title: chat.turns.length || chat.title !== 'New chat' ? chat.title : chatTitle(question),
             updatedAt: now,
             turns: [...chat.turns, turn],
         }));
@@ -362,6 +363,7 @@ export function useWorkspaceAssistant({
         assistantChatStorageError,
         newAssistantChat,
         selectAssistantChat,
+        renameAssistantChat: renameChat,
         deleteAssistantChat,
         assistantBusy,
         assistantCancelable,

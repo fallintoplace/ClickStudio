@@ -175,7 +175,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         changeAssistantQuestion,
         assistantProposal,
         assistantChats, activeAssistantChatId, assistantTurns, assistantChatStorageError,
-        newAssistantChat, selectAssistantChat, deleteAssistantChat,
+        newAssistantChat, selectAssistantChat, renameAssistantChat, deleteAssistantChat,
         assistantBusy,
         assistantCancelable,
         assistantPhase,
@@ -746,6 +746,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
             if (selectableRunId) setIncludeRun(true);
         },
         onSelectAssistantChat: selectAssistantChat,
+        onRenameAssistantChat: renameAssistantChat,
         onDeleteAssistantChat: deleteAssistantChat,
         assistantProposal,
         assistantBusy,

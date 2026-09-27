@@ -178,6 +178,12 @@
     .assistant-chat-actions { display: flex; flex: none; align-items: center; gap: 3px; }
     .assistant-chat-actions .button-base { min-height: 32px; padding-inline: 8px; font-size: 8px; white-space: nowrap; }
     .assistant-chat-actions .button-base svg { width: 12px; height: 12px; }
+    .assistant-chat-actions .assistant-rename-button { padding-inline: 5px; }
+    .assistant-chat-rename { display: flex; min-width: 0; flex: none; align-items: center; gap: 5px; }
+    .assistant-chat-rename-input { min-width: 0; flex: 1; }
+    .assistant-chat-rename-input input { box-sizing: border-box; width: 100%; min-width: 0; height: 34px; padding: 0 9px; border: 1px solid var(--line-bright); border-radius: 8px; outline: 0; background: var(--control-well); color: var(--text); font-size: 9px; }
+    .assistant-chat-rename-input input:focus-visible { border-color: var(--focus-color); box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus-color) 20%, transparent); }
+    .assistant-chat-rename .button-base { min-height: 32px; padding-inline: 8px; font-size: 8px; white-space: nowrap; }
     .assistant-chat-panel { display: flex; min-width: 0; min-height: 0; flex: 1; overflow: hidden; }
     .assistant-transcript-frame { display: flex; min-width: 0; min-height: 0; flex: 1; }
     .assistant-transcript { display: grid; width: 100%; min-width: 0; min-height: 0; align-content: start; gap: 16px; overflow: auto; padding: 12px 4px; scrollbar-width: thin; }

@@ -1015,9 +1015,19 @@ test('Ask AI keeps chat history when SQL changes and sends prior messages with f
     await page.getByRole('button', { name: 'New chat', exact: true }).click();
     await expect(page.locator('.assistant-empty-chat')).toBeVisible();
     await expect(page.getByText('Answer to Show the old question', { exact: true })).toHaveCount(0);
-    await page.getByRole('combobox', { name: 'Chat history' }).selectOption({ label: 'Show the old question' });
+    const chatHistory = page.getByRole('combobox', { name: 'Chat history' });
+    await chatHistory.selectOption({ label: 'Show the old question' });
     await expect(page.getByText('Answer to Show the old question', { exact: true })).toBeVisible();
     await expect(page.getByText('Answer to And now?', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Rename conversation', exact: true }).click();
+    const conversationName = page.getByRole('textbox', { name: 'Conversation name', exact: true });
+    await conversationName.fill('Flight delay analysis');
+    await page.getByRole('button', { name: 'Save name', exact: true }).click();
+    await expect(chatHistory.locator('option:checked')).toHaveText('Flight delay analysis');
+    await chatHistory.selectOption({ label: 'New chat' });
+    await chatHistory.selectOption({ label: 'Flight delay analysis' });
+    await expect(page.getByText('Answer to Show the old question', { exact: true })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Conversation: Flight delay analysis' })).toBeVisible();
     page.once('dialog', dialog => dialog.accept());
     await page.getByRole('button', { name: 'Delete current chat', exact: true }).click();
     await expect(page.locator('.assistant-empty-chat')).toBeVisible();
@@ -1051,6 +1061,27 @@ test('Ask AI shows a stop action while a response is in progress', async ({ page
     } finally {
         releaseResponse?.();
     }
+});
+
+test('Ask AI keeps a custom conversation name after its first message', async ({ page }) => {
+    await page.route('**/api/assistant/sql', async route => {
+        const body = route.request().postDataJSON() as Record<string, unknown>;
+        await route.fulfill({ json: {
+            id: 'custom-title-answer', owner: 'local-owner', connectionId: 'demo', action: 'ask', createdAt: '2026-09-23T00:00:00.000Z',
+            baseSql: String(body.sql ?? ''), responseId: 'test-response', model: 'test-model', promptVersion: 'test', contextSummary: [], decision: 'pending',
+            sql: null, summary: 'Custom title kept', assumptions: [], tables: [], caveats: [], clarification: null, findings: [],
+        } });
+    });
+    await trust(page);
+    await useAdvancedMode(page);
+    await page.getByTestId('open-ai').click();
+    await page.getByRole('button', { name: 'Rename conversation', exact: true }).click();
+    await page.getByRole('textbox', { name: 'Conversation name', exact: true }).fill('Flight lookup');
+    await page.getByRole('button', { name: 'Save name', exact: true }).click();
+    await page.getByRole('textbox', { name: 'Ask AI', exact: true }).fill('Find a flight');
+    await page.getByRole('button', { name: 'Send', exact: true }).click();
+    await expect(page.getByText('Custom title kept', { exact: true })).toBeVisible();
+    await expect(page.getByRole('combobox', { name: 'Chat history' }).locator('option:checked')).toHaveText('Flight lookup');
 });
 
 test('Scripts show each statement outcome and open that statement’s retained result', async ({ page }) => {

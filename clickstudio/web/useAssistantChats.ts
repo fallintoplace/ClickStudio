@@ -40,6 +40,11 @@ export function useAssistantChats(connectionId: string) {
     const selectChat = (chatId: string) => {
         setState(current => current.chats.some(chat => chat.id === chatId) ? { ...current, activeChatId: chatId } : current);
     };
+    const renameChat = (chatId: string, title: string) => {
+        const normalizedTitle = title.trim().slice(0, 80);
+        if (!normalizedTitle) return;
+        updateChat(chatId, chat => ({ ...chat, title: normalizedTitle }));
+    };
     const createChat = (force = false) => {
         if (!force && !activeChat.turns.length && activeChat.title === 'New chat') return activeChat.id;
         const chat = createAssistantChat();
@@ -55,5 +60,5 @@ export function useAssistantChats(connectionId: string) {
         });
     };
 
-    return { chats: state.chats, activeChat, storageError, updateChat, selectChat, createChat, deleteChat };
+    return { chats: state.chats, activeChat, storageError, updateChat, selectChat, renameChat, createChat, deleteChat };
 }
