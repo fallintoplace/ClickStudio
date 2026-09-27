@@ -142,8 +142,10 @@ function configureHttp(app: Express, config: Config, runs: RunService, artifacts
         if (req.path.startsWith('/api')) {
             res.setHeader('Cache-Control', 'no-store');
             if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
-                if (req.get('x-clickstudio-intent') !== '1')
-                    return res.status(403).json({ error: { code: 'REQUEST_INTENT', message: 'The workspace action header is required' } });
+                if (req.get('x-clickstudio-intent') !== '1') {
+                    res.status(403).json({ error: { code: 'REQUEST_INTENT', message: 'The workspace action header is required' } });
+                    return;
+                }
             }
         }
         next();
@@ -155,8 +157,15 @@ function configureHttp(app: Express, config: Config, runs: RunService, artifacts
     app.post('/api/session', (req, res) => { const token = sessions.login(body(req).token, req.socket.remoteAddress ?? 'unknown'); res.cookie('clickstudio_session', token, { httpOnly: true, sameSite: 'strict', secure: config.origin.startsWith('https:'), path: '/', maxAge: 12 * 3600000 }); res.json({ ok: true }); });
     app.delete('/api/session', (req, res) => { sessions.logout(req.get('cookie')); res.clearCookie('clickstudio_session', { path: '/', sameSite: 'strict', secure: config.origin.startsWith('https:') }); res.json({ ok: true }); });
     app.get('/api/shared/:token', (req, res) => res.json(artifacts.resolveShare(text(req.params.token, 'share token', 100))));
-    app.use('/api', (req, res, next) => { const p = sessions.principal(req.get('cookie')); if (!p)
-        return res.status(401).json({ error: { code: 'LOGIN_REQUIRED', message: 'Sign in to this workspace' } }); res.locals.principal = p; next(); });
+    app.use('/api', (req, res, next) => {
+        const p = sessions.principal(req.get('cookie'));
+        if (!p) {
+            res.status(401).json({ error: { code: 'LOGIN_REQUIRED', message: 'Sign in to this workspace' } });
+            return;
+        }
+        res.locals.principal = p;
+        next();
+    });
     app.get('/api/editor/clickhouse-parser.wasm', async (_req, res, next) => {
         try {
             const bytes = await parserWasm();
