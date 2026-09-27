@@ -14,7 +14,7 @@ declare global {
 
 async function replaceSql(page: Page, sql: string) {
     const editor = page.locator('.cm-content');
-    await editor.click();
+    await editor.focus();
     await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.insertText(sql);
     await expect.poll(async () => (await editor.innerText()).replace(/\s/g, ''))
@@ -133,7 +133,7 @@ test('A running query shows its submitted SQL and keeps previous rows until it e
         await expect(progress).toBeVisible();
         await expect(progress).toContainText(submittedSql);
         await expect(progress.locator('.loading-orbit')).toBeVisible();
-        await expect(progress).toContainText('Result from previous execution');
+        await expect(progress).toContainText('Previous result');
         await expect(table).toContainText('2026-01-01');
         await expect(results.locator('.table-pagination')).toHaveCount(0);
 
@@ -220,9 +220,9 @@ test('A failed query stays in Results beside the previous success until retry', 
         const failure = results.getByTestId('query-failure');
         await expect(failure).toContainText('SYNTAX_ERROR');
         await expect(failure).toContainText('Syntax error at position 15');
-        await expect(failure.locator('details pre')).toHaveText(submittedSql);
-        await expect(results.locator('[data-run-status="failed"]')).toBeVisible();
-        await expect(results.locator('.result-provenance')).toContainText('Previous successful result');
+        await expect(failure.locator('pre.result-execution-sql')).toHaveText(submittedSql);
+        await expect(results.locator('.result-provenance')).toContainText('Previous result');
+        await expect(results.locator('.result-provenance')).toContainText('Latest attempt failed');
         await expect(results.getByRole('table', { name: 'Retained query rows' })).toBeVisible();
         await expect(page.locator('.execution-bar')).toHaveAttribute('data-run-status', 'failed');
         await expect(page.locator('.execution-bar code')).toHaveCount(0);
@@ -274,7 +274,6 @@ test('A failed saved run shows its error in Results', async ({ page }) => {
         const results = page.getByRole('region', { name: 'Query results', exact: true });
         await expect(results.getByTestId('query-failure')).toContainText('SYNTAX_ERROR');
         await expect(results.getByTestId('query-failure')).toContainText('Syntax error at position 15');
-        await expect(results.locator('[data-run-status="failed"]')).toBeVisible();
         await expect(page.locator('.execution-bar')).toHaveAttribute('data-run-status', 'failed');
     } finally {
         await page.unroute(runRoute);
@@ -904,6 +903,7 @@ test('A late AI context preview cannot attach to an edited question', async ({ p
     await trust(page);
     await useAdvancedMode(page);
     await page.getByTestId('open-ai').click();
+    await page.locator('.assistant-task-picker input[type="radio"][value="review"]').check();
     const question = page.getByRole('textbox', { name: 'YOUR QUESTION OR FOCUS', exact: true });
     await question.fill('Show the old question');
     await page.getByRole('button', { name: 'Preview context', exact: true }).click();

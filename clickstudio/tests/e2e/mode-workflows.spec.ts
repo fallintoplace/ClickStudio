@@ -210,6 +210,7 @@ test('Advanced editor, insights, pipeline and AI copilot stay read-only until a 
     await page.getByRole('button', { name: 'Open operator graph in Insights', exact: true }).click();
     await expect(results.getByRole('region', { name: 'Scrollable operator graph', exact: true })).toBeVisible();
     await page.getByTestId('open-ai').click();
+    await expect(page.locator('.assistant-task-picker input[type="radio"]')).toHaveCount(6);
     await page.locator('.assistant-panel input[type="radio"][value="performance"]').check();
     await page.locator('.assistant-panel textarea').fill('Why is this query slow?');
     await page.getByRole('checkbox').check();

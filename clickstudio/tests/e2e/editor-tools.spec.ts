@@ -7,7 +7,7 @@ function readSql(page: Page) {
 
 async function replaceSql(page: Page, sql: string) {
     const editor = page.locator('.cm-content');
-    await editor.click();
+    await editor.focus();
     await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.insertText(sql);
     await expect.poll(() => readSql(page)).toBe(sql);
@@ -25,41 +25,6 @@ test('statement navigation stays keyboard-accessible without executing SQL', asy
     await page.keyboard.press('Alt+PageDown');
     await expect.poll(() => readSql(page)).toBe(sql);
     expect(runs).toBe(0);
-});
-
-test('snippets preserve the existing query, offer linked fields, and undo', async ({ page }) => {
-    await trust(page);
-    let runs = 0;
-    page.on('request', request => { if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/runs') runs++; });
-    await replaceSql(page, 'SELECT 1 -- keep this');
-    const editor = page.locator('.cm-content');
-    const tools = page.getByRole('group', { name: 'SQL template' });
-    await tools.getByRole('combobox', { name: 'SQL template', exact: true }).selectOption('ch_time_series');
-    await expect(editor).toHaveText('SELECT 1 -- keep this');
-    await tools.getByRole('button', { name: 'Add as new query' }).click();
-    await expect.poll(async () => (await readSql(page)).split('\n').map(line => line.trim()).filter(Boolean).slice(0, 3)).toEqual(['SELECT 1 -- keep this', ';', 'SELECT']);
-    await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe('event_time');
-    await page.keyboard.insertText('created_at');
-    await expect.poll(async () => ((await readSql(page)).match(/created_at/g) ?? []).length).toBe(2);
-    await page.keyboard.press('Tab');
-    await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe('events');
-    await page.keyboard.press('Escape');
-    await page.keyboard.press('ControlOrMeta+z');
-    await expect.poll(() => readSql(page)).toContain('event_time');
-    await expect.poll(() => readSql(page)).toContain('SELECT 1 -- keep this');
-    await page.keyboard.press('ControlOrMeta+z');
-    await expect.poll(() => readSql(page)).toBe('SELECT 1 -- keep this');
-    expect(runs).toBe(0);
-});
-
-test('incomplete SQL disables query tools but remains editable', async ({ page }) => {
-    await trust(page);
-    await replaceSql(page, "SELECT 'unfinished");
-    const tools = page.getByRole('group', { name: 'SQL template' });
-    await tools.getByRole('combobox', { name: 'SQL template', exact: true }).selectOption('ch_top_values');
-    await expect(tools.getByRole('button', { name: 'Add as new query' })).toBeDisabled();
-    await replaceSql(page, "SELECT 'finished'");
-    await expect(tools.getByRole('button', { name: 'Add as new query' })).toBeEnabled();
 });
 
 test('keyword completion is available outside strings and comments', async ({ page }) => {

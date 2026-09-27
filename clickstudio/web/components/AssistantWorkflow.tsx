@@ -24,6 +24,16 @@ function AssistantFlowSteps({ context, proposal }: { context?: AssistantContext;
     </ol>;
 }
 
+function AssistantTaskPicker({ action, onActionChange }: { action: AssistantAction; onActionChange: (action: AssistantAction) => void }) {
+    return <fieldset className="assistant-task-picker">
+        <legend>Choose a task</legend>
+        <div>{assistantActionOptions.map(option => <label key={option.value} className="assistant-task-option">
+            <input type="radio" name="assistant-task" value={option.value} checked={action === option.value} onChange={() => onActionChange(option.value)}/>
+            <span><strong>{option.label}</strong><small>{option.description}</small></span>
+        </label>)}</div>
+    </fieldset>;
+}
+
 export type AssistantWorkflowProps = {
     mode: 'beginner' | 'expert';
     sql: string;
@@ -96,6 +106,7 @@ export function AssistantWorkflow({ mode, sql, action, onActionChange, question,
 
     if (action === 'generate') return <section className="assistant-panel assistant-generate-panel animate-enter" aria-label="Generate SQL with AI">
         <div className="assistant-safety"><span className="assistant-glyph"><Icon name="assistant"/></span><div><strong>Write SQL</strong><p>Describe what you need. Review the diff before adding it to your draft.</p></div></div>
+        <AssistantTaskPicker action={action} onActionChange={onActionChange}/>
         <label className="field-label" htmlFor="expert-sql-prompt">YOUR QUESTION<textarea id="expert-sql-prompt" className="field-textarea" aria-label="YOUR QUESTION" value={question} onChange={event => onQuestionChange(event.target.value)} onKeyDown={event => { if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') { event.preventDefault(); if (trusted && schemaReady && question.trim() && !busy) onGenerateSql(); } }} placeholder="For example: show event counts by day" rows={4}/></label>
         <div className="flex flex-wrap items-center justify-end gap-2"><Button variant="primary" disabled={!trusted || !schemaReady || busy || !question.trim()} onClick={onGenerateSql}>{busy ? 'Generating SQL…' : 'Generate SQL'}</Button></div>
         <p className="assistant-generation-disclosure">Your question, current SQL, and available schema are sent to OpenAI to draft SQL. The query is not run automatically.</p>
@@ -107,13 +118,7 @@ export function AssistantWorkflow({ mode, sql, action, onActionChange, question,
     return <section className="assistant-panel">
         <div className="assistant-safety"><span className="assistant-glyph"><Icon name="assistant"/></span><div><strong>ClickHouse-aware help for your SQL</strong><p>Choose a task, preview the context, then shape the proposal for your draft.</p></div></div>
         <AssistantFlowSteps context={context} proposal={proposal}/>
-        <fieldset className="assistant-task-picker">
-            <legend>Choose a task</legend>
-            <div>{assistantActionOptions.map(option => <label key={option.value} className="assistant-task-option">
-                <input type="radio" name="assistant-task" value={option.value} checked={action === option.value} onChange={() => onActionChange(option.value)}/>
-                <span><strong>{option.label}</strong><small>{option.description}</small></span>
-            </label>)}</div>
-        </fieldset>
+        <AssistantTaskPicker action={action} onActionChange={onActionChange}/>
         <label className="field-label">YOUR QUESTION OR FOCUS<textarea className="field-textarea" value={question} onChange={event => onQuestionChange(event.target.value)} placeholder="Describe what you want to understand or improve…" rows={3}/></label>
         <label className="include-result"><input type="checkbox" checked={includeResult} onChange={event => onIncludeResult(event.target.checked)} disabled={!runId}/><span><strong>Include selected result</strong><small>Its retained rows will appear in the context preview.</small></span></label>
         <div className="assistant-actions"><div className="flex flex-wrap items-center justify-end gap-2"><Button variant="secondary" disabled={!trusted || busy} onClick={onPreview}>{busy && !context ? 'Preparing context…' : context ? 'Refresh context preview' : 'Preview context'}</Button></div>{output}</div>
