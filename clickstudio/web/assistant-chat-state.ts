@@ -1,4 +1,6 @@
-import type { AssistantAction, AssistantSource, Proposal, Result } from '../shared/types.js';
+import { isResult } from '../shared/run-wire.js';
+import { parseAssistantProposal } from '../shared/assistant-proposal.js';
+import type { Proposal, Result } from '../shared/types.js';
 
 export type AssistantTurnStatus = 'pending' | 'complete' | 'failed' | 'cancelled';
 
@@ -34,24 +36,7 @@ export interface AssistantChatState {
     chats: AssistantChat[];
 }
 
-const actions = ['ask', 'generate', 'explain', 'repair', 'result', 'performance', 'review'] as const satisfies readonly AssistantAction[];
 const record = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
-const strings = (value: unknown): value is string[] => Array.isArray(value) && value.every(item => typeof item === 'string');
-
-function recoverSources(value: unknown): AssistantSource[] | undefined {
-    if (value === undefined) return undefined;
-    if (!Array.isArray(value) || value.length > 20) return undefined;
-    const sources = value.flatMap((source): AssistantSource[] => {
-        if (!record(source) || typeof source.title !== 'string' || source.title.length > 512 || typeof source.url !== 'string' || source.url.length > 2048) return [];
-        try {
-            const url = new URL(source.url);
-            if ((url.protocol === 'http:' || url.protocol === 'https:') && !url.username && !url.password)
-                return [{ title: source.title, url: url.href }];
-        } catch { return []; }
-        return [];
-    });
-    return sources.length === value.length ? sources : undefined;
-}
 
 export const assistantChatsStorageKey = (connectionId: string) => `clickstudio:assistant-chats:${encodeURIComponent(connectionId)}:v1`;
 
@@ -65,48 +50,41 @@ export function createAssistantChatState(): AssistantChatState {
     return { version: 1, activeChatId: chat.id, chats: [chat] };
 }
 
-function recoverProposal(value: unknown): Proposal | undefined {
-    if (!record(value) || typeof value.id !== 'string' || typeof value.owner !== 'string' ||
-        typeof value.connectionId !== 'string' || !actions.includes(value.action as AssistantAction) ||
-        typeof value.createdAt !== 'string' || typeof value.baseSql !== 'string' || typeof value.responseId !== 'string' ||
-        typeof value.model !== 'string' || typeof value.promptVersion !== 'string' || !strings(value.contextSummary) ||
-        typeof value.summary !== 'string' || (value.sql !== null && typeof value.sql !== 'string') ||
-        !strings(value.assumptions) || !strings(value.tables) || !strings(value.caveats) ||
-        !(value.clarification === null || typeof value.clarification === 'string') ||
-        !Array.isArray(value.findings) || !['pending', 'accepted', 'rejected'].includes(String(value.decision))) return undefined;
-    const sources = recoverSources(value.sources);
-    if (value.sources !== undefined && !sources) return undefined;
-    const findings = value.findings.every(item => record(item) && ['high', 'medium', 'low'].includes(String(item.severity)) &&
-        typeof item.message === 'string' && typeof item.evidence === 'string');
-    if (!findings) return undefined;
-    return { ...value, ...(sources ? { sources } : {}) } as unknown as Proposal;
-}
-
 function recoverRunContext(value: unknown): AssistantChatRunContext | undefined {
-    if (!record(value) || JSON.stringify(value).length > 60_000 ||
+    if (!record(value)) return undefined;
+    try {
+        const serialized = JSON.stringify(value);
+        if (typeof serialized !== 'string' || serialized.length > 60_000) return undefined;
+    } catch {
+        return undefined;
+    }
+    if (
         (value.evidenceSql !== undefined && (typeof value.evidenceSql !== 'string' || value.evidenceSql.length > 200_000)) ||
         (value.error !== undefined && (typeof value.error !== 'string' || value.error.length > 3_000))) return undefined;
+    let result: Result | undefined;
     if (value.result !== undefined) {
-        const result = value.result;
-        if (!record(result) || !Array.isArray(result.columns) || !Array.isArray(result.rows) ||
-            result.columns.length > 100 || result.rows.length > 100 ||
-            typeof result.runId !== 'string' || typeof result.queryId !== 'string' ||
-            typeof result.createdAt !== 'string' || typeof result.expiresAt !== 'string' ||
-            !['complete', 'truncated'].includes(String(result.completeness))) return undefined;
-        const columns = result.columns as unknown[];
-        const rows = result.rows as unknown[];
-        const columnsValid = columns.every(column => record(column) && typeof column.name === 'string' && typeof column.type === 'string');
-        const rowsValid = rows.every(row => Array.isArray(row) && row.length === columns.length);
-        if (!columnsValid || !rowsValid) return undefined;
+        const candidate = value.result;
+        if (!isResult(candidate) ||
+            candidate.columns.length > 100 || candidate.rows.length > 100 ||
+            candidate.rows.some(row => row.length !== candidate.columns.length)) return undefined;
+        result = candidate;
     }
-    return value as unknown as AssistantChatRunContext;
+    return {
+        ...(result ? { result } : {}),
+        ...(typeof value.evidenceSql === 'string' ? { evidenceSql: value.evidenceSql } : {}),
+        ...(typeof value.error === 'string' ? { error: value.error } : {}),
+    };
+}
+
+function isAssistantTurnStatus(value: unknown): value is AssistantTurnStatus {
+    return value === 'pending' || value === 'complete' || value === 'failed' || value === 'cancelled';
 }
 
 function recoverTurn(value: unknown): AssistantChatTurn | undefined {
     if (!record(value) || typeof value.id !== 'string' || typeof value.question !== 'string' || value.question.length > 4_000 ||
         typeof value.contextSql !== 'string' || value.contextSql.length > 200_000 || typeof value.includeRun !== 'boolean' ||
-        !['pending', 'complete', 'failed', 'cancelled'].includes(String(value.status))) return undefined;
-    const proposal = value.proposal === undefined ? undefined : recoverProposal(value.proposal);
+        !isAssistantTurnStatus(value.status)) return undefined;
+    const proposal = value.proposal === undefined ? undefined : parseAssistantProposal(value.proposal);
     if (value.proposal !== undefined && !proposal) return undefined;
     const runContext = value.runContext === undefined ? undefined : recoverRunContext(value.runContext);
     if (value.runContext !== undefined && !runContext) return undefined;
@@ -118,7 +96,7 @@ function recoverTurn(value: unknown): AssistantChatTurn | undefined {
         includeRun: value.includeRun,
         ...(typeof value.runId === 'string' ? { runId: value.runId } : {}),
         ...(runContext ? { runContext } : {}),
-        status: interrupted ? 'cancelled' : value.status as AssistantTurnStatus,
+        status: interrupted ? 'cancelled' : value.status,
         ...(proposal ? { proposal } : {}),
         ...(interrupted
             ? { error: 'This request was interrupted when the page closed. Send another message to continue.' }

@@ -30,6 +30,40 @@ test('Assistant chats restore the selected thread and keep every conversation', 
     assert.deepEqual(recovered.chats[1].turns[0].runContext.result.rows, [['1']]);
 });
 
+test('Malformed retained run results are discarded without losing other turns', () => {
+    const result = {
+        runId: 'run-1', queryId: 'query-1', columns: [{ name: 'answer', type: 'UInt8' }],
+        rows: [['1']], completeness: 'complete', createdAt: 'now', expiresAt: 'later',
+    };
+    const recovered = recoverAssistantChatState({
+        version: 1,
+        activeChatId: 'chat',
+        chats: [{ id: 'chat', title: 'A chat', createdAt: 'now', updatedAt: 'now', turns: [
+            { id: 'valid', question: 'Keep me', contextSql: 'SELECT 1', includeRun: true, status: 'complete', runContext: { result } },
+            { id: 'bad-row-width', question: 'Drop me', contextSql: 'SELECT 2', includeRun: true, status: 'complete',
+                runContext: { result: { ...result, rows: [['1', 'extra']] } } },
+            { id: 'bad-cell', question: 'Drop me too', contextSql: 'SELECT 3', includeRun: true, status: 'complete',
+                runContext: { result: { ...result, rows: [[undefined]] } } },
+        ] }],
+    });
+
+    assert.deepEqual(recovered.chats[0].turns.map(turn => turn.id), ['valid']);
+});
+
+test('Cyclic run context is discarded without throwing during recovery', () => {
+    const runContext = {};
+    runContext.self = runContext;
+    const recovered = recoverAssistantChatState({
+        version: 1,
+        activeChatId: 'chat',
+        chats: [{ id: 'chat', title: 'A chat', createdAt: 'now', updatedAt: 'now', turns: [
+            { id: 'cycle', question: 'Recover safely', contextSql: 'SELECT 1', includeRun: true, status: 'complete', runContext },
+        ] }],
+    });
+
+    assert.deepEqual(recovered.chats[0].turns, []);
+});
+
 test('An in-flight chat turn becomes a clear cancelled message after reload', () => {
     const state = createAssistantChatState();
     state.chats[0].turns.push({

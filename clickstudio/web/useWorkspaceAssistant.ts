@@ -1,18 +1,10 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import type { AssistantConversationMessage, Proposal, Result, Schema } from '../shared/types';
+import { parseAssistantProposal } from '../shared/assistant-proposal';
+import type { AssistantConversationMessage, Result, Schema } from '../shared/types';
 import { isFrontendDemoPreview, message, post } from './api';
 import { useAssistantChats } from './useAssistantChats';
 import type { AssistantChatTurn } from './assistant-chat-state';
 import { checkpoint, type Draft, type WorkspaceState } from './workspace-state';
-
-function isProposal(value: unknown): value is Proposal {
-    if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
-    const proposal = value as { id?: unknown; baseSql?: unknown; decision?: unknown; sql?: unknown; summary?: unknown; assumptions?: unknown; caveats?: unknown; findings?: unknown };
-    return typeof proposal.id === 'string' && typeof proposal.baseSql === 'string' &&
-        ['pending', 'accepted', 'rejected'].includes(String(proposal.decision)) &&
-        (proposal.sql === null || typeof proposal.sql === 'string') && typeof proposal.summary === 'string' &&
-        Array.isArray(proposal.assumptions) && Array.isArray(proposal.caveats) && Array.isArray(proposal.findings);
-}
 
 function boundedAssistantResult(result?: Result): Result | undefined {
     if (!result) return undefined;
@@ -303,7 +295,7 @@ export function useWorkspaceAssistant({
                     turns: chat.turns.map(current => current.id === turnId ? { ...current, runContext: storedRunContext } : current),
                 }));
             setActivity({ chatId, turnId, phase: 'generating' });
-            const proposal = await post<unknown>('/assistant/sql', {
+            const response = await post<unknown>('/assistant/sql', {
                 connectionId,
                 question,
                 conversation: history,
@@ -318,7 +310,8 @@ export function useWorkspaceAssistant({
                 evidenceSql: storedRunContext?.evidenceSql,
                 error: storedRunContext?.error,
             }, { signal: controller.signal });
-            if (!isProposal(proposal)) throw new Error('The assistant returned incomplete data. Try again.');
+            const proposal = parseAssistantProposal(response);
+            if (!proposal) throw new Error('The assistant returned incomplete data. Try again.');
             if (requestRef.current !== requestId) return;
             if (contextKeyRef.current !== requestContextKey) {
                 cancelAssistantRequest('context-changed', requestId);
@@ -359,23 +352,26 @@ export function useWorkspaceAssistant({
         setActivity({ chatId, turnId: chatTurnId, phase: 'deciding' });
         setAssistantError('');
         try {
-            const reviewed = isFrontendDemoPreview && proposal.owner === 'vercel-session'
+            const response: unknown = isFrontendDemoPreview && proposal.owner === 'vercel-session'
                 ? { ...proposal, decision, decidedAt: new Date().toISOString() }
-                : await post<Proposal>(
+                : await post<unknown>(
                     `/assistant/proposals/${encodeURIComponent(proposal.id)}/decision`,
                     { decision, connectionId, currentSql: active.sql },
                 );
+            const reviewed = parseAssistantProposal(response);
+            if (!reviewed) throw new Error('The assistant returned incomplete data. Try again.');
             updateChat(chatId, chat => ({
                 ...chat,
                 updatedAt: new Date().toISOString(),
                 turns: chat.turns.map(current => current.id === chatTurnId ? { ...current, proposal: reviewed } : current),
             }));
             const currentDraft = workspaceRef.current.tabs.find(draft => draft.id === draftId);
-            if (decision === 'accepted' && reviewed.sql !== null && currentDraft?.sql === proposal.baseSql) {
+            const reviewedSql = reviewed.sql;
+            if (decision === 'accepted' && reviewedSql !== null && currentDraft?.sql === proposal.baseSql) {
                 setWorkspace(current => ({
                     ...current,
                     tabs: current.tabs.map(draft => draft.id === draftId
-                        ? { ...checkpoint(draft, 'Before accepted AI proposal'), sql: reviewed.sql!, from: 0, to: 0 }
+                        ? { ...checkpoint(draft, 'Before accepted AI proposal'), sql: reviewedSql, from: 0, to: 0 }
                         : draft),
                 }));
             }
