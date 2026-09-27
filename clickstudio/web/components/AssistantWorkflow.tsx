@@ -123,12 +123,9 @@ export function AssistantWorkflow(props: AssistantWorkflowProps) {
             {!trusted && <div className="assistant-feedback callout">Trust this connection before sharing its schema with the assistant.</div>}
             {!schemaReady && trusted && <div className="assistant-feedback callout assistant-schema-refresh"><span>{schemaStatus || 'Load the ClickHouse schema before asking the assistant.'}</span><Button variant="secondary" disabled={schemaLoading} onClick={onRefreshSchema}>{schemaLoading ? 'Loading…' : 'Refresh schema'}</Button></div>}
             <div className="assistant-chat-composer">
-                <div className="assistant-composer-context">
-                    <p className="assistant-context-note">Current SQL and schema are included. Latest run is added when available.</p>
-                </div>
                 <ScrollEdgeFrame<HTMLTextAreaElement> className="assistant-question-frame">{ref => <textarea ref={ref} id="assistant-question" className="field-textarea" aria-label="Ask AI" value={question} onChange={event => onQuestionChange(event.target.value)} onKeyDown={sendOnEnter} placeholder="Message… (Enter to send)" rows={2}/>}</ScrollEdgeFrame>
                 <div className="assistant-composer-footer"><span>Shift+Enter for a new line</span>{busy ? cancelable ? <Button variant="danger" onClick={onCancelRequest} aria-label="Stop assistant response" title="Stop generating">Stop</Button> : <Button variant="secondary" disabled>{phase === 'deciding' ? 'Applying…' : 'Working…'}</Button> : <Button variant="primary" disabled={!trusted || !schemaReady || !question.trim()} onClick={ask}><Icon name="send"/>Send</Button>}</div>
-                <details className="assistant-disclosure"><summary>What gets sent and saved?</summary><p>Your message, this chat, and the context above are sent to OpenAI. The assistant may search the web for current information; sources appear with its answer. The latest query run is sent only when selected. Chat history is saved in this browser. Review SQL suggestions before applying them; they never run automatically.</p></details>
+                <details className="assistant-disclosure"><summary>What gets sent and saved?</summary><p>Your message, chat history, current SQL, and schema are sent to OpenAI. The latest completed run’s SQL, saved rows, and any error are included when available. The assistant may search the web; sources appear with its answer. This chat is saved in this browser. SQL suggestions never run automatically.</p></details>
             </div>
         </div>
     </section>;

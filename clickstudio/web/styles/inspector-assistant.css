@@ -237,8 +237,6 @@
     .assistant-schema-refresh { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     .assistant-schema-refresh .button-base { min-height: 27px; flex: none; padding-inline: 8px; font-size: 8px; }
     .assistant-chat-composer { display: grid; min-width: 0; gap: 4px; padding: 8px; border: 1px solid var(--line-bright); border-radius: 11px; background: var(--panel-raised); box-shadow: 0 5px 16px #0002; }
-    .assistant-composer-context { display: grid; min-width: 0; gap: 5px; }
-    .assistant-context-note { margin: 0; color: var(--muted); font-size: 8px; line-height: 1.45; }
     .assistant-question-frame { min-width: 0; }
     .assistant-question-frame .field-textarea { display: block; box-sizing: border-box; width: 100%; min-height: 58px; max-height: 150px; resize: vertical; padding: 8px 2px; border: 0; border-radius: 0; outline: 0; background: transparent; color: var(--text); font-size: 9px; line-height: 1.5; }
     .assistant-question-frame .field-textarea:focus { box-shadow: none; }
