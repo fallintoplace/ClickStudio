@@ -1,4 +1,6 @@
-import { DEFAULT_LIMITS, type Column, type Connection, type Row, type Schema } from '../shared/types.js';
+import { DEFAULT_LIMITS, type Capability, type Column, type Connection, type Row, type Schema } from '../shared/types.js';
+import type { ReplicationSnapshot } from '../shared/replication.js';
+import type { QueryLogSource, WorkloadSnapshot, WorkloadWindow } from '../shared/workload.js';
 
 export const CLICKHOUSE_CLOUD_CONNECTION_ID = 'clickhouse-cloud';
 
@@ -33,12 +35,13 @@ export class CloudRequestError extends Error {
     }
 }
 
-async function requestCloud<T>(body: Record<string, unknown>): Promise<T> {
+async function requestCloud<T>(body: Record<string, unknown>, signal?: AbortSignal): Promise<T> {
     const response = await fetch('/api/cloud', {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
+        ...(signal ? { signal } : {}),
     });
     const payload: unknown = await response.json().catch(() => null);
     if (!response.ok) {
@@ -57,14 +60,24 @@ function capability(available: boolean, reason?: string) {
     return { available, ...(reason ? { reason } : {}) };
 }
 
-function makeConnection(credentials: CloudCredentials, host: string, serverVersion: string): Connection & { trusted: boolean } {
+type CloudConnectionTest = {
+    host: string;
+    database: string;
+    username: string;
+    serverVersion: string;
+    queryLog: Capability;
+    queryLogSource?: QueryLogSource;
+    replication: Capability;
+};
+
+function makeConnection(credentials: CloudCredentials, tested: CloudConnectionTest): Connection & { trusted: boolean } {
     const available = capability(true);
     const unavailable = capability(false, 'This hosted Cloud connection does not provide this feature yet.');
     return {
         dataSource: 'clickhouse',
         id: CLICKHOUSE_CLOUD_CONNECTION_ID,
         name: 'ClickHouse Cloud',
-        host,
+        host: tested.host,
         database: credentials.database,
         username: credentials.username,
         readonly: false,
@@ -72,7 +85,7 @@ function makeConnection(credentials: CloudCredentials, host: string, serverVersi
         limits: { ...DEFAULT_LIMITS, rows: 1_000, bytes: 2_000_000, seconds: 45, threads: 4 },
         manifest: {
             version: 1,
-            serverVersion,
+            serverVersion: tested.serverVersion,
             testedAt: new Date().toISOString(),
             schema: available,
             progress: unavailable,
@@ -83,9 +96,10 @@ function makeConnection(credentials: CloudCredentials, host: string, serverVersi
             queryTree: unavailable,
             explainPipeline: unavailable,
             pipeline: unavailable,
-            queryLog: unavailable,
+            queryLog: tested.queryLog,
+            ...(tested.queryLogSource ? { queryLogSource: tested.queryLogSource } : {}),
             traceLog: unavailable,
-            replication: unavailable,
+            replication: tested.replication,
             documentation: unavailable,
             import: unavailable,
             scripts: capability(false, 'Run one SQL statement at a time in the hosted Cloud connection.'),
@@ -95,8 +109,8 @@ function makeConnection(credentials: CloudCredentials, host: string, serverVersi
 }
 
 export async function connectClickHouseCloud(credentials: CloudCredentials) {
-    const tested = await requestCloud<{ host: string; database: string; username: string; serverVersion: string }>({ action: 'test', credentials });
-    const connection = makeConnection(credentials, tested.host, tested.serverVersion);
+    const tested = await requestCloud<CloudConnectionTest>({ action: 'test', credentials });
+    const connection = makeConnection(credentials, tested);
     activeCloud = { credentials: { ...credentials }, connection };
     return connection;
 }
@@ -117,4 +131,16 @@ export async function runClickHouseCloudSql(sql: string): Promise<CloudQueryResu
 export async function loadClickHouseCloudSchema(): Promise<Schema> {
     if (!activeCloud) throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before loading its schema.', 401);
     return await requestCloud<Schema>({ action: 'schema', credentials: activeCloud.credentials });
+}
+
+export async function loadClickHouseCloudWorkload(minutes: WorkloadWindow, signal: AbortSignal): Promise<WorkloadSnapshot> {
+    if (!activeCloud) throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before loading workload history.', 401);
+    const source = activeCloud.connection.manifest?.queryLogSource;
+    if (!source) throw new CloudRequestError('QUERY_LOG_UNAVAILABLE', 'Test the connection to check query-log access.', 409);
+    return await requestCloud<WorkloadSnapshot>({ action: 'workload', credentials: activeCloud.credentials, minutes, source }, signal);
+}
+
+export async function loadClickHouseCloudReplication(signal: AbortSignal): Promise<ReplicationSnapshot> {
+    if (!activeCloud) throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before loading replication status.', 401);
+    return await requestCloud<ReplicationSnapshot>({ action: 'replication', credentials: activeCloud.credentials }, signal);
 }
