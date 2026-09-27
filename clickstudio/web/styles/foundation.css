@@ -40,6 +40,7 @@
     --signal-accent: var(--accent);
     --scrollbar-thumb: color-mix(in srgb, var(--accent) 35%, var(--muted));
     --scrollbar-thumb-hover: color-mix(in srgb, var(--accent) 55%, var(--muted));
+    --scroll-edge-shadow-color: #00000052;
     --amber: #ffad52;
     --red: #ff6b75;
     --violet: #c598ff;
@@ -99,6 +100,7 @@
     --text: #17262c;
     --text-soft: #3a4f57;
     --muted: #5a7079;
+    --scroll-edge-shadow-color: #17303a30;
     --accent-cyan: #08758d;
     --accent-cyan-strong: #0a849d;
     --accent-cyan-action: #08758d;

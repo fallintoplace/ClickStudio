@@ -3,6 +3,7 @@
 @import "./styles/app-chrome.css";
 @import "./styles/editor.css";
 @import "./styles/results-core.css";
+@import "./styles/scroll-edge-shadows.css";
 @import "./styles/visualizations.css";
 @import "./styles/inspector-assistant.css";
 @import "./styles/responsive.css";
