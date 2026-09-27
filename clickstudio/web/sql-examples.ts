@@ -437,6 +437,159 @@ ORDER BY number`,
 
 const quoteIdentifier = (value: string) => `\`${value.replaceAll('`', '``')}\``;
 
+function baseColumnType(type: string) {
+    let base = type.trim();
+    while (true) {
+        const wrapped = /^(?:Nullable|LowCardinality)\((.*)\)$/i.exec(base);
+        if (!wrapped) return base;
+        base = wrapped[1]!.trim();
+    }
+}
+
+function isDateColumn(column: Schema['columns'][number]) {
+    return /^(?:Date(?:32)?|DateTime(?:64)?)(?:\b|\()/i.test(baseColumnType(column.type));
+}
+
+function isNumericColumn(column: Schema['columns'][number]) {
+    return /^(?:U?Int(?:8|16|32|64|128|256)|Float(?:32|64)|Decimal(?:32|64|128|256)?(?:\([^)]*\))?)(?:\b|$)/i.test(baseColumnType(column.type));
+}
+
+function dimensionRank(column: Schema['columns'][number]) {
+    const type = baseColumnType(column.type);
+    if (!/^(?:String|FixedString\(\d+\)|Enum(?:8|16)(?:\(.*\))?|UUID|IPv4|IPv6)$/i.test(type)) return 0;
+    const name = column.name.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    if (/(?:^|_)(?:id|uuid|key|hash|token)(?:_|$)/.test(name)) return 0;
+    if (/(?:^|_)(?:country|region|city|category|status|type|channel|source|event|product|artist|game|department|device|platform|browser|method|group|name|tag)(?:_|$)/.test(name)) return 2;
+    return 1;
+}
+
+function measureRank(column: Schema['columns'][number]) {
+    if (!isNumericColumn(column)) return 0;
+    const name = column.name.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    if (/(?:^|_)(?:id|rank|sequence|seq)(?:_|$)/.test(name)) return 0;
+    return /(?:^|_)(?:amount|revenue|sales|price|cost|population|quantity|count|events|trips|latency|duration|temperature|score|rating|bytes|size|distance|value|total|views|requests|downloads|orders|weight|height)(?:_|$)/.test(name) ? 2 : 0;
+}
+
+function columnForTable(schema: Schema, table: Schema['tables'][number]) {
+    return schema.columns.filter(column => column.database === table.database && column.table === table.name);
+}
+
+function compareTableRows(left: Schema['tables'][number], right: Schema['tables'][number]) {
+    const leftRows = /^\d+$/.test(left.rowEstimate ?? '') ? BigInt(left.rowEstimate!) : undefined;
+    const rightRows = /^\d+$/.test(right.rowEstimate ?? '') ? BigInt(right.rowEstimate!) : undefined;
+    if (leftRows !== undefined && rightRows !== undefined && leftRows !== rightRows) return leftRows > rightRows ? -1 : 1;
+    if (leftRows !== undefined && rightRows === undefined) return -1;
+    if (leftRows === undefined && rightRows !== undefined) return 1;
+    return 0;
+}
+
+function timeSeriesExample(table: Schema['tables'][number], time: Schema['columns'][number], measure: Schema['columns'][number] | undefined): SqlExample {
+    const tableName = `${quoteIdentifier(table.database)}.${quoteIdentifier(table.name)}`;
+    const timeName = quoteIdentifier(time.name);
+    const aggregate = measure
+        ? /(?:temperature|latency|duration|score|rating|price|rate|percent|percentage|distance|weight|height)/i.test(measure.name) ? 'avg' : 'sum'
+        : 'count';
+    const value = measure ? `${aggregate}(${quoteIdentifier(measure.name)})` : 'count()';
+    const valueAlias = measure ? 'metric_value' : 'row_count';
+    const name = measure ? `Daily ${measure.name} in ${table.name}` : `Daily rows in ${table.name}`;
+    return {
+        id: `cloud-time-series-${table.database}.${table.name}`,
+        name,
+        description: `Show the latest 30 daily ${measure ? `${aggregate} of ${measure.name}` : 'row counts'} from ${table.database}.${table.name}.`,
+        dataset: `${table.database}.${table.name}`,
+        category: 'timeSeries',
+        featuredOrder: 1,
+        sql: `SELECT day, ${valueAlias}\nFROM (\n    SELECT\n        toDate(${timeName}) AS day,\n        ${value} AS ${valueAlias}\n    FROM ${tableName}\n    WHERE ${timeName} IS NOT NULL\n    GROUP BY day\n    ORDER BY day DESC\n    LIMIT 30\n)\nORDER BY day`,
+        chart: { kind: 'line', x: 0, ys: [1], title: name },
+    };
+}
+
+function categoryExample(table: Schema['tables'][number], column: Schema['columns'][number], featuredOrder: number): SqlExample {
+    const name = `Top ${column.name} values in ${table.name}`;
+    const field = quoteIdentifier(column.name);
+    return {
+        id: `cloud-category-${table.database}.${table.name}.${column.name}`,
+        name,
+        description: `Count rows by ${column.name} in ${table.database}.${table.name}.`,
+        dataset: `${table.database}.${table.name}`,
+        category: 'aggregation',
+        featuredOrder,
+        sql: `SELECT\n    ${field} AS category,\n    count() AS row_count\nFROM ${quoteIdentifier(table.database)}.${quoteIdentifier(table.name)}\nWHERE ${field} IS NOT NULL AND toString(${field}) != ''\nGROUP BY category\nORDER BY row_count DESC\nLIMIT 10`,
+        chart: { kind: 'bar', x: 0, ys: [1], title: name },
+    };
+}
+
+function geoExample(table: Schema['tables'][number], columns: Schema['columns'][number][]): SqlExample | undefined {
+    const latitude = columns.find(column => isNumericColumn(column) && /^(?:lat|latitude)$/i.test(column.name));
+    const longitude = columns.find(column => isNumericColumn(column) && /^(?:lon|lng|longitude)$/i.test(column.name));
+    if (latitude && longitude) {
+        const lat = quoteIdentifier(latitude.name);
+        const lon = quoteIdentifier(longitude.name);
+        const name = `Plot locations in ${table.name}`;
+        return {
+            id: `cloud-geo-coordinates-${table.database}.${table.name}`,
+            name,
+            description: `Plot stored latitude and longitude values from ${table.database}.${table.name}.`,
+            dataset: `${table.database}.${table.name}`,
+            category: 'cities',
+            featuredOrder: 3,
+            sql: `SELECT\n    ${lon} AS longitude,\n    ${lat} AS latitude\nFROM ${quoteIdentifier(table.database)}.${quoteIdentifier(table.name)}\nWHERE ${lat} BETWEEN -90 AND 90\n    AND ${lon} BETWEEN -180 AND 180\nLIMIT 500`,
+            chart: { kind: 'scatter', x: 0, ys: [1], title: name },
+        };
+    }
+
+    const point = columns.find(column => /^(?:Point|Ring|Polygon|MultiPolygon|LineString|Geometry)$/i.test(baseColumnType(column.type)));
+    if (!point) return undefined;
+    const field = quoteIdentifier(point.name);
+    const name = `Preview ${point.name} locations in ${table.name}`;
+    return {
+        id: `cloud-geo-native-${table.database}.${table.name}.${point.name}`,
+        name,
+        description: `Read native geographic values from ${table.database}.${table.name}.`,
+        dataset: `${table.database}.${table.name}`,
+        category: 'cities',
+        featuredOrder: 3,
+        sql: `SELECT ${field} AS location\nFROM ${quoteIdentifier(table.database)}.${quoteIdentifier(table.name)}\nWHERE ${field} IS NOT NULL\nLIMIT 100`,
+        chart: { kind: 'table', x: 0, ys: [], title: name },
+    };
+}
+
+function cloudFeaturedExamples(schema?: Schema) {
+    const tables = (schema?.tables ?? [])
+        .filter(table => !['system', 'information_schema'].includes(table.database.toLowerCase()))
+        .map((table, index) => ({ table, columns: schema ? columnForTable(schema, table) : [], index }))
+        .sort((left, right) => compareTableRows(left.table, right.table) || right.columns.length - left.columns.length || left.index - right.index);
+
+    const timeExample = tables.flatMap(({ table, columns }) => {
+        const time = columns.filter(isDateColumn)
+            .sort((left, right) => Number(/(?:date|time|timestamp|_at$|^day$)/i.test(right.name)) - Number(/(?:date|time|timestamp|_at$|^day$)/i.test(left.name)))[0];
+        if (!time) return [];
+        const measure = columns.filter(column => measureRank(column) > 0)
+            .sort((left, right) => measureRank(right) - measureRank(left))[0];
+        return [timeSeriesExample(table, time, measure)];
+    })[0];
+
+    const categoryCandidates = tables.flatMap(({ table, columns, index }) => columns
+        .filter(column => dimensionRank(column) > 0)
+        .map(column => ({ table, column, tableIndex: index, rank: dimensionRank(column) })))
+        .sort((left, right) => right.rank - left.rank || left.tableIndex - right.tableIndex || left.column.name.localeCompare(right.column.name));
+    const categories: SqlExample[] = [];
+    const featuredCategoryTables = new Set<string>();
+    for (const candidate of categoryCandidates) {
+        const tableKey = `${candidate.table.database}.${candidate.table.name}`;
+        if (featuredCategoryTables.has(tableKey)) continue;
+        categories.push(categoryExample(candidate.table, candidate.column, categories.length + 2));
+        featuredCategoryTables.add(tableKey);
+        if (categories.length === 2) break;
+    }
+    const geo = tables.map(({ table, columns }) => geoExample(table, columns))
+        .find((example): example is SqlExample => Boolean(example));
+
+    return [timeExample, ...categories, geo]
+        .filter((example): example is SqlExample => Boolean(example))
+        .map((example, index) => ({ ...example, featuredOrder: index + 1 }));
+}
+
 export function sqlExamplesFor(connection: Pick<Connection, 'id' | 'dataSource'>, schema?: Schema): SqlExample[] {
     if (connection.id === PLAYGROUND_CONNECTION_ID) return playgroundExamples;
     if (connection.dataSource === 'fixture') return [...demoExamples, ...GEO_HELP_EXAMPLES];
@@ -453,5 +606,16 @@ export function sqlExamplesFor(connection: Pick<Connection, 'id' | 'dataSource'>
             chart: { kind: 'table', x: 0, ys: [], title: `Preview ${table.name}` },
         }));
 
-    return [...tableExamples, ...genericExamples, ...GEO_HELP_EXAMPLES];
+    const featured = cloudFeaturedExamples(schema);
+    const featuredExamples = featured.length
+        ? featured
+        : tableExamples.length
+            ? []
+            : genericExamples.map((example, index) => ({ ...example, featuredOrder: index + 1 }));
+    const orderedTableExamples = !featured.length && tableExamples.length
+        ? tableExamples.map((example, index) => index === 0 ? { ...example, featuredOrder: 1 } : example)
+        : tableExamples;
+    const cloudGeoExamples = GEO_HELP_EXAMPLES.map(example => ({ ...example, featuredOrder: undefined }));
+
+    return [...orderedTableExamples, ...featuredExamples, ...genericExamples, ...cloudGeoExamples];
 }
