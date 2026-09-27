@@ -75,8 +75,8 @@
     .schema-chevron { width: 13px; height: 13px; color: var(--muted); transition: transform .2s ease; }
     .schema-table[open] .schema-chevron { transform: rotate(180deg); }
     .schema-table-content { display: grid; gap: 8px; padding: 0 7px 7px; animation: enter .18s ease both; }
-    .schema-table-metadata { display: grid; gap: 8px; padding: 0 1px; }
-    .schema-stat-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
+    .schema-table-metadata { display: grid; gap: 6px; padding: 0 1px; }
+    .schema-stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); gap: 5px; }
     .schema-stat { display: grid; min-width: 0; gap: 4px; padding: 7px; border: 1px solid var(--line); border-radius: 6px; background: var(--page-raised); }
     .schema-stat > span, .schema-key > span, .schema-view-target > span { color: var(--muted); font-size: 7px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
     .schema-stat > strong { overflow: hidden; color: var(--text-soft); font-family: var(--font-mono); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
