@@ -347,6 +347,21 @@ export function createApp(config: Config, overrides: {
         }
         res.status(201).json({ ...context, evidenceSql: run?.sql ?? null });
     });
+    app.post('/api/assistant/sql', async (req, res) => {
+        const p = principal(res), v = body(req), connectionId = identifier(v.connectionId, 'connectionId');
+        canWrite(p);
+        requireThat(authorized(p, connectionId), 403, 'WORKSPACE_UNTRUSTED', 'Trust this connection before sharing context');
+        const question = text(v.question, 'question', 4000), sql = text(v.sql, 'SQL', 200000, true);
+        const schema = await driver.schema(connectionId), connection = driver.connection(p, connectionId);
+        const documentation = await assistantReferenceDocs(driver, p, connectionId, question, sql, schema, connection.database);
+        const context = ai.prepare(p, { connectionId, action: 'generate', question, sql, schema,
+            serverVersion: connection.manifest?.serverVersion, documentation, sensitiveColumns: config.sensitiveColumns });
+        if (!secretFree(context.payload)) {
+            store.delete('ai-contexts', context.id);
+            throw new AppError(400, 'SECRET_IN_CONTEXT', 'This context contains a configured secret; remove it before sharing');
+        }
+        res.status(201).json(await ai.propose(p, context.id, true));
+    });
     app.post('/api/assistant/proposals', async (req, res) => { const v = body(req); res.json(await ai.propose(principal(res), identifier(v.contextId, 'contextId'), v.consent === true)); });
     app.get('/api/assistant/proposals/:id', (req, res) => res.json(ai.get(principal(res), id(req))));
     app.post('/api/assistant/proposals/:id/decision', (req, res) => { const v = body(req); requireThat(v.decision === 'accepted' || v.decision === 'rejected', 400, 'DECISION', 'Unknown proposal decision'); res.json(ai.decide(principal(res), id(req), v.decision, identifier(v.connectionId, 'connectionId'), text(v.currentSql, 'current SQL', 200000, true))); });

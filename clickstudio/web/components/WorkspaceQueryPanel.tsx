@@ -1,5 +1,6 @@
-import type { RefObject } from 'react';
-import type { RunKind, Schema } from '../../shared/types';
+import { useMemo, type RefObject } from 'react';
+import { diffLines } from 'diff';
+import type { Proposal, RunKind, Schema } from '../../shared/types';
 import type { NativeParseSnapshot, NativeParserStatus } from '../../shared/native-parser';
 import { hasSqlComments, type SqlParameter } from '../../shared/sql';
 import type { Copy, ExperienceLevel } from '../i18n';
@@ -23,6 +24,8 @@ export type WorkspaceQueryPanelState = Readonly<{
     active: Draft;
     connection: Connected;
     schema?: Schema;
+    assistantProposal?: Proposal;
+    assistantBusy: boolean;
     copy: Copy;
     experience: ExperienceLevel;
     dark: boolean;
@@ -41,6 +44,7 @@ export type WorkspaceQueryPanelActions = Readonly<{
     onPatch: (values: Partial<Draft>) => void;
     onToggleSqlMap: () => void;
     onOpenAssistant: () => void;
+    onDecideAssistantProposal: (decision: 'accepted' | 'rejected') => void;
     onSave: () => Promise<void>;
     onFormat: (formatter: WorkspaceFormatter) => Promise<void>;
     onRun: (wholeScript?: boolean, kind?: RunKind) => Promise<void>;
@@ -51,6 +55,48 @@ export type WorkspaceQueryPanelActions = Readonly<{
     onOpenDetached: () => void;
     onDockDetached: () => void;
 }>;
+
+type SqlDiffRow = { kind: 'added' | 'removed' | 'context'; text: string; oldLine?: number; newLine?: number };
+
+function sqlDiffRows(before: string, after: string): SqlDiffRow[] {
+    let oldLine = 1;
+    let newLine = 1;
+    return diffLines(before, after).flatMap(change => {
+        const lines = change.value.split('\n');
+        if (lines.at(-1) === '') lines.pop();
+        const kind = change.added ? 'added' : change.removed ? 'removed' : 'context';
+        return lines.map(text => {
+            const row: SqlDiffRow = {
+                kind,
+                text: text.replace(/\r$/, ''),
+                ...(kind === 'added' ? {} : { oldLine }),
+                ...(kind === 'removed' ? {} : { newLine }),
+            };
+            if (kind !== 'added') oldLine++;
+            if (kind !== 'removed') newLine++;
+            return row;
+        });
+    });
+}
+
+function SqlProposalDiff({ proposal, currentSql, busy, onDecision }: {
+    proposal: Proposal;
+    currentSql: string;
+    busy: boolean;
+    onDecision: (decision: 'accepted' | 'rejected') => void;
+}) {
+    const rows = useMemo(() => sqlDiffRows(proposal.baseSql, proposal.sql ?? ''), [proposal.baseSql, proposal.sql]);
+    const added = rows.filter(row => row.kind === 'added').length;
+    const removed = rows.filter(row => row.kind === 'removed').length;
+    const stale = proposal.baseSql !== currentSql;
+    const unsafe = proposal.quality?.status === 'fail';
+    return <section className="sql-proposal-diff" role="region" aria-live="polite" aria-label="Generated SQL diff" data-testid="sql-proposal-diff">
+        <header className="sql-proposal-diff-heading"><div><span className="eyebrow">SQL PROPOSAL</span><strong>{proposal.summary}</strong></div><span className="sql-proposal-diff-count"><i>+{added}</i><i>−{removed}</i></span></header>
+        {stale && <div className="callout callout-error" role="alert">The draft changed after generation. Reject this diff and generate again.</div>}
+        <pre className="sql-proposal-diff-code" aria-label="Line-by-line SQL changes"><code>{rows.map((row, index) => <span className={`sql-proposal-diff-line is-${row.kind}`} key={`${row.kind}-${index}`}><span className="sql-proposal-diff-gutter">{row.oldLine ?? ''} {row.newLine ?? ''}</span><span className="sql-proposal-diff-sign">{row.kind === 'added' ? '+' : row.kind === 'removed' ? '−' : ' '}</span><span>{row.text || ' '}</span></span>)}</code></pre>
+        <footer className="sql-proposal-diff-footer"><span>{unsafe ? 'This proposal failed the read-only SQL safety check.' : 'Review the changes before applying them. SQL will not run until you press Run.'}</span><div><Button variant="secondary" onClick={() => onDecision('rejected')} disabled={busy}>Reject</Button><Button variant="primary" onClick={() => onDecision('accepted')} disabled={busy || stale || unsafe}>Accept SQL</Button></div></footer>
+    </section>;
+}
 
 export function WorkspaceQueryPanel({
     state,
@@ -85,6 +131,8 @@ export function WorkspaceQueryPanel({
         view,
     } = state;
     const { statementCount, editorErrorContext, editorErrorRange } = viewState;
+    const sqlProposal = experience === 'expert' && state.assistantProposal?.action === 'generate' &&
+        state.assistantProposal.decision === 'pending' && state.assistantProposal.sql !== null ? state.assistantProposal : undefined;
     const {
         queryPanelRef,
         queryMode,
@@ -160,6 +208,7 @@ export function WorkspaceQueryPanel({
             <div className="editor-workspace-layout">
                 <div className="editor-main-column">
                     {experience === 'beginner' && (!trusted || (!demoMode && !connection.manifest)) && <div className="beginner-connection-notice" role="status"><span>{demoMode ? 'Start the sample workspace to run this query.' : !connection.manifest ? trusted ? 'Retest this connection to refresh its feature checks.' : 'Test this connection to discover its ClickHouse features.' : 'Trust this connection to run SQL.'}</span><Button variant="secondary" className="toolbar-small" onClick={() => void actions.onConnectionAction()}>{demoMode ? 'Start exploring' : !connection.manifest ? trusted ? 'Retest connection' : 'Test connection' : 'Trust connection'}</Button></div>}
+                    {sqlProposal && <SqlProposalDiff proposal={sqlProposal} currentSql={active.sql} busy={state.assistantBusy} onDecision={actions.onDecideAssistantProposal}/>}
                     <div className="editor-frame"><SqlEditor key={active.id} ref={editorRef} value={active.sql} from={active.from} to={active.to} schema={trusted ? schema : undefined} dark={dark} nativeParserEnabled={nativeParserEnabled} parserStatus={nativeParserStatus} error={editorErrorContext?.error} errorRange={editorErrorRange} onChange={sql => actions.onPatch({ sql })} onSelection={(from, to) => actions.onPatch({ from, to })} onRun={wholeScript => void actions.onRun(wholeScript)} onNativeParserStatus={actions.onNativeParserStatus} onNativeParseSnapshot={actions.onNativeParseSnapshot}/></div>
                     {unsupportedParameters
                         ? <div className="callout mt-3" role="status">{connection.manifest?.parameters.reason ?? 'Query parameters are unavailable on this connection.'} Replace placeholders with SQL literals to run this query.</div>

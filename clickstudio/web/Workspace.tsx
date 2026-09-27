@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import type { ProfilePipeline, QueryDocument, QueryProfile, Result, Run, RunKind, Script } from '../shared/types';
+import type { ProfilePipeline, QueryDocument, QueryProfile, Result, Run, RunKind, Schema, Script } from '../shared/types';
 import { DEFAULT_LIMITS } from '../shared/types';
 import { exportCsv, recommendChart } from '../shared/results';
 import { formatSql, lexSql, parameterNames, selectedStatement, splitSql } from '../shared/sql';
@@ -176,6 +176,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         startVoiceInput,
         prepareAssistantContext,
         requestAssistantProposal,
+        requestAssistantSql,
         decideAssistantProposal,
     } = useWorkspaceAssistant({
         active,
@@ -737,6 +738,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         voiceListening,
         voiceError,
         onPreview: () => void prepareAssistantContext(experience === 'beginner' ? 'generate' : undefined),
+        onGenerateSql: (currentSchema?: Schema, serverVersion?: string) => void requestAssistantSql(currentSchema, serverVersion),
         onRequestProposal: () => void requestAssistantProposal(),
         onDecideProposal: (decision: 'accepted' | 'rejected') => void decideAssistantProposal(decision),
         onRunQuery: () => void execute(),
@@ -745,7 +747,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
     } satisfies InspectorPaneProps;
 
     const queryPanel = <WorkspaceQueryPanel
-        state={{ active, connection, schema, copy, experience, dark, nativeParserEnabled, nativeParserStatus,
+        state={{ active, connection, schema, assistantProposal, assistantBusy, copy, experience, dark, nativeParserEnabled, nativeParserStatus,
             trusted, unsupportedParameters, parameters, busy, inspector, demoMode, view }}
         actions={{
             onPatch: patch,
@@ -754,6 +756,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
                 setResultsCollapsed(false);
             },
             onOpenAssistant: () => showInspector('assistant'),
+            onDecideAssistantProposal: (decision: 'accepted' | 'rejected') => void decideAssistantProposal(decision),
             onSave: saveDraft,
             onFormat: formatActiveSql,
             onRun: execute,

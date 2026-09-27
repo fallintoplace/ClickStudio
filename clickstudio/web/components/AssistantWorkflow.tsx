@@ -43,6 +43,11 @@ export type AssistantWorkflowProps = {
     voiceListening: boolean;
     voiceError: string;
     onPreview: () => void;
+    onGenerateSql: () => void;
+    schemaReady: boolean;
+    schemaLoading: boolean;
+    schemaStatus: string;
+    onRefreshSchema: () => void;
     onRequestProposal: () => void;
     onDecideProposal: (decision: 'accepted' | 'rejected') => void;
     onRunQuery: () => void;
@@ -51,6 +56,7 @@ export type AssistantWorkflowProps = {
 
 function AssistantOutput({ mode, sql, context, proposal, busy, error, onRequestProposal, onDecideProposal, onRunQuery, runDisabled }: Pick<AssistantWorkflowProps, 'mode' | 'sql' | 'context' | 'proposal' | 'busy' | 'error' | 'onRequestProposal' | 'onDecideProposal' | 'onRunQuery' | 'runDisabled'>) {
     const beginner = mode === 'beginner';
+    const diffInEditor = !beginner && proposal?.action === 'generate';
     return <>
         {error && <div className="callout callout-error" role="alert">{error}</div>}
         {context && <div className="context-preview animate-enter">
@@ -65,11 +71,12 @@ function AssistantOutput({ mode, sql, context, proposal, busy, error, onRequestP
             {proposal.caveats.map(item => <p className="proposal-point" key={item}><span>NOTE</span>{item}</p>)}
             {proposal.findings.map(item => <p className="proposal-finding" key={`${item.severity}-${item.message}`}><strong>{item.severity}</strong>{item.message}<small>{item.evidence}</small></p>)}
             {proposal.sql !== null && <>
-                <span className="eyebrow mt-4">PROPOSED SQL</span>
-                <pre className="proposal-sql">{proposal.sql}</pre>
+                {diffInEditor
+                    ? proposal.decision === 'pending' && <p className="proposal-review-hint">Review the SQL diff above the editor, then accept or reject it there.</p>
+                    : <><span className="eyebrow mt-4">PROPOSED SQL</span><pre className="proposal-sql">{proposal.sql}</pre></>}
                 {proposal.decision === 'pending' && <>
                     {proposal.baseSql !== sql && <div className="callout callout-error">The SQL draft changed. Refresh the context before applying this proposal.</div>}
-                    <div className="proposal-buttons"><Button variant="secondary" onClick={() => onDecideProposal('rejected')} disabled={busy}>Reject</Button><Button variant="primary" onClick={() => onDecideProposal('accepted')} disabled={busy || proposal.baseSql !== sql}>{beginner ? 'Use this query' : 'Apply to editor'}</Button></div>
+                    {!diffInEditor && <div className="proposal-buttons"><Button variant="secondary" onClick={() => onDecideProposal('rejected')} disabled={busy}>Reject</Button><Button variant="primary" onClick={() => onDecideProposal('accepted')} disabled={busy || proposal.baseSql !== sql}>{beginner ? 'Use this query' : 'Apply to editor'}</Button></div>}
                 </>}
                 {beginner && proposal.decision === 'accepted' && <div className="beginner-run-ready"><span><span className="status-light is-trusted"/> Added to your SQL draft</span><Button variant="primary" onClick={onRunQuery} disabled={runDisabled || busy}><Icon name="play"/>{busy ? 'Starting…' : 'Run this query'}</Button></div>}
             </>}
@@ -77,7 +84,7 @@ function AssistantOutput({ mode, sql, context, proposal, busy, error, onRequestP
     </>;
 }
 
-export function AssistantWorkflow({ mode, sql, action, onActionChange, question, onQuestionChange, context, proposal, busy, error, trusted, runId, includeResult, onIncludeResult, onVoiceInput, voiceListening, voiceError, onPreview, onRequestProposal, onDecideProposal, onRunQuery, runDisabled }: AssistantWorkflowProps) {
+export function AssistantWorkflow({ mode, sql, action, onActionChange, question, onQuestionChange, context, proposal, busy, error, trusted, runId, includeResult, onIncludeResult, onVoiceInput, voiceListening, voiceError, onPreview, onGenerateSql, schemaReady, schemaLoading, schemaStatus, onRefreshSchema, onRequestProposal, onDecideProposal, onRunQuery, runDisabled }: AssistantWorkflowProps) {
     const beginner = mode === 'beginner';
     const speechAvailable = Boolean(window.SpeechRecognition ?? window.webkitSpeechRecognition);
     const voiceButton = <Button variant="ghost" className={cx('voice-button', voiceListening && 'is-listening')} title={speechAvailable ? (voiceListening ? 'Stop dictation' : 'Dictate your question') : 'Voice input is not available in this browser'} aria-label={voiceListening ? 'Stop dictation' : 'Dictate question'} disabled={!speechAvailable} onClick={onVoiceInput}><Icon name="mic"/>{voiceListening ? 'Listening…' : 'Use voice'}</Button>;
@@ -91,6 +98,17 @@ export function AssistantWorkflow({ mode, sql, action, onActionChange, question,
         {!trusted && <div className="callout">Trust this connection to include its schema.</div>}
         {voiceError && <div className="callout callout-error" role="alert">{voiceError}</div>}
         <div className="assistant-actions">{output}</div>
+    </section>;
+
+    if (action === 'generate') return <section className="assistant-panel assistant-generate-panel animate-enter" aria-label="Generate SQL with AI">
+        <div className="assistant-safety"><span className="assistant-glyph"><Icon name="assistant"/></span><div><strong>Write SQL</strong><p>Describe what you need. Review the diff before adding it to your draft.</p></div></div>
+        <label className="field-label" htmlFor="expert-sql-prompt">YOUR QUESTION<textarea id="expert-sql-prompt" className="field-textarea" aria-label="YOUR QUESTION" value={question} onChange={event => onQuestionChange(event.target.value)} onKeyDown={event => { if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') { event.preventDefault(); if (trusted && schemaReady && question.trim() && !busy) onGenerateSql(); } }} readOnly={voiceListening} placeholder="For example: show event counts by day" rows={4}/></label>
+        <div className="flex flex-wrap items-center justify-between gap-2">{voiceButton}<Button variant="primary" disabled={!trusted || !schemaReady || busy || !question.trim()} onClick={onGenerateSql}>{busy ? 'Generating SQL…' : 'Generate SQL'}</Button></div>
+        <p className="assistant-generation-disclosure">Your question, current SQL, and available schema are sent to OpenAI to draft SQL. The query is not run automatically.</p>
+        {!trusted && <div className="callout">Trust this connection before generating SQL from its schema.</div>}
+        {!schemaReady && trusted && <div className="callout assistant-schema-refresh"><span>{schemaStatus || 'Load the ClickHouse schema before generating SQL.'}</span><Button variant="secondary" disabled={schemaLoading} onClick={onRefreshSchema}>{schemaLoading ? 'Loading…' : 'Refresh schema'}</Button></div>}
+        {voiceError && <div className="callout callout-error" role="alert">{voiceError}</div>}
+        <AssistantOutput mode={mode} sql={sql} context={undefined} proposal={proposal} busy={busy} error={error} onRequestProposal={onRequestProposal} onDecideProposal={onDecideProposal} onRunQuery={onRunQuery} runDisabled={runDisabled}/>
     </section>;
 
     return <section className="assistant-panel">

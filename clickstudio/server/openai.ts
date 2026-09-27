@@ -15,7 +15,7 @@ export class OpenAIDriver implements AssistantDriver {
         this.client = new OpenAI({ apiKey: key, maxRetries: 0, timeout: 45000 }); }
     async propose(context: PreparedContext, signal: AbortSignal) {
         if (!this.client)
-            throw new AppError(503, 'AI_UNAVAILABLE', 'Set OPENAI_API_KEY and OPENAI_MODEL on the server');
+            throw new AppError(503, 'AI_UNAVAILABLE', 'Set OPENAI_API_KEY on the server');
         const content: OpenAI.Responses.ResponseInputContent[] = [{ type: 'input_text', text: JSON.stringify({ question: context.payload.question, context: JSON.parse(context.payload.context) }) }];
         if (context.payload.image)
             content.push({ type: 'input_image', image_url: context.payload.image, detail: 'auto' });

@@ -73,7 +73,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     requireThat(new Set(profiles.map(p => p.id)).size === profiles.length, 400, 'CONNECTION_IDS', 'Connection IDs must be unique');
     requireThat(env.DEMO_MODE !== 'true' || local, 400, 'DEMO_LOCAL_ONLY', 'Fixture mode is loopback-only');
     return { host, port, origin, dataDir: resolve(env.DATA_DIR ?? '.data'), token, demo: env.DEMO_MODE === 'true', profiles,
-        openaiKey: env.OPENAI_API_KEY, openaiModel: env.OPENAI_MODEL, openaiRealtimeModel: env.OPENAI_REALTIME_MODEL ?? 'gpt-realtime-2.1', sensitiveColumns: (env.AI_SENSITIVE_COLUMNS ?? 'password,token,secret,api_key').split(',').map(s => s.trim()),
+        openaiKey: env.OPENAI_API_KEY, openaiModel: env.OPENAI_MODEL?.trim() || 'gpt-5-mini', openaiRealtimeModel: env.OPENAI_REALTIME_MODEL ?? 'gpt-realtime-2.1', sensitiveColumns: (env.AI_SENSITIVE_COLUMNS ?? 'password,token,secret,api_key').split(',').map(s => s.trim()),
         telemetryUrl: env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, traceUrl: env.TRACE_URL_TEMPLATE, production: env.NODE_ENV === 'production' };
 }
 export function publicProfile(p: Profile): Connection { return { dataSource: 'clickhouse', id: p.id, name: p.name, host: new URL(p.url).origin, database: p.database, username: p.username, readonly: true, limits: p.limits }; }

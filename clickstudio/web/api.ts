@@ -26,7 +26,7 @@ export const isFrontendDemoPreview = import.meta.env.VITE_DEMO_MODE === 'true';
 const demoPreview = isFrontendDemoPreview ? new DemoPreviewApi() : undefined;
 
 export async function api<T>(path: string, options: ApiOptions = {}): Promise<T> {
-    if (demoPreview)
+    if (demoPreview && path !== '/assistant/sql')
         return await demoPreview.request(path, options) as T;
 
     const response = await fetch(`/api${path}`, { method: options.method ?? 'GET', credentials: 'same-origin', signal: options.signal,

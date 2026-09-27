@@ -6,6 +6,9 @@
   "functions": {
     "api/cloud.ts": {
       "maxDuration": 60
+    },
+    "api/assistant/sql.ts": {
+      "maxDuration": 60
     }
   },
   "headers": [

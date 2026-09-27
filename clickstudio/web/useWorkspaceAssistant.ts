@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import type { AssistantAction, Proposal } from '../shared/types';
-import { message, post } from './api';
+import type { AssistantAction, Proposal, Schema } from '../shared/types';
+import { isFrontendDemoPreview, message, post } from './api';
 import { checkpoint, type Draft, type WorkspaceState } from './workspace-state';
 import type { Locale } from './i18n';
 import type { AssistantContext, SpeechRecognitionLike } from './workspace-types';
@@ -248,6 +248,52 @@ export function useWorkspaceAssistant({
         }
     };
 
+    const requestAssistantSql = async (schema?: Schema, serverVersion?: string) => {
+        if (!trusted) return;
+        if (!assistantQuestion.trim()) {
+            setAssistantError('Describe the SQL you want to generate first.');
+            return;
+        }
+        if (!schema) {
+            setAssistantError('Refresh the ClickHouse schema before generating SQL.');
+            return;
+        }
+        const draftId = active.id;
+        const requestKey = assistantContextKey(
+            connectionId,
+            draftId,
+            active.sql,
+            active.parameters,
+            activeRunId,
+            includeResult,
+            'generate',
+            assistantQuestion,
+        );
+        const requestId = ++requestRef.current;
+        assistantKeyRef.current = requestKey;
+        setAssistantBusyKey(requestKey);
+        setAssistantError('');
+        setAssistantAction('generate');
+        setAssistantContextForDraft(draftId, undefined);
+        setAssistantProposalForDraft(draftId, undefined);
+        try {
+            const proposal = await post<unknown>('/assistant/sql', {
+                connectionId,
+                question: assistantQuestion,
+                sql: active.sql,
+                schema,
+                serverVersion,
+            });
+            if (!isProposal(proposal)) throw new Error('SQL generation returned incomplete data. Try again.');
+            if (requestRef.current !== requestId || assistantKeyRef.current !== requestKey) return;
+            setAssistantProposalForDraft(draftId, { key: requestKey, value: proposal });
+        } catch (caught) {
+            if (requestRef.current === requestId && assistantKeyRef.current === requestKey) setAssistantError(message(caught));
+        } finally {
+            if (requestRef.current === requestId) setAssistantBusyKey(undefined);
+        }
+    };
+
     const decideAssistantProposal = async (decision: 'accepted' | 'rejected') => {
         if (!assistantProposal || assistantProposal.decision !== 'pending' || assistantProposal.baseSql !== active.sql) return;
         const proposal = assistantProposal;
@@ -266,10 +312,12 @@ export function useWorkspaceAssistant({
         setAssistantBusyKey(requestKey);
         setAssistantError('');
         try {
-            const reviewed = await post<Proposal>(
-                `/assistant/proposals/${encodeURIComponent(proposal.id)}/decision`,
-                { decision, connectionId, currentSql: active.sql },
-            );
+            const reviewed = isFrontendDemoPreview && proposal.owner === 'vercel-session'
+                ? { ...proposal, decision, decidedAt: new Date().toISOString() }
+                : await post<Proposal>(
+                    `/assistant/proposals/${encodeURIComponent(proposal.id)}/decision`,
+                    { decision, connectionId, currentSql: active.sql },
+                );
             setAssistantProposalForDraft(draftId, { key: requestKey, value: reviewed }, true);
             const currentDraft = workspaceRef.current.tabs.find(draft => draft.id === draftId);
             if (decision === 'accepted' && reviewed.sql !== null && currentDraft?.sql === proposal.baseSql) {
@@ -303,6 +351,7 @@ export function useWorkspaceAssistant({
         startVoiceInput,
         prepareAssistantContext,
         requestAssistantProposal,
+        requestAssistantSql,
         decideAssistantProposal,
     };
 }

@@ -94,17 +94,17 @@ test('Compact shows a single document tab and keeps tabs for multiple queries', 
 });
 
 test('Switching to Advanced keeps the same AI question, query and run evidence', async ({ page }) => {
-    const contexts: Record<string, unknown>[] = [];
-    const proposals: Record<string, unknown>[] = [];
+    const generations: Record<string, unknown>[] = [];
+    const runRequests: Record<string, unknown>[] = [];
     let proposalBaseSql = '';
-    await page.route('**/api/assistant/context', async route => {
-        const body = jsonRecord(route.request().postDataJSON(), 'Assistant context request');
-        contexts.push(body);
-        proposalBaseSql = String(body.sql ?? '');
-        await route.fulfill({ status: 201, json: { id: 'test-context', summary: ['Schema: demo.events', 'Only the selected question and schema are included.'] } });
+    page.on('request', request => {
+        if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/runs')
+            runRequests.push(jsonRecord(request.postDataJSON(), 'Run request'));
     });
-    await page.route('**/api/assistant/proposals', async route => {
-        proposals.push(jsonRecord(route.request().postDataJSON(), 'Assistant proposal request'));
+    await page.route('**/api/assistant/sql', async route => {
+        const body = jsonRecord(route.request().postDataJSON(), 'SQL generation request');
+        generations.push(body);
+        proposalBaseSql = String(body.sql ?? '');
         await route.fulfill({ json: {
             id: 'test-proposal', owner: 'local-owner', connectionId: 'demo', action: 'generate', createdAt: '2026-09-23T00:00:00.000Z',
             baseSql: proposalBaseSql, responseId: 'test-response', model: 'test-model', promptVersion: 'test', contextSummary: ['Fixture-backed mock'], decision: 'pending',
@@ -129,19 +129,18 @@ test('Switching to Advanced keeps the same AI question, query and run evidence',
     await page.getByTestId('save-query').click();
     await expect(page.getByRole('status').filter({ hasText: 'revision 1' })).toBeVisible();
     await page.getByTestId('open-ai').click();
-    const prompt = page.getByRole('textbox', { name: 'YOUR QUESTION OR FOCUS', exact: true });
+    const prompt = page.getByRole('textbox', { name: 'YOUR QUESTION', exact: true });
     await prompt.fill('Show event counts by day');
-    await page.getByRole('button', { name: 'Preview context', exact: true }).click();
-    await expect(page.getByText(/Schema: demo\.events/)).toBeVisible();
-    expect(contexts).toHaveLength(1);
-    expect(contexts[0]).toMatchObject({ action: 'generate', question: 'Show event counts by day', connectionId: 'demo' });
-
-    page.on('dialog', dialog => dialog.accept());
-    await page.getByRole('button', { name: 'Ask AI for a proposal', exact: true }).click();
-    await expect(page.getByText('Show the sample event counts by day.', { exact: true })).toBeVisible();
-    expect(proposals).toEqual([{ contextId: 'test-context', consent: true }]);
-    await page.getByRole('button', { name: 'Apply to editor', exact: true }).click();
+    await page.getByRole('button', { name: 'Generate SQL', exact: true }).click();
+    await expect(page.getByTestId('sql-proposal-diff').getByText('Show the sample event counts by day.', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('sql-proposal-diff')).toBeVisible();
+    expect(generations).toHaveLength(1);
+    expect(generations[0]).toMatchObject({ question: 'Show event counts by day', connectionId: 'demo' });
+    expect(generations[0]?.schema).toBeTruthy();
+    expect(runRequests).toHaveLength(0);
+    await page.getByRole('button', { name: 'Accept SQL', exact: true }).click();
     await expect(page.locator('.cm-content')).toContainText(generatedSql);
+    expect(runRequests).toHaveLength(0);
     await page.getByTestId('run-statement').click();
 
     const results = page.getByRole('region', { name: 'Query results', exact: true });

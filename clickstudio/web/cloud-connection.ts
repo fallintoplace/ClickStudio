@@ -1,4 +1,4 @@
-import { DEFAULT_LIMITS, type Column, type Connection, type Row, type Schema } from '../shared/types';
+import { DEFAULT_LIMITS, type Column, type Connection, type Row, type Schema } from '../shared/types.js';
 
 export const CLICKHOUSE_CLOUD_CONNECTION_ID = 'clickhouse-cloud';
 

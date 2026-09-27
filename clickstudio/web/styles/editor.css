@@ -135,6 +135,25 @@
     .sql-map-button svg { width: 14px; height: 14px; }
     .save-revision-button { min-height: 34px; }
     .editor-frame { min-height: 120px; flex: 1; overflow: auto; background: var(--page-raised); }
+    .sql-proposal-diff { display: grid; flex: none; gap: 8px; max-height: min(42vh, 360px); overflow: hidden; padding: 10px; border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--line-bright)); border-radius: 9px; background: color-mix(in srgb, var(--panel-raised) 94%, transparent); box-shadow: 0 8px 24px color-mix(in srgb, var(--shadow-color, #000) 12%, transparent); }
+    .sql-proposal-diff-heading { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 12px; }
+    .sql-proposal-diff-heading > div { display: grid; min-width: 0; gap: 3px; }
+    .sql-proposal-diff-heading strong { overflow: hidden; color: var(--text-soft); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+    .sql-proposal-diff-count { display: flex; flex: none; gap: 8px; font-family: var(--font-mono); font-size: 9px; }
+    .sql-proposal-diff-count i { color: var(--green); font-style: normal; }
+    .sql-proposal-diff-count i + i { color: var(--red); }
+    .sql-proposal-diff-code { min-height: 38px; max-height: 220px; overflow: auto; margin: 0; padding: 5px 0; border: 1px solid var(--line); border-radius: 6px; background: var(--page); color: var(--text-soft); font-family: var(--font-mono); font-size: 9px; line-height: 1.55; }
+    .sql-proposal-diff-code code { display: block; min-width: max-content; }
+    .sql-proposal-diff-line { display: grid; grid-template-columns: 60px 16px minmax(0, 1fr); min-height: 15px; white-space: pre; }
+    .sql-proposal-diff-line.is-added { background: color-mix(in srgb, var(--green) 13%, transparent); color: var(--green); }
+    .sql-proposal-diff-line.is-removed { background: color-mix(in srgb, var(--red) 12%, transparent); color: var(--red); }
+    .sql-proposal-diff-gutter { padding: 0 7px 0 3px; border-right: 1px solid var(--line); color: var(--muted); text-align: right; }
+    .sql-proposal-diff-sign { text-align: center; }
+    .sql-proposal-diff-line > span:last-child { padding-right: 12px; }
+    .sql-proposal-diff-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--muted); font-size: 8px; line-height: 1.45; }
+    .sql-proposal-diff-footer > span { min-width: 0; }
+    .sql-proposal-diff-footer > div { display: flex; flex: none; gap: 6px; }
+    .sql-proposal-diff-footer .button-base { min-height: 29px; padding-inline: 10px; font-size: 8px; }
     .sql-editor, .sql-editor .cm-editor { width: 100%; height: 100%; min-height: 100%; }
     .sql-editor .cm-editor { background: transparent; color: var(--text); }
     .sql-editor .cm-scroller { overflow: auto; }

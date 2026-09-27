@@ -186,7 +186,7 @@ export class AssistantService {
         const usage = this.usage(p);
         return { available: this.driver.available, model: this.driver.model, callsRemaining: Math.max(0, 20 - usage.calls),
             inputBytesRemaining: Math.max(0, 5000000 - usage.inputBytes), promptVersion: PROMPT_VERSION,
-            reason: this.driver.available ? undefined : 'Configure OPENAI_API_KEY and OPENAI_MODEL on the server. No sample AI response is substituted.' };
+            reason: this.driver.available ? undefined : 'Configure OPENAI_API_KEY on the server. OPENAI_MODEL is optional.' };
     }
     private usage(p: Principal): Usage {
         const day = new Date().toISOString().slice(0, 10), existing = this.store.get<Usage>('ai-usage', hash(p.id));
