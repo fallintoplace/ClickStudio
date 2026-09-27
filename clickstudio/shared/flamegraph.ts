@@ -71,7 +71,7 @@ export function flamegraphQuery(source: FlamegraphSource) {
 }
 
 function mutableRoot(type: FlamegraphTraceType): MutableFrame {
-    return { id: `${type}:root`, name: type === 'CPU' ? 'CPU samples' : 'Wall-clock samples', samples: 0, selfSamples: 0, children: new Map() };
+    return { id: `${type}:root`, name: type === 'CPU' ? 'CPU samples' : 'Wall-clock samples', samples: 0, selfSamples: 0, children: new Map<string, MutableFrame>() };
 }
 
 function freezeFrame(frame: MutableFrame): FlamegraphFrame {
@@ -102,7 +102,7 @@ export function parseFlamegraphRows(queryId: string, rows: readonly Row[]): Flam
             let child = parent.children.get(key);
             if (!child) {
                 if (nodeCount >= MAX_FLAMEGRAPH_NODES) { truncated = true; break; }
-                child = { id: `${type}:${nodeCount++}`, name: frame.name, location: frame.location, samples: 0, selfSamples: 0, children: new Map() };
+                child = { id: `${type}:${nodeCount++}`, name: frame.name, location: frame.location, samples: 0, selfSamples: 0, children: new Map<string, MutableFrame>() };
                 parent.children.set(key, child);
             }
             child.samples = Math.min(Number.MAX_SAFE_INTEGER, child.samples + count);
