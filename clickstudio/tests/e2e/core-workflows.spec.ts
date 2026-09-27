@@ -124,6 +124,30 @@ test('Run button submits the live CodeMirror document before React catches up', 
     await expect(page.locator('.execution-bar')).toHaveAttribute('data-run-status', 'succeeded');
 });
 
+test('The previous result notice explains when the SQL selection changes', async ({ page }) => {
+    await trust(page);
+    await replaceSql(page, 'SELECT 1;\nSELECT 2;');
+    const editor = page.locator('.cm-content');
+    const results = page.getByRole('region', { name: 'Query results', exact: true });
+
+    await editor.focus();
+    await page.keyboard.press('ControlOrMeta+Home');
+    await page.keyboard.press('Shift+End');
+    await page.keyboard.press('Shift+ArrowLeft');
+    await runButton(page).click();
+    await expect(page.locator('.execution-bar')).toHaveAttribute('data-run-status', 'succeeded');
+    await expect(results.locator('.result-provenance-header')).toHaveCount(0);
+
+    await editor.focus();
+    await page.keyboard.press('ControlOrMeta+Home');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Shift+End');
+    await page.keyboard.press('Shift+ArrowLeft');
+    const provenance = results.locator('.result-provenance-header');
+    await expect(provenance).toContainText('SQL, selection, or parameters changed');
+    await expect(provenance).toHaveAttribute('aria-label', 'SQL text, selection, or bound parameters changed since this run. Rerun to refresh the result.');
+});
+
 test('Two Run button clicks in one task submit only one request', async ({ page }) => {
     await trust(page);
     await useAdvancedMode(page);
@@ -788,17 +812,18 @@ test('SQL and parameter edits label old results without changing their run evide
     const queryId = await page.locator('.execution-bar code').innerText();
 
     await replaceSql(page, 'SELECT 42');
-    await expect(results.locator('.result-provenance')).toContainText('Result from previous execution');
+    await expect(results.locator('.result-provenance-header')).toContainText('Previous result');
+    await expect(results.locator('.result-provenance-header')).toContainText('SQL, selection, or parameters changed');
     await expect(page.locator('.execution-bar code')).toHaveText(queryId);
     await replaceSql(page, submittedSql);
-    await expect(results.locator('.result-provenance')).toHaveCount(0);
+    await expect(results.locator('.result-provenance-header')).toHaveCount(0);
 
     await replaceSql(page, 'SELECT {threshold:UInt64}');
     await page.getByRole('textbox', { name: 'threshold:UInt64', exact: true }).fill('9007199254740993');
     await runQuery(page);
     const parameterRunId = await page.locator('.execution-bar code').innerText();
     await page.getByRole('textbox', { name: 'threshold:UInt64', exact: true }).fill('9007199254740994');
-    await expect(results.locator('.result-provenance')).toContainText('bound parameters changed');
+    await expect(results.locator('.result-provenance-header')).toContainText('parameters changed');
     await expect(page.locator('.execution-bar code')).toHaveText(parameterRunId);
     expect(runRequests).toBe(2);
 });
@@ -1114,7 +1139,7 @@ test('Scripts show each statement outcome and open that statement’s retained r
 
     await first.click();
     await expect(results.getByRole('table', { name: 'Retained query rows' })).toBeVisible();
-    await expect(results.locator('.result-provenance')).toHaveCount(0);
+    await expect(results.locator('.result-provenance-header')).toHaveCount(0);
     await second.click();
     await expect(results.getByTestId('query-failure')).toContainText('FIXTURE_ERROR');
     await expect(page.locator('.cm-content')).toContainText('SELECT 1; SELECT fixture_error; SELECT 3;');
