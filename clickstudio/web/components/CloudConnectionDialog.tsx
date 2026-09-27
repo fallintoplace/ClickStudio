@@ -1,15 +1,12 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import type { Connection } from '../../shared/types';
-import { connectClickHouseCloud, type CloudCredentials } from '../cloud-connection';
+import { connectClickHouseCloud, loadSavedCloudConnectionProfile, saveCloudConnectionProfile, type CloudCredentials } from '../cloud-connection';
 import type { Connected } from '../workspace-types';
 import { Button, Icon } from './ui';
 import { OverlayPortal } from './OverlayPortal';
 
 export function CloudConnectionDialog({ onClose, onConnect }: { onClose: () => void; onConnect: (connection: Connection & { trusted: boolean }) => void }) {
-    const [host, setHost] = useState('');
-    const [database, setDatabase] = useState('default');
-    const [username, setUsername] = useState('default');
-    const [password, setPassword] = useState('');
+    const [savedProfile] = useState(loadSavedCloudConnectionProfile);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
     const dialog = useRef<HTMLElement>(null);
@@ -42,9 +39,15 @@ export function CloudConnectionDialog({ onClose, onConnect }: { onClose: () => v
         if (busy) return;
         setBusy(true);
         setError('');
+        const form = new FormData(event.currentTarget);
+        const host = String(form.get('host') ?? '');
+        const database = String(form.get('database') ?? '');
+        const username = String(form.get('username') ?? '');
+        const password = String(form.get('password') ?? '');
         const credentials: CloudCredentials = { host, database, username, password };
         try {
             const connection: Connected = await connectClickHouseCloud(credentials);
+            saveCloudConnectionProfile({ host, database, username });
             onConnect(connection);
         } catch (caught) {
             setError(caught instanceof Error ? caught.message : 'Could not connect to ClickHouse Cloud.');
@@ -62,16 +65,16 @@ export function CloudConnectionDialog({ onClose, onConnect }: { onClose: () => v
                     <Button variant="ghost" aria-label="Close connection dialog" disabled={busy} onClick={onClose}><Icon name="close"/></Button>
                 </header>
                 <p id="cloud-connect-description" className="cloud-connect-description">Use the HTTPS host and user credentials from the service’s Connect dialog. ClickStudio checks the connection before opening the workspace.</p>
-                <form className="cloud-connect-form" onSubmit={event => void connect(event)}>
-                    <label className="field-label">HTTPS host<input className="field-input" value={host} onChange={event => setHost(event.target.value)} placeholder="service.region.provider.clickhouse.cloud:8443" autoComplete="off" autoCapitalize="none" spellCheck={false} required autoFocus/></label>
+                <form className="cloud-connect-form" onSubmit={event => void connect(event)} autoComplete="on">
+                    <label className="field-label">HTTPS host<input className="field-input" name="host" defaultValue={savedProfile?.host ?? ''} placeholder="service.region.provider.clickhouse.cloud:8443" autoComplete="off" autoCapitalize="none" spellCheck={false} required autoFocus/></label>
                     <div className="cloud-connect-fields">
-                        <label className="field-label">Database<input className="field-input" value={database} onChange={event => setDatabase(event.target.value)} autoComplete="off" required/></label>
-                        <label className="field-label">Username<input className="field-input" value={username} onChange={event => setUsername(event.target.value)} autoComplete="username" required/></label>
+                        <label className="field-label">Database<input className="field-input" name="database" defaultValue={savedProfile?.database ?? 'default'} autoComplete="off" required/></label>
+                        <label className="field-label">Username<input className="field-input" name="username" defaultValue={savedProfile?.username ?? 'default'} autoComplete="username" required/></label>
                     </div>
-                    <label className="field-label">Password<input className="field-input" type="password" value={password} onChange={event => setPassword(event.target.value)} autoComplete="current-password" required/></label>
-                    <div className="cloud-connect-notice"><Icon name="lock"/><span>The password stays in this tab’s memory and is sent to ClickStudio over HTTPS with each request. It is cleared on reload or disconnect. Your ClickHouse user’s permissions control what SQL can change.</span></div>
+                    <label className="field-label">Password<input className="field-input" name="password" type="password" autoComplete="current-password" required/></label>
+                    <div className="cloud-connect-notice"><Icon name="lock"/><span>The host, database, and username from your last successful connection are saved in this browser. ClickStudio never saves the password; your browser’s password manager can fill it after a refresh. The password stays in this tab’s memory, is sent over HTTPS with each request, and is cleared on reload or disconnect. Your ClickHouse user’s permissions control what SQL can change.</span></div>
                     {error && <div className="callout callout-error cloud-connect-error" role="alert">{error}</div>}
-                    <div className="cloud-connect-actions"><Button variant="secondary" disabled={busy} onClick={onClose}>Cancel</Button><Button variant="primary" type="submit" disabled={busy || !host || !database || !username || !password}>{busy ? <><span className="loading-orbit" aria-hidden="true"/> Connecting…</> : 'Connect service'}</Button></div>
+                    <div className="cloud-connect-actions"><Button variant="secondary" disabled={busy} onClick={onClose}>Cancel</Button><Button variant="primary" type="submit" disabled={busy}>{busy ? <><span className="loading-orbit" aria-hidden="true"/> Connecting…</> : 'Connect service'}</Button></div>
                 </form>
             </section>
         </div>
