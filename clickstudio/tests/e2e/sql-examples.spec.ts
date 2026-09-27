@@ -71,7 +71,7 @@ test('Help tour exposes ClickStudio native workflows from one place', async ({ p
     await expect(dialog.getByTestId('help-section-tour')).toHaveAttribute('aria-selected', 'true');
     await dialog.getByTestId('help-section-workflows').click();
     await expect(dialog.getByText('Bind typed values', { exact: true })).toBeVisible();
-    await expect(dialog.getByText(/runs every statement and stops at the first error/)).toBeVisible();
+    await expect(dialog.getByText(/executes all SQL in the editor and stops after the first error/)).toBeVisible();
 
     await dialog.getByTestId('help-section-monitoring').click();
     await expect(dialog.getByRole('heading', { name: 'Workload', exact: true })).toBeVisible();

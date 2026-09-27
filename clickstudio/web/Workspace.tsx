@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import type { ProfilePipeline, QueryDocument, QueryProfile, Result, Run, RunKind, Schema, Script } from '../shared/types';
 import { DEFAULT_LIMITS } from '../shared/types';
 import { exportCsv, recommendChart } from '../shared/results';
-import { formatSql, lexSql, parameterNames, selectedStatement, splitSql } from '../shared/sql';
+import { lexSql, parameterNames, selectedStatement, splitSql } from '../shared/sql';
 import { api, download, isFrontendDemoPreview, message, post } from './api';
 import { PLAYGROUND_CONNECTION_ID } from './playground';
 import type { EditorHandle } from './components/SqlEditor';
@@ -45,7 +45,6 @@ import type {
     Inspector,
     ResultsView,
     WorkspaceActionRef,
-    WorkspaceFormatter,
     WorkspaceRunCapability,
     WorkspaceRunCapabilityAction,
 } from './workspace-types';
@@ -67,6 +66,7 @@ import { useWorkspaceNotifications, WORKSPACE_TOAST_TIMEOUT_MS } from './useWork
 import { useWorkspaceViewState } from './useWorkspaceViewState';
 import { useDetachedQueryEditor } from './useDetachedQueryEditor';
 import { useDetachedResultsPanel } from './useDetachedResultsPanel';
+import { useWorkspaceSqlFormatter } from './useWorkspaceSqlFormatter';
 
 type WorkspaceProps = Readonly<{
     connection: Connected;
@@ -100,6 +100,30 @@ async function loadAssistantRunContext(run: Run | undefined, snapshot: Result | 
         : undefined;
     signal.throwIfAborted();
     return { result, evidenceSql: run.sql, error: run.error?.message };
+}
+
+type WorkspaceRunActionTitleContext = Readonly<{
+    trusted: boolean;
+    busy: BusyAction;
+    unsupportedParameters: boolean;
+    connection: Connected;
+    copy: Copy['common'];
+}>;
+
+function workspaceRunActionTitle(
+    capability: WorkspaceRunCapability | undefined,
+    action: WorkspaceRunCapabilityAction,
+    { trusted, busy, unsupportedParameters, connection, copy }: WorkspaceRunActionTitleContext,
+) {
+    if (!trusted) return copy.runActionTrustRequired;
+    if (busy) return copy.runActionWait;
+    if (unsupportedParameters) return copy.runActionRemoveParameters;
+    if (capability?.available === false) {
+        if (action === 'script' && connection.id === PLAYGROUND_CONNECTION_ID) return copy.playgroundScriptUnavailable;
+        return capability.reason;
+    }
+    if (action === 'explain-analyze') return copy.runtimeExecutesQuery;
+    return undefined;
 }
 
 export function Workspace({ connection, connectionLabel, connections, onSelectConnection, onRefreshConnections, trustActionRef, testConnectionActionRef, demoMode, experience, nativeParserEnabled, dark, copy, locale }: WorkspaceProps) {
@@ -158,17 +182,8 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         try { return parameterNames(active.sql); } catch { return []; }
     }, [active.sql]);
     const unsupportedParameters = parameters.length > 0 && connection.manifest?.parameters.available === false;
-    const runActionTitle = (capability: WorkspaceRunCapability | undefined, action: WorkspaceRunCapabilityAction): string | undefined => {
-        if (!trusted) return copy.common.runActionTrustRequired;
-        if (busy) return copy.common.runActionWait;
-        if (unsupportedParameters) return copy.common.runActionRemoveParameters;
-        if (capability?.available === false) {
-            if (action === 'script' && connection.id === PLAYGROUND_CONNECTION_ID) return copy.common.playgroundScriptUnavailable;
-            return capability.reason;
-        }
-        if (action === 'explain-analyze') return copy.common.runtimeExecutesQuery;
-        return undefined;
-    };
+    const runActionTitle = (capability: WorkspaceRunCapability | undefined, action: WorkspaceRunCapabilityAction): string | undefined =>
+        workspaceRunActionTitle(capability, action, { trusted, busy, unsupportedParameters, connection, copy: copy.common });
     const currentConnection = connections.find(item => item.id === connection.id) ?? connection;
     const trusted = currentConnection.trusted;
 
@@ -230,20 +245,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         setWorkspace(current => ({ ...current, tabs: current.tabs.map(draft => draft.id === id ? change(draft) : draft) }));
     }, []);
     const patch = useCallback((values: Partial<Draft>) => update(active.id, draft => ({ ...draft, ...values })), [active.id, update]);
-    const formatActiveSql = useCallback(async (formatter: WorkspaceFormatter) => {
-        const draftId = active.id, sourceSql = active.sql;
-        const applyBuiltIn = () => setWorkspace(current => current.activeId !== draftId ? current : ({ ...current,
-            tabs: current.tabs.map(draft => draft.id === draftId && draft.sql === sourceSql ? { ...draft, sql: formatSql(sourceSql) } : draft),
-        }));
-        if (formatter === 'builtin') {
-            applyBuiltIn();
-            return;
-        }
-        if (!nativeParserEnabled || nativeParserStatus !== 'ready') return;
-        const result = await editor.current?.formatNative();
-        if (result === 'unavailable' || result === 'fallback')
-            applyBuiltIn();
-    }, [active.id, active.sql, nativeParserEnabled, nativeParserStatus]);
+    const formatActiveSql = useWorkspaceSqlFormatter(active, setWorkspace, editor, nativeParserEnabled, nativeParserStatus);
 
     const { run, setRunForRun, page, setPage, resultPage, snapshot, setSnapshotForRun, profile, setProfileForRun, pipeline, setPipelineForRun, flamegraph, setFlamegraphForRun, profilesByRun, pipelinesByRun, eventState } = useRunEvidence({
         activeRunId,

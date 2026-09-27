@@ -71,7 +71,9 @@ test('Vercel assistant returns a requested table proposal with example geography
         findings: [],
     });
     process.env.OPENAI_API_KEY = 'test-key';
-    globalThis.fetch = async (_input, init) => {
+    globalThis.fetch = async (input, init) => {
+        if (String(input).endsWith('/responses/input_tokens'))
+            return Response.json({ object: 'response.input_tokens', input_tokens: 200 });
         const payload = JSON.parse(String(init?.body)) as { instructions?: string };
         assert.doesNotMatch(payload.instructions ?? '', /SQL must be SELECT\/WITH only/i);
         assert.match(payload.instructions ?? '', /fixed list of SQL statement types/i);
@@ -116,7 +118,9 @@ test('Vercel assistant instructs a full table copy when the source is present', 
         findings: [],
     });
     process.env.OPENAI_API_KEY = 'test-key';
-    globalThis.fetch = async (_input, init) => {
+    globalThis.fetch = async (input, init) => {
+        if (String(input).endsWith('/responses/input_tokens'))
+            return Response.json({ object: 'response.input_tokens', input_tokens: 200 });
         const payload = JSON.parse(String(init?.body)) as { instructions?: string };
         assert.match(payload.instructions ?? '', /copy a named source table.*all rows and columns/i);
         assert.match(payload.instructions ?? '', /CREATE TABLE target ENGINE = MergeTree ORDER BY tuple\(\) AS SELECT \* FROM source statement/i);

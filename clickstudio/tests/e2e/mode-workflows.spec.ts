@@ -241,7 +241,7 @@ test('Standard import opens from the left rail and formatting is available in th
 
     await replaceSql(page, 'select 1 as value from numbers(1)');
     await page.getByTestId('format-sql').click();
-    await expect(page.locator('.cm-content .cm-line')).toHaveText(['select 1 as value', 'FROM numbers(1)']);
+    await expect(page.locator('.cm-content .cm-line')).toHaveText(['SELECT 1 AS value', 'FROM numbers(1)']);
 });
 
 test('Experimental insights and AI requests do not execute SQL', async ({ page }) => {
