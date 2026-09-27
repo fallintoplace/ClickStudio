@@ -53,6 +53,25 @@ type AssistantRunContext = { result?: Result; evidenceSql?: string; error?: stri
 type AssistantRunContextLoader = (signal: AbortSignal) => Promise<AssistantRunContext>;
 type ActiveAssistantRequest = { id: number; key: string; draftId: string; controller: AbortController };
 
+export function useDefaultAssistantRunContext(
+    runId: string | undefined,
+    includeRun: boolean,
+    assistantBusy: boolean,
+    setIncludeRun: (include: boolean) => void,
+) {
+    const defaultedRunIdRef = useRef<string | undefined>(undefined);
+    useEffect(() => {
+        if (!runId) {
+            defaultedRunIdRef.current = undefined;
+            if (includeRun) setIncludeRun(false);
+            return;
+        }
+        if (defaultedRunIdRef.current === runId) return;
+        defaultedRunIdRef.current = runId;
+        if (!assistantBusy) setIncludeRun(true);
+    }, [assistantBusy, includeRun, runId, setIncludeRun]);
+}
+
 export function useWorkspaceAssistant({
     active,
     activeRunId,

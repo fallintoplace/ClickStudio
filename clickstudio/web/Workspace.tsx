@@ -31,7 +31,7 @@ import { useRunEvidence } from './useRunEvidence';
 import { useResultSnapshot } from './useResultSnapshot';
 import { useWorkspaceTabs } from './useWorkspaceTabs';
 import { useWorkspaceData } from './useWorkspaceData';
-import { useWorkspaceAssistant } from './useWorkspaceAssistant';
+import { useDefaultAssistantRunContext, useWorkspaceAssistant } from './useWorkspaceAssistant';
 import { useWorkspacePanels } from './useWorkspacePanels';
 import { useScriptExecution } from './useScriptExecution';
 import { usePendingExecution } from './usePendingExecution';
@@ -240,9 +240,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         setError,
     });
     const selectableRunId = run && terminal(run) ? run.id : undefined;
-    useEffect(() => {
-        if (!selectableRunId && includeRun) setIncludeRun(false);
-    }, [includeRun, selectableRunId, setIncludeRun]);
+    useDefaultAssistantRunContext(selectableRunId, includeRun, assistantBusy, setIncludeRun);
     const pendingExecution = usePendingExecution({ activeDraftId: active.id, busy, run, script });
     const scriptFollowRef = useScriptExecution({
         scriptId: active.scriptId,
