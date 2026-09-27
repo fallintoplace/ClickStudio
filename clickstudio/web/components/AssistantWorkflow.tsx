@@ -118,10 +118,16 @@ export function AssistantWorkflow(props: AssistantWorkflowProps) {
             {!trusted && <div className="assistant-feedback callout">Trust this connection before sharing its schema with the assistant.</div>}
             {!schemaReady && trusted && <div className="assistant-feedback callout assistant-schema-refresh"><span>{schemaStatus || 'Load the ClickHouse schema before asking the assistant.'}</span><Button variant="secondary" disabled={schemaLoading} onClick={onRefreshSchema}>{schemaLoading ? 'Loading…' : 'Refresh schema'}</Button></div>}
             <div className="assistant-chat-composer">
-                <div className="assistant-composer-context"><span className="assistant-context-chip">Current SQL</span><span className="assistant-context-chip">Schema</span><label className="assistant-include-run" title="Send its SQL, retained rows when available, and any error."><input type="checkbox" checked={includeRun} onChange={event => onIncludeRun(event.target.checked)} disabled={!runId}/><span>Include latest run</span></label></div>
+                <div className="assistant-composer-context">
+                    <p className="assistant-context-note">Every message includes the SQL in your editor and available tables and columns from this connection.</p>
+                    <label className="assistant-include-run">
+                        <input type="checkbox" checked={includeRun} onChange={event => onIncludeRun(event.target.checked)} disabled={!runId} aria-describedby="assistant-include-run-help"/>
+                        <span className="assistant-include-run-copy"><strong>Also include latest query run</strong><small id="assistant-include-run-help">{runId ? 'Adds its SQL, saved result rows, and any error.' : 'Run a query first to include its SQL, rows, and any error.'}</small></span>
+                    </label>
+                </div>
                 <ScrollEdgeFrame<HTMLTextAreaElement> className="assistant-question-frame">{ref => <textarea ref={ref} id="assistant-question" className="field-textarea" aria-label="Ask AI" value={question} onChange={event => onQuestionChange(event.target.value)} onKeyDown={sendOnEnter} placeholder="Message… (Enter to send)" rows={2}/>}</ScrollEdgeFrame>
                 <div className="assistant-composer-footer"><span>Shift+Enter for a new line</span>{busy ? cancelable ? <Button variant="danger" onClick={onCancelRequest} aria-label="Stop assistant response" title="Stop generating">Stop</Button> : <Button variant="secondary" disabled>{phase === 'deciding' ? 'Applying…' : 'Working…'}</Button> : <Button variant="primary" disabled={!trusted || !schemaReady || !question.trim()} onClick={ask}><Icon name="send"/>Send</Button>}</div>
-                <details className="assistant-disclosure"><summary>Privacy and review</summary><p>Your messages and current SQL and schema are sent with each follow-up. The latest run is included only when selected. Chat history, including shared run context, is saved in this browser. Review every SQL proposal before applying it; proposals are never run automatically.</p></details>
+                <details className="assistant-disclosure"><summary>What gets sent and saved?</summary><p>Your message, this chat, and the context above are sent to OpenAI. The latest query run is sent only when selected. Chat history is saved in this browser. Review SQL suggestions before applying them; they never run automatically.</p></details>
             </div>
         </div>
     </section>;
