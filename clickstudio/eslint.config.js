@@ -12,6 +12,7 @@ export default defineConfig([
       "**/playwright-report/**",
       "**/test-results/**",
       "**/vendor/**",
+      "**/.vercel/**",
       "**/.core-build/**",
       "**/.workspace-build/**",
     ],
