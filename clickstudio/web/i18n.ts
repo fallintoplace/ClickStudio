@@ -328,7 +328,6 @@ export interface Copy {
         referenceResults: string;
         referenceInsert: string;
         referenceCopy: string;
-        referenceTableEngine: string;
         referenceSystemTable: string;
         clearSearch: string;
         objectSearch: string;

@@ -31,11 +31,10 @@ export function ObjectDetails({ copy, selection, trusted, copiedId, onClose, onI
                     <Button variant="ghost" className="toolbar-small" onClick={() => void onCopy(qualified, selection.id)}><Icon name="copy"/>{copiedId === selection.id ? copy.copied : copy.copyName}</Button>
                 </div>
             </div>
-            <div className="object-reference-actions">
+            {(table.engine.endsWith('MergeTree') || table.database === 'system') && <div className="object-reference-actions">
                 {table.engine.endsWith('MergeTree') && <Button variant="secondary" className="toolbar-small object-parts-action" disabled={!trusted} title={!trusted ? copy.runActionTrustRequired : undefined} onClick={() => onOpenParts(table)}><Icon name="chart"/>{copy.partsVisualize}</Button>}
-                {table.engine && <Button variant="secondary" className="toolbar-small" onClick={() => onOpenReference(table.engine, 'Table Engine')}><Icon name="reference"/>{copy.referenceTableEngine}</Button>}
                 {table.database === 'system' && <Button variant="ghost" className="toolbar-small" onClick={() => onOpenReference(table.name, 'System Table')}><Icon name="reference"/>{copy.referenceSystemTable}</Button>}
-            </div>
+            </div>}
             <TableMetadata table={table}/>
         </section>;
     }

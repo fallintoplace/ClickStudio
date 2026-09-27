@@ -293,7 +293,6 @@ export const english: Copy = {
         referenceResults: 'Reference results',
         referenceInsert: 'Insert name',
         referenceCopy: 'Copy name',
-        referenceTableEngine: 'Engine reference',
         referenceSystemTable: 'System table reference',
         clearSearch: 'Clear search',
         objectSearch: 'Search objects, columns, engines, and indexes…',

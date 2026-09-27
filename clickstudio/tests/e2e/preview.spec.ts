@@ -42,8 +42,6 @@ test('Static production preview loads the native parser and exports retained sam
     const table = page.getByRole('button', { name: 'events MergeTree', exact: true });
     await expect(table).toBeVisible();
     await table.click();
-    await page.getByRole('button', { name: 'Engine reference', exact: true }).click();
-    await expect(page.getByRole('article', { name: 'Table Engine: MergeTree' })).toBeVisible();
 
     const [download] = await Promise.all([
         page.waitForEvent('download'),
