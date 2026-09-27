@@ -153,7 +153,8 @@ export interface EditorHandle {
     indent: () => void;
     retryNativeParser: () => void;
     formatNative: () => Promise<'formatted' | 'fallback' | 'unavailable' | 'rejected'>;
-    selection: () => {
+    snapshot: () => {
+        sql: string;
         from: number;
         to: number;
     };
@@ -331,7 +332,14 @@ export const SqlEditor = forwardRef<EditorHandle, SqlEditorProps>(function SqlEd
                 return 'unavailable';
             }
         },
-        selection: () => { const s = view.current?.state.selection.main; return { from: s?.from ?? 0, to: s?.to ?? 0 }; },
+        snapshot: () => {
+            const state = view.current?.state, selection = state?.selection.main;
+            return {
+                sql: state?.doc.toString() ?? current.current.value,
+                from: selection?.from ?? current.current.from,
+                to: selection?.to ?? current.current.to,
+            };
+        },
     }), [applyDiagnostics]);
     return <div className="sql-editor" ref={element}><ScrollEdgeShadows edges={edges}/></div>;
 });

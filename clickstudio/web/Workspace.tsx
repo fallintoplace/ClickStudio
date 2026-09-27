@@ -139,6 +139,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
     const [cancelling, setCancelling] = useState(false);
     const { error, setError, notice, setNotice } = useWorkspaceNotifications();
     const executionFailureRef = useRef(false);
+    const executionInFlightRef = useRef(false);
     const { error: failedQueryError, clear: clearFailedQueryError, record: storeFailedQueryError } = useFailedQueryErrors(active.id);
     const [search, setSearch] = useState('');
     const storageError = useWorkspacePersistence(key, workspace);
@@ -260,6 +261,12 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         }
         finally { setBusy(''); }
     };
+    const performExecution = async (task: () => Promise<void>, kind: BusyAction = 'run') => {
+        if (executionInFlightRef.current) return;
+        executionInFlightRef.current = true;
+        try { await perform(task, kind); }
+        finally { executionInFlightRef.current = false; }
+    };
 
     const addDraft = (draft: Draft) => {
         if (workspaceRef.current.tabs.length >= MAX_TABS) { setError(`Close a tab before creating another. This workspace supports ${MAX_TABS} open drafts.`); return false; }
@@ -288,12 +295,12 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
     };
 
     const runExample = (example: SqlExample, output: 'results' | 'chart' | 'map') => {
-        if (busy) { setError(copy.common.runActionWait); return true; }
+        if (busy || executionInFlightRef.current) { setError(copy.common.runActionWait); return true; }
         if (!trusted) { setError(copy.common.runActionTrustRequired); return true; }
 
         const draft = createExampleDraft(example);
         if (!openNewDraft(draft)) return true;
-        void perform(async () => {
+        void performExecution(async () => {
             const statements = splitSql(draft.sql);
             if (statements.length !== 1) throw new Error('An example must contain exactly one SQL statement to run directly.');
             const statement = statements[0]!;
@@ -330,7 +337,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         return true;
     };
 
-    const execute = (wholeScript = false, kind: RunKind = 'query') => perform(async () => {
+    const execute = (wholeScript = false, kind: RunKind = 'query') => performExecution(async () => {
         if (!trusted) throw new Error('Review and trust this read only connection before running SQL.');
         if (wholeScript && connection.manifest?.scripts.available === false)
             throw new Error(connection.manifest.scripts.reason ?? 'Scripts are unavailable on this connection.');
@@ -347,12 +354,12 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         const explainAnalyze = connection.manifest?.explainAnalyze;
         if (kind === 'analyze' && explainAnalyze?.available === false)
             throw new Error(explainAnalyze.reason ?? 'EXPLAIN ANALYZE is unavailable on this connection.');
-        const selected = editor.current?.selection() ?? { from: active.from, to: active.to };
-        const statement = wholeScript ? undefined : selectedStatement(active.sql, selected.from, selected.to);
+        const editorSnapshot = editor.current?.snapshot() ?? { sql: active.sql, from: active.from, to: active.to };
+        const statement = wholeScript ? undefined : selectedStatement(editorSnapshot.sql, editorSnapshot.from, editorSnapshot.to);
         if (!wholeScript && !statement) throw new Error('Write or select a SQL statement before running it.');
         const payload = {
             clientRequestId: crypto.randomUUID(), connectionId: connection.id, documentId: active.serverId,
-            sql: wholeScript ? active.sql : statement!.sql, parameters: active.parameters,
+            sql: wholeScript ? editorSnapshot.sql : statement!.sql, parameters: active.parameters,
             parentRunId: active.parentRunId, kind, limits: { rows: connection.limits.rows || DEFAULT_LIMITS.rows, seconds: connection.limits.seconds || DEFAULT_LIMITS.seconds },
             tags: { workspace: 'clickstudio', experience },
             ...(wholeScript ? {} : { sourceFrom: statement!.from, sourceTo: statement!.to }),
@@ -368,15 +375,16 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
                 created = await post<Script>('/scripts', { ...payload, stopOnError: true });
             } catch (caught) {
                 pendingExecution.clear(payload.clientRequestId);
-                recordFailedQueryError({ draftId: active.id, draftSql: active.sql, statementSql: payload.sql, sourceFrom: 0, error: apiErrorDetail(caught) });
+                recordFailedQueryError({ draftId: active.id, draftSql: editorSnapshot.sql, statementSql: payload.sql, sourceFrom: 0, error: apiErrorDetail(caught) });
                 throw caught;
             }
             pendingExecution.acceptScript(payload.clientRequestId, created.id);
             scriptFollowRef.current = { scriptId: created.id, enabled: true };
             setScripts(current => ({ ...current, [created.id]: created }));
             const first = created.statements.find(item => item.runId);
-            if (first?.runId) patch({ activeRunId: first.runId, scriptId: created.id, runIds: rememberRunIds(active.runIds, [first.runId]) });
-            else patch({ scriptId: created.id });
+            update(active.id, current => first?.runId
+                ? { ...current, activeRunId: first.runId, scriptId: created.id, runIds: rememberRunIds(current.runIds, [first.runId]) }
+                : { ...current, scriptId: created.id });
             setView('results');
         } else {
             const previousResult = run && terminal(run) && resultPage
@@ -388,7 +396,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
                 created = await post<Run>('/runs', payload);
             } catch (caught) {
                 pendingExecution.clear(payload.clientRequestId);
-                if (statement) recordFailedQueryError({ draftId: active.id, draftSql: active.sql, statementSql: statement.sql, sourceFrom: statement.from, error: apiErrorDetail(caught) });
+                if (statement) recordFailedQueryError({ draftId: active.id, draftSql: editorSnapshot.sql, statementSql: statement.sql, sourceFrom: statement.from, error: apiErrorDetail(caught) });
                 throw caught;
             }
             pendingExecution.acceptRun(payload.clientRequestId, created.id);
@@ -396,7 +404,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
             if (created.status === 'succeeded' && connection.dataSource === 'clickhouse' && connection.readonly === false && isSchemaChangingSql(statement!.sql))
                 void loadSchema(true);
             setPage(0); setView(kind === 'explain' ? 'indexes' : kind === 'plan' ? 'plan' : kind === 'pipeline' ? 'pipeline' : kind === 'analyze' ? 'runtime' : 'results');
-            patch({ activeRunId: created.id, scriptId: undefined, runIds: [...new Set([...active.runIds, created.id])] });
+            update(active.id, current => ({ ...current, activeRunId: created.id, scriptId: undefined, runIds: rememberRunIds(current.runIds, [created.id]) }));
             editor.current?.focus();
         }
         setDrawerOpen(false);
@@ -639,7 +647,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         addDraft(draftFromDocument(document));
     };
     const openSqlDraft = (name: string, sql: string, run: boolean) => {
-        if (run && busy) { setError(copy.common.runActionWait); return; }
+        if (run && (busy || executionInFlightRef.current)) { setError(copy.common.runActionWait); return; }
         if (run && !trusted) { setError(copy.common.runActionTrustRequired); return; }
         const draft = newDraft(name, sql);
         if (!openNewDraft(draft)) return;
@@ -648,7 +656,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
             window.requestAnimationFrame(() => editor.current?.focus());
             return;
         }
-        void perform(async () => {
+        void performExecution(async () => {
             const statements = splitSql(draft.sql);
             if (statements.length !== 1) throw new Error('Generated object preview must contain exactly one SQL statement.');
             const statement = statements[0]!;

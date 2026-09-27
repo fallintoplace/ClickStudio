@@ -128,6 +128,9 @@ test('Refreshing run history shows the latest run without executing SQL', async 
     await expect(pane.getByText('No runs yet', { exact: true })).toBeVisible();
     refresh = true;
     await pane.getByRole('button', { name: '↻ Refresh', exact: true }).click();
-    await expect(pane.locator('.history-card')).toContainText('SELECT history_refresh');
+    const historyCard = pane.locator('.history-card');
+    await expect(historyCard).toContainText('SELECT history_refresh');
+    await historyCard.click();
+    await expect(page.locator('.cm-content')).toContainText('SELECT history_refresh');
     expect(executions).toBe(0);
 });

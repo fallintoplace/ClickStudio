@@ -99,6 +99,53 @@ test('Run evidence stays with its draft through tab and mode switches', async ({
     expect(runRequests).toBe(2);
 });
 
+test('Keyboard Run submits the live CodeMirror document before React catches up', async ({ page }) => {
+    await trust(page);
+    await useAdvancedMode(page);
+    const sql = 'SELECT 42 AS keyboard_snapshot';
+    await replaceSql(page, 'SELECT 1 AS previous_draft');
+
+    const submitted = page.waitForRequest(request => request.method() === 'POST' && new URL(request.url()).pathname === '/api/runs');
+    await page.locator('.cm-content').evaluate((element, currentSql) => {
+        const content = element as HTMLElement;
+        content.focus();
+        document.execCommand('selectAll');
+        if (!document.execCommand('insertText', false, currentSql))
+            throw new Error('Could not update the CodeMirror document synchronously.');
+        const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
+        content.dispatchEvent(new KeyboardEvent('keydown', {
+            key: 'Enter', code: 'Enter', bubbles: true, cancelable: true,
+            metaKey: isMac, ctrlKey: !isMac,
+        }));
+    }, sql);
+    const request = await submitted;
+    expect((request.postDataJSON() as { sql: string }).sql).toBe(sql);
+    await expect(page.locator('.execution-bar')).toHaveAttribute('data-run-status', 'succeeded');
+});
+
+test('Two keyboard Run events in one task submit only one request', async ({ page }) => {
+    await trust(page);
+    await useAdvancedMode(page);
+    await replaceSql(page, 'SELECT 42 AS single_submission');
+
+    let runRequests = 0;
+    page.on('request', request => {
+        if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/runs') runRequests++;
+    });
+    await page.locator('.cm-content').evaluate(element => {
+        const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
+        const shortcut = () => new KeyboardEvent('keydown', {
+            key: 'Enter', code: 'Enter', bubbles: true, cancelable: true,
+            metaKey: isMac, ctrlKey: !isMac,
+        });
+        element.dispatchEvent(shortcut());
+        element.dispatchEvent(shortcut());
+    });
+    await expect(page.locator('.execution-bar')).toHaveAttribute('data-run-status', 'succeeded');
+    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+    expect(runRequests).toBe(1);
+});
+
 test('A running query shows its submitted SQL and keeps previous rows until it ends', async ({ page }) => {
     await trust(page);
     await page.getByRole('textbox', { name: 'SQL document name', exact: true }).fill('Running query.sql');
