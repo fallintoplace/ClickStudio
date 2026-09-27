@@ -29,6 +29,43 @@ function boundedAssistantResult(result?: Result): Result | undefined {
     return bounded;
 }
 
+const MAX_ASSISTANT_HISTORY_BYTES = 24_000;
+const MAX_ASSISTANT_HISTORY_TURNS = 8;
+const MAX_RECENT_ASSISTANT_TURN_BYTES = 12_000;
+
+function compactConversationTurn(turn: AssistantChatTurn): AssistantConversationMessage[] {
+    const messages: AssistantConversationMessage[] = [{
+        role: 'user',
+        content: JSON.stringify({ question: turn.question.slice(0, 2_000) }),
+    }];
+    if (turn.proposal) {
+        messages.push({ role: 'assistant', content: JSON.stringify({
+            summary: turn.proposal.summary.slice(0, 1_500),
+            clarification: turn.proposal.clarification?.slice(0, 500) ?? null,
+        }) });
+    } else if (turn.error) {
+        messages.push({ role: 'assistant', content: turn.error.slice(0, 800) });
+    }
+    return messages;
+}
+
+function detailedConversationTurn(turn: AssistantChatTurn): AssistantConversationMessage[] {
+    const messages: AssistantConversationMessage[] = [{ role: 'user', content: JSON.stringify({
+        question: turn.question,
+        sql: turn.contextSql,
+        includeRun: turn.includeRun,
+        ...(turn.runId ? { runId: turn.runId } : {}),
+        ...(turn.runContext ? { runContext: turn.runContext } : {}),
+    }) }];
+    if (turn.proposal) {
+        const { summary, clarification, sql, assumptions, tables, caveats, sources, findings, decision, quality } = turn.proposal;
+        messages.push({ role: 'assistant', content: JSON.stringify({ summary, clarification, sql, assumptions, tables, caveats, sources, findings, decision, quality }) });
+    } else if (turn.error) {
+        messages.push({ role: 'assistant', content: turn.error });
+    }
+    return messages;
+}
+
 function assistantContextKey(
     connectionId: string,
     draftId: string,
@@ -50,23 +87,21 @@ function assistantContextKey(
 }
 
 function conversationHistory(turns: readonly AssistantChatTurn[]): AssistantConversationMessage[] {
-    return turns.flatMap(turn => {
-        if (turn.status === 'pending') return [];
-        const messages: AssistantConversationMessage[] = [{ role: 'user', content: JSON.stringify({
-            question: turn.question,
-            sql: turn.contextSql,
-            includeRun: turn.includeRun,
-            ...(turn.runId ? { runId: turn.runId } : {}),
-            ...(turn.runContext ? { runContext: turn.runContext } : {}),
-        }) }];
-        if (turn.proposal) {
-            const { summary, clarification, sql, assumptions, tables, caveats, sources, findings, decision, quality } = turn.proposal;
-            messages.push({ role: 'assistant', content: JSON.stringify({ summary, clarification, sql, assumptions, tables, caveats, sources, findings, decision, quality }) });
-        } else if (turn.error) {
-            messages.push({ role: 'assistant', content: turn.error });
-        }
-        return messages;
+    const completed = turns.filter(turn => turn.status !== 'pending').slice(-MAX_ASSISTANT_HISTORY_TURNS);
+    const bundles = completed.map((turn, index) => {
+        const compact = compactConversationTurn(turn);
+        if (index !== completed.length - 1) return compact;
+        const detailed = detailedConversationTurn(turn);
+        return new TextEncoder().encode(JSON.stringify(detailed)).length <= MAX_RECENT_ASSISTANT_TURN_BYTES
+            ? detailed
+            : compact;
     });
+    const history = () => bundles.flat();
+    const bytes = () => new TextEncoder().encode(JSON.stringify(history())).length;
+    while (bundles.length > 1 && bytes() > MAX_ASSISTANT_HISTORY_BYTES) bundles.shift();
+    if (bytes() > MAX_ASSISTANT_HISTORY_BYTES && bundles.length)
+        bundles[0] = compactConversationTurn(completed[completed.length - 1]!);
+    return bytes() <= MAX_ASSISTANT_HISTORY_BYTES ? history() : [];
 }
 
 function chatTitle(question: string) {

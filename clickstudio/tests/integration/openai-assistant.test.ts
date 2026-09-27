@@ -6,8 +6,12 @@ import type { PreparedContext } from '../../core/assistant.js';
 test('OpenAI receives prior chat messages before the fresh SQL context', async t => {
     const originalFetch = globalThis.fetch;
     let requestBody: Record<string, unknown> | undefined;
-    globalThis.fetch = async (_input, init) => {
-        requestBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+    globalThis.fetch = async (input, init) => {
+        const url = String(input);
+        const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        if (url.endsWith('/responses/input_tokens'))
+            return new Response(JSON.stringify({ object: 'response.input_tokens', input_tokens: 200 }), { status: 200, headers: { 'content-type': 'application/json' } });
+        requestBody = body;
         return new Response(JSON.stringify({
             id: 'response-1',
             status: 'completed',
