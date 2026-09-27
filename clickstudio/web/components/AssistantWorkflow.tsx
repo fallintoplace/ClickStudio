@@ -59,6 +59,12 @@ function AssistantOutput({ mode, sql, turn, busy, editorProposalId, onDecideProp
     const diffInEditor = !beginner && currentProposal && proposal.decision === 'pending' &&
         (proposal.action === 'ask' || proposal.action === 'generate');
     const stale = proposal.decision === 'accepted' ? proposalSql !== sql : proposal.baseSql !== sql;
+    const sources = (proposal.sources ?? []).flatMap(source => {
+        try {
+            const url = new URL(source.url);
+            return url.protocol === 'http:' || url.protocol === 'https:' ? [{ ...source, url: url.href, label: source.title || url.hostname }] : [];
+        } catch { return []; }
+    });
     return <div className={cx('proposal-card', beginner && 'beginner-proposal-card')}>
         <div className="proposal-heading">
             {proposalSql !== null && <span className={cx('proposal-quality', proposal.quality?.status)}>{proposal.quality?.score ?? '—'}<small>QUALITY</small></span>}
@@ -69,6 +75,7 @@ function AssistantOutput({ mode, sql, turn, busy, editorProposalId, onDecideProp
         {proposal.assumptions.map((item, index) => <p className="proposal-point" key={`${index}-${item}`}><span>ASSUMPTION</span>{item}</p>)}
         {proposal.caveats.map((item, index) => <p className="proposal-point" key={`${index}-${item}`}><span>NOTE</span>{item}</p>)}
         {proposal.findings.map((item, index) => <p className="proposal-finding" key={`${index}-${item.severity}-${item.message}`}><strong>{item.severity}</strong>{item.message}<small>{item.evidence}</small></p>)}
+        {sources.length > 0 && <div className="assistant-web-sources"><span className="eyebrow">WEB SOURCES</span><ul>{sources.map(source => <li key={source.url}><a href={source.url} target="_blank" rel="noopener noreferrer">{source.label}</a></li>)}</ul></div>}
         {proposalSql !== null && <>
             {diffInEditor
                 ? <p className="proposal-review-hint">Review the SQL diff above the editor, then accept or reject it there.</p>
@@ -128,7 +135,7 @@ export function AssistantWorkflow(props: AssistantWorkflowProps) {
                 </div>
                 <ScrollEdgeFrame<HTMLTextAreaElement> className="assistant-question-frame">{ref => <textarea ref={ref} id="assistant-question" className="field-textarea" aria-label="Ask AI" value={question} onChange={event => onQuestionChange(event.target.value)} onKeyDown={sendOnEnter} placeholder="Message… (Enter to send)" rows={2}/>}</ScrollEdgeFrame>
                 <div className="assistant-composer-footer"><span>Shift+Enter for a new line</span>{busy ? cancelable ? <Button variant="danger" onClick={onCancelRequest} aria-label="Stop assistant response" title="Stop generating">Stop</Button> : <Button variant="secondary" disabled>{phase === 'deciding' ? 'Applying…' : 'Working…'}</Button> : <Button variant="primary" disabled={!trusted || !schemaReady || !question.trim()} onClick={ask}><Icon name="send"/>Send</Button>}</div>
-                <details className="assistant-disclosure"><summary>What gets sent and saved?</summary><p>Your message, this chat, and the context above are sent to OpenAI. The latest query run is sent only when selected. Chat history is saved in this browser. Review SQL suggestions before applying them; they never run automatically.</p></details>
+                <details className="assistant-disclosure"><summary>What gets sent and saved?</summary><p>Your message, this chat, and the context above are sent to OpenAI. The assistant may search the web for current information; sources appear with its answer. The latest query run is sent only when selected. Chat history is saved in this browser. Review SQL suggestions before applying them; they never run automatically.</p></details>
             </div>
         </div>
     </section>;

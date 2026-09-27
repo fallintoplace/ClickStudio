@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import type { AssistantDriver, PreparedContext } from '../core/assistant.js';
 import { AppError } from '../core/errors.js';
 import { validateProposal } from '../core/assistant.js';
+import type { AssistantSource } from '../shared/types.js';
 const strings = { type: 'array', items: { type: 'string' } };
 const schema = { type: 'object', additionalProperties: false, required: ['sql', 'summary', 'assumptions', 'tables', 'caveats', 'clarification', 'findings'], properties: {
         sql: { type: ['string', 'null'] }, summary: { type: 'string' }, assumptions: strings, tables: strings, caveats: strings, clarification: { type: ['string', 'null'] },
@@ -25,7 +26,8 @@ export class OpenAIDriver implements AssistantDriver {
         ];
         try {
             const response = await this.client.responses.create({ model: this.model, store: false, instructions: context.payload.instructions, input,
-                max_output_tokens: 12_000, text: { format: { type: 'json_schema', name: 'clickhouse_proposal', strict: true, schema } } }, { signal });
+                tools: [{ type: 'web_search' }], tool_choice: 'auto', max_output_tokens: 12_000,
+                text: { format: { type: 'json_schema', name: 'clickhouse_proposal', strict: true, schema } } }, { signal });
             if (response.status !== 'completed' || !response.output_text) {
                 const reason = response.incomplete_details?.reason;
                 const message = reason === 'max_output_tokens'
@@ -35,7 +37,19 @@ export class OpenAIDriver implements AssistantDriver {
                         : 'The assistant stopped before completing a response. No draft was changed.';
                 throw new AppError(502, 'AI_INCOMPLETE', message);
             }
-            return { content: validateProposal(JSON.parse(response.output_text)), responseId: response.id };
+            const sourceMap = new Map<string, AssistantSource>();
+            for (const item of response.output) {
+                if (item.type !== 'message') continue;
+                for (const part of item.content) {
+                    if (part.type !== 'output_text') continue;
+                    for (const annotation of part.annotations) {
+                        if (annotation.type === 'url_citation' && !sourceMap.has(annotation.url) && sourceMap.size < 20)
+                            sourceMap.set(annotation.url, { title: annotation.title, url: annotation.url });
+                    }
+                }
+            }
+            const sources = [...sourceMap.values()];
+            return { content: validateProposal({ ...JSON.parse(response.output_text), ...(sources.length ? { sources } : {}) }), responseId: response.id };
         }
         catch (error) {
             if (error instanceof AppError)

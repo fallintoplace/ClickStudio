@@ -283,6 +283,10 @@
     .proposal-quality.low, .proposal-quality.poor { border-color: color-mix(in srgb, var(--red) 29%, transparent); background: color-mix(in srgb, var(--red) 5%, transparent); color: var(--red); }
     .proposal-point { margin: 0; color: var(--text-soft); font-size: 8px; line-height: 1.5; }
     .proposal-point span { display: block; margin-bottom: 3px; color: var(--amber); font-size: 7px; font-weight: 750; letter-spacing: .1em; }
+    .assistant-web-sources { display: grid; gap: 4px; }
+    .assistant-web-sources ul { display: grid; gap: 3px; margin: 0; padding-left: 16px; }
+    .assistant-web-sources li, .assistant-web-sources a { color: var(--text-soft); font-size: 8px; line-height: 1.5; overflow-wrap: anywhere; }
+    .assistant-web-sources a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
     .proposal-finding { display: grid; gap: 4px; margin: 0; padding: 8px; border-radius: 7px; background: var(--panel); color: var(--text-soft); font-size: 8px; line-height: 1.5; }
     .proposal-finding strong { color: var(--amber); font-size: 7px; text-transform: uppercase; }
     .proposal-finding small { color: var(--muted); font-size: 7px; }

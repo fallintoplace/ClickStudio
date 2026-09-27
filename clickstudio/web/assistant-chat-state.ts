@@ -1,4 +1,4 @@
-import type { AssistantAction, Proposal, Result } from '../shared/types.js';
+import type { AssistantAction, AssistantSource, Proposal, Result } from '../shared/types.js';
 
 export type AssistantTurnStatus = 'pending' | 'complete' | 'failed' | 'cancelled';
 
@@ -38,6 +38,21 @@ const actions = ['ask', 'generate', 'explain', 'repair', 'result', 'performance'
 const record = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
 const strings = (value: unknown): value is string[] => Array.isArray(value) && value.every(item => typeof item === 'string');
 
+function recoverSources(value: unknown): AssistantSource[] | undefined {
+    if (value === undefined) return undefined;
+    if (!Array.isArray(value) || value.length > 20) return undefined;
+    const sources = value.flatMap((source): AssistantSource[] => {
+        if (!record(source) || typeof source.title !== 'string' || source.title.length > 512 || typeof source.url !== 'string' || source.url.length > 2048) return [];
+        try {
+            const url = new URL(source.url);
+            if ((url.protocol === 'http:' || url.protocol === 'https:') && !url.username && !url.password)
+                return [{ title: source.title, url: url.href }];
+        } catch { return []; }
+        return [];
+    });
+    return sources.length === value.length ? sources : undefined;
+}
+
 export const assistantChatsStorageKey = (connectionId: string) => `clickstudio:assistant-chats:${encodeURIComponent(connectionId)}:v1`;
 
 export function createAssistantChat(): AssistantChat {
@@ -59,10 +74,12 @@ function recoverProposal(value: unknown): Proposal | undefined {
         !strings(value.assumptions) || !strings(value.tables) || !strings(value.caveats) ||
         !(value.clarification === null || typeof value.clarification === 'string') ||
         !Array.isArray(value.findings) || !['pending', 'accepted', 'rejected'].includes(String(value.decision))) return undefined;
+    const sources = recoverSources(value.sources);
+    if (value.sources !== undefined && !sources) return undefined;
     const findings = value.findings.every(item => record(item) && ['high', 'medium', 'low'].includes(String(item.severity)) &&
         typeof item.message === 'string' && typeof item.evidence === 'string');
     if (!findings) return undefined;
-    return value as unknown as Proposal;
+    return { ...value, ...(sources ? { sources } : {}) } as unknown as Proposal;
 }
 
 function recoverRunContext(value: unknown): AssistantChatRunContext | undefined {

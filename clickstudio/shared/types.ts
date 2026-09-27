@@ -387,6 +387,10 @@ export interface AssistantConversationMessage {
     role: 'user' | 'assistant';
     content: string;
 }
+export interface AssistantSource {
+    title: string;
+    url: string;
+}
 export interface ProposalContent {
     sql: string | null;
     summary: string;
@@ -394,6 +398,7 @@ export interface ProposalContent {
     tables: string[];
     caveats: string[];
     clarification: string | null;
+    sources?: AssistantSource[];
     findings: {
         severity: 'high' | 'medium' | 'low';
         message: string;

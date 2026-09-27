@@ -5,7 +5,7 @@ import { canWrite, mustOwn } from './guards.js';
 import { audit, hash, type Store } from './store.js';
 import { choice, record, text } from './validation.js';
 import { buildEvaluationReport, evaluateProposal } from './assistant-evaluation.js';
-export const PROMPT_VERSION = 'clickstudio-assistant-v7';
+export const PROMPT_VERSION = 'clickstudio-assistant-v8';
 export const MAX_ASSISTANT_CONVERSATION_MESSAGES = 40;
 export const MAX_ASSISTANT_CONVERSATION_BYTES = 80_000;
 export const PLAYBOOKS = {
@@ -185,6 +185,7 @@ export function buildContext(input: ContextInput): {
         'Use the meaning of the request and current workspace context to judge relevance. For an unrelated request, answer briefly and steer toward a ClickHouse, data, or query question. Do not use a fixed list of SQL statement types or features as the relevance boundary. ' +
         'When the request asks to copy a named source table into a new table with all rows and columns, use the source and target names from the request and supplied schema, and propose one ClickHouse-valid CREATE TABLE target ENGINE = MergeTree ORDER BY tuple() AS SELECT * FROM source statement. This copies every source column and row into a new MergeTree table; ClickHouse Cloud uses its SharedMergeTree-backed implementation. Do not omit the ENGINE clause. Do not answer with a standalone SELECT, choose a subset, rename columns, or invent a source schema. ' +
         'If a requested source table is absent from the supplied schema, say it is absent. For a request to create a new table about that subject, draft a useful starter table with sample rows when reasonable, label them as examples, and do not query or claim data from the missing source. Ask one focused clarification only when a missing detail cannot reasonably be assumed. ' +
+        'Use web search when current or external information can improve the answer, and cite any web sources used. Keep claims about this ClickHouse connection grounded in the supplied workspace data. ' +
         'For explain, result, performance analysis without a concrete fix, and review, sql may be null. ' +
         'For review and explain actions sql MUST be null. Return the requested structured object.';
     return { payload: { instructions, question: input.question, context: encoded(), ...(conversation.length ? { conversation } : {}), image }, summary };
@@ -330,10 +331,23 @@ export class AssistantService {
 export function validateProposal(value: unknown): ProposalContent {
     const v = record(value, 'model proposal');
     const strings = (x: unknown, name: string) => { requireThat(Array.isArray(x) && x.length <= 50, 502, 'AI_OUTPUT', `Invalid ${name}`); return x.map(s => text(s, name, 4000, true)); };
+    const sources = v.sources === undefined ? undefined : (() => {
+        requireThat(Array.isArray(v.sources) && v.sources.length <= 20, 502, 'AI_OUTPUT', 'Invalid web sources');
+        return v.sources.map((raw, index) => {
+            const source = record(raw, `web source ${index + 1}`), title = text(source.title, 'web source title', 512, true), url = text(source.url, 'web source URL', 2048);
+            let parsed: URL | undefined;
+            try { parsed = new URL(url); }
+            catch { parsed = undefined; }
+            requireThat(parsed, 502, 'AI_OUTPUT', 'Invalid web source URL');
+            requireThat((parsed.protocol === 'http:' || parsed.protocol === 'https:') && !parsed.username && !parsed.password, 502, 'AI_OUTPUT', 'Invalid web source URL');
+            return { title, url };
+        });
+    })();
     requireThat(Array.isArray(v.findings) && v.findings.length <= 30, 502, 'AI_OUTPUT', 'Invalid review findings');
     return { sql: v.sql === null ? null : text(v.sql, 'proposed SQL', 100000), summary: text(v.summary, 'summary', 20000, true),
         assumptions: strings(v.assumptions, 'assumptions'), tables: strings(v.tables, 'tables'), caveats: strings(v.caveats, 'caveats'),
         clarification: v.clarification === null ? null : text(v.clarification, 'clarification', 4000),
+        ...(sources ? { sources } : {}),
         findings: v.findings.map(raw => {
             const f = record(raw);
             const severity = choice(f.severity, FINDING_SEVERITIES, 502, 'AI_OUTPUT', 'Invalid finding severity');
