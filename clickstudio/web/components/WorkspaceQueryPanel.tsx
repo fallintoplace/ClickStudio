@@ -136,7 +136,7 @@ export function WorkspaceQueryPanel({
         view,
     } = state;
     const { statementCount, editorErrorContext, editorErrorRange } = viewState;
-    const sqlProposal = experience === 'expert' && state.assistantProposal?.action === 'generate' &&
+    const sqlProposal = experience === 'expert' && (state.assistantProposal?.action === 'ask' || state.assistantProposal?.action === 'generate') &&
         state.assistantProposal.decision === 'pending' && state.assistantProposal.sql !== null ? state.assistantProposal : undefined;
     const {
         queryPanelRef,

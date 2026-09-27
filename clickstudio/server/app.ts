@@ -28,7 +28,7 @@ import { OpenAIVoiceService, safetyIdentifier, type VoiceService } from './voice
 import { telemetry, recordRun } from './telemetry.js';
 type Driver = QueryDriver & ImportDriver & Pick<ClickHouseDriver, 'connection' | 'connections' | 'test' | 'targets' | 'profileEvidence' | 'profilePipeline' | 'profileFlamegraph' | 'workload' | 'replication' | 'queryTree' | 'tableParts' | 'nativeExplorer' | 'searchDocumentation' | 'documentationEntry' | 'close'>;
 const MAX_WASM_PARSER_BYTES = 64 * 1024 * 1024;
-const ASSISTANT_ACTIONS = ['generate', 'explain', 'repair', 'result', 'performance', 'review'] as const satisfies readonly AssistantAction[];
+const ASSISTANT_ACTIONS = ['ask', 'generate', 'explain', 'repair', 'result', 'performance', 'review'] as const satisfies readonly AssistantAction[];
 const IMPORT_FORMATS = ['csv', 'json', 'ndjson'] as const;
 const MONITOR_CONDITIONS = ['changed', 'nonempty', 'failure'] as const;
 let parserWasmCache: Promise<Uint8Array> | undefined;
@@ -354,8 +354,16 @@ export function createApp(config: Config, overrides: {
         const question = text(v.question, 'question', 4000), sql = text(v.sql, 'SQL', 200000, true);
         const schema = await driver.schema(connectionId), connection = driver.connection(p, connectionId);
         const documentation = await assistantReferenceDocs(driver, p, connectionId, question, sql, schema, connection.database);
-        const context = ai.prepare(p, { connectionId, database: connection.database, action: 'generate', question, sql, schema,
-            serverVersion: connection.manifest?.serverVersion, documentation, sensitiveColumns: config.sensitiveColumns });
+        let run: Run | undefined;
+        if (v.includeRun === true) {
+            requireThat(Boolean(v.runId), 400, 'RUN_REQUIRED', 'Select a completed run before including its context');
+            run = runs.get(p, identifier(v.runId, 'runId'));
+            requireThat(run.connectionId === connectionId, 409, 'CONNECTION_MISMATCH', 'Selected evidence belongs to another connection');
+        }
+        const result = run?.resultState === 'reopenable' ? runs.result(p, run.id) : undefined;
+        const context = ai.prepare(p, { connectionId, database: connection.database, action: 'ask', question, sql, schema, result,
+            evidenceSql: run?.sql, error: run?.error?.message, serverVersion: connection.manifest?.serverVersion,
+            documentation, sensitiveColumns: config.sensitiveColumns });
         if (!secretFree(context.payload)) {
             store.delete('ai-contexts', context.id);
             throw new AppError(400, 'SECRET_IN_CONTEXT', 'This context contains a configured secret; remove it before sharing');

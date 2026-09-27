@@ -1,10 +1,10 @@
 import { RunComparisonLauncher } from './RunComparison';
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import type { AssistantAction, ProfilePipeline, Proposal, QueryDocument, QueryProfile, Run, Schema } from '../../shared/types';
+import type { ProfilePipeline, Proposal, QueryDocument, QueryProfile, Run, Schema } from '../../shared/types';
 import { AssistantWorkflow } from './AssistantWorkflow';
 import { Button, cx, formatBytes, Icon, inspectorLabel, Status } from './ui';
 import type { IconName } from './ui';
-import type { AssistantContext, Connected, Inspector } from '../workspace-types';
+import type { Connected, Inspector } from '../workspace-types';
 import type { NativeParseSnapshot, NativeParserStatus } from '../../shared/native-parser';
 import { NativeParserInspector } from './NativeParserInspector';
 import { ObjectExplorer } from './ObjectExplorer';
@@ -54,11 +54,8 @@ export type InspectorPaneProps = {
     onRefreshDocuments: () => void;
     onRefreshRevisions: () => void;
     onRestoreRevision: (revision: QueryDocument) => void;
-    assistantAction: AssistantAction;
-    onAssistantAction: (action: AssistantAction) => void;
     assistantQuestion: string;
     onAssistantQuestion: (question: string) => void;
-    assistantContext?: AssistantContext;
     assistantProposal?: Proposal;
     assistantBusy: boolean;
     assistantError: string;
@@ -66,11 +63,9 @@ export type InspectorPaneProps = {
     nativeParserStatus: NativeParserStatus;
     nativeParseSnapshot?: NativeParseSnapshot;
     onRetryParser: () => void;
-    includeResult: boolean;
-    onIncludeResult: (include: boolean) => void;
-    onPreview: () => void;
-    onGenerateSql: (schema?: Schema, serverVersion?: string, database?: string) => void;
-    onRequestProposal: () => void;
+    includeRun: boolean;
+    onIncludeRun: (include: boolean) => void;
+    onAskAI: (schema?: Schema, serverVersion?: string, database?: string) => void;
     onDecideProposal: (decision: 'accepted' | 'rejected') => void;
     onRunQuery: () => void;
     runDisabled: boolean;
@@ -90,7 +85,7 @@ const inspectorTabs = [
     { id: 'assistant', icon: 'assistant' },
 ] as const satisfies readonly { id: Inspector; icon: IconName }[];
 
-export function InspectorPane({ comparisonProfiles, comparisonPipelines, copy, inspector, setInspector, connection, schema, schemaLoading, schemaError, search, setSearch, history, documents, revisions, revisionsDocumentId, revisionLoading, revisionError, currentRevision, unsavedDraft, canRestoreRevision, run, profile, pipeline, onRefreshSchema, onRefreshHistory, onInsert, onOpenSqlDraft, onOpenImport, onExportResult, exportDisabled, onOpenRun, onOpenDocument, onLoadProfile, onLoadPipeline, onOpenGraph, connectionId, sql, trusted, runId, onRefreshDocuments, onRefreshRevisions, onRestoreRevision, assistantAction, onAssistantAction, assistantQuestion, onAssistantQuestion, assistantContext, assistantProposal, assistantBusy, assistantError, nativeParserEnabled, nativeParserStatus, nativeParseSnapshot, onRetryParser, includeResult, onIncludeResult, onPreview, onGenerateSql, onRequestProposal, onDecideProposal, onRunQuery, runDisabled, expert = false, drawer = false, onClose }: InspectorPaneProps) {
+export function InspectorPane({ comparisonProfiles, comparisonPipelines, copy, inspector, setInspector, connection, schema, schemaLoading, schemaError, search, setSearch, history, documents, revisions, revisionsDocumentId, revisionLoading, revisionError, currentRevision, unsavedDraft, canRestoreRevision, run, profile, pipeline, onRefreshSchema, onRefreshHistory, onInsert, onOpenSqlDraft, onOpenImport, onExportResult, exportDisabled, onOpenRun, onOpenDocument, onLoadProfile, onLoadPipeline, onOpenGraph, connectionId, sql, trusted, runId, onRefreshDocuments, onRefreshRevisions, onRestoreRevision, assistantQuestion, onAssistantQuestion, assistantProposal, assistantBusy, assistantError, nativeParserEnabled, nativeParserStatus, nativeParseSnapshot, onRetryParser, includeRun, onIncludeRun, onAskAI, onDecideProposal, onRunQuery, runDisabled, expert = false, drawer = false, onClose }: InspectorPaneProps) {
     const visibleDocuments = documents.filter(document => document.connectionId === connectionId && !document.deletedAt);
     const [selectedRevisionNumber, setSelectedRevisionNumber] = useState<number>();
     const [referenceTarget, setReferenceTarget] = useState<{ name: string; type: string }>();
@@ -140,7 +135,7 @@ export function InspectorPane({ comparisonProfiles, comparisonPipelines, copy, i
             {inspector === 'parser' && <NativeParserInspector enabled={nativeParserEnabled} status={nativeParserStatus} snapshot={nativeParseSnapshot} onRetry={onRetryParser}/>}
             {inspector === 'details' && <RunDetails run={run} profile={profile} onLoad={onLoadProfile} unavailableReason={connection.manifest?.queryLog.available === false ? connection.manifest.queryLog.reason : undefined}/>}
             {inspector === 'pipeline' && <PipelineView run={run} profile={profile} pipeline={pipeline} onLoad={onLoadPipeline} onOpenGraph={onOpenGraph} available={connection.manifest?.pipeline.available !== false} unavailableReason={connection.manifest?.pipeline.available === false ? connection.manifest.pipeline.reason : undefined}/>}
-            {inspector === 'assistant' && <AssistantWorkflow mode={expert ? 'expert' : 'beginner'} sql={sql} action={assistantAction} onActionChange={onAssistantAction} question={assistantQuestion} onQuestionChange={onAssistantQuestion} context={assistantContext} proposal={assistantProposal} busy={assistantBusy} error={assistantError} trusted={trusted} runId={runId} includeResult={includeResult} onIncludeResult={onIncludeResult} onPreview={onPreview} onGenerateSql={() => onGenerateSql(schema, connection.manifest?.serverVersion, connection.database)} schemaReady={Boolean(schema) && !schemaLoading && !schemaError} schemaLoading={schemaLoading} schemaStatus={schemaError} onRefreshSchema={onRefreshSchema} onRequestProposal={onRequestProposal} onDecideProposal={onDecideProposal} onRunQuery={onRunQuery} runDisabled={runDisabled}/>}
+            {inspector === 'assistant' && <AssistantWorkflow mode={expert ? 'expert' : 'beginner'} sql={sql} question={assistantQuestion} onQuestionChange={onAssistantQuestion} proposal={assistantProposal} busy={assistantBusy} error={assistantError} trusted={trusted} runId={runId} includeRun={includeRun} onIncludeRun={onIncludeRun} onAskAI={() => onAskAI(schema, connection.manifest?.serverVersion, connection.database)} schemaReady={Boolean(schema) && !schemaLoading && !schemaError} schemaLoading={schemaLoading} schemaStatus={schemaError} onRefreshSchema={onRefreshSchema} onDecideProposal={onDecideProposal} onRunQuery={onRunQuery} runDisabled={runDisabled}/>}
         </div>
         <footer className="inspector-footer"><div className="inspector-footer-actions"><Button variant="secondary" className="toolbar-small" onClick={onOpenImport}>{copy.import}</Button><Button variant="secondary" className="toolbar-small" onClick={onExportResult} disabled={exportDisabled}>{copy.export}</Button></div><div className="inspector-footer-meta"><span className="connection-readonly"><Icon name={connection.readonly ? 'lock' : 'database'}/> {connection.readonly ? copy.readOnly : 'Read/write'}</span><span title={`${connection.name} · ${connection.database}`}>{connection.name} <i>·</i> {connection.database}</span></div></footer>
     </aside>;

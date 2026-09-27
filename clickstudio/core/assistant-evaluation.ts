@@ -52,17 +52,18 @@ function knownTableSet(context: EvaluationContext): Set<string> {
 export function evaluateProposal(content: ProposalContent, action: AssistantAction, context: EvaluationContext = {}): ProposalQuality {
     const checks: ProposalQualityCheck[] = [];
     const inspectOnly = action === 'review' || action === 'explain';
+    const flexible = action === 'ask';
     if (inspectOnly && content.sql !== null)
         checks.push({ id: 'contract', status: 'fail', message: 'This playbook must not return replacement SQL.' });
-    else if (!inspectOnly && content.sql === null)
+    else if (!inspectOnly && !flexible && content.sql === null)
         checks.push({ id: 'contract', status: 'warn', message: 'No SQL was proposed; the response needs clarification before it can be applied.' });
     else
-        checks.push({ id: 'contract', status: 'pass', message: inspectOnly ? 'Inspect-only playbook returned no replacement SQL.' : 'The playbook returned an applicable SQL proposal.' });
+        checks.push({ id: 'contract', status: 'pass', message: inspectOnly ? 'Inspect-only playbook returned no replacement SQL.' : flexible && content.sql === null ? 'The request was answered without replacement SQL.' : 'The playbook returned an applicable SQL proposal.' });
 
     if (content.sql === null) {
         checks.push({ id: 'safety', status: 'pass', message: 'No SQL was returned, so there is no executable proposal to gate.' });
         checks.push({ id: 'grounding', status: 'pass', message: 'No table references were introduced.' });
-        checks.push({ id: 'semantic', status: content.clarification ? 'pass' : 'warn', message: content.clarification ? 'The response asks for clarification instead of guessing.' : 'No SQL was returned and no clarification was recorded.' });
+        checks.push({ id: 'semantic', status: content.clarification || flexible ? 'pass' : 'warn', message: content.clarification ? 'The response asks for clarification instead of guessing.' : flexible ? 'The request was answered without returning SQL.' : 'No SQL was returned and no clarification was recorded.' });
     }
     else {
         try {

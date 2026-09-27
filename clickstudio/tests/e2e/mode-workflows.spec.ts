@@ -106,7 +106,7 @@ test('Switching to Advanced keeps the same AI question, query and run evidence',
         generations.push(body);
         proposalBaseSql = String(body.sql ?? '');
         await route.fulfill({ json: {
-            id: 'test-proposal', owner: 'local-owner', connectionId: 'demo', action: 'generate', createdAt: '2026-09-23T00:00:00.000Z',
+            id: 'test-proposal', owner: 'local-owner', connectionId: 'demo', action: 'ask', createdAt: '2026-09-23T00:00:00.000Z',
             baseSql: proposalBaseSql, responseId: 'test-response', model: 'test-model', promptVersion: 'test', contextSummary: ['Fixture-backed mock'], decision: 'pending',
             sql: generatedSql, summary: 'Show the sample event counts by day.', assumptions: [], tables: ['demo.events'], caveats: ['The demo fixture does not evaluate SQL.'], clarification: null, findings: [],
             quality: { evaluatorVersion: 'test', evaluatedAt: '2026-09-23T00:00:00.000Z', status: 'pass', score: 100, checks: [] },
@@ -118,7 +118,7 @@ test('Switching to Advanced keeps the same AI question, query and run evidence',
         if (decision !== 'accepted' && decision !== 'rejected')
             throw new Error('Assistant decision request did not include a valid decision');
         await route.fulfill({ json: {
-            id: 'test-proposal', owner: 'local-owner', connectionId: 'demo', action: 'generate', createdAt: '2026-09-23T00:00:00.000Z', decidedAt: '2026-09-23T00:00:01.000Z',
+            id: 'test-proposal', owner: 'local-owner', connectionId: 'demo', action: 'ask', createdAt: '2026-09-23T00:00:00.000Z', decidedAt: '2026-09-23T00:00:01.000Z',
             baseSql: proposalBaseSql, responseId: 'test-response', model: 'test-model', promptVersion: 'test', contextSummary: ['Fixture-backed mock'], decision,
             sql: generatedSql, summary: 'Show the sample event counts by day.', assumptions: [], tables: ['demo.events'], caveats: [], clarification: null, findings: [],
         } });
@@ -129,13 +129,13 @@ test('Switching to Advanced keeps the same AI question, query and run evidence',
     await page.getByTestId('save-query').click();
     await expect(page.getByRole('status').filter({ hasText: 'revision 1' })).toBeVisible();
     await page.getByTestId('open-ai').click();
-    const prompt = page.getByRole('textbox', { name: 'YOUR QUESTION', exact: true });
+    const prompt = page.getByRole('textbox', { name: 'Ask AI', exact: true });
     await prompt.fill('Show event counts by day');
-    await page.getByRole('button', { name: 'Generate SQL', exact: true }).click();
+    await page.getByRole('button', { name: 'Ask AI', exact: true }).click();
     await expect(page.getByTestId('sql-proposal-diff').getByText('Show the sample event counts by day.', { exact: true })).toBeVisible();
     await expect(page.getByTestId('sql-proposal-diff')).toBeVisible();
     expect(generations).toHaveLength(1);
-    expect(generations[0]).toMatchObject({ question: 'Show event counts by day', connectionId: 'demo' });
+    expect(generations[0]).toMatchObject({ action: 'ask', question: 'Show event counts by day', connectionId: 'demo' });
     expect(generations[0]?.schema).toBeTruthy();
     expect(runRequests).toHaveLength(0);
     await page.getByRole('button', { name: 'Accept SQL', exact: true }).click();
@@ -169,20 +169,16 @@ test('Switching to Advanced keeps the same AI question, query and run evidence',
 
 test('Advanced editor, insights, pipeline and AI copilot stay read-only until a user runs SQL', async ({ page }) => {
     const runRequests: unknown[] = [];
-    const contexts: Record<string, unknown>[] = [];
-    let proposalRequests = 0;
+    const assistantRequests: Record<string, unknown>[] = [];
     page.on('request', request => {
         if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/runs') runRequests.push(request.postDataJSON());
     });
-    await page.route('**/api/assistant/context', async route => {
-        contexts.push(jsonRecord(route.request().postDataJSON(), 'Assistant context request'));
-        await route.fulfill({ status: 201, json: { id: 'expert-context', summary: ['Current SQL, schema, and selected retained result are included.'] } });
-    });
-    await page.route('**/api/assistant/proposals', async route => {
-        proposalRequests++;
+    await page.route('**/api/assistant/sql', async route => {
+        const body = jsonRecord(route.request().postDataJSON(), 'Assistant request');
+        assistantRequests.push(body);
         await route.fulfill({ json: {
-            id: 'expert-proposal', owner: 'local-owner', connectionId: 'demo', action: 'performance', createdAt: '2026-09-23T00:00:00.000Z',
-            baseSql: String(contexts[0]?.sql ?? ''), responseId: 'test-response', model: 'test-model', promptVersion: 'test', contextSummary: ['Fixture-backed mock'], decision: 'pending',
+            id: 'expert-proposal', owner: 'local-owner', connectionId: 'demo', action: 'ask', createdAt: '2026-09-23T00:00:00.000Z',
+            baseSql: String(body.sql ?? ''), responseId: 'test-response', model: 'test-model', promptVersion: 'test', contextSummary: ['Fixture-backed mock'], decision: 'pending',
             sql: null, summary: 'The fixture has no measured performance data.', assumptions: [], tables: [], caveats: ['Demo runs do not measure ClickHouse performance.'], clarification: null,
             findings: [{ severity: 'low', message: 'No slowdown can be inferred from fixture data.', evidence: 'The sample driver is not a ClickHouse server.' }],
         } });
@@ -210,18 +206,14 @@ test('Advanced editor, insights, pipeline and AI copilot stay read-only until a 
     await page.getByRole('button', { name: 'Open operator graph in Insights', exact: true }).click();
     await expect(results.getByRole('region', { name: 'Scrollable operator graph', exact: true })).toBeVisible();
     await page.getByTestId('open-ai').click();
-    await expect(page.locator('.assistant-task-picker input[type="radio"]')).toHaveCount(6);
-    await page.locator('.assistant-panel input[type="radio"][value="performance"]').check();
-    await page.locator('.assistant-panel textarea').fill('Why is this query slow?');
-    await page.getByRole('checkbox').check();
-    await page.getByRole('button', { name: 'Preview context', exact: true }).click();
-    await expect(page.getByText(/Current SQL, schema/)).toBeVisible();
-    expect(contexts[0]).toMatchObject({ action: 'performance', question: 'Why is this query slow?', runId: activeRunId, includeResult: true });
-
-    page.on('dialog', dialog => dialog.accept());
-    await page.getByRole('button', { name: 'Ask AI for a proposal', exact: true }).click();
+    await expect(page.locator('.assistant-task-picker')).toHaveCount(0);
+    await page.getByRole('textbox', { name: 'Ask AI', exact: true }).fill('Why is this query slow?');
+    await page.getByRole('checkbox', { name: /Include latest run/ }).check();
+    await page.getByRole('button', { name: 'Ask AI', exact: true }).click();
     await expect(page.getByText('The fixture has no measured performance data.', { exact: true })).toBeVisible();
-    expect(proposalRequests).toBe(1);
+    expect(assistantRequests).toHaveLength(1);
+    expect(assistantRequests[0]).toMatchObject({ action: 'ask', question: 'Why is this query slow?', runId: activeRunId, includeRun: true });
+    expect(assistantRequests[0]?.result).toBeTruthy();
     expect(runRequests).toHaveLength(1);
     await expect(page.locator('.execution-bar code')).toHaveText(queryId);
 });

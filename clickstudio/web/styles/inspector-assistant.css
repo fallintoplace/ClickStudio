@@ -168,7 +168,6 @@
     .pipeline-stage.stage-estimated .stage-evidence { background: color-mix(in srgb, var(--amber) 7%, transparent); color: var(--amber); }
     .pipeline-stage.stage-planned .stage-evidence { background: color-mix(in srgb, var(--accent) 8%, transparent); color: var(--accent); }
     .assistant-panel { display: grid; align-content: start; gap: 13px; padding: 12px; }
-    .assistant-generate-panel { gap: 10px; }
     .assistant-generation-disclosure, .proposal-review-hint { margin: 0; color: var(--muted); font-size: 8px; line-height: 1.55; }
     .assistant-schema-refresh { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     .assistant-schema-refresh .button-base { min-height: 27px; flex: none; padding-inline: 8px; font-size: 8px; }
@@ -197,30 +196,7 @@
     .include-result span { display: grid; gap: 4px; }
     .include-result strong { color: var(--text-soft); font-size: 8px; }
     .include-result small { color: var(--muted); font-size: 7px; line-height: 1.5; }
-    .assistant-flow-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; margin: 0; padding: 0; list-style: none; }
-    .assistant-flow-steps li { display: flex; min-width: 0; align-items: center; gap: 7px; padding: 7px 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel-raised); color: var(--muted); }
-    .assistant-flow-steps li > span { display: grid; width: 18px; height: 18px; flex: none; place-items: center; border: 1px solid var(--line-bright); border-radius: 5px; color: inherit; font-family: var(--font-mono); font-size: 7px; }
-    .assistant-flow-steps li > strong { overflow: hidden; font-size: 8px; text-overflow: ellipsis; }
-    .assistant-flow-steps li.is-current { border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); background: color-mix(in srgb, var(--accent) 8%, var(--panel-raised)); color: var(--accent); }
-    .assistant-flow-steps li.is-current > span, .assistant-flow-steps li.is-complete > span { border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); }
-    .assistant-flow-steps li.is-complete { color: var(--text-soft); }
-    .assistant-task-picker { display: grid; gap: 7px; min-width: 0; margin: 0; padding: 0; border: 0; }
-    .assistant-task-picker legend { margin-bottom: 7px; color: var(--muted); font-size: 8px; font-weight: 730; letter-spacing: .08em; text-transform: uppercase; }
-    .assistant-task-picker > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
-    .assistant-task-option { position: relative; display: block; min-width: 0; cursor: pointer; }
-    .assistant-task-option input { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; }
-    .assistant-task-option > span { display: grid; min-height: 48px; align-content: center; gap: 3px; padding: 7px 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel-raised); transition: border-color .15s ease, background-color .15s ease; }
-    .assistant-task-option strong { overflow: hidden; color: var(--text-soft); font-size: 8px; font-weight: 680; text-overflow: ellipsis; white-space: nowrap; }
-    .assistant-task-option small { overflow: hidden; color: var(--muted); font-size: 7px; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
-    .assistant-task-option input:checked + span { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); background: color-mix(in srgb, var(--accent) 8%, var(--panel-raised)); }
-    .assistant-task-option input:checked + span strong { color: var(--accent); }
-    .assistant-task-option input:focus-visible + span { outline: 2px solid var(--focus-color); outline-offset: 2px; }
-    .assistant-context-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-    .assistant-context-heading small { color: var(--muted); font-size: 7px; }
-    .assistant-actions { display: grid; gap: 9px; }
-    .context-preview, .proposal-card { display: grid; gap: 8px; padding: 10px; border: 1px solid var(--line-bright); border-radius: 10px; background: var(--panel-raised); }
-    .context-preview > p { display: flex; gap: 7px; margin: 0; color: var(--text-soft); font-size: 8px; line-height: 1.5; }
-    .context-preview > p span { color: var(--green); }
+    .proposal-card { display: grid; gap: 8px; padding: 10px; border: 1px solid var(--line-bright); border-radius: 10px; background: var(--panel-raised); }
     .proposal-heading { display: flex; align-items: center; gap: 9px; }
     .proposal-heading > div { display: grid; gap: 4px; }
     .proposal-heading strong { font-size: 9px; line-height: 1.45; }

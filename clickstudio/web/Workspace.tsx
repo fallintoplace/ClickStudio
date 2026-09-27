@@ -161,18 +161,13 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
     const trusted = currentConnection.trusted;
 
     const {
-        assistantAction,
-        changeAssistantAction,
         assistantQuestion,
         changeAssistantQuestion,
-        assistantContext,
         assistantProposal,
         assistantBusy,
         assistantError,
-        includeResult,
-        setIncludeResult,
-        prepareAssistantContext,
-        requestAssistantProposal,
+        includeRun,
+        setIncludeRun,
         requestAssistantSql,
         decideAssistantProposal,
     } = useWorkspaceAssistant({
@@ -183,7 +178,6 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         workspaceRef,
         setWorkspace,
     });
-
     const {
         schema, schemaLoading, schemaError,
         documents, setDocuments, documentsLoaded, documentsReadError,
@@ -240,6 +234,10 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         loadHistory,
         setError,
     });
+    const selectableRunId = run && terminal(run) ? run.id : undefined;
+    useEffect(() => {
+        if (!selectableRunId && includeRun) setIncludeRun(false);
+    }, [includeRun, selectableRunId, setIncludeRun]);
     const pendingExecution = usePendingExecution({ activeDraftId: active.id, busy, run, script });
     const scriptFollowRef = useScriptExecution({
         scriptId: active.scriptId,
@@ -712,15 +710,12 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         connectionId: connection.id,
         sql: active.sql,
         trusted,
-        runId: run?.id,
+        runId: selectableRunId,
         onRefreshDocuments: () => void loadDocuments(),
         onRefreshRevisions: () => void loadDocumentRevisions(active.serverId),
         onRestoreRevision: restoreDocumentRevision,
-        assistantAction,
-        onAssistantAction: changeAssistantAction,
         assistantQuestion,
         onAssistantQuestion: changeAssistantQuestion,
-        assistantContext,
         assistantProposal,
         assistantBusy,
         assistantError,
@@ -728,11 +723,24 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         nativeParserStatus,
         nativeParseSnapshot,
         onRetryParser: () => editor.current?.retryNativeParser(),
-        includeResult,
-        onIncludeResult: setIncludeResult,
-        onPreview: () => void prepareAssistantContext(experience === 'beginner' ? 'generate' : undefined),
-        onGenerateSql: (currentSchema?: Schema, serverVersion?: string, database?: string) => void requestAssistantSql(currentSchema, serverVersion, database),
-        onRequestProposal: () => void requestAssistantProposal(),
+        includeRun,
+        onIncludeRun: setIncludeRun,
+        onAskAI: async (currentSchema?: Schema, serverVersion?: string, database?: string) => {
+            try {
+                let selectedResult: Result | undefined;
+                if (includeRun) {
+                    if (!run || !terminal(run)) throw new Error('Wait for the latest run to finish before including it.');
+                    if (run.resultState === 'reopenable') {
+                        selectedResult = snapshot?.runId === run.id
+                            ? snapshot
+                            : await api<Result>(`/runs/${encodeURIComponent(run.id)}/snapshot`);
+                    }
+                }
+                await requestAssistantSql(currentSchema, serverVersion, database, selectedResult, run?.sql, run?.error?.message);
+            } catch (caught) {
+                setError(message(caught));
+            }
+        },
         onDecideProposal: (decision: 'accepted' | 'rejected') => void decideAssistantProposal(decision),
         onRunQuery: () => void execute(),
         runDisabled: !trusted || Boolean(busy) || unsupportedParameters,

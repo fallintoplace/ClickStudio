@@ -382,7 +382,7 @@ export interface AuditEvent {
     outcome: 'allowed' | 'denied' | 'failed';
     ruleId?: string;
 }
-export type AssistantAction = 'generate' | 'explain' | 'repair' | 'result' | 'performance' | 'review';
+export type AssistantAction = 'ask' | 'generate' | 'explain' | 'repair' | 'result' | 'performance' | 'review';
 export interface ProposalContent {
     sql: string | null;
     summary: string;

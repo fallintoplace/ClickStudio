@@ -11,4 +11,3 @@ export type WorkspaceRunCapability = Readonly<{ available: boolean; reason?: str
 export type WorkspaceActionRef = { current: () => Promise<void> };
 export type RunEventState = 'idle' | 'live' | 'reconnecting';
 export type SelectOption<Value extends string> = { value: Value; label: string };
-export type AssistantContext = { id: string; summary: string[]; key: string };

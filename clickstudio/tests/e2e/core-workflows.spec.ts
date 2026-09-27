@@ -890,29 +890,32 @@ test('Refreshing run history replaces the visible list with the latest response'
     await expect(page.getByText('SELECT refreshed_history_entry')).toBeVisible();
 });
 
-test('A late AI context preview cannot attach to an edited question', async ({ page }) => {
+test('A late AI answer cannot attach to an edited question', async ({ page }) => {
     let release!: () => void;
     const responseGate = new Promise<void>(resolve => { release = resolve; });
     let requestReceived!: () => void;
     const received = new Promise<void>(resolve => { requestReceived = resolve; });
-    await page.route('**/api/assistant/context', async route => {
+    await page.route('**/api/assistant/sql', async route => {
         requestReceived();
         await responseGate;
-        await route.fulfill({ status: 201, json: { id: 'old-context', summary: ['Context for the old question'] } });
+        await route.fulfill({ json: {
+            id: 'old-answer', owner: 'local-owner', connectionId: 'demo', action: 'ask', createdAt: '2026-09-23T00:00:00.000Z',
+            baseSql: 'SELECT 1', responseId: 'test-response', model: 'test-model', promptVersion: 'test', contextSummary: [], decision: 'pending',
+            sql: null, summary: 'Answer for the old question', assumptions: [], tables: [], caveats: [], clarification: null, findings: [],
+        } });
     });
     await trust(page);
     await useAdvancedMode(page);
     await page.getByTestId('open-ai').click();
-    await page.locator('.assistant-task-picker input[type="radio"][value="review"]').check();
-    const question = page.getByRole('textbox', { name: 'YOUR QUESTION OR FOCUS', exact: true });
+    const question = page.getByRole('textbox', { name: 'Ask AI', exact: true });
     await question.fill('Show the old question');
-    await page.getByRole('button', { name: 'Preview context', exact: true }).click();
+    await page.getByRole('button', { name: 'Ask AI', exact: true }).click();
     await received;
     await question.fill('Show a different question');
     release();
-    await expect(page.getByText('Context for the old question', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('Answer for the old question', { exact: true })).toHaveCount(0);
     await expect(question).toHaveValue('Show a different question');
-    await expect(page.getByRole('button', { name: 'Send to AI & propose', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Ask AI', exact: true })).toBeEnabled();
 });
 
 test('Scripts show each statement outcome and open that statement’s retained result', async ({ page }) => {

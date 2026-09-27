@@ -25,10 +25,10 @@ export class OpenAIDriver implements AssistantDriver {
             if (response.status !== 'completed' || !response.output_text) {
                 const reason = response.incomplete_details?.reason;
                 const message = reason === 'max_output_tokens'
-                    ? 'The SQL proposal reached the response length limit. Try asking for a smaller part at a time. No draft was changed.'
+                    ? 'The assistant response reached its length limit. Try asking for a smaller part at a time. No draft was changed.'
                     : reason === 'content_filter'
                         ? 'The response was stopped by the content filter. No draft was changed.'
-                        : 'The model stopped before completing the SQL proposal. No draft was changed.';
+                        : 'The assistant stopped before completing a response. No draft was changed.';
                 throw new AppError(502, 'AI_INCOMPLETE', message);
             }
             return { content: validateProposal(JSON.parse(response.output_text)), responseId: response.id };

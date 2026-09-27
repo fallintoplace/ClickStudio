@@ -1,15 +1,8 @@
 import { useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import type { AssistantAction, Proposal, Schema } from '../shared/types';
+import type { Proposal, Result, Schema } from '../shared/types';
 import { isFrontendDemoPreview, message, post } from './api';
 import { checkpoint, type Draft, type WorkspaceState } from './workspace-state';
-import type { AssistantContext } from './workspace-types';
 import { useScopedValue } from './useScopedValue';
-
-function isAssistantContext(value: unknown): value is Pick<AssistantContext, 'id' | 'summary'> {
-    if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
-    const context = value as { id?: unknown; summary?: unknown };
-    return typeof context.id === 'string' && Array.isArray(context.summary) && context.summary.every(item => typeof item === 'string');
-}
 
 function isProposal(value: unknown): value is Proposal {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
@@ -20,14 +13,28 @@ function isProposal(value: unknown): value is Proposal {
         Array.isArray(proposal.assumptions) && Array.isArray(proposal.caveats) && Array.isArray(proposal.findings);
 }
 
-function assistantContextKey(
+function boundedAssistantResult(result?: Result): Result | undefined {
+    if (!result) return undefined;
+    const columns = result.columns.slice(0, 100);
+    const bounded: Result = { ...result, columns, rows: [] };
+    let bytes = JSON.stringify(bounded).length;
+    for (const row of result.rows) {
+        const boundedRow = row.slice(0, columns.length);
+        const rowBytes = JSON.stringify(boundedRow).length;
+        if (bounded.rows.length >= 100 || bytes + rowBytes > 24_000) break;
+        bounded.rows.push(boundedRow);
+        bytes += rowBytes;
+    }
+    return bounded;
+}
+
+function assistantRequestKey(
     connectionId: string,
     draftId: string,
     sql: string,
     parameters: Record<string, string>,
     runId: string | undefined,
-    includeResult: boolean,
-    action: AssistantAction,
+    includeRun: boolean,
     question: string,
 ) {
     return JSON.stringify({
@@ -36,8 +43,7 @@ function assistantContextKey(
         sql,
         parameters: Object.entries(parameters).sort(([left], [right]) => left.localeCompare(right)),
         runId,
-        includeResult,
-        action,
+        includeRun,
         question,
     });
 }
@@ -57,23 +63,20 @@ export function useWorkspaceAssistant({
     workspaceRef: { current: WorkspaceState };
     setWorkspace: Dispatch<SetStateAction<WorkspaceState>>;
 }) {
-    const [assistantAction, setAssistantAction] = useState<AssistantAction>('generate');
     const [assistantQuestion, setAssistantQuestion] = useState('');
-    const [assistantContextState, setAssistantContextForDraft] = useScopedValue<AssistantContext | undefined>(active.id);
     const [assistantProposalState, setAssistantProposalForDraft] = useScopedValue<{ key: string; value: Proposal } | undefined>(active.id);
     const [assistantBusyKey, setAssistantBusyKey] = useState<string>();
     const [assistantErrors, setAssistantErrors] = useState<Record<string, string>>({});
-    const [includeResult, setIncludeResultState] = useState(false);
+    const [includeRun, setIncludeRunState] = useState(false);
     const requestRef = useRef(0);
 
-    const assistantKey = assistantContextKey(
+    const assistantKey = assistantRequestKey(
         connectionId,
         active.id,
         active.sql,
         active.parameters,
         activeRunId,
-        includeResult,
-        assistantAction,
+        includeRun,
         assistantQuestion,
     );
     const assistantKeyRef = useRef(assistantKey);
@@ -81,7 +84,6 @@ export function useWorkspaceAssistant({
     const assistantBusy = assistantBusyKey === assistantKey;
     const assistantError = assistantErrors[active.id] ?? '';
     const setAssistantError = (error: string) => setAssistantErrors(current => ({ ...current, [active.id]: error }));
-    const assistantContext = assistantContextState?.key === assistantKey ? assistantContextState : undefined;
     const assistantProposal = assistantProposalState && (
         assistantProposalState.key === assistantKey ||
         (assistantProposalState.value.decision === 'accepted' && assistantProposalState.value.sql === active.sql)
@@ -90,147 +92,69 @@ export function useWorkspaceAssistant({
     const clearAssistantReview = () => {
         requestRef.current++;
         setAssistantBusyKey(undefined);
-        setAssistantContextForDraft(active.id, undefined);
         setAssistantProposalForDraft(active.id, undefined);
         setAssistantError('');
-    };
-
-    const setAssistantContext = (context?: AssistantContext) => {
-        requestRef.current++;
-        setAssistantBusyKey(undefined);
-        setAssistantContextForDraft(active.id, context);
-    };
-
-    const setAssistantProposal = (proposal?: Proposal) => {
-        requestRef.current++;
-        setAssistantBusyKey(undefined);
-        setAssistantProposalForDraft(active.id, proposal ? { key: assistantKey, value: proposal } : undefined);
-    };
-
-    const changeAssistantAction = (value: AssistantAction) => {
-        setAssistantAction(value);
-        setAssistantContext(undefined);
-        setAssistantProposal(undefined);
     };
 
     const changeAssistantQuestion = (question: string) => {
         requestRef.current++;
         setAssistantBusyKey(undefined);
         setAssistantQuestion(question);
-        setAssistantContextForDraft(active.id, undefined);
         setAssistantProposalForDraft(active.id, undefined);
         setAssistantError('');
     };
 
-    const setIncludeResult = (include: boolean) => {
-        if (include === includeResult) return;
-        setIncludeResultState(include);
+    const setIncludeRun = (include: boolean) => {
+        if (include === includeRun) return;
+        setIncludeRunState(include);
         clearAssistantReview();
     };
 
-    const prepareAssistantContext = async (action = assistantAction, question = assistantQuestion) => {
-        if (!trusted) return;
-        if (!question.trim() && action === 'generate') {
-            setAssistantError('Describe what you want to learn from your data first.');
-            return;
-        }
-        const draftId = active.id;
-        const requestKey = assistantContextKey(
-            connectionId,
-            draftId,
-            active.sql,
-            active.parameters,
-            activeRunId,
-            includeResult,
-            action,
-            question,
-        );
-        const requestId = ++requestRef.current;
-        setAssistantBusyKey(requestKey);
-        setAssistantError('');
-        setAssistantAction(action);
-        try {
-            const result = await post<unknown>('/assistant/context', {
-                connectionId,
-                action,
-                question,
-                sql: active.sql,
-                runId: activeRunId,
-                includeResult,
-            });
-            if (!isAssistantContext(result)) throw new Error('The context preview returned incomplete data. Try again.');
-            if (requestRef.current !== requestId || assistantKeyRef.current !== requestKey) return;
-            setAssistantContextForDraft(draftId, { ...result, key: requestKey });
-            setAssistantProposalForDraft(draftId, undefined);
-        } catch (caught) {
-            if (requestRef.current === requestId && assistantKeyRef.current === requestKey) setAssistantError(message(caught));
-        } finally {
-            if (requestRef.current === requestId) setAssistantBusyKey(undefined);
-        }
-    };
-
-    const requestAssistantProposal = async () => {
-        if (!assistantContext || assistantBusy) return;
-        const context = assistantContext;
-        if (context.key !== assistantKeyRef.current) {
-            setAssistantError('The draft changed. Preview the current context before asking for a proposal.');
-            return;
-        }
-        if (!window.confirm(`Send the reviewed SQL and selected context to the configured AI provider? ${assistantContext.summary.join(' ')}`)) return;
-        const draftId = active.id;
-        const requestId = ++requestRef.current;
-        setAssistantBusyKey(context.key);
-        setAssistantError('');
-        try {
-            const proposal = await post<unknown>('/assistant/proposals', { contextId: context.id, consent: true });
-            if (!isProposal(proposal)) throw new Error('The AI proposal returned incomplete data. Try again.');
-            if (requestRef.current !== requestId || assistantKeyRef.current !== context.key) return;
-            setAssistantProposalForDraft(draftId, { key: context.key, value: proposal });
-        } catch (caught) {
-            if (requestRef.current === requestId && assistantKeyRef.current === context.key) setAssistantError(message(caught));
-        } finally {
-            if (requestRef.current === requestId) setAssistantBusyKey(undefined);
-        }
-    };
-
-    const requestAssistantSql = async (schema?: Schema, serverVersion?: string, database?: string) => {
+    const requestAssistantSql = async (schema?: Schema, serverVersion?: string, database?: string, result?: Result, evidenceSql?: string, runError?: string) => {
         if (!trusted) return;
         if (!assistantQuestion.trim()) {
-            setAssistantError('Describe the SQL you want to generate first.');
+            setAssistantError('Ask a question or describe the SQL you want first.');
             return;
         }
         if (!schema) {
-            setAssistantError('Refresh the ClickHouse schema before generating SQL.');
+            setAssistantError('Refresh the ClickHouse schema before asking the assistant.');
+            return;
+        }
+        if (includeRun && !activeRunId) {
+            setAssistantError('Run a query before including its run context.');
             return;
         }
         const draftId = active.id;
-        const requestKey = assistantContextKey(
+        const requestKey = assistantRequestKey(
             connectionId,
             draftId,
             active.sql,
             active.parameters,
             activeRunId,
-            includeResult,
-            'generate',
+            includeRun,
             assistantQuestion,
         );
         const requestId = ++requestRef.current;
         assistantKeyRef.current = requestKey;
         setAssistantBusyKey(requestKey);
         setAssistantError('');
-        setAssistantAction('generate');
-        setAssistantContextForDraft(draftId, undefined);
         setAssistantProposalForDraft(draftId, undefined);
         try {
             const proposal = await post<unknown>('/assistant/sql', {
                 connectionId,
                 question: assistantQuestion,
                 sql: active.sql,
-                schema,
+                schema: { ...schema, columns: schema.columns.map(({ database: columnDatabase, table, name, type }) => ({ database: columnDatabase, table, name, type })) },
                 serverVersion,
                 database,
+                action: 'ask',
+                runId: includeRun ? activeRunId : undefined,
+                includeRun,
+                result: includeRun ? boundedAssistantResult(result) : undefined,
+                evidenceSql: includeRun ? evidenceSql : undefined,
+                error: includeRun ? runError : undefined,
             });
-            if (!isProposal(proposal)) throw new Error('SQL generation returned incomplete data. Try again.');
+            if (!isProposal(proposal)) throw new Error('The assistant returned incomplete data. Try again.');
             if (requestRef.current !== requestId || assistantKeyRef.current !== requestKey) return;
             setAssistantProposalForDraft(draftId, { key: requestKey, value: proposal });
         } catch (caught) {
@@ -244,14 +168,13 @@ export function useWorkspaceAssistant({
         if (!assistantProposal || assistantProposal.decision !== 'pending' || assistantProposal.baseSql !== active.sql) return;
         const proposal = assistantProposal;
         const draftId = active.id;
-        const requestKey = assistantContextKey(
+        const requestKey = assistantRequestKey(
             connectionId,
             draftId,
             active.sql,
             active.parameters,
             activeRunId,
-            includeResult,
-            assistantAction,
+            includeRun,
             assistantQuestion,
         );
         const requestId = ++requestRef.current;
@@ -282,18 +205,13 @@ export function useWorkspaceAssistant({
     };
 
     return {
-        assistantAction,
-        changeAssistantAction,
         assistantQuestion,
         changeAssistantQuestion,
-        assistantContext,
         assistantProposal,
         assistantBusy,
         assistantError,
-        includeResult,
-        setIncludeResult,
-        prepareAssistantContext,
-        requestAssistantProposal,
+        includeRun,
+        setIncludeRun,
         requestAssistantSql,
         decideAssistantProposal,
     };
