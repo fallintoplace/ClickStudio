@@ -33,6 +33,7 @@ export function useScrollEdges<T extends HTMLElement>() {
 
         measure();
         viewport.addEventListener('scroll', scheduleMeasure, { passive: true });
+        viewport.addEventListener('input', scheduleMeasure);
 
         const resizeObserver = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(scheduleMeasure);
         const observeChildren = () => {
@@ -49,6 +50,7 @@ export function useScrollEdges<T extends HTMLElement>() {
 
         return () => {
             viewport.removeEventListener('scroll', scheduleMeasure);
+            viewport.removeEventListener('input', scheduleMeasure);
             resizeObserver?.disconnect();
             mutationObserver?.disconnect();
             if (frame) cancelAnimationFrame(frame);

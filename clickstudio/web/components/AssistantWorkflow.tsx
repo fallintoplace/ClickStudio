@@ -1,4 +1,5 @@
 import type { Proposal } from '../../shared/types';
+import { ScrollEdgeShadows, useScrollEdges } from './ScrollEdgeShadows';
 import { Button, cx, Icon } from './ui';
 
 export type AssistantWorkflowProps = {
@@ -51,11 +52,12 @@ function AssistantOutput({ mode, sql, proposal, busy, error, onDecideProposal, o
 export function AssistantWorkflow(props: AssistantWorkflowProps) {
     const { mode, sql, question, onQuestionChange, proposal, busy, error, trusted, runId, includeRun, onIncludeRun,
         onAskAI, schemaReady, schemaLoading, schemaStatus, onRefreshSchema, onDecideProposal, onRunQuery, runDisabled } = props;
+    const { ref: questionScrollRef, edges: questionEdges } = useScrollEdges<HTMLTextAreaElement>();
     const output = <AssistantOutput mode={mode} sql={sql} proposal={proposal} busy={busy} error={error} onDecideProposal={onDecideProposal} onRunQuery={onRunQuery} runDisabled={runDisabled}/>;
     const ask = () => { void onAskAI(); };
     return <section className="assistant-panel animate-enter" aria-label="Ask AI">
         <div className="assistant-safety"><span className="assistant-glyph"><Icon name="assistant"/></span><div><strong>Ask AI</strong><p>Ask about your SQL or results, request a query, or get help fixing and improving one.</p></div></div>
-        <label className="field-label" htmlFor="assistant-question">YOUR QUESTION<textarea id="assistant-question" className="field-textarea" aria-label="Ask AI" value={question} onChange={event => onQuestionChange(event.target.value)} onKeyDown={event => { if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') { event.preventDefault(); if (trusted && schemaReady && question.trim() && !busy) ask(); } }} placeholder="For example: explain this query, help fix this error, or show event counts by day…" rows={4}/></label>
+        <div className="field-label"><label htmlFor="assistant-question">YOUR QUESTION</label><div className="scroll-edge-frame assistant-question-frame"><textarea ref={questionScrollRef} id="assistant-question" className="field-textarea" aria-label="Ask AI" value={question} onChange={event => onQuestionChange(event.target.value)} onKeyDown={event => { if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') { event.preventDefault(); if (trusted && schemaReady && question.trim() && !busy) ask(); } }} placeholder="For example: explain this query, help fix this error, or show event counts by day…" rows={4}/><ScrollEdgeShadows edges={questionEdges}/></div></div>
         <label className="include-result"><input type="checkbox" checked={includeRun} onChange={event => onIncludeRun(event.target.checked)} disabled={!runId}/><span><strong>Include latest run</strong><small>Send its SQL, retained rows when available, and any error.</small></span></label>
         <div className="flex flex-wrap items-center justify-end gap-2"><Button variant="primary" disabled={!trusted || !schemaReady || busy || !question.trim()} onClick={ask}>{busy ? 'Thinking…' : 'Ask AI'}</Button></div>
         <p className="assistant-generation-disclosure">Your question, current SQL, and available schema are sent to OpenAI. The latest run’s SQL, retained rows when available, and error are included only when selected. Any SQL proposal must be reviewed before it is applied, and is never run automatically.</p>

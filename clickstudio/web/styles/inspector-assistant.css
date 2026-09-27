@@ -191,6 +191,7 @@
     .field-label { display: grid; gap: 6px; color: var(--muted); font-size: 8px; font-weight: 730; letter-spacing: .08em; }
     .field-label .field-input { letter-spacing: normal; text-transform: none; }
     .field-textarea { min-height: 82px; resize: vertical; line-height: 1.5; }
+    .assistant-question-frame > .field-textarea { display: block; box-sizing: border-box; }
     .include-result { display: flex; align-items: flex-start; gap: 8px; padding: 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-raised); cursor: pointer; }
     .include-result input { margin: 2px 0 0; accent-color: var(--accent); }
     .include-result span { display: grid; gap: 4px; }
