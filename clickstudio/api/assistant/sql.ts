@@ -108,9 +108,10 @@ async function post(request: Request): Promise<Response> {
         const connectionId = field(body.connectionId, 'Connection ID', 128);
         const question = field(body.question, 'Question', 4_000);
         const sql = field(body.sql, 'SQL', 200_000, true);
+        const database = body.database === undefined ? undefined : field(body.database, 'Database', 128);
         const schema = schemaFrom(body.schema, connectionId);
         const serverVersion = typeof body.serverVersion === 'string' ? body.serverVersion.slice(0, 128) : undefined;
-        const built = buildContext({ connectionId, action: 'generate', question, sql, schema, serverVersion,
+        const built = buildContext({ connectionId, database, action: 'generate', question, sql, schema, serverVersion,
             sensitiveColumns: (process.env.AI_SENSITIVE_COLUMNS ?? 'password,token,secret,api_key').split(',').map(name => name.trim()) });
         const ip = request.headers.get('x-real-ip')?.trim() || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
         if (!allowRequest(ip)) return fail('AI_RATE_LIMIT', 'This network has reached the temporary SQL generation limit. Try again later.', 429);

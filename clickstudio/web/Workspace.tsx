@@ -738,7 +738,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         voiceListening,
         voiceError,
         onPreview: () => void prepareAssistantContext(experience === 'beginner' ? 'generate' : undefined),
-        onGenerateSql: (currentSchema?: Schema, serverVersion?: string) => void requestAssistantSql(currentSchema, serverVersion),
+        onGenerateSql: (currentSchema?: Schema, serverVersion?: string, database?: string) => void requestAssistantSql(currentSchema, serverVersion, database),
         onRequestProposal: () => void requestAssistantProposal(),
         onDecideProposal: (decision: 'accepted' | 'rejected') => void decideAssistantProposal(decision),
         onRunQuery: () => void execute(),

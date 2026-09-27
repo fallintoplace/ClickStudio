@@ -248,7 +248,7 @@ export function useWorkspaceAssistant({
         }
     };
 
-    const requestAssistantSql = async (schema?: Schema, serverVersion?: string) => {
+    const requestAssistantSql = async (schema?: Schema, serverVersion?: string, database?: string) => {
         if (!trusted) return;
         if (!assistantQuestion.trim()) {
             setAssistantError('Describe the SQL you want to generate first.');
@@ -283,6 +283,7 @@ export function useWorkspaceAssistant({
                 sql: active.sql,
                 schema,
                 serverVersion,
+                database,
             });
             if (!isProposal(proposal)) throw new Error('SQL generation returned incomplete data. Try again.');
             if (requestRef.current !== requestId || assistantKeyRef.current !== requestKey) return;

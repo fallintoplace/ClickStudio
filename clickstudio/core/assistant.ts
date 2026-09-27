@@ -16,6 +16,7 @@ export const PLAYBOOKS = {
 } satisfies Record<AssistantAction, string>;
 export interface ContextInput {
     connectionId: string;
+    database?: string;
     action: AssistantAction;
     question: string;
     sql: string;
@@ -92,13 +93,17 @@ export function buildContext(input: ContextInput): {
     requireThat(!credentialPattern.test([input.sql, input.question, input.rules, input.error, input.plan, input.evidenceSql].join('\n')), 400, 'CREDENTIAL_LIKE_CONTEXT', 'The draft or question appears to contain a credential. Remove it before sharing with AI.');
     const sensitive = new Set((input.sensitiveColumns ?? []).map(c => c.toLowerCase()));
     const columns = input.schema.columns.filter(c => !sensitive.has(c.name.toLowerCase()));
+    const prioritizedColumns = input.database
+        ? [...columns.filter(column => column.database === input.database), ...columns.filter(column => column.database !== input.database)]
+        : columns;
+    const sentColumns = prioritizedColumns.slice(0, 250);
     const summary = [`Action: ${input.action} (propose/review only)`, `Playbook: ${input.action}@${PROMPT_VERSION}`,
-        `Schema: ${Math.min(columns.length, 250)} of ${columns.length} permitted columns`,
+        `Schema: ${sentColumns.length} of ${columns.length} permitted columns${input.database ? `; prioritizing database ${input.database}` : ''}`,
         'Connection credentials, cookies and API keys are not included.'];
     const context: AssistantContextData = {
         dialect: 'ClickHouse', serverVersion: input.serverVersion ?? 'unknown', sql: input.sql,
-        schema: columns.slice(0, 250).map(c => ({ database: c.database, table: c.table, name: c.name, type: c.type })),
-        schemaFetchedAt: input.schema.fetchedAt, schemaIncomplete: input.schema.truncated || columns.length > 250,
+        schema: sentColumns.map(c => ({ database: c.database, table: c.table, name: c.name, type: c.type })),
+        schemaFetchedAt: input.schema.fetchedAt, schemaIncomplete: input.schema.truncated || columns.length > sentColumns.length,
         workspaceRules: input.rules?.slice(0, 4000) ?? 'Read-only, bounded queries. SQL and evidence stay visible.',
     };
     const referenceDocs = (input.documentation ?? []).slice(0, 4).map(entry => ({
@@ -137,7 +142,7 @@ export function buildContext(input: ContextInput): {
     const schema = context.schema;
     while (Buffer.byteLength(encoded()) > 60000 && schema.length)
         schema.pop();
-    if (schema.length !== Math.min(columns.length, 250))
+    if (schema.length !== sentColumns.length)
         context.schemaIncomplete = true;
     requireThat(Buffer.byteLength(encoded()) <= 60000, 413, 'CONTEXT_TOO_LARGE', 'Select a smaller SQL statement or plan for this request');
     if (result && input.result && result.rows.length < input.result.rows.length)

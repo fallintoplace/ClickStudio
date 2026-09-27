@@ -338,7 +338,7 @@ export function createApp(config: Config, overrides: {
             requireThat(run.connectionId === connectionId, 409, 'CONNECTION_MISMATCH', 'Selected evidence belongs to another connection');
         }
         const result = v.includeResult === true && run ? runs.result(p, run.id) : undefined;
-        const context = ai.prepare(p, { connectionId, action, question, sql, schema, result, evidenceSql: run?.sql, error: run?.error?.message,
+        const context = ai.prepare(p, { connectionId, database: connection.database, action, question, sql, schema, result, evidenceSql: run?.sql, error: run?.error?.message,
             serverVersion: connection.manifest?.serverVersion, rules: v.rules === undefined ? undefined : text(v.rules, 'workspace rules', 4000, true), documentation,
             sensitiveColumns: config.sensitiveColumns, image: v.image === undefined ? undefined : text(v.image, 'image', 2900000) });
         if (!secretFree(context.payload)) {
@@ -354,7 +354,7 @@ export function createApp(config: Config, overrides: {
         const question = text(v.question, 'question', 4000), sql = text(v.sql, 'SQL', 200000, true);
         const schema = await driver.schema(connectionId), connection = driver.connection(p, connectionId);
         const documentation = await assistantReferenceDocs(driver, p, connectionId, question, sql, schema, connection.database);
-        const context = ai.prepare(p, { connectionId, action: 'generate', question, sql, schema,
+        const context = ai.prepare(p, { connectionId, database: connection.database, action: 'generate', question, sql, schema,
             serverVersion: connection.manifest?.serverVersion, documentation, sensitiveColumns: config.sensitiveColumns });
         if (!secretFree(context.payload)) {
             store.delete('ai-contexts', context.id);
