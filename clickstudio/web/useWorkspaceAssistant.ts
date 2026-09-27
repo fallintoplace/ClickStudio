@@ -1,4 +1,4 @@
-import { useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { Proposal, Result, Schema } from '../shared/types';
 import { isFrontendDemoPreview, message, post } from './api';
 import { checkpoint, type Draft, type WorkspaceState } from './workspace-state';
@@ -48,6 +48,11 @@ function assistantRequestKey(
     });
 }
 
+type AssistantPhase = 'preparing' | 'generating' | 'deciding';
+type AssistantRunContext = { result?: Result; evidenceSql?: string; error?: string };
+type AssistantRunContextLoader = (signal: AbortSignal) => Promise<AssistantRunContext>;
+type ActiveAssistantRequest = { id: number; key: string; draftId: string; controller: AbortController };
+
 export function useWorkspaceAssistant({
     active,
     activeRunId,
@@ -66,9 +71,12 @@ export function useWorkspaceAssistant({
     const [assistantQuestion, setAssistantQuestion] = useState('');
     const [assistantProposalState, setAssistantProposalForDraft] = useScopedValue<{ key: string; value: Proposal } | undefined>(active.id);
     const [assistantBusyKey, setAssistantBusyKey] = useState<string>();
+    const [assistantPhase, setAssistantPhase] = useState<AssistantPhase>();
     const [assistantErrors, setAssistantErrors] = useState<Record<string, string>>({});
+    const [assistantNotices, setAssistantNotices] = useState<Record<string, string>>({});
     const [includeRun, setIncludeRunState] = useState(false);
     const requestRef = useRef(0);
+    const activeRequestRef = useRef<ActiveAssistantRequest | undefined>(undefined);
 
     const assistantKey = assistantRequestKey(
         connectionId,
@@ -82,23 +90,51 @@ export function useWorkspaceAssistant({
     const assistantKeyRef = useRef(assistantKey);
     assistantKeyRef.current = assistantKey;
     const assistantBusy = assistantBusyKey === assistantKey;
+    const assistantCancelable = activeRequestRef.current?.key === assistantKey;
     const assistantError = assistantErrors[active.id] ?? '';
+    const assistantNotice = assistantNotices[active.id] ?? '';
     const setAssistantError = (error: string) => setAssistantErrors(current => ({ ...current, [active.id]: error }));
     const assistantProposal = assistantProposalState && (
         assistantProposalState.key === assistantKey ||
         (assistantProposalState.value.decision === 'accepted' && assistantProposalState.value.sql === active.sql)
     ) ? assistantProposalState.value : undefined;
 
-    const clearAssistantReview = () => {
+    const cancelAssistantRequest = (reason: 'cancelled' | 'context-changed', expectedRequestId?: number) => {
+        const request = activeRequestRef.current;
+        if (!request || (expectedRequestId !== undefined && request.id !== expectedRequestId)) return false;
+        activeRequestRef.current = undefined;
+        request.controller.abort();
         requestRef.current++;
         setAssistantBusyKey(undefined);
-        setAssistantProposalForDraft(active.id, undefined);
-        setAssistantError('');
+        setAssistantPhase(undefined);
+        setAssistantErrors(current => ({ ...current, [request.draftId]: '' }));
+        setAssistantNotices(current => ({
+            ...current,
+            [request.draftId]: reason === 'cancelled'
+                ? 'Request cancelled.'
+                : 'Request cancelled because the question or context changed. Ask again to use the updated context.',
+        }));
+        return true;
     };
+    const cancelAssistantRequestRef = useRef(cancelAssistantRequest);
+    cancelAssistantRequestRef.current = cancelAssistantRequest;
+
+    useEffect(() => {
+        const request = activeRequestRef.current;
+        if (request && request.key !== assistantKey)
+            cancelAssistantRequestRef.current('context-changed', request.id);
+    }, [assistantKey]);
+
+    useEffect(() => () => {
+        activeRequestRef.current?.controller.abort();
+        activeRequestRef.current = undefined;
+    }, []);
 
     const changeAssistantQuestion = (question: string) => {
+        cancelAssistantRequest('context-changed');
         requestRef.current++;
         setAssistantBusyKey(undefined);
+        setAssistantPhase(undefined);
         setAssistantQuestion(question);
         setAssistantProposalForDraft(active.id, undefined);
         setAssistantError('');
@@ -106,11 +142,16 @@ export function useWorkspaceAssistant({
 
     const setIncludeRun = (include: boolean) => {
         if (include === includeRun) return;
+        cancelAssistantRequest('context-changed');
+        requestRef.current++;
+        setAssistantBusyKey(undefined);
+        setAssistantPhase(undefined);
         setIncludeRunState(include);
-        clearAssistantReview();
+        setAssistantProposalForDraft(active.id, undefined);
+        setAssistantError('');
     };
 
-    const requestAssistantSql = async (schema?: Schema, serverVersion?: string, database?: string, result?: Result, evidenceSql?: string, runError?: string) => {
+    const requestAssistantSql = async (schema?: Schema, serverVersion?: string, database?: string, loadRunContext?: AssistantRunContextLoader) => {
         if (!trusted) return;
         if (!assistantQuestion.trim()) {
             setAssistantError('Ask a question or describe the SQL you want first.');
@@ -134,12 +175,24 @@ export function useWorkspaceAssistant({
             includeRun,
             assistantQuestion,
         );
+        const activeRequest = activeRequestRef.current;
+        if (activeRequest?.key === requestKey) return;
+        if (activeRequest)
+            cancelAssistantRequest('context-changed', activeRequest.id);
         const requestId = ++requestRef.current;
+        const controller = new AbortController();
+        activeRequestRef.current = { id: requestId, key: requestKey, draftId, controller };
         assistantKeyRef.current = requestKey;
         setAssistantBusyKey(requestKey);
+        setAssistantPhase(includeRun ? 'preparing' : 'generating');
         setAssistantError('');
+        setAssistantNotices(current => ({ ...current, [draftId]: '' }));
         setAssistantProposalForDraft(draftId, undefined);
         try {
+            const runContext = includeRun ? await loadRunContext?.(controller.signal) : undefined;
+            controller.signal.throwIfAborted();
+            if (includeRun && !runContext) throw new Error('Could not load the selected run context. Try again.');
+            setAssistantPhase('generating');
             const proposal = await post<unknown>('/assistant/sql', {
                 connectionId,
                 question: assistantQuestion,
@@ -150,22 +203,36 @@ export function useWorkspaceAssistant({
                 action: 'ask',
                 runId: includeRun ? activeRunId : undefined,
                 includeRun,
-                result: includeRun ? boundedAssistantResult(result) : undefined,
-                evidenceSql: includeRun ? evidenceSql : undefined,
-                error: includeRun ? runError : undefined,
-            });
+                result: includeRun ? boundedAssistantResult(runContext?.result) : undefined,
+                evidenceSql: includeRun ? runContext?.evidenceSql : undefined,
+                error: includeRun ? runContext?.error : undefined,
+            }, { signal: controller.signal });
             if (!isProposal(proposal)) throw new Error('The assistant returned incomplete data. Try again.');
-            if (requestRef.current !== requestId || assistantKeyRef.current !== requestKey) return;
+            if (requestRef.current !== requestId) return;
+            if (assistantKeyRef.current !== requestKey) {
+                cancelAssistantRequest('context-changed', requestId);
+                return;
+            }
             setAssistantProposalForDraft(draftId, { key: requestKey, value: proposal });
         } catch (caught) {
-            if (requestRef.current === requestId && assistantKeyRef.current === requestKey) setAssistantError(message(caught));
+            if (activeRequestRef.current?.id === requestId && requestRef.current === requestId) {
+                if (assistantKeyRef.current !== requestKey)
+                    cancelAssistantRequest('context-changed', requestId);
+                else setAssistantError(message(caught));
+            }
         } finally {
-            if (requestRef.current === requestId) setAssistantBusyKey(undefined);
+            if (activeRequestRef.current?.id === requestId) {
+                activeRequestRef.current = undefined;
+                setAssistantBusyKey(undefined);
+                setAssistantPhase(undefined);
+            }
         }
     };
 
     const decideAssistantProposal = async (decision: 'accepted' | 'rejected') => {
         if (!assistantProposal || assistantProposal.decision !== 'pending' || assistantProposal.baseSql !== active.sql) return;
+        if (activeRequestRef.current)
+            cancelAssistantRequest('context-changed', activeRequestRef.current.id);
         const proposal = assistantProposal;
         const draftId = active.id;
         const requestKey = assistantRequestKey(
@@ -179,6 +246,7 @@ export function useWorkspaceAssistant({
         );
         const requestId = ++requestRef.current;
         setAssistantBusyKey(requestKey);
+        setAssistantPhase('deciding');
         setAssistantError('');
         try {
             const reviewed = isFrontendDemoPreview && proposal.owner === 'vercel-session'
@@ -200,7 +268,10 @@ export function useWorkspaceAssistant({
         } catch (caught) {
             if (requestRef.current === requestId && assistantKeyRef.current === requestKey) setAssistantError(message(caught));
         } finally {
-            if (requestRef.current === requestId) setAssistantBusyKey(undefined);
+            if (requestRef.current === requestId) {
+                setAssistantBusyKey(undefined);
+                setAssistantPhase(undefined);
+            }
         }
     };
 
@@ -209,10 +280,14 @@ export function useWorkspaceAssistant({
         changeAssistantQuestion,
         assistantProposal,
         assistantBusy,
+        assistantCancelable,
+        assistantPhase,
         assistantError,
+        assistantNotice,
         includeRun,
         setIncludeRun,
         requestAssistantSql,
+        cancelAssistantRequest: () => cancelAssistantRequest('cancelled'),
         decideAssistantProposal,
     };
 }

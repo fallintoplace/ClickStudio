@@ -152,7 +152,9 @@ async function post(request: Request): Promise<Response> {
             evaluationSchema: { tables: schema.tables, truncated: schema.truncated }, state: 'running',
         };
         const driver = new OpenAIDriver(process.env.OPENAI_API_KEY, MODEL);
-        const response = await driver.propose(context, AbortSignal.timeout(45_000));
+        const signal = AbortSignal.any([request.signal, AbortSignal.timeout(45_000)]);
+        const response = await driver.propose(context, signal);
+        signal.throwIfAborted();
         const content = validateProposal(response.content);
         if (content.sql !== null) guardSql(content.sql);
         const proposal: Proposal = {
@@ -164,6 +166,7 @@ async function post(request: Request): Promise<Response> {
         };
         return json(proposal, 201);
     } catch (error) {
+        if (request.signal.aborted) return new Response(null, { status: 499 });
         if (error instanceof AppError) return fail(error.code, error.message, error.status);
         return fail('AI_PROVIDER_ERROR', 'The assistant request failed. No SQL was applied or run.', 502);
     }

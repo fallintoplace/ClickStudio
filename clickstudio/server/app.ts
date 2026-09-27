@@ -32,6 +32,67 @@ const ASSISTANT_ACTIONS = ['ask', 'generate', 'explain', 'repair', 'result', 'pe
 const IMPORT_FORMATS = ['csv', 'json', 'ndjson'] as const;
 const MONITOR_CONDITIONS = ['changed', 'nonempty', 'failure'] as const;
 let parserWasmCache: Promise<Uint8Array> | undefined;
+
+function registerAssistantSqlRoute(app: Express, dependencies: {
+    config: Config;
+    driver: Driver;
+    runs: RunService;
+    ai: AssistantService;
+    store: Store;
+    authorized: (principal: Principal, connectionId: string) => boolean;
+    secretFree: (value: unknown) => boolean;
+}) {
+    const { config, driver, runs, ai, store, authorized, secretFree } = dependencies;
+    app.post('/api/assistant/sql', async (req, res) => {
+        const cancellation = new AbortController();
+        let preparedContextId: string | undefined;
+        let proposalStarted = false;
+        const cancelOnDisconnect = () => {
+            if (!res.writableEnded && !cancellation.signal.aborted) cancellation.abort();
+        };
+        req.once('aborted', cancelOnDisconnect);
+        res.once('close', cancelOnDisconnect);
+        try {
+            const p = principal(res), v = body(req), connectionId = identifier(v.connectionId, 'connectionId');
+            canWrite(p);
+            requireThat(authorized(p, connectionId), 403, 'WORKSPACE_UNTRUSTED', 'Trust this connection before sharing context');
+            const question = text(v.question, 'question', 4000), sql = text(v.sql, 'SQL', 200000, true);
+            const schema = await driver.schema(connectionId), connection = driver.connection(p, connectionId);
+            let run: Run | undefined;
+            if (v.includeRun === true) {
+                requireThat(Boolean(v.runId), 400, 'RUN_REQUIRED', 'Select a completed run before including its context');
+                run = runs.get(p, identifier(v.runId, 'runId'));
+                requireThat(run.connectionId === connectionId, 409, 'CONNECTION_MISMATCH', 'Selected evidence belongs to another connection');
+            }
+            const documentation = await assistantReferenceDocs(driver, p, connectionId, question, sql, schema, connection.database);
+            const result = run?.resultState === 'reopenable' ? runs.result(p, run.id) : undefined;
+            const context = ai.prepare(p, { connectionId, database: connection.database, action: 'ask', question, sql, schema, result,
+                evidenceSql: run?.sql, error: run?.error?.message, serverVersion: connection.manifest?.serverVersion,
+                documentation, sensitiveColumns: config.sensitiveColumns });
+            preparedContextId = context.id;
+            if (!secretFree(context.payload)) {
+                store.delete('ai-contexts', context.id);
+                throw new AppError(400, 'SECRET_IN_CONTEXT', 'This context contains a configured secret; remove it before sharing');
+            }
+            cancellation.signal.throwIfAborted();
+            proposalStarted = true;
+            const proposal = await ai.propose(p, context.id, true, cancellation.signal);
+            cancellation.signal.throwIfAborted();
+            res.status(201).json(proposal);
+        }
+        catch (error) {
+            if (cancellation.signal.aborted) {
+                if (!proposalStarted && preparedContextId) store.delete('ai-contexts', preparedContextId);
+            }
+            else throw error;
+        }
+        finally {
+            req.off('aborted', cancelOnDisconnect);
+            res.off('close', cancelOnDisconnect);
+        }
+    });
+}
+
 async function loadClickHouseParserWasm(): Promise<Uint8Array> {
     let bytes: Buffer;
     try {
@@ -347,29 +408,7 @@ export function createApp(config: Config, overrides: {
         }
         res.status(201).json({ ...context, evidenceSql: run?.sql ?? null });
     });
-    app.post('/api/assistant/sql', async (req, res) => {
-        const p = principal(res), v = body(req), connectionId = identifier(v.connectionId, 'connectionId');
-        canWrite(p);
-        requireThat(authorized(p, connectionId), 403, 'WORKSPACE_UNTRUSTED', 'Trust this connection before sharing context');
-        const question = text(v.question, 'question', 4000), sql = text(v.sql, 'SQL', 200000, true);
-        const schema = await driver.schema(connectionId), connection = driver.connection(p, connectionId);
-        const documentation = await assistantReferenceDocs(driver, p, connectionId, question, sql, schema, connection.database);
-        let run: Run | undefined;
-        if (v.includeRun === true) {
-            requireThat(Boolean(v.runId), 400, 'RUN_REQUIRED', 'Select a completed run before including its context');
-            run = runs.get(p, identifier(v.runId, 'runId'));
-            requireThat(run.connectionId === connectionId, 409, 'CONNECTION_MISMATCH', 'Selected evidence belongs to another connection');
-        }
-        const result = run?.resultState === 'reopenable' ? runs.result(p, run.id) : undefined;
-        const context = ai.prepare(p, { connectionId, database: connection.database, action: 'ask', question, sql, schema, result,
-            evidenceSql: run?.sql, error: run?.error?.message, serverVersion: connection.manifest?.serverVersion,
-            documentation, sensitiveColumns: config.sensitiveColumns });
-        if (!secretFree(context.payload)) {
-            store.delete('ai-contexts', context.id);
-            throw new AppError(400, 'SECRET_IN_CONTEXT', 'This context contains a configured secret; remove it before sharing');
-        }
-        res.status(201).json(await ai.propose(p, context.id, true));
-    });
+    registerAssistantSqlRoute(app, { config, driver, runs, ai, store, authorized, secretFree });
     app.post('/api/assistant/proposals', async (req, res) => { const v = body(req); res.json(await ai.propose(principal(res), identifier(v.contextId, 'contextId'), v.consent === true)); });
     app.get('/api/assistant/proposals/:id', (req, res) => res.json(ai.get(principal(res), id(req))));
     app.post('/api/assistant/proposals/:id/decision', (req, res) => { const v = body(req); requireThat(v.decision === 'accepted' || v.decision === 'rejected', 400, 'DECISION', 'Unknown proposal decision'); res.json(ai.decide(principal(res), id(req), v.decision, identifier(v.connectionId, 'connectionId'), text(v.currentSql, 'current SQL', 200000, true))); });

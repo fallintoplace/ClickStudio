@@ -166,10 +166,14 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         changeAssistantQuestion,
         assistantProposal,
         assistantBusy,
+        assistantCancelable,
+        assistantPhase,
         assistantError,
+        assistantNotice,
         includeRun,
         setIncludeRun,
         requestAssistantSql,
+        cancelAssistantRequest,
         decideAssistantProposal,
     } = useWorkspaceAssistant({
         active,
@@ -726,29 +730,30 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         onAssistantQuestion: changeAssistantQuestion,
         assistantProposal,
         assistantBusy,
+        assistantCancelable,
+        assistantPhase,
         assistantError,
+        assistantNotice,
         nativeParserEnabled,
         nativeParserStatus,
         nativeParseSnapshot,
         onRetryParser: () => editor.current?.retryNativeParser(),
         includeRun,
         onIncludeRun: setIncludeRun,
-        onAskAI: async (currentSchema?: Schema, serverVersion?: string, database?: string) => {
-            try {
-                let selectedResult: Result | undefined;
-                if (includeRun) {
-                    if (!run || !terminal(run)) throw new Error('Wait for the latest run to finish before including it.');
-                    if (run.resultState === 'reopenable') {
-                        selectedResult = snapshot?.runId === run.id
-                            ? snapshot
-                            : await api<Result>(`/runs/${encodeURIComponent(run.id)}/snapshot`);
-                    }
-                }
-                await requestAssistantSql(currentSchema, serverVersion, database, selectedResult, run?.sql, run?.error?.message);
-            } catch (caught) {
-                setError(message(caught));
-            }
+        onAskAI: (currentSchema?: Schema, serverVersion?: string, database?: string) => {
+            const loadRunContext = includeRun ? async (signal: AbortSignal) => {
+                if (!run || !terminal(run)) throw new Error('Wait for the latest run to finish before including it.');
+                const selectedResult = run.resultState === 'reopenable'
+                    ? snapshot?.runId === run.id
+                        ? snapshot
+                        : await api<Result>(`/runs/${encodeURIComponent(run.id)}/snapshot`, { signal })
+                    : undefined;
+                signal.throwIfAborted();
+                return { result: selectedResult, evidenceSql: run.sql, error: run.error?.message };
+            } : undefined;
+            void requestAssistantSql(currentSchema, serverVersion, database, loadRunContext);
         },
+        onCancelAssistantRequest: cancelAssistantRequest,
         onDecideProposal: (decision: 'accepted' | 'rejected') => void decideAssistantProposal(decision),
         onRunQuery: () => void execute(),
         runDisabled: !trusted || Boolean(busy) || unsupportedParameters,

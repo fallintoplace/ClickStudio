@@ -48,7 +48,7 @@ export interface PreparedContext {
     };
     summary: string[];
     evaluationSchema?: Pick<Schema, 'tables' | 'truncated'>;
-    state: 'ready' | 'running' | 'complete' | 'failed';
+    state: 'ready' | 'running' | 'complete' | 'failed' | 'cancelled';
     proposalId?: string;
 }
 export interface AssistantDriver {
@@ -213,7 +213,7 @@ export class AssistantService {
         this.store.put('ai-contexts', context.id, context);
         return context;
     }
-    async propose(p: Principal, contextId: string, consent: boolean): Promise<Proposal> {
+    async propose(p: Principal, contextId: string, consent: boolean, clientSignal?: AbortSignal): Promise<Proposal> {
         canWrite(p);
         requireThat(consent, 400, 'AI_CONSENT_REQUIRED', 'Review and explicitly approve the context before sending');
         const context = this.store.get<PreparedContext>('ai-contexts', contextId);
@@ -234,8 +234,11 @@ export class AssistantService {
         context.state = 'running';
         this.store.put('ai-contexts', contextId, context);
         audit(this.store, p, 'ai.send-context', contextId);
+        const signal = clientSignal ? AbortSignal.any([clientSignal, AbortSignal.timeout(45000)]) : AbortSignal.timeout(45000);
         try {
-            const response = await this.driver.propose(context, AbortSignal.timeout(45000));
+            signal.throwIfAborted();
+            const response = await this.driver.propose(context, signal);
+            signal.throwIfAborted();
             const content = validateProposal(response.content);
             if (context.action === 'review' || context.action === 'explain')
                 content.sql = null;
@@ -249,6 +252,11 @@ export class AssistantService {
             return proposal;
         }
         catch (error) {
+            if (clientSignal?.aborted) {
+                context.state = 'cancelled';
+                audit(this.store, p, 'ai.cancel-context', contextId);
+                throw clientSignal.reason ?? new DOMException('The assistant request was cancelled.', 'AbortError');
+            }
             context.state = 'failed';
             audit(this.store, p, 'ai.proposal', contextId, 'failed');
             throw error;
