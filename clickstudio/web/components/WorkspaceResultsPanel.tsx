@@ -5,6 +5,7 @@ import type { Copy, ExperienceLevel, Locale } from '../i18n';
 import type { BusyAction, Connected, ResultsView } from '../workspace-types';
 import type { Draft } from '../workspace-state';
 import type { FailedQueryError } from '../workspace-helpers';
+import { CLICKHOUSE_CLOUD_CONNECTION_ID } from '../cloud-connection';
 import { PanelResizeHandles, panelTargetIsInteractive, type WorkspacePanelController } from '../useWorkspacePanels';
 import type { WorkspaceViewState } from '../useWorkspaceViewState';
 import { ChartView, GeoView, InsightsView, ResultGrid } from './ResultViews';
@@ -202,7 +203,7 @@ export function WorkspaceResultsPanel({
             </div>}
             {visibleResultsView !== 'sqlmap' && !execution && failedAttempt && run && <div className="result-provenance" aria-live="polite"><span className="status-light is-warning"/><span><strong>Previous result</strong><small>Latest attempt failed</small></span></div>}
             {visibleResultsView !== 'sqlmap' && !execution && !failedAttempt && staleResult && <div className="result-provenance" aria-live="polite"><span className="status-light is-warning"/><span><strong>Result from previous execution</strong><small>SQL or bound parameters changed since this run. Rerun to refresh the result.</small></span></div>}
-            {visibleResultsView === 'results' && script && <ScriptResults script={script} runs={history} activeRunId={run?.id} onSelectRun={actions.onSelectScriptRun} onCancel={actions.onCancel} cancelDisabled={cancelling}/>}
+            {visibleResultsView === 'results' && script && <ScriptResults script={script} runs={history} activeRunId={run?.id} onSelectRun={actions.onSelectScriptRun} onCancel={actions.onCancel} cancelDisabled={cancelling} cancelAfterCurrentStatement={connection.id === CLICKHOUSE_CLOUD_CONNECTION_ID}/>}
             {resultsRun && visibleResultsView === 'results' && (!execution || showPreviousResult) && <ResultGrid key={resultsRun.id} run={resultsRun} page={resultsPage} pageIndex={resultsPageIndex} loading={!resultsPage && resultsRun.resultState === 'reopenable'} onPage={actions.onPage} showPagination={!showPreviousResult} previousRun={showPreviousResult || staleResult || Boolean(failedAttempt && run)} obscured={showPreviousResult}/>}
             {run && visibleResultsView === 'indexes' && <ExplainIndexesView analysis={explainIndexAnalysis} loading={!retainedSnapshot && run.resultState === 'reopenable'} copy={copy.common}/>}
             {run && visibleResultsView === 'plan' && <ExplainPlanView plan={explainPlan} loading={!retainedSnapshot && run.resultState === 'reopenable'} copy={copy.common}/>}

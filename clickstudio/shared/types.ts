@@ -296,6 +296,7 @@ export interface Script {
         to: number;
         runId?: string;
         status: 'pending' | 'skipped' | RunStatus;
+        error?: ApiError;
     }[];
 }
 export type ChartKind = 'table' | 'number' | 'line' | 'bar' | 'scatter' | 'heatmap' | 'candlestick';

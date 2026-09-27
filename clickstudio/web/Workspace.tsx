@@ -253,6 +253,12 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
     const selectableRunId = run && terminal(run) ? run.id : undefined;
     useDefaultAssistantRunContext(selectableRunId, includeRun, assistantBusy, setIncludeRun);
     const pendingExecution = usePendingExecution({ activeDraftId: active.id, busy, run, script });
+    const refreshSchemaAfterScript = useCallback((completed: Script) => {
+        if (completed.connectionId !== connection.id || connection.dataSource !== 'clickhouse' || connection.readonly) return;
+        if (completed.statements.some(statement =>
+            (statement.status === 'succeeded' || statement.status === 'truncated') && isSchemaChangingSql(statement.sql)))
+            void loadSchema(true);
+    }, [connection, loadSchema]);
     const scriptFollowRef = useScriptExecution({
         scriptId: active.scriptId,
         draftId: active.id,
@@ -260,6 +266,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         setScripts,
         loadHistory,
         setError,
+        onComplete: refreshSchemaAfterScript,
     });
 
     const perform = async (task: () => Promise<void>, kind: BusyAction = 'save') => {

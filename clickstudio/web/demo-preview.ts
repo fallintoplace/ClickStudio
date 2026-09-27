@@ -1,5 +1,5 @@
 import { nativeExplorerFixture } from '../shared/native-explorer-fixtures.js';
-import type { QueryDocument, Result, ResultPage, Run, Schema, Script } from '../shared/types.js';
+import type { ApiError, QueryDocument, Result, ResultPage, Run, Schema, Script } from '../shared/types.js';
 import { splitSql } from '../shared/sql.js';
 import { sqlForRunKind } from '../shared/explain-plan.js';
 import { isResult, isRun } from '../shared/run-wire.js';
@@ -54,6 +54,8 @@ export {
 export type { DemoPreviewStarter } from './demo-preview-data.js';
 
 type RequestOptions = { method?: string; body?: unknown; signal?: AbortSignal };
+const MAX_SCRIPT_STATEMENTS = 50;
+const MAX_SCRIPT_SQL_LENGTH = 200_000;
 const demoQueryTree = [
     'QUERY id: 0',
     '  PROJECTION COLUMNS',
@@ -83,6 +85,7 @@ export class DemoPreviewApi {
 
     constructor() {
         this.restore();
+        this.interruptRestoredCloudScripts();
         if (!this.runs.has(DEMO_PREVIEW_RUN_ID)) this.addRun(DEMO_PREVIEW_RUN_ID, DEMO_PREVIEW_SQL, 'query', {});
         for (const starter of DEMO_PREVIEW_STARTERS) {
             if (this.documents.has(starter.id)) continue;
@@ -174,20 +177,48 @@ export class DemoPreviewApi {
         }
     }
 
+    private interruptRestoredCloudScripts() {
+        for (const script of this.scripts.values()) {
+            if (script.connectionId !== CLICKHOUSE_CLOUD_CONNECTION_ID || script.status !== 'running') continue;
+            const statements = script.statements.map(statement => statement.status === 'running'
+                ? {
+                    ...statement,
+                    status: 'interrupted' as const,
+                    error: {
+                        code: 'SCRIPT_INTERRUPTED',
+                        message: 'The page closed before ClickHouse returned a result. This statement may have completed, so it was not retried.',
+                    },
+                }
+                : statement.status === 'pending' ? { ...statement, status: 'skipped' as const } : statement);
+            this.scripts.set(script.id, { ...script, status: 'interrupted', statements });
+        }
+    }
+
     private persist() {
         try {
-            const runs = [...this.runs.values()].slice(-100);
             const results = [...this.results.values()].slice(-100);
+            const scripts = [...this.scripts.values()].slice(-50);
             const serialize = () => JSON.stringify({
                 version: 1, trusted: this.trusted, sequence: this.sequence,
-                runs, results, scripts: [...this.scripts.values()].slice(-50), documents: [...this.documents.values()].slice(-100),
+                runs: [...this.runs.values()].slice(-100).map(run =>
+                    run.resultState === 'reopenable' && !results.some(result => result.runId === run.id)
+                        ? { ...run, resultState: 'expired' as const }
+                        : run),
+                results, scripts, documents: [...this.documents.values()].slice(-100),
                 revisions: [...this.revisions.entries()].slice(-100),
             });
             let serialized = serialize();
             while (serialized.length > previewStorageBudget) {
-                const oldestPlaygroundResult = results.findIndex(result => this.runs.get(result.runId)?.connectionId === PLAYGROUND_CONNECTION_ID);
-                if (oldestPlaygroundResult < 0) break;
-                results.splice(oldestPlaygroundResult, 1);
+                const playgroundResult = results.findIndex(result => this.runs.get(result.runId)?.connectionId === PLAYGROUND_CONNECTION_ID);
+                const oldestCloudOrPlayground = results.findIndex(result => this.runs.get(result.runId)?.connectionId !== 'demo');
+                const resultToExpire = playgroundResult >= 0 ? playgroundResult : oldestCloudOrPlayground >= 0 ? oldestCloudOrPlayground : results.length ? 0 : -1;
+                if (resultToExpire >= 0) {
+                    results.splice(resultToExpire, 1);
+                } else {
+                    const oldestCompletedScript = scripts.findIndex(script => script.status !== 'running');
+                    if (oldestCompletedScript < 0) break;
+                    scripts.splice(oldestCompletedScript, 1);
+                }
                 serialized = serialize();
             }
             localStorage.setItem(previewStorageKey, serialized);
@@ -210,6 +241,109 @@ export class DemoPreviewApi {
         } : resultFor(run));
         this.persist();
         return run;
+    }
+
+    private async executeCloudScript(scriptId: string) {
+        let script = this.scripts.get(scriptId);
+        const cloud = getClickHouseCloudConnection();
+        if (!script) return;
+        if (!cloud) {
+            const firstPending = script.statements.findIndex(statement => statement.status === 'pending');
+            const statements = script.statements.map((statement, index) => index === firstPending
+                ? { ...statement, status: 'failed' as const, error: { code: 'CLOUD_DISCONNECTED', message: 'Reconnect to ClickHouse Cloud before running this script.' } }
+                : statement.status === 'pending' ? { ...statement, status: 'skipped' as const } : statement);
+            this.scripts.set(script.id, { ...script, status: 'failed', statements });
+            this.persist();
+            return;
+        }
+
+        for (let index = 0; index < script.statements.length; index++) {
+            script = this.scripts.get(scriptId);
+            if (!script) return;
+            const statement = script.statements[index]!;
+            if (statement.status !== 'pending') continue;
+            if (script.cancelled) {
+                this.scripts.set(script.id, {
+                    ...script,
+                    status: 'cancelled',
+                    statements: script.statements.map(item => item.status === 'pending' ? { ...item, status: 'skipped' } : item),
+                });
+                this.persist();
+                return;
+            }
+
+            const startedAt = now();
+            const runningStatements = [...script.statements];
+            runningStatements[index] = { ...statement, status: 'running', error: undefined };
+            script = { ...script, statements: runningStatements };
+            this.scripts.set(script.id, script);
+            this.persist();
+
+            try {
+                const response = await runClickHouseCloudSql(statement.sql, script.id);
+                const finishedAt = now();
+                const runId = crypto.randomUUID();
+                const resultExpiresAt = expiresAt();
+                const status = response.truncated ? 'truncated' as const : 'succeeded' as const;
+                const run: Run = {
+                    dataSource: 'clickhouse', id: runId, queryId: response.queryId, owner,
+                    connectionId: CLICKHOUSE_CLOUD_CONNECTION_ID, sql: statement.sql, sourceFrom: statement.from, sourceTo: statement.to,
+                    kind: 'query', parameters: {}, limits: { ...cloud.limits },
+                    tags: { workspace: 'clickstudio', source: 'ClickHouse Cloud', execution: 'Vercel function' },
+                    status, createdAt: startedAt, startedAt, finishedAt, elapsedMs: response.elapsedMs,
+                    rowCount: response.rows.length, bytes: response.bytes, columns: response.columns,
+                    warnings: response.truncated ? ['The result reached the 1,000-row display limit and may be incomplete.'] : [],
+                    sequence: ++this.sequence, resultExpiresAt, resultState: 'reopenable',
+                    requestedBy: owner, executedAs: cloud.username,
+                    permissionSnapshot: { readonly: cloud.readonly, role: 'ClickHouse Cloud user' },
+                    retryPolicy: 'never', serverVersion: cloud.manifest?.serverVersion,
+                };
+                const result: Result = {
+                    runId, queryId: response.queryId, columns: response.columns, rows: response.rows,
+                    completeness: response.truncated ? 'truncated' : 'complete', createdAt: finishedAt, expiresAt: resultExpiresAt,
+                };
+                this.runs.set(run.id, run);
+                this.results.set(run.id, result);
+
+                const current = this.scripts.get(scriptId);
+                if (!current) return;
+                const statements = [...current.statements];
+                statements[index] = { ...statements[index]!, runId: run.id, status, error: undefined };
+                this.scripts.set(scriptId, { ...current, statements });
+                this.persist();
+            } catch (caught) {
+                const current = this.scripts.get(scriptId);
+                if (!current) return;
+                const error: ApiError = caught instanceof CloudRequestError
+                    ? { code: caught.code, message: caught.message }
+                    : { code: 'CLOUD_SCRIPT_STATEMENT', message: caught instanceof Error ? caught.message : 'ClickHouse could not run this statement.' };
+                const statements = [...current.statements];
+                statements[index] = { ...statements[index]!, status: 'failed', error };
+                if (current.stopOnError)
+                    for (let later = index + 1; later < statements.length; later++)
+                        if (statements[later]!.status === 'pending') statements[later] = { ...statements[later]!, status: 'skipped' };
+                const successes = statements.filter(item => item.status === 'succeeded' || item.status === 'truncated').length;
+                const hasPending = statements.some(item => item.status === 'pending');
+                this.scripts.set(scriptId, {
+                    ...current,
+                    status: current.cancelled ? 'cancelled' : hasPending ? 'running' : successes ? 'partial' : 'failed',
+                    statements,
+                });
+                this.persist();
+                if (current.stopOnError) return;
+            }
+        }
+
+        script = this.scripts.get(scriptId);
+        if (!script) return;
+        const successes = script.statements.filter(item => item.status === 'succeeded' || item.status === 'truncated').length;
+        const failed = script.statements.some(item => item.status === 'failed' || item.status === 'timed_out' || item.status === 'interrupted');
+        const status = script.cancelled ? 'cancelled' : failed ? (successes ? 'partial' : 'failed') : 'succeeded';
+        const statements = script.cancelled
+            ? script.statements.map(item => item.status === 'pending' ? { ...item, status: 'skipped' as const } : item)
+            : script.statements;
+        this.scripts.set(scriptId, { ...script, status, statements });
+        this.persist();
     }
 
     private demoSchema(): Schema {
@@ -532,9 +666,28 @@ export class DemoPreviewApi {
         if (pathname === '/scripts' && method === 'POST') {
             if (body.connectionId === PLAYGROUND_CONNECTION_ID)
                 throw new Error('Run one statement at a time on ClickHouse Playground.');
-            const sql = typeof body.sql === 'string' ? body.sql : DEMO_PREVIEW_SQL;
+            const sql = typeof body.sql === 'string' ? body.sql : body.connectionId === CLICKHOUSE_CLOUD_CONNECTION_ID ? '' : DEMO_PREVIEW_SQL;
             const id = crypto.randomUUID();
             const statements = splitSql(sql);
+            if (body.connectionId === CLICKHOUSE_CLOUD_CONNECTION_ID) {
+                if (!getClickHouseCloudConnection())
+                    throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before running a script.', 401);
+                if (!sql.trim() || sql.length > MAX_SCRIPT_SQL_LENGTH)
+                    throw new Error(`Enter a script under ${MAX_SCRIPT_SQL_LENGTH.toLocaleString()} characters.`);
+                if (statements.length === 0 || statements.length > MAX_SCRIPT_STATEMENTS)
+                    throw new Error(`A script must contain 1–${MAX_SCRIPT_STATEMENTS} SQL statements.`);
+                if (Object.keys(record(body.parameters)).length)
+                    throw new Error('Remove query parameters before running a script on ClickHouse Cloud.');
+                const script: Script = {
+                    id, owner, connectionId: CLICKHOUSE_CLOUD_CONNECTION_ID, sql, createdAt: now(),
+                    status: 'running', stopOnError: body.stopOnError !== false, cancelled: false,
+                    statements: statements.map(statement => ({ ...statement, status: 'pending' })),
+                };
+                this.scripts.set(id, script);
+                this.persist();
+                void this.executeCloudScript(id);
+                return script;
+            }
             const items = statements.map(statement => {
                 const run = this.addRun(crypto.randomUUID(), statement.sql, 'query', record(body.parameters) as Record<string, string>);
                 return { ...statement, runId: run.id, status: 'succeeded' as const };
@@ -544,7 +697,19 @@ export class DemoPreviewApi {
             this.persist();
             return script;
         }
-        if (parts[0] === 'scripts' && parts[1]) return this.scripts.get(parts[1]) ?? { id: parts[1], owner, connectionId: 'demo', sql: DEMO_PREVIEW_SQL, createdAt: now(), status: 'succeeded', stopOnError: true, cancelled: false, statements: [] } satisfies Script;
+        if (parts[0] === 'scripts' && parts[1]) {
+            const script = this.scripts.get(parts[1]);
+            if (parts[2] === 'cancel' && method === 'POST') {
+                if (!script) throw new Error('This script is no longer available in this browser.');
+                if (script.connectionId !== CLICKHOUSE_CLOUD_CONNECTION_ID || script.status !== 'running' || script.cancelled)
+                    return script;
+                const stopping = { ...script, cancelled: true };
+                this.scripts.set(script.id, stopping);
+                this.persist();
+                return stopping;
+            }
+            return script ?? { id: parts[1], owner, connectionId: 'demo', sql: DEMO_PREVIEW_SQL, createdAt: now(), status: 'succeeded', stopOnError: true, cancelled: false, statements: [] } satisfies Script;
+        }
 
         if (pathname === '/documents' && method === 'GET') return this.documentsFor(url.searchParams.get('trash') === 'true', url.searchParams.get('connectionId'));
         if (pathname === '/documents' && method === 'POST') return this.saveDocument(body);

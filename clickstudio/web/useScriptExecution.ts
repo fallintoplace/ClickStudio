@@ -4,13 +4,14 @@ import { rememberRunIds } from '../shared/workspace-view';
 import { api, message } from './api';
 import type { Draft } from './workspace-state';
 
-export function useScriptExecution({ scriptId, draftId, updateDraft, setScripts, loadHistory, setError }: {
+export function useScriptExecution({ scriptId, draftId, updateDraft, setScripts, loadHistory, setError, onComplete }: {
     scriptId?: string;
     draftId: string;
     updateDraft: (id: string, change: (draft: Draft) => Draft) => void;
     setScripts: Dispatch<SetStateAction<Record<string, Script>>>;
     loadHistory: () => Promise<void>;
     setError: (error: string) => void;
+    onComplete: (script: Script) => void;
 }) {
     const followRef = useRef<{ scriptId: string; enabled: boolean } | undefined>(undefined);
 
@@ -41,6 +42,7 @@ export function useScriptExecution({ scriptId, draftId, updateDraft, setScripts,
                     finished = true;
                     window.clearInterval(timer);
                     void loadHistory().catch(() => undefined);
+                    onComplete(next);
                 }
             } catch (caught) {
                 if (!closed) setError(message(caught));
@@ -49,7 +51,7 @@ export function useScriptExecution({ scriptId, draftId, updateDraft, setScripts,
         void refresh();
         timer = window.setInterval(() => { void refresh(); }, 900);
         return () => { closed = true; window.clearInterval(timer); };
-    }, [draftId, loadHistory, scriptId, setError, setScripts, updateDraft]);
+    }, [draftId, loadHistory, onComplete, scriptId, setError, setScripts, updateDraft]);
 
     return followRef;
 }

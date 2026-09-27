@@ -56,12 +56,13 @@ function validateCredentials(value: unknown): { credentials: CloudCredentials; u
     return { credentials: { host: endpoint.host, database, username, password }, url: endpoint.toString() };
 }
 
-function makeClient(credentials: CloudCredentials, url: string) {
+function makeClient(credentials: CloudCredentials, url: string, sessionId?: string) {
     return createClient({
         url,
         database: credentials.database,
         username: credentials.username,
         password: credentials.password,
+        ...(sessionId ? { session_id: sessionId } : {}),
         application: 'clickstudio-cloud',
         request_timeout: 50_000,
         max_open_connections: 1,
@@ -182,14 +183,14 @@ function isReadQuery(sql: string) {
     return ['SELECT', 'WITH', 'SHOW', 'DESCRIBE', 'DESC', 'EXPLAIN'].includes(first ?? '');
 }
 
-async function runSql(credentials: CloudCredentials, url: string, sql: string) {
+async function runSql(credentials: CloudCredentials, url: string, sql: string, sessionId?: string) {
     const statement = sql.trim();
     if (!statement || statement.length > MAX_SQL_LENGTH)
         throw new Error(`Enter one SQL statement under ${MAX_SQL_LENGTH.toLocaleString()} characters.`);
     if (splitSql(statement).length !== 1)
         throw new Error('Run one SQL statement at a time on ClickHouse Cloud.');
 
-    const client = makeClient(credentials, url);
+    const client = makeClient(credentials, url, sessionId);
     const queryId = `clickstudio-${randomUUID()}`;
     const startedAt = performance.now();
     try {
@@ -301,7 +302,10 @@ async function post(request: Request): Promise<Response> {
             return json(await readSchema(credentials, url));
         if (body.action === 'run') {
             if (typeof body.sql !== 'string') return fail('SQL_REQUIRED', 'Enter SQL to run.');
-            return json(await runSql(credentials, url, body.sql));
+            const sessionId = body.sessionId;
+            if (sessionId !== undefined && (typeof sessionId !== 'string' || !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(sessionId)))
+                return fail('SESSION_ID', 'The SQL session id is invalid.');
+            return json(await runSql(credentials, url, body.sql, sessionId));
         }
         if (body.action === 'workload') {
             if (!isWorkloadWindow(body.minutes)) return fail('WORKLOAD_WINDOW', 'Choose a supported workload time window.');

@@ -102,7 +102,7 @@ function makeConnection(credentials: CloudCredentials, tested: CloudConnectionTe
             replication: tested.replication,
             documentation: unavailable,
             import: unavailable,
-            scripts: capability(false, 'Run one SQL statement at a time in the hosted Cloud connection.'),
+            scripts: capability(true),
             parameters: unavailable,
         },
     };
@@ -123,9 +123,9 @@ export function disconnectClickHouseCloud() {
     activeCloud = undefined;
 }
 
-export async function runClickHouseCloudSql(sql: string): Promise<CloudQueryResult> {
+export async function runClickHouseCloudSql(sql: string, sessionId?: string): Promise<CloudQueryResult> {
     if (!activeCloud) throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before running SQL.', 401);
-    return await requestCloud<CloudQueryResult>({ action: 'run', credentials: activeCloud.credentials, sql });
+    return await requestCloud<CloudQueryResult>({ action: 'run', credentials: activeCloud.credentials, sql, ...(sessionId ? { sessionId } : {}) });
 }
 
 export async function loadClickHouseCloudSchema(): Promise<Schema> {
