@@ -5,6 +5,7 @@ import type { SqlExample } from '../sql-examples';
 import type { Connected } from '../workspace-types';
 import { GEO_HELP_CITIES, GEO_HELP_EXAMPLE } from '../help-demos';
 import { geoHueForValue } from '../geo-color';
+import { safeStatementCount } from '../workspace-helpers';
 import { MaterializedViewExplorer } from './MaterializedViewExplorer';
 import { MergeTreePartsPanel } from './MergeTreePartsPanel';
 import { MonitoringHelpPreview } from './MonitoringHelpPreview';
@@ -127,6 +128,7 @@ export function WorkspaceHelpPanel({ examples, sourceLabel, copy, locale, open, 
         });
     }, [category, copy, examples, featuredExamples, locale, search]);
     const selected = filteredExamples.find(example => example.id === selectedId) ?? filteredExamples[0];
+    const selectedIsScript = selected ? (safeStatementCount(selected.sql) ?? 0) > 1 : false;
     const availableCategories = helpCategories.filter(value => {
         if (value === 'all') return true;
         if (value === 'featured') return featuredExamples.length > 0;
@@ -390,8 +392,8 @@ export function WorkspaceHelpPanel({ examples, sourceLabel, copy, locale, open, 
                                 <pre><code>{selected.sql}</code></pre>
                                 <div className="sql-example-actions">
                                     <Button variant="secondary" className="sql-example-action" data-testid="open-sql-example" aria-label={copy.openInNewSql} title={copy.openInNewSql} onClick={() => { if (onOpenExample(selected)) onClose(false); }}><Icon name="plus"/>{copy.openExample}</Button>
-                                    <Button variant="primary" className="sql-example-action" data-testid="run-sql-example" onClick={() => { if (onRunExample(selected, 'results')) onClose(false); }}><Icon name="play"/>{copy.run}</Button>
-                                    <Button variant="secondary" className="sql-example-action" data-testid="chart-sql-example" onClick={() => { if (onRunExample(selected, 'chart')) onClose(false); }}><Icon name="chart"/>{copy.chart}</Button>
+                                    <Button variant="primary" className="sql-example-action" data-testid="run-sql-example" onClick={() => { if (onRunExample(selected, 'results')) onClose(false); }}><Icon name="play"/>{selectedIsScript ? copy.runScript : copy.run}</Button>
+                                    {!selectedIsScript && <Button variant="secondary" className="sql-example-action" data-testid="chart-sql-example" onClick={() => { if (onRunExample(selected, 'chart')) onClose(false); }}><Icon name="chart"/>{copy.chart}</Button>}
                                 </div>
                                 </article>}
                             </div>}

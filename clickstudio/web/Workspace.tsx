@@ -60,6 +60,7 @@ import {
     helpStatementSql,
     insertEditorText,
     revealEditorRange,
+    safeStatementCount,
     type FailedQueryError,
 } from './workspace-helpers';
 import { useWorkspaceNotifications, WORKSPACE_TOAST_TIMEOUT_MS } from './useWorkspaceNotifications';
@@ -318,132 +319,127 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         return draft;
     };
 
+    const executeSqlForDraft = (draft: Draft, sql: string, options: {
+        kind?: RunKind;
+        view?: ResultsView;
+        sourceRange?: { from: number; to: number };
+        draftSql?: string;
+        expandResults?: boolean;
+        trackChartRun?: boolean;
+        preview?: boolean;
+    } = {}) => {
+        const kind = options.kind ?? 'query';
+        let statements: ReturnType<typeof splitSql> = [];
+        let parseError: unknown;
+        let parseFailed = false;
+        try { statements = splitSql(sql); }
+        catch (caught) { parseFailed = true; parseError = caught; }
+        const isScript = kind === 'query' && statements.length > 1;
+        const statement = isScript ? undefined : statements[0];
+        const draftSql = options.draftSql ?? draft.sql;
+        const sourceRange = options.sourceRange ?? (sql === draft.sql && statement ? statement : undefined);
+
+        return performExecution(async () => {
+            if (parseFailed) throw parseError;
+            if (!trusted) throw new Error('Review and trust this read only connection before running SQL.');
+            if (isScript && connection.manifest?.scripts.available !== true)
+                throw new Error(connection.manifest?.scripts.reason ?? 'Scripts are unavailable on this connection.');
+            if (kind === 'explain' && connection.manifest?.explain.available === false)
+                throw new Error(connection.manifest.explain.reason ?? 'EXPLAIN is unavailable on this connection.');
+            const explainPlan = connection.manifest?.explainPlan ?? connection.manifest?.explain;
+            if (kind === 'plan' && explainPlan?.available === false)
+                throw new Error(explainPlan.reason ?? 'EXPLAIN PLAN is unavailable on this connection.');
+            const explainPipeline = connection.manifest?.explainPipeline ?? connection.manifest?.pipeline;
+            if (kind === 'pipeline' && explainPipeline?.available === false)
+                throw new Error(explainPipeline.reason ?? 'EXPLAIN PIPELINE is unavailable on this connection.');
+            const explainAnalyze = connection.manifest?.explainAnalyze;
+            if (kind === 'analyze' && explainAnalyze?.available === false)
+                throw new Error(explainAnalyze.reason ?? 'EXPLAIN ANALYZE is unavailable on this connection.');
+            if (statements.length === 0) throw new Error('Write or select a SQL statement before running it.');
+            if (!isScript && statements.length > 1)
+                throw new Error('This action accepts exactly one SQL statement.');
+            if (parameterNames(sql).length && connection.manifest?.parameters.available === false)
+                throw new Error(connection.manifest.parameters.reason ?? 'Query parameters are unavailable on this connection.');
+
+            const payload = {
+                clientRequestId: crypto.randomUUID(), connectionId: connection.id, documentId: draft.serverId,
+                sql: isScript ? sql : statement!.sql, parameters: draft.parameters,
+                parentRunId: draft.parentRunId, kind, limits: { rows: connection.limits.rows || DEFAULT_LIMITS.rows, seconds: connection.limits.seconds || DEFAULT_LIMITS.seconds },
+                tags: { workspace: 'clickstudio', experience },
+                ...(!isScript && sourceRange ? { sourceFrom: sourceRange.from, sourceTo: sourceRange.to } : {}),
+            };
+            clearFailedQueryError(draft.id);
+            const previousResult = draft.id === active.id && run && terminal(run) && resultPage
+                ? { draftId: draft.id, run, page: resultPage, pageIndex: page }
+                : undefined;
+
+            if (isScript) {
+                pendingExecution.start(payload.clientRequestId, draft.id, payload.sql, previousResult);
+                let created: Script;
+                try {
+                    created = await post<Script>('/scripts', { ...payload, stopOnError: true });
+                } catch (caught) {
+                    pendingExecution.clear(payload.clientRequestId);
+                    recordFailedQueryError({ draftId: draft.id, draftSql, statementSql: payload.sql, sourceFrom: 0, error: apiErrorDetail(caught) });
+                    throw caught;
+                }
+                pendingExecution.acceptScript(payload.clientRequestId, created.id);
+                scriptFollowRef.current = { scriptId: created.id, enabled: true };
+                setScripts(current => ({ ...current, [created.id]: created }));
+                const first = created.statements.find(item => item.runId);
+                update(draft.id, current => first?.runId
+                    ? { ...current, activeRunId: first.runId, scriptId: created.id, runIds: rememberRunIds(current.runIds, [first.runId]) }
+                    : { ...current, scriptId: created.id });
+                setPage(0);
+                setView('results');
+                if (options.trackChartRun) setExampleChartRunId(undefined);
+            } else {
+                pendingExecution.start(payload.clientRequestId, draft.id, payload.sql, previousResult);
+                let created: Run;
+                try {
+                    created = await post<Run>('/runs', payload);
+                } catch (caught) {
+                    pendingExecution.clear(payload.clientRequestId);
+                    if (statement) recordFailedQueryError({ draftId: draft.id, draftSql, statementSql: statement.sql, sourceFrom: sourceRange?.from ?? 0, error: apiErrorDetail(caught) });
+                    throw caught;
+                }
+                pendingExecution.acceptRun(payload.clientRequestId, created.id);
+                setRunForRun(created.id, created, true);
+                if (created.status === 'succeeded' && connection.dataSource === 'clickhouse' && connection.readonly === false && isSchemaChangingSql(statement!.sql))
+                    void loadSchema(true);
+                setPage(0);
+                setView(kind === 'explain' ? 'indexes' : kind === 'plan' ? 'plan' : kind === 'pipeline' ? 'pipeline' : kind === 'analyze' ? 'runtime' : options.view ?? 'results');
+                update(draft.id, current => ({ ...current, activeRunId: created.id, scriptId: undefined, runIds: rememberRunIds(current.runIds, [created.id]) }));
+                if (draft.id === active.id) editor.current?.focus();
+                if (options.trackChartRun) setExampleChartRunId(options.view === 'chart' ? created.id : undefined);
+            }
+            if (options.expandResults) setResultsCollapsed(false);
+            if (inspectorRef.current !== 'assistant') setDrawerOpen(false);
+            if (!isFrontendDemoPreview)
+                setNotice(demoMode
+                    ? isScript ? 'Sample results were generated. Script SQL was not sent to ClickHouse.' : options.preview ? 'Sample preview generated. SQL was not sent to ClickHouse.' : 'Sample results were generated. Query SQL was not sent to ClickHouse.'
+                    : isScript ? 'Script submitted to the selected ClickHouse connection.' : options.preview ? 'Table preview submitted to the selected ClickHouse connection.' : 'Query submitted to the selected ClickHouse connection.');
+            void loadHistory().catch(() => undefined);
+        }, isScript ? 'script' : 'run');
+    };
+
     const runExample = (example: SqlExample, output: 'results' | 'chart' | 'map') => {
         if (busy || executionInFlightRef.current) { setError(copy.common.runActionWait); return true; }
         if (!trusted) { setError(copy.common.runActionTrustRequired); return true; }
-
         const draft = createExampleDraft(example);
         if (!openNewDraft(draft)) return true;
-        void performExecution(async () => {
-            const statements = splitSql(draft.sql);
-            if (statements.length !== 1) throw new Error('An example must contain exactly one SQL statement to run directly.');
-            const statement = statements[0]!;
-            const requestId = crypto.randomUUID();
-            clearFailedQueryError(draft.id);
-            pendingExecution.start(requestId, draft.id, statement.sql);
-            let created: Run;
-            try {
-                created = await post<Run>('/runs', {
-                    clientRequestId: requestId, connectionId: connection.id, documentId: draft.serverId,
-                    sql: statement.sql, parameters: draft.parameters, parentRunId: draft.parentRunId, kind: 'query',
-                    limits: { rows: connection.limits.rows || DEFAULT_LIMITS.rows, seconds: connection.limits.seconds || DEFAULT_LIMITS.seconds },
-                    tags: { workspace: 'clickstudio', experience }, sourceFrom: statement.from, sourceTo: statement.to,
-                });
-            } catch (caught) {
-                pendingExecution.clear(requestId);
-                recordFailedQueryError({ draftId: draft.id, draftSql: draft.sql, statementSql: statement.sql, sourceFrom: statement.from, error: apiErrorDetail(caught) });
-                throw caught;
-            }
-            pendingExecution.acceptRun(requestId, created.id);
-            setRunForRun(created.id, created, true);
-            setPage(0);
-            update(draft.id, current => ({ ...current, activeRunId: created.id, scriptId: undefined, runIds: rememberRunIds(current.runIds, [created.id]) }));
-            setView(output);
-            setResultsCollapsed(false);
-            if (inspectorRef.current !== 'assistant') setDrawerOpen(false);
-            setExampleChartRunId(output === 'chart' ? created.id : undefined);
-            if (!isFrontendDemoPreview)
-                setNotice(demoMode
-                    ? 'Sample results were generated. Query SQL was not sent to ClickHouse.'
-                    : 'Query submitted to the selected ClickHouse connection.');
-            void loadHistory().catch(() => undefined);
-        }, 'run');
+        void executeSqlForDraft(draft, draft.sql, { view: output, expandResults: true, trackChartRun: true });
         return true;
     };
 
-    const execute = (wholeScript = false, kind: RunKind = 'query', sqlOverride?: string) => performExecution(async () => {
-        if (!trusted) throw new Error('Review and trust this read only connection before running SQL.');
-        if (wholeScript && connection.manifest?.scripts.available !== true)
-            throw new Error(connection.manifest?.scripts.reason ?? 'Scripts are unavailable on this connection.');
-        if (kind === 'explain' && connection.manifest?.explain.available === false)
-            throw new Error(connection.manifest.explain.reason ?? 'EXPLAIN is unavailable on this connection.');
-        const explainPlan = connection.manifest?.explainPlan ?? connection.manifest?.explain;
-        if (kind === 'plan' && explainPlan?.available === false)
-            throw new Error(explainPlan.reason ?? 'EXPLAIN PLAN is unavailable on this connection.');
-        const explainPipeline = connection.manifest?.explainPipeline ?? connection.manifest?.pipeline;
-        if (kind === 'pipeline' && explainPipeline?.available === false)
-            throw new Error(explainPipeline.reason ?? 'EXPLAIN PIPELINE is unavailable on this connection.');
-        const explainAnalyze = connection.manifest?.explainAnalyze;
-        if (kind === 'analyze' && explainAnalyze?.available === false)
-            throw new Error(explainAnalyze.reason ?? 'EXPLAIN ANALYZE is unavailable on this connection.');
+    const execute = (kind: RunKind = 'query', sqlOverride?: string) => {
         const editorSnapshot = editor.current?.snapshot() ?? { sql: active.sql, from: active.from, to: active.to };
-        const explicitStatements = sqlOverride === undefined ? undefined : splitSql(sqlOverride);
-        if (explicitStatements && !wholeScript && explicitStatements.length !== 1)
-            throw new Error('A directly run query must contain exactly one SQL statement.');
-        if (wholeScript && explicitStatements && explicitStatements.length === 0)
-            throw new Error('Write or select a SQL statement before running it.');
-        const statement = wholeScript ? undefined : explicitStatements?.[0] ?? selectedStatement(editorSnapshot.sql, editorSnapshot.from, editorSnapshot.to);
-        if (!wholeScript && !statement) throw new Error('Write or select a SQL statement before running it.');
-        const executionSql = sqlOverride ?? editorSnapshot.sql;
-        if (parameterNames(executionSql).length && connection.manifest?.parameters.available === false)
-            throw new Error(connection.manifest.parameters.reason ?? 'Query parameters are unavailable on this connection.');
-        const payload = {
-            clientRequestId: crypto.randomUUID(), connectionId: connection.id, documentId: active.serverId,
-            sql: wholeScript ? sqlOverride ?? editorSnapshot.sql : statement!.sql, parameters: active.parameters,
-            parentRunId: active.parentRunId, kind, limits: { rows: connection.limits.rows || DEFAULT_LIMITS.rows, seconds: connection.limits.seconds || DEFAULT_LIMITS.seconds },
-            tags: { workspace: 'clickstudio', experience },
-            ...(wholeScript || sqlOverride !== undefined ? {} : { sourceFrom: statement!.from, sourceTo: statement!.to }),
-        };
-        clearFailedQueryError(active.id);
-        if (wholeScript) {
-            const previousResult = run && terminal(run) && resultPage
-                ? { draftId: active.id, run, page: resultPage, pageIndex: page }
-                : undefined;
-            pendingExecution.start(payload.clientRequestId, active.id, payload.sql, previousResult);
-            let created: Script;
-            try {
-                created = await post<Script>('/scripts', { ...payload, stopOnError: true });
-            } catch (caught) {
-                pendingExecution.clear(payload.clientRequestId);
-                recordFailedQueryError({ draftId: active.id, draftSql: editorSnapshot.sql, statementSql: payload.sql, sourceFrom: 0, error: apiErrorDetail(caught) });
-                throw caught;
-            }
-            pendingExecution.acceptScript(payload.clientRequestId, created.id);
-            scriptFollowRef.current = { scriptId: created.id, enabled: true };
-            setScripts(current => ({ ...current, [created.id]: created }));
-            const first = created.statements.find(item => item.runId);
-            update(active.id, current => first?.runId
-                ? { ...current, activeRunId: first.runId, scriptId: created.id, runIds: rememberRunIds(current.runIds, [first.runId]) }
-                : { ...current, scriptId: created.id });
-            setView('results');
-        } else {
-            const previousResult = run && terminal(run) && resultPage
-                ? { draftId: active.id, run, page: resultPage, pageIndex: page }
-                : undefined;
-            pendingExecution.start(payload.clientRequestId, active.id, payload.sql, previousResult);
-            let created: Run;
-            try {
-                created = await post<Run>('/runs', payload);
-            } catch (caught) {
-                pendingExecution.clear(payload.clientRequestId);
-                if (statement) recordFailedQueryError({ draftId: active.id, draftSql: editorSnapshot.sql, statementSql: statement.sql, sourceFrom: sqlOverride === undefined ? statement.from : 0, error: apiErrorDetail(caught) });
-                throw caught;
-            }
-            pendingExecution.acceptRun(payload.clientRequestId, created.id);
-            setRunForRun(created.id, created, true);
-            if (created.status === 'succeeded' && connection.dataSource === 'clickhouse' && connection.readonly === false && isSchemaChangingSql(statement!.sql))
-                void loadSchema(true);
-            setPage(0); setView(kind === 'explain' ? 'indexes' : kind === 'plan' ? 'plan' : kind === 'pipeline' ? 'pipeline' : kind === 'analyze' ? 'runtime' : 'results');
-            update(active.id, current => ({ ...current, activeRunId: created.id, scriptId: undefined, runIds: rememberRunIds(current.runIds, [created.id]) }));
-            editor.current?.focus();
-        }
-        if (inspectorRef.current !== 'assistant') setDrawerOpen(false);
-        if (!isFrontendDemoPreview)
-            setNotice(demoMode
-                ? wholeScript ? 'Sample results were generated. Script SQL was not sent to ClickHouse.' : 'Sample results were generated. Query SQL was not sent to ClickHouse.'
-                : wholeScript ? 'Script submitted to the selected ClickHouse connection.' : 'Query submitted to the selected ClickHouse connection.');
-        void loadHistory().catch(() => undefined);
-    }, wholeScript ? 'script' : 'run');
+        const selection = editorSnapshot.to > editorSnapshot.from ? editorSnapshot.sql.slice(editorSnapshot.from, editorSnapshot.to) : undefined;
+        const selected = selectedStatement(editorSnapshot.sql, editorSnapshot.from, editorSnapshot.to);
+        const sql = sqlOverride ?? (kind === 'query' ? selection ?? editorSnapshot.sql : selected?.sql ?? '');
+        const sourceRange = sqlOverride === undefined && !selection ? selected : undefined;
+        return executeSqlForDraft(active, sql, { kind, sourceRange, draftSql: editorSnapshot.sql });
+    };
 
     const cancel = async () => {
         if (cancellingRef.current) return;
@@ -687,26 +683,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
             window.requestAnimationFrame(() => editor.current?.focus());
             return;
         }
-        void performExecution(async () => {
-            const statements = splitSql(draft.sql);
-            if (statements.length !== 1) throw new Error('Generated object preview must contain exactly one SQL statement.');
-            const statement = statements[0]!;
-            const created = await post<Run>('/runs', {
-                clientRequestId: crypto.randomUUID(), connectionId: connection.id, documentId: draft.serverId,
-                sql: statement.sql, parameters: draft.parameters, parentRunId: draft.parentRunId, kind: 'query',
-                limits: { rows: connection.limits.rows || DEFAULT_LIMITS.rows, seconds: connection.limits.seconds || DEFAULT_LIMITS.seconds },
-                tags: { workspace: 'clickstudio', experience }, sourceFrom: statement.from, sourceTo: statement.to,
-            });
-            setRunForRun(created.id, created, true);
-            setPage(0);
-            update(draft.id, current => ({ ...current, activeRunId: created.id, scriptId: undefined, runIds: rememberRunIds(current.runIds, [created.id]) }));
-            setView('results');
-            setResultsCollapsed(false);
-            setExampleChartRunId(undefined);
-            if (!isFrontendDemoPreview)
-                setNotice(demoMode ? 'Sample preview generated. SQL was not sent to ClickHouse.' : 'Table preview submitted to the selected ClickHouse connection.');
-            void loadHistory().catch(() => undefined);
-        }, 'run');
+        void executeSqlForDraft(draft, draft.sql, { expandResults: true, trackChartRun: true, preview: true });
     };
     const inspectorProps = {
         copy: copy.common,
@@ -777,9 +754,11 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         onAskAI: (currentSchema?: Schema, serverVersion?: string, database?: string) => void requestAssistantSql(currentSchema, serverVersion, database, includeRun ? signal => loadAssistantRunContext(run, snapshot, signal) : undefined),
         onCancelAssistantRequest: cancelAssistantRequest,
         onDecideProposal: (turnId: string, decision: 'accepted' | 'rejected') => void decideAssistantProposal(turnId, decision),
-        onRunQuery: sql => void execute(false, 'query', sql),
+        onRunQuery: sql => void execute('query', sql),
         runDisabled: sql => {
             if (!trusted || busy) return true;
+            const statementCount = safeStatementCount(sql);
+            if (statementCount !== undefined && statementCount > 1 && connection.manifest?.scripts.available !== true) return true;
             if (connection.manifest?.parameters.available !== false) return false;
             try { return parameterNames(sql).length > 0; } catch { return true; }
         },
@@ -915,7 +894,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
                             }}
                             busy={Boolean(busy)}
                             unsupportedParameters={unsupportedParameters}
-                            onRunExplain={kind => void execute(false, kind)}
+                            onRunExplain={kind => void execute(kind)}
                             comparison={{
                                 connectionId: connection.id,
                                 trusted,

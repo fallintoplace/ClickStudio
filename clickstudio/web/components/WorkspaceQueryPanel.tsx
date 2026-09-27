@@ -44,7 +44,7 @@ export type WorkspaceQueryPanelActions = Readonly<{
     onOpenAssistant: () => void;
     onSave: () => Promise<void>;
     onFormat: (formatter: WorkspaceFormatter) => Promise<void>;
-    onRun: (wholeScript?: boolean, kind?: RunKind, sqlOverride?: string) => Promise<void>;
+    onRun: (kind?: RunKind, sqlOverride?: string) => Promise<void>;
     runActionTitle: (capability: WorkspaceRunCapability | undefined, action: WorkspaceRunCapabilityAction) => string | undefined;
     onConnectionAction: () => Promise<void>;
     onNativeParserStatus: (status: NativeParserStatus) => void;
@@ -105,13 +105,7 @@ export function WorkspaceQueryPanel({
     const runDisabled = !trusted || Boolean(busy) || unsupportedParameters || (runRequiresScript && !connection.manifest?.scripts.available);
     const runTitle = runRequiresScript ? actions.runActionTitle(connection.manifest?.scripts, 'script') : undefined;
     const standardFormatter = nativeParserEnabled && nativeParserStatus === 'ready' ? 'wasm' : 'builtin';
-    const runSql = () => {
-        const snapshot = editorRef.current?.snapshot() ?? active;
-        const selection = snapshot.to > snapshot.from ? snapshot.sql.slice(snapshot.from, snapshot.to) : undefined;
-        const sql = selection ?? snapshot.sql;
-        const count = safeStatementCount(sql);
-        return actions.onRun(count !== undefined && count > 1, 'query', selection);
-    };
+    const runSql = () => actions.onRun('query');
     return <section
         ref={queryPanelRef}
         className={cx('editor-surface', panels.queryCollapsed && 'is-collapsed', queryFloating && 'is-floating', queryMode === 'maximized' && 'is-maximized', activeFloatingPanel === 'query' && queryFloating && 'is-front')}
@@ -189,10 +183,10 @@ export function WorkspaceQueryPanel({
                     <div className="editor-rail-status"><div className="editor-mode-label"><span className="editor-language-dot"/>{copy.common.clickhouseSql}</div><span>{statementCount === undefined ? copy.common.incompleteSql : (statementCount === 1 ? copy.common.oneStatement : copy.common.manyStatements).replace('{count}', String(statementCount))}</span></div>
                     <div className="editor-actions">
                         <RunActionGroup copy={copy.common} runLabel={copy.common.run} runTitle={runTitle} running={busy === 'run' || busy === 'script'} disabled={runDisabled} onRun={() => void runSql()} actions={[
-                            { id: 'explain', label: copy.common.explain, disabled: !trusted || Boolean(busy) || unsupportedParameters || !connection.manifest?.explain.available, title: actions.runActionTitle(connection.manifest?.explain, 'explain'), onSelect: () => void actions.onRun(false, 'explain') },
-                            { id: 'explain-plan', label: copy.common.explainPlan, disabled: !trusted || Boolean(busy) || unsupportedParameters || !(connection.manifest?.explainPlan ?? connection.manifest?.explain)?.available, title: actions.runActionTitle(connection.manifest?.explainPlan ?? connection.manifest?.explain, 'explain-plan'), onSelect: () => void actions.onRun(false, 'plan') },
-                            { id: 'explain-pipeline', label: copy.common.explainPipeline, disabled: !trusted || Boolean(busy) || unsupportedParameters || !(connection.manifest?.explainPipeline ?? connection.manifest?.pipeline)?.available, title: actions.runActionTitle(connection.manifest?.explainPipeline ?? connection.manifest?.pipeline, 'explain-pipeline'), onSelect: () => void actions.onRun(false, 'pipeline') },
-                            { id: 'explain-analyze', label: copy.common.explainAnalyze, disabled: !trusted || Boolean(busy) || unsupportedParameters || !connection.manifest?.explainAnalyze?.available, title: actions.runActionTitle(connection.manifest?.explainAnalyze, 'explain-analyze'), onSelect: () => void actions.onRun(false, 'analyze') },
+                            { id: 'explain', label: copy.common.explain, disabled: !trusted || Boolean(busy) || unsupportedParameters || !connection.manifest?.explain.available, title: actions.runActionTitle(connection.manifest?.explain, 'explain'), onSelect: () => void actions.onRun('explain') },
+                            { id: 'explain-plan', label: copy.common.explainPlan, disabled: !trusted || Boolean(busy) || unsupportedParameters || !(connection.manifest?.explainPlan ?? connection.manifest?.explain)?.available, title: actions.runActionTitle(connection.manifest?.explainPlan ?? connection.manifest?.explain, 'explain-plan'), onSelect: () => void actions.onRun('plan') },
+                            { id: 'explain-pipeline', label: copy.common.explainPipeline, disabled: !trusted || Boolean(busy) || unsupportedParameters || !(connection.manifest?.explainPipeline ?? connection.manifest?.pipeline)?.available, title: actions.runActionTitle(connection.manifest?.explainPipeline ?? connection.manifest?.pipeline, 'explain-pipeline'), onSelect: () => void actions.onRun('pipeline') },
+                            { id: 'explain-analyze', label: copy.common.explainAnalyze, disabled: !trusted || Boolean(busy) || unsupportedParameters || !connection.manifest?.explainAnalyze?.available, title: actions.runActionTitle(connection.manifest?.explainAnalyze, 'explain-analyze'), onSelect: () => void actions.onRun('analyze') },
                         ]}/>
                     </div>
                 </aside>}
