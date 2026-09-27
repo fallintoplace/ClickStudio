@@ -174,7 +174,10 @@ export function WorkspaceQueryPanel({
                 <Button variant="secondary" className="save-revision-button" data-testid="save-query" aria-label={copy.common.saveRevision} onClick={() => void actions.onSave()} disabled={Boolean(busy)}><Icon name="documents"/>{copy.common.save}</Button>
             </div>}
             <div className="editor-heading-actions">
-                {experience === 'beginner' && <Button variant="primary" className="run-query-button compact-run-button" data-testid="run-statement" aria-label={copy.common.runStatement} onClick={() => void actions.onRun()} disabled={!trusted || Boolean(busy) || unsupportedParameters}><Icon name="play"/>{busy === 'run' || busy === 'script' ? copy.common.running : copy.common.run}</Button>}
+                {experience === 'beginner' && <>
+                    <Button variant="ghost" className="sql-ai-button" data-testid="open-ai" aria-label={copy.common.askAi} aria-pressed={inspector === 'assistant'} onClick={actions.onOpenAssistant}><Icon name="assistant"/>{copy.common.askAi}</Button>
+                    <Button variant="primary" className="run-query-button compact-run-button" data-testid="run-statement" aria-label={copy.common.runStatement} onClick={() => void actions.onRun()} disabled={!trusted || Boolean(busy) || unsupportedParameters}><Icon name="play"/>{busy === 'run' || busy === 'script' ? copy.common.running : copy.common.run}</Button>
+                </>}
                 {experience === 'expert' && <>
                     {nativeParserEnabled && nativeParserStatus === 'unavailable' && <>
                         <span className="toolbar-small" role="status" title="Formatting remains available while the native parser is unavailable.">{copy.common.parserUnavailable}</span>
