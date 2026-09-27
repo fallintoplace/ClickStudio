@@ -81,10 +81,10 @@
     .workspace-root.is-expert .workspace-layout { grid-template-columns: minmax(280px, 310px) minmax(0, 1fr); }
     .workspace-root.is-expert .icon-rail { display: none; }
     .workspace-root.is-expert .workspace-main { grid-column: 2; grid-row: 1; }
-    .workspace-root.is-expert .inspector-pane:not(.is-drawer) { grid-column: 1; grid-row: 1; border-right: 1px solid var(--line); border-left: 0; }
-    .workspace-layout.has-assistant-dock { grid-template-columns: 58px minmax(0, 1fr) minmax(320px, min(36vw, 460px)); }
-    .workspace-layout.has-assistant-dock > .workspace-main { grid-column: 2; grid-row: 1; }
-    .workspace-layout.has-assistant-dock > .inspector-pane.is-docked-assistant { grid-column: 3; grid-row: 1; border-left: 1px solid var(--line-bright); }
+    .workspace-root.is-expert .inspector-pane { grid-column: 1; grid-row: 1; border-right: 1px solid var(--line); border-left: 0; }
+    .workspace-root.has-inspector-dock .workspace-layout { grid-template-columns: 58px minmax(0, 1fr) minmax(320px, min(36vw, 460px)); }
+    .workspace-root.has-inspector-dock .workspace-layout > .workspace-main { grid-column: 2; grid-row: 1; }
+    .workspace-root.has-inspector-dock .workspace-layout > .inspector-pane.is-docked-inspector { grid-column: 3; grid-row: 1; border-left: 1px solid var(--line-bright); }
     .icon-rail { z-index: var(--z-app-chrome); display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 14px 7px; border-right: 1px solid var(--line); background: color-mix(in srgb, var(--page-raised) 74%, transparent); }
     .rail-separator { width: 24px; height: 1px; flex: none; margin: 3px 0 5px; background: var(--line); }
     .rail-icon-button { position: relative; display: grid; width: 39px; height: 39px; flex: none; place-items: center; border: 1px solid transparent; border-radius: 11px; background: transparent; color: var(--muted); cursor: pointer; transition: transform .2s ease, background .2s ease, color .2s ease, border .2s ease; }

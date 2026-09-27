@@ -1,6 +1,6 @@
 @layer components {
     .inspector-pane { display: flex; min-width: 0; min-height: 0; flex-direction: column; overflow: hidden; border-left: 1px solid var(--line); background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 90%, var(--page)), var(--page-raised)); animation: inspectorReveal .35s cubic-bezier(.2,.7,.2,1) both; }
-    .inspector-pane.is-expert-browser.is-browser-tab-selected:not(.is-drawer) > .inspector-header { display: none; }
+    .inspector-pane.is-expert-browser.is-browser-tab-selected > .inspector-header { display: none; }
     .inspector-header { display: flex; min-height: 66px; flex: none; align-items: center; justify-content: space-between; gap: 8px; padding: 11px 16px; border-bottom: 1px solid var(--line); background: var(--panel-header); }
     .inspector-header h2 { margin: 3px 0 0; font-family: var(--font-display); font-size: 15px; font-weight: 680; letter-spacing: -.025em; }
     .inspector-tabs { display: flex; flex: none; gap: 5px; padding: 8px 13px; border-bottom: 1px solid var(--line); background: var(--control-well); }
@@ -8,7 +8,8 @@
     .inspector-tabs button svg { width: 15px; height: 15px; }
     .inspector-tabs button:hover { background: var(--control-hover); color: var(--text); }
     .inspector-tabs button[aria-pressed="true"] { border-color: var(--active-border); background: var(--active-surface); color: var(--accent); box-shadow: var(--active-inset); }
-    .inspector-tabs.is-browser-tabs { align-items: center; gap: 4px; padding: 8px 10px; }
+    .inspector-tabs.is-browser-tabs > button.is-assistant-tab[aria-pressed="true"] { border-color: color-mix(in srgb, var(--violet) 36%, var(--line)); background: color-mix(in srgb, var(--violet) 10%, var(--panel)); color: var(--violet); box-shadow: inset 0 0 18px color-mix(in srgb, var(--violet) 3%, transparent); }
+    .inspector-tabs.is-browser-tabs { container-type: inline-size; align-items: center; gap: 4px; padding: 8px 10px; }
     .inspector-tabs.is-browser-tabs > button { display: flex; width: auto; min-width: 0; min-height: 34px; flex: 1; align-items: center; justify-content: center; gap: 7px; padding: 0 8px; font-size: 9px; font-weight: 620; }
     .inspector-tabs.is-browser-tabs > button svg { width: 18px; height: 18px; flex: none; }
     .inspector-more { position: relative; flex: none; }
@@ -20,6 +21,10 @@
     .inspector-tabs.is-browser-tabs .inspector-more-menu button:hover { background: var(--panel-hover); color: var(--text); }
     .inspector-tabs.is-browser-tabs .inspector-more-menu button[aria-pressed="true"] { color: var(--accent); }
     .inspector-tabs.is-browser-tabs .inspector-more-menu button svg { width: 14px; height: 14px; }
+    @container (max-width: 340px) {
+        .inspector-tabs.is-browser-tabs > button span { display: none; }
+        .inspector-tabs.is-browser-tabs > button { gap: 4px; padding-inline: 4px; }
+    }
     .inspector-content { min-height: 0; flex: 1; overflow: auto; background: color-mix(in srgb, var(--page) 70%, transparent); }
     .inspector-content.is-assistant-content { display: flex; overflow: hidden; }
     .inspector-section { display: grid; align-content: start; gap: 10px; padding: 14px; }
@@ -317,8 +322,6 @@
     .inspector-footer-meta { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 7px; }
     .inspector-footer-meta > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .inspector-footer-meta i { color: var(--line-bright); font-style: normal; }
-    .is-drawer { position: fixed; z-index: var(--z-drawer); top: 68px; right: 0; bottom: 0; width: min(460px, calc(100vw - 44px)); border-left: 1px solid var(--line-bright); background: color-mix(in srgb, var(--panel) 92%, transparent); box-shadow: var(--shadow); backdrop-filter: blur(24px); }
-    .drawer-backdrop { position: fixed; z-index: var(--z-overlay-backdrop); inset: 68px 0 0; border: 0; background: #0008; animation: fadeIn .18s ease both; backdrop-filter: blur(2px); }
     .execution-bar { position: relative; z-index: var(--z-execution-bar); display: flex; min-height: 43px; flex: none; align-items: center; justify-content: space-between; gap: 18px; overflow: hidden; padding: 5px 17px; border-top: 1px solid var(--line-bright); background: var(--surface-glass); box-shadow: 0 -10px 28px #0002; }
     .execution-bar.is-running { border-top-color: color-mix(in srgb, var(--accent) 37%, var(--line)); }
     .help-button { display: inline-flex; min-height: 27px; flex: none; align-items: center; justify-content: center; gap: 6px; padding: 0 8px; border: 1px solid var(--active-border); border-radius: var(--radius-compact); background: transparent; color: var(--text); font-size: 9px; font-weight: 700; white-space: nowrap; cursor: pointer; animation: helpBeacon 2.5s ease-in-out infinite; transition: border-color .16s ease, background .16s ease, color .16s ease; }
@@ -380,7 +383,6 @@
     .empty-connection h1 { margin: 0; color: var(--text); font-size: 23px; }
     .empty-connection p { font-size: 10px; }
     .animate-enter { animation: enter .28s cubic-bezier(.2,.75,.2,1) both; }
-    .animate-drawer { animation: drawerIn .24s cubic-bezier(.2,.8,.2,1) both; }
     .mt-2 { margin-top: .5rem; }
     .mt-4 { margin-top: 1rem; }
     .mt-8 { margin-top: 2rem; }

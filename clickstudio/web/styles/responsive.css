@@ -1,6 +1,5 @@
 
 @keyframes enter { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes drawerIn { from { opacity: .6; transform: translateX(18px); } to { opacity: 1; transform: translateX(0); } }
 @keyframes inspectorReveal { from { opacity: .7; transform: translateX(7px); } to { opacity: 1; transform: translateX(0); } }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -86,7 +85,7 @@
     .icon-rail { padding: 10px 3px; }
     .rail-icon-button { width: 35px; height: 35px; }
     .workspace-root.is-expert .icon-rail { display: flex; }
-    .workspace-root.is-expert .inspector-pane:not(.is-drawer) { display: none; }
+    .workspace-root.is-expert .inspector-pane { display: none; }
     .workspace-content { padding: 7px; gap: 7px; }
     .workspace-content.has-run { grid-template-rows: minmax(260px, 1fr) minmax(225px, .9fr); }
     .beginner-workspace-content { grid-template-rows: minmax(320px, 1fr) minmax(170px, .7fr); }
@@ -108,23 +107,20 @@
     .results-title, .results-actions { gap: 6px; }
     .results-mark { display: none; }
     .results-tabs button { padding: 7px 6px; font-size: 8px; }
-    .is-drawer { top: 60px; }
-    .drawer-backdrop { top: 60px; }
-    .workspace-root.has-assistant-dock .workspace-layout { grid-template-columns: 44px minmax(0, 1fr) minmax(275px, min(38vw, 360px)); }
-    .workspace-root.has-assistant-dock .workspace-layout > .icon-rail { grid-column: 1; grid-row: 1; }
-    .workspace-root.has-assistant-dock .workspace-layout > .workspace-main { grid-column: 2; grid-row: 1; }
-    .workspace-root.has-assistant-dock .workspace-layout > .inspector-pane.is-docked-assistant { display: flex; grid-column: 3; grid-row: 1; }
+    .workspace-root.has-inspector-dock .workspace-layout { grid-template-columns: 44px minmax(0, 1fr) minmax(275px, min(38vw, 360px)); }
+    .workspace-root.has-inspector-dock .workspace-layout > .icon-rail { grid-column: 1; grid-row: 1; }
+    .workspace-root.has-inspector-dock .workspace-layout > .workspace-main { grid-column: 2; grid-row: 1; }
+    .workspace-root.has-inspector-dock .workspace-layout > .inspector-pane.is-docked-inspector { display: flex; grid-column: 3; grid-row: 1; }
 }
 
 @media (max-width: 720px) {
-    .workspace-root.has-assistant-dock .workspace-layout { grid-template-columns: 44px minmax(0, 1fr); grid-template-rows: minmax(520px, 1fr) minmax(300px, 40vh); }
-    .workspace-root.has-assistant-dock .workspace-layout > .icon-rail { grid-column: 1; grid-row: 1 / span 2; }
-    .workspace-root.has-assistant-dock .workspace-layout > .workspace-main { grid-column: 2; grid-row: 1; }
-    .workspace-root.has-assistant-dock .workspace-layout > .inspector-pane.is-docked-assistant { grid-column: 2; grid-row: 2; min-height: 300px; border-top: 1px solid var(--line-bright); border-left: 0; }
+    .workspace-root.has-inspector-dock .workspace-layout { grid-template-columns: 44px minmax(0, 1fr); grid-template-rows: minmax(520px, 1fr) minmax(300px, 40vh); }
+    .workspace-root.has-inspector-dock .workspace-layout > .icon-rail { grid-column: 1; grid-row: 1 / span 2; }
+    .workspace-root.has-inspector-dock .workspace-layout > .workspace-main { grid-column: 2; grid-row: 1; }
+    .workspace-root.has-inspector-dock .workspace-layout > .inspector-pane.is-docked-inspector { grid-column: 2; grid-row: 2; min-height: 300px; border-top: 1px solid var(--line-bright); border-left: 0; }
 }
 
 @media (max-width: 560px) {
-    .is-drawer { width: calc(100vw - 12px); }
     .new-tab-labeled { gap: 4px; padding-inline: 7px; font-size: 9px; }
     .help-button { width: 29px; min-height: 29px; padding: 0; }
     .help-button span { display: none; }
