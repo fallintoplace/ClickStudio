@@ -126,6 +126,8 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
     const [queryCollapsed, setQueryCollapsed] = useState(false);
     const [resultsCollapsed, setResultsCollapsed] = useState(false);
     const [inspector, setInspector] = useState<Inspector>('schema');
+    const inspectorRef = useRef(inspector);
+    inspectorRef.current = inspector;
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [compactViewport, setCompactViewport] = useState(() => window.matchMedia('(max-width: 850px)').matches);
     const [importOpen, setImportOpen] = useState(false);
@@ -302,7 +304,8 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         executionFailureRef.current = true;
         storeFailedQueryError(failure);
         if (workspaceRef.current.activeId !== failure.draftId) return;
-        setView('results'); setResultsCollapsed(false); setDrawerOpen(false);
+        setView('results'); setResultsCollapsed(false);
+        if (inspectorRef.current !== 'assistant') setDrawerOpen(false);
     };
 
     const createExampleDraft = (example: SqlExample) => {
@@ -346,7 +349,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
             update(draft.id, current => ({ ...current, activeRunId: created.id, scriptId: undefined, runIds: rememberRunIds(current.runIds, [created.id]) }));
             setView(output);
             setResultsCollapsed(false);
-            setDrawerOpen(false);
+            if (inspectorRef.current !== 'assistant') setDrawerOpen(false);
             setExampleChartRunId(output === 'chart' ? created.id : undefined);
             if (!isFrontendDemoPreview)
                 setNotice(demoMode
@@ -433,7 +436,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
             update(active.id, current => ({ ...current, activeRunId: created.id, scriptId: undefined, runIds: rememberRunIds(current.runIds, [created.id]) }));
             editor.current?.focus();
         }
-        setDrawerOpen(false);
+        if (inspectorRef.current !== 'assistant') setDrawerOpen(false);
         if (!isFrontendDemoPreview)
             setNotice(demoMode
                 ? wholeScript ? 'Sample results were generated. Script SQL was not sent to ClickHouse.' : 'Sample results were generated. Query SQL was not sent to ClickHouse.'

@@ -302,8 +302,8 @@ test('A failed query stays in Results beside the previous success until retry', 
         await expect(failure).toContainText('SYNTAX_ERROR');
         await expect(failure).toContainText('Syntax error at position 15');
         await expect(failure.locator('pre.result-execution-sql')).toHaveText(submittedSql);
-        await expect(results.locator('.result-provenance')).toContainText('Previous result');
-        await expect(results.locator('.result-provenance')).toContainText('Latest attempt failed');
+        await expect(results.locator('.result-provenance-header')).toContainText('Previous result');
+        await expect(results.locator('.result-provenance-header')).toContainText('Latest attempt failed');
         await expect(results.getByRole('table', { name: 'Retained query rows' })).toBeVisible();
         await expect(page.locator('.execution-bar')).toHaveAttribute('data-run-status', 'failed');
         await expect(page.locator('.execution-bar code')).toHaveCount(0);

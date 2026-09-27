@@ -90,6 +90,40 @@ test('Standard exposes assignment actions and can run a query without opening AI
     await expect(page.locator('.parser-switch')).toHaveCount(0);
 });
 
+test('Standard keeps AI open after successful and failed query runs', async ({ page }) => {
+    await beginInCompactMode(page);
+    await page.getByTestId('open-ai').click();
+
+    const assistant = page.locator('.assistant-panel');
+    const question = page.getByRole('textbox', { name: 'Ask AI', exact: true });
+    const runButton = page.getByTestId('run-button');
+    const results = page.getByRole('region', { name: 'Query results', exact: true });
+    await expect(assistant).toBeVisible();
+    await expect(runButton).toBeEnabled();
+    await question.fill('Keep the AI panel open');
+
+    await runButton.click();
+    await expect(results.getByRole('table', { name: 'Retained query rows', exact: true })).toBeVisible();
+    await expect(assistant).toBeVisible();
+    await expect(question).toHaveValue('Keep the AI panel open');
+
+    const runRoute = (url: URL) => url.pathname === '/api/runs';
+    await page.route(runRoute, async route => {
+        if (route.request().method() !== 'POST') return route.continue();
+        await route.fulfill({ status: 400, json: { error: { code: 'SYNTAX_ERROR', message: 'Syntax error at position 15', position: 15 } } });
+    });
+
+    try {
+        await replaceSql(page, 'SELECT * FROM missing_table');
+        await runButton.click();
+        await expect(results.getByTestId('query-failure')).toContainText('SYNTAX_ERROR');
+        await expect(assistant).toBeVisible();
+        await expect(question).toHaveValue('Keep the AI panel open');
+    } finally {
+        await page.unroute(runRoute);
+    }
+});
+
 test('Standard shows a single document tab and keeps tabs for multiple queries', async ({ page }) => {
     await beginInCompactMode(page);
     await expect(page.locator('.document-tabs.is-compact-single')).toBeVisible();
