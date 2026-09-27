@@ -808,11 +808,17 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
                 <span className="rail-separator"/>
                 <RailButton icon="schema" label={copy.common.objects} active={inspector === 'schema' && drawerOpen} onClick={() => showInspector('schema')}/>
                 <RailButton icon="reference" label={copy.common.reference} active={inspector === 'reference' && drawerOpen} onClick={() => showInspector('reference')}/>
+                {experience === 'beginner' && <>
+                    <span className="rail-spacer"/>
+                    <span className="rail-separator"/>
+                    <RailButton icon="importFile" label={copy.common.import} onClick={() => setImportOpen(true)}/>
+                    <RailButton icon="exportFile" label={copy.common.export} disabled={run?.resultState !== 'reopenable'} onClick={() => void exportCurrentCsv()}/>
+                </>}
                 {experience === 'expert' && <>
                     <RailButton icon="history" label={copy.common.history} active={inspector === 'history' && drawerOpen} onClick={() => showInspector('history')}/>
                     <RailButton icon="documents" label={copy.common.queries} active={inspector === 'documents' && drawerOpen} onClick={() => showInspector('documents')}/>
                 </>}
-                <span className="rail-spacer"/>
+                {experience === 'expert' && <span className="rail-spacer"/>}
                 {experience === 'expert' && <RailButton icon="assistant" label={copy.common.assistant} accent active={inspector === 'assistant'} onClick={() => showInspector('assistant')}/>}
                 {experience === 'expert' && <><RailButton icon="details" label="Run details" active={inspector === 'details'} onClick={() => showInspector('details')}/><RailButton icon="pipeline" label="Pipeline" active={inspector === 'pipeline'} onClick={() => showInspector('pipeline')}/></>}
                 {experience === 'expert' && <RailButton icon="parser" label="Parser" active={inspector === 'parser'} onClick={() => showInspector('parser')}/>}

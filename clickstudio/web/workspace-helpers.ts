@@ -58,7 +58,7 @@ export type FailedQueryError = {
 };
 
 export function resultsViews(run: Run | undefined, experience: ExperienceLevel): readonly ResultsView[] {
-    if (experience === 'beginner') return ['results'];
+    if (experience === 'beginner') return run?.kind === 'query' ? ['results', 'chart'] : ['results'];
     if (run?.kind === 'explain') return ['results', 'indexes'];
     if (run?.kind === 'plan') return ['results', 'plan'];
     if (run?.kind === 'pipeline') return ['results', 'pipeline'];

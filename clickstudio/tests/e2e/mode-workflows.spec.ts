@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { jsonRecord, openBlankSql, openWorkspacePanel, runIdentity, trust, trustCurrentConnection, useAdvancedMode } from './helpers.js';
+import { jsonRecord, openBlankSql, openWorkspacePanel, replaceSql, runIdentity, runScript, trust, trustCurrentConnection, useAdvancedMode } from './helpers.js';
 
 const generatedSql = 'SELECT day, events FROM demo.events ORDER BY day';
 
@@ -7,7 +7,9 @@ async function beginInCompactMode(page: Page) {
     await page.addInitScript(() => localStorage.setItem('clickstudio:experience', 'beginner'));
     await page.goto('/');
     await expect(page.getByRole('textbox', { name: 'SQL editor', exact: true })).toBeVisible();
-    await expect(page.getByTestId('open-ai')).toHaveCount(0);
+    await expect(page.getByTestId('open-ai')).toBeVisible();
+    await expect(page.getByTestId('format-sql')).toBeVisible();
+    await expect(page.getByTestId('run-action-script')).toBeVisible();
     await expect(page.getByTestId('save-query')).toHaveCount(0);
     await expect(page.locator('.draft-status')).toHaveCount(0);
     await expect(page.locator('.restore-sql-trigger')).toHaveCount(0);
@@ -29,7 +31,7 @@ async function beginInCompactMode(page: Page) {
     await trustCurrentConnection(page);
 }
 
-test('Standard opens on SQL and can run a query without opening AI', async ({ page }) => {
+test('Standard exposes assignment actions and can run a query without opening AI', async ({ page }) => {
     let contextRequests = 0;
     page.on('request', request => {
         if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/assistant/context') contextRequests++;
@@ -41,7 +43,12 @@ test('Standard opens on SQL and can run a query without opening AI', async ({ pa
     const editor = page.getByRole('textbox', { name: 'SQL editor', exact: true });
     await expect(editor).toBeVisible();
     await expect(editor).toContainText('SELECT');
-    await expect(page.getByTestId('open-ai')).toHaveCount(0);
+    await expect(page.getByTestId('open-ai')).toBeVisible();
+    await expect(page.getByTestId('format-sql')).toBeVisible();
+    await expect(page.getByTestId('run-action-script')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Import', exact: true })).toBeVisible();
+    const exportButton = page.getByRole('button', { name: 'Export', exact: true });
+    await expect(exportButton).toBeDisabled();
     await expect(page.locator('.editor-control-rail')).toHaveCount(0);
     await expect(page.getByRole('textbox', { name: 'Describe your data question', exact: true })).toHaveCount(0);
 
@@ -53,7 +60,14 @@ test('Standard opens on SQL and can run a query without opening AI', async ({ pa
     await runQuery.click();
     const results = page.getByRole('region', { name: 'Query results', exact: true });
     await expect(results.getByRole('table', { name: 'Retained query rows', exact: true })).toBeVisible();
-    await expect(results.locator('.results-tabs')).toHaveCount(0);
+    await expect(results.getByRole('tab', { name: 'Results', exact: true })).toBeVisible();
+    await expect(results.getByRole('tab', { name: 'Chart', exact: true })).toBeVisible();
+    await results.getByRole('tab', { name: 'Chart', exact: true }).click();
+    await expect(results.locator('.chart-workspace, .chart-table-fallback')).toBeVisible();
+    await results.getByRole('tab', { name: 'Results', exact: true }).click();
+    await expect(exportButton).toBeEnabled();
+    const [download] = await Promise.all([page.waitForEvent('download'), exportButton.click()]);
+    expect(download.suggestedFilename()).toMatch(/\.csv$/);
     await expect(page.getByRole('status').filter({ hasText: 'Sample results were generated. Query SQL was not sent to ClickHouse.' })).toBeVisible();
     expect(contextRequests).toBe(0);
     await expect(results.getByRole('tab', { name: 'Insights', exact: true })).toHaveCount(0);
@@ -66,13 +80,14 @@ test('Standard opens on SQL and can run a query without opening AI', async ({ pa
     await expect(page.getByTestId('save-query')).toBeVisible();
     await expect(page.locator('.editor-control-rail')).toBeVisible();
     await expect(page.locator('.parser-switch')).toBeVisible();
-    await expect(results.locator('.results-tabs')).toBeVisible();
+    await expect(results.getByRole('tab', { name: 'Chart', exact: true })).toBeVisible();
+    await expect(results.getByRole('tab', { name: 'Insights', exact: true })).toBeVisible();
     await expect(page.getByRole('tablist', { name: 'SQL documents', exact: true }).getByRole('tab')).toHaveCount(1);
     await page.getByText('Standard', { exact: true }).click();
     await expect(page.locator('.execution-bar code')).toHaveText(queryId);
     await expect(results.getByRole('table', { name: 'Retained query rows', exact: true })).toBeVisible();
-    await expect(results.locator('.results-tabs')).toHaveCount(0);
-    await expect(page.getByTestId('open-ai')).toHaveCount(0);
+    await expect(results.getByRole('tab', { name: 'Chart', exact: true })).toBeVisible();
+    await expect(page.getByTestId('open-ai')).toBeVisible();
     await expect(page.locator('.parser-switch')).toHaveCount(0);
 });
 
@@ -158,13 +173,41 @@ test('Switching to Experimental keeps the same AI question, query and run eviden
     await expect(page.locator('.cm-content')).toContainText(generatedSql);
     await expect(page.locator('.execution-bar code')).toHaveText(queryId);
     await page.getByText('Standard', { exact: true }).click();
-    await expect(page.getByTestId('open-ai')).toHaveCount(0);
-    await expect(results.locator('.results-tabs')).toHaveCount(0);
+    await expect(page.getByTestId('open-ai')).toBeVisible();
+    await expect(results.getByRole('tab', { name: 'Chart', exact: true })).toBeVisible();
+    await expect(results.getByRole('tab', { name: 'Insights', exact: true })).toHaveCount(0);
     await expect(results.getByRole('table', { name: 'Retained query rows', exact: true })).toBeVisible();
     await expect(page.locator('.execution-bar code')).toHaveText(queryId);
     await useAdvancedMode(page);
     await expect(prompt).toHaveValue('Show event counts by day');
     await expect(results.getByRole('tab', { name: 'Insights', exact: true })).toHaveAttribute('aria-selected', 'true');
+});
+
+test('Standard can run a script and open its statement results', async ({ page }) => {
+    await beginInCompactMode(page);
+    await replaceSql(page, 'SELECT 1; SELECT 2;');
+    await expect(page.getByTestId('run-action-script')).toBeEnabled();
+    await runScript(page);
+
+    const results = page.getByRole('region', { name: 'Query results', exact: true });
+    const first = results.getByRole('button', { name: 'Statement 1: succeeded', exact: true });
+    const second = results.getByRole('button', { name: 'Statement 2: succeeded', exact: true });
+    await expect(first).toBeVisible();
+    await expect(second).toBeVisible();
+    await first.click();
+    await expect(results.getByRole('table', { name: 'Retained query rows', exact: true })).toBeVisible();
+});
+
+test('Standard import opens from the left rail and formatting is available in the editor', async ({ page }) => {
+    await beginInCompactMode(page);
+    await page.getByRole('button', { name: 'Import', exact: true }).click();
+    const importDialog = page.getByRole('dialog', { name: 'Import data', exact: true });
+    await expect(importDialog).toBeVisible();
+    await importDialog.getByRole('button', { name: 'Close import wizard', exact: true }).click();
+
+    await replaceSql(page, 'select 1 as value');
+    await page.getByTestId('format-sql').click();
+    await expect(page.locator('.cm-content')).toContainText('SELECT');
 });
 
 test('Experimental editor, insights, pipeline and AI copilot stay read-only until a user runs SQL', async ({ page }) => {

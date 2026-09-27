@@ -20,6 +20,15 @@ export async function openBlankSql(page: Page) {
     await page.getByTestId('blank-sql').click();
 }
 
+export async function replaceSql(page: Page, sql: string) {
+    const editor = page.locator('.cm-content');
+    await editor.focus();
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.insertText(sql);
+    await expect.poll(async () => (await editor.innerText()).replace(/\s/g, ''))
+        .toContain(sql.replace(/\s/g, ''));
+}
+
 type WorkspacePanel = 'history' | 'parser' | 'pipeline';
 
 export async function openWorkspacePanel(page: Page, panel: WorkspacePanel) {

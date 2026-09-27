@@ -176,7 +176,9 @@ export function WorkspaceQueryPanel({
             <div className="editor-heading-actions">
                 {experience === 'beginner' && <>
                     <Button variant="ghost" className="sql-ai-button" data-testid="open-ai" aria-label={copy.common.askAi} aria-pressed={inspector === 'assistant'} onClick={actions.onOpenAssistant}><Icon name="assistant"/>{copy.common.askAi}</Button>
+                    <Button variant="ghost" className="toolbar-small standard-format-button" data-testid="format-sql" aria-label={copy.common.formatSql} title={copy.common.formatSql} onClick={() => void actions.onFormat('builtin')}>{copy.common.format}</Button>
                     <Button variant="primary" className="run-query-button compact-run-button" data-testid="run-statement" aria-label={copy.common.runStatement} onClick={() => void actions.onRun()} disabled={!trusted || Boolean(busy) || unsupportedParameters}><Icon name="play"/>{busy === 'run' || busy === 'script' ? copy.common.running : copy.common.run}</Button>
+                    <Button variant="secondary" className="toolbar-small standard-run-script-button" data-testid="run-action-script" aria-label={copy.common.runScript} title={actions.runActionTitle(connection.manifest?.scripts, 'script')} onClick={() => void actions.onRun(true)} disabled={!trusted || Boolean(busy) || unsupportedParameters || !connection.manifest?.scripts.available}>{copy.common.runScript}</Button>
                 </>}
                 {experience === 'expert' && <>
                     {nativeParserEnabled && nativeParserStatus === 'unavailable' && <>

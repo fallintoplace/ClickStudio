@@ -115,8 +115,8 @@ export function RunActionGroup({ runLabel, running, disabled, onRun, actions, co
     </div>;
 }
 
-export function RailButton({ icon, label, active, accent, onClick }: { icon: IconName; label: string; active?: boolean; accent?: boolean; onClick: () => void }) {
-    return <button className={cx('rail-icon-button', active && 'is-active', accent && 'is-accent')} type="button" title={label} aria-label={label} aria-pressed={active} onClick={onClick}><Icon name={icon}/><span className="rail-tooltip">{label}</span></button>;
+export function RailButton({ icon, label, active, accent, disabled, onClick }: { icon: IconName; label: string; active?: boolean; accent?: boolean; disabled?: boolean; onClick: () => void }) {
+    return <button className={cx('rail-icon-button', active && 'is-active', accent && 'is-accent')} type="button" title={label} aria-label={label} aria-pressed={active} disabled={disabled} onClick={onClick}><Icon name={icon}/><span className="rail-tooltip">{label}</span></button>;
 }
 
 export function EmptyWorkspace({ onRun, beginner }: { onRun: () => void; beginner: boolean }) {

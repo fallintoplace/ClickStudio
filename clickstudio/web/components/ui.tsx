@@ -40,6 +40,8 @@ const iconPaths = {
     restore: <><rect x="5" y="7" width="12" height="12" rx="1.5"/><path d="M8 7V5h11v11h-2"/></>,
     plus: <path d="M12 5v14M5 12h14"/>,
     lock: <><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 1 1 8 0v3"/></>,
+    importFile: <><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></>,
+    exportFile: <><path d="M12 15V3m0 0 4 4m-4-4-4 4"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></>,
     bolt: <path d="m13 2-9 12h7l-1 8 10-13h-7l1-7Z"/>,
     copy: <><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></>,
     mic: <><rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5 11.5a7 7 0 0 0 14 0M12 18.5v3m-4 0h8"/></>,
