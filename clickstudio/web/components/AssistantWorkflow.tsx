@@ -98,49 +98,39 @@ export function AssistantWorkflow(props: AssistantWorkflowProps) {
             if (!busy && question.trim()) ask();
         }
     };
-    const moveChatTab = (event: ReactKeyboardEvent<HTMLButtonElement>, index: number) => {
-        const nextIndex = event.key === 'ArrowRight' ? (index + 1) % chats.length
-            : event.key === 'ArrowLeft' ? (index - 1 + chats.length) % chats.length
-                : event.key === 'Home' ? 0 : event.key === 'End' ? chats.length - 1 : undefined;
-        if (nextIndex === undefined) return;
-        event.preventDefault();
-        const chatId = chats[nextIndex]?.id;
-        if (!chatId) return;
-        onSelectChat(chatId);
-        window.requestAnimationFrame(() => document.getElementById(`assistant-chat-tab-${chatId}`)?.focus());
-    };
     const deleteChat = () => {
         const title = activeChat?.title || 'this chat';
         if (window.confirm(`Delete “${title}” and its conversation?`)) onDeleteChat(activeChatId);
     };
 
     return <section className="assistant-panel animate-enter" aria-label="Ask AI">
-        <div className="assistant-safety"><span className="assistant-glyph"><Icon name="assistant"/></span><div><strong>Ask AI</strong><p>Ask about your SQL or results, request a query, or get help fixing and improving one.</p></div></div>
-        {storageError && <div className="callout callout-error" role="alert">{storageError}</div>}
         <div className="assistant-chat-toolbar">
-            <ScrollEdgeFrame<HTMLDivElement> className="assistant-chat-tabs-frame">{ref => <div ref={ref} className="assistant-chat-tabs" role="tablist" aria-label="AI chats">
-                {chats.map((chat, index) => <button key={chat.id} id={`assistant-chat-tab-${chat.id}`} type="button" role="tab" aria-selected={chat.id === activeChatId} aria-controls={chat.id === activeChatId ? `assistant-chat-panel-${chat.id}` : undefined} tabIndex={chat.id === activeChatId ? 0 : -1} onClick={() => onSelectChat(chat.id)} onKeyDown={event => moveChatTab(event, index)} title={chat.title}>
-                    <span>{chat.title}</span>{chat.turns.length > 0 && <small>{chat.turns.length}</small>}
-                </button>)}
-            </div>}</ScrollEdgeFrame>
-            <div className="assistant-chat-actions"><Button variant="secondary" onClick={onNewChat}>New chat</Button><Button variant="ghost" onClick={deleteChat} aria-label="Delete current chat">Delete</Button></div>
+            <label className="assistant-chat-select-wrap"><span className="sr-only">Chat history</span><select className="assistant-chat-select" aria-label="Chat history" value={activeChatId} onChange={event => onSelectChat(event.target.value)}>
+                {[...chats].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)).map(chat => <option key={chat.id} value={chat.id}>{chat.title}</option>)}
+            </select><Icon name="chevron"/></label>
+            <div className="assistant-chat-actions"><Button variant="secondary" onClick={onNewChat}><Icon name="plus"/>New chat</Button><Button variant="ghost" onClick={deleteChat} aria-label="Delete current chat">Delete</Button></div>
         </div>
-        <div id={`assistant-chat-panel-${activeChatId}`} className="assistant-chat-panel" role="tabpanel" aria-labelledby={`assistant-chat-tab-${activeChatId}`}>
-            <ScrollEdgeFrame<HTMLDivElement> className="assistant-transcript-frame">{ref => <div ref={element => { transcriptViewport.current = element; ref(element); }} className="assistant-transcript" role="log" aria-label="Chat messages" aria-live="polite">
-                {!turns.length && <div className="assistant-empty-chat"><span className="assistant-glyph"><Icon name="assistant"/></span><strong>Start a conversation</strong><p>Ask a question, then send follow-ups here. Each message uses the latest SQL and schema.</p></div>}
+        {storageError && <div className="assistant-feedback callout callout-error" role="alert">{storageError}</div>}
+        <div id={`assistant-chat-panel-${activeChatId}`} className="assistant-chat-panel" role="region" aria-label={`Conversation: ${activeChat?.title ?? 'New chat'}`}>
+            <ScrollEdgeFrame<HTMLDivElement> className="assistant-transcript-frame">{ref => <div ref={element => { transcriptViewport.current = element; ref(element); }} className={cx('assistant-transcript', !turns.length && 'is-empty')} role="log" aria-label="Chat messages" aria-live="polite" aria-relevant="additions text">
+                {!turns.length && <div className="assistant-empty-chat"><span className="assistant-glyph"><Icon name="assistant"/></span><strong>Start a conversation</strong><p>Ask about your query. Follow-ups keep this chat’s context.</p></div>}
                 {turns.map(turn => <article className="assistant-turn" key={turn.id}>
                     <div className="assistant-user-message"><span>You</span><p>{turn.question}</p></div>
                     <div className="assistant-response"><span className="assistant-response-label">Assistant</span><AssistantOutput mode={mode} sql={sql} turn={turn} busy={busy} editorProposalId={editorProposalId} onDecideProposal={onDecideProposal} onRunQuery={onRunQuery} runDisabled={runDisabled}/></div>
                 </article>)}
             </div>}</ScrollEdgeFrame>
         </div>
-        <div className="field-label"><label htmlFor="assistant-question">MESSAGE</label><ScrollEdgeFrame<HTMLTextAreaElement> className="assistant-question-frame">{ref => <textarea ref={ref} id="assistant-question" className="field-textarea" aria-label="Ask AI" value={question} onChange={event => onQuestionChange(event.target.value)} onKeyDown={sendOnEnter} placeholder="Ask a follow-up… (Enter to send, Shift+Enter for a new line)" rows={3}/>}</ScrollEdgeFrame></div>
-        <label className="include-result"><input type="checkbox" checked={includeRun} onChange={event => onIncludeRun(event.target.checked)} disabled={!runId}/><span><strong>Include latest run</strong><small>Send its SQL, retained rows when available, and any error.</small></span></label>
-        <div className="flex flex-wrap items-center justify-end gap-2"><Button variant="primary" disabled={!trusted || !schemaReady || busy || !question.trim()} onClick={ask}>{busy ? phase === 'preparing' ? 'Preparing run…' : phase === 'deciding' ? 'Saving…' : 'Thinking…' : 'Send'}</Button>{cancelable && <Button variant="secondary" onClick={onCancelRequest}>Cancel</Button>}</div>
-        {error && <div className="callout callout-error" role="alert">{error}</div>}
-        {notice && <div className="callout" role="status">{notice}</div>}
-        <p className="assistant-generation-disclosure">Your messages, SQL, and any run context you chose to share are sent with each follow-up. Current SQL and schema are refreshed for each message; the latest run is included only when selected. Chat history, including shared run context, is saved in this browser. Review every SQL proposal before applying it; proposals are never run automatically.</p>
-        {!trusted && <div className="callout">Trust this connection before sharing its schema with the assistant.</div>}
-        {!schemaReady && trusted && <div className="callout assistant-schema-refresh"><span>{schemaStatus || 'Load the ClickHouse schema before asking the assistant.'}</span><Button variant="secondary" disabled={schemaLoading} onClick={onRefreshSchema}>{schemaLoading ? 'Loading…' : 'Refresh schema'}</Button></div>}
+        <div className="assistant-composer-area">
+            {error && <div className="assistant-feedback callout callout-error" role="alert">{error}</div>}
+            {notice && <div className="assistant-feedback callout" role="status">{notice}</div>}
+            {!trusted && <div className="assistant-feedback callout">Trust this connection before sharing its schema with the assistant.</div>}
+            {!schemaReady && trusted && <div className="assistant-feedback callout assistant-schema-refresh"><span>{schemaStatus || 'Load the ClickHouse schema before asking the assistant.'}</span><Button variant="secondary" disabled={schemaLoading} onClick={onRefreshSchema}>{schemaLoading ? 'Loading…' : 'Refresh schema'}</Button></div>}
+            <div className="assistant-chat-composer">
+                <div className="assistant-composer-context"><span className="assistant-context-chip">Current SQL</span><span className="assistant-context-chip">Schema</span><label className="assistant-include-run" title="Send its SQL, retained rows when available, and any error."><input type="checkbox" checked={includeRun} onChange={event => onIncludeRun(event.target.checked)} disabled={!runId}/><span>Include latest run</span></label></div>
+                <ScrollEdgeFrame<HTMLTextAreaElement> className="assistant-question-frame">{ref => <textarea ref={ref} id="assistant-question" className="field-textarea" aria-label="Ask AI" value={question} onChange={event => onQuestionChange(event.target.value)} onKeyDown={sendOnEnter} placeholder="Message… (Enter to send)" rows={2}/>}</ScrollEdgeFrame>
+                <div className="assistant-composer-footer"><span>Shift+Enter for a new line</span>{busy ? cancelable ? <Button variant="danger" onClick={onCancelRequest} aria-label="Stop assistant response" title="Stop generating">Stop</Button> : <Button variant="secondary" disabled>{phase === 'deciding' ? 'Applying…' : 'Working…'}</Button> : <Button variant="primary" disabled={!trusted || !schemaReady || !question.trim()} onClick={ask}><Icon name="send"/>Send</Button>}</div>
+                <details className="assistant-disclosure"><summary>Privacy and review</summary><p>Your messages and current SQL and schema are sent with each follow-up. The latest run is included only when selected. Chat history, including shared run context, is saved in this browser. Review every SQL proposal before applying it; proposals are never run automatically.</p></details>
+            </div>
+        </div>
     </section>;
 }

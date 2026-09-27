@@ -991,6 +991,7 @@ test('Ask AI keeps chat history when SQL changes and sends prior messages with f
     await question.fill('Show the old question');
     await page.getByRole('button', { name: 'Send', exact: true }).click();
     await expect(page.getByText('Answer to Show the old question', { exact: true })).toBeVisible();
+    await expect(question).toBeInViewport();
 
     await replaceSql(page, 'SELECT 2');
     await expect(page.getByText('Answer to Show the old question', { exact: true })).toBeVisible();
@@ -1014,12 +1015,42 @@ test('Ask AI keeps chat history when SQL changes and sends prior messages with f
     await page.getByRole('button', { name: 'New chat', exact: true }).click();
     await expect(page.locator('.assistant-empty-chat')).toBeVisible();
     await expect(page.getByText('Answer to Show the old question', { exact: true })).toHaveCount(0);
-    await page.getByRole('tab', { name: /Show the old question/ }).click();
+    await page.getByRole('combobox', { name: 'Chat history' }).selectOption({ label: 'Show the old question' });
     await expect(page.getByText('Answer to Show the old question', { exact: true })).toBeVisible();
     await expect(page.getByText('Answer to And now?', { exact: true })).toBeVisible();
     page.once('dialog', dialog => dialog.accept());
     await page.getByRole('button', { name: 'Delete current chat', exact: true }).click();
     await expect(page.locator('.assistant-empty-chat')).toBeVisible();
+});
+
+test('Ask AI shows a stop action while a response is in progress', async ({ page }) => {
+    let releaseResponse: (() => void) | undefined;
+    let markRequestStarted: (() => void) | undefined;
+    const responseGate = new Promise<void>(resolve => { releaseResponse = resolve; });
+    const requestStarted = new Promise<void>(resolve => { markRequestStarted = resolve; });
+    await page.route('**/api/assistant/sql', async route => {
+        markRequestStarted?.();
+        await responseGate;
+        await route.fulfill({ json: {} }).catch(() => undefined);
+    });
+
+    try {
+        await trust(page);
+        await useAdvancedMode(page);
+        await page.getByTestId('open-ai').click();
+        const question = page.getByRole('textbox', { name: 'Ask AI', exact: true });
+        await question.fill('Explain this query');
+        await page.getByRole('button', { name: 'Send', exact: true }).click();
+        await requestStarted;
+
+        const stop = page.getByRole('button', { name: 'Stop assistant response', exact: true });
+        await expect(stop).toBeVisible();
+        await stop.click();
+        await expect(page.locator('.assistant-turn-error')).toHaveText('Request cancelled.');
+        await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeDisabled();
+    } finally {
+        releaseResponse?.();
+    }
 });
 
 test('Scripts show each statement outcome and open that statement’s retained result', async ({ page }) => {
