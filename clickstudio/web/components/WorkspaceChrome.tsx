@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { Run, Script } from '../../shared/types';
+import { lexSql } from '../../shared/sql';
 import { Button, cx, formatBytes, formatCount, Icon, Status, terminal } from './ui';
 import type { IconName } from './ui';
 import type { RunEventState } from '../workspace-types';
@@ -60,6 +61,20 @@ function statementRowOutcome(count: number, action: 'returned' | 'written') {
     return `${formatCount(count)} ${count === 1 ? 'row' : 'rows'} ${action}`;
 }
 
+function statementOutcome(run: Run) {
+    if (run.columns.length > 0 || run.rowCount > 0)
+        return statementRowOutcome(run.rowCount, 'returned');
+
+    const command = lexSql(run.sql).find(token => token.kind === 'word')?.text.toUpperCase();
+    if (command === 'INSERT')
+        return run.writtenRows === undefined ? 'INSERT completed · row count unavailable' : statementRowOutcome(run.writtenRows, 'written');
+    if (command === 'CREATE')
+        return run.writtenRows !== undefined && run.writtenRows > 0
+            ? `CREATE completed · ${statementRowOutcome(run.writtenRows, 'written')}`
+            : 'CREATE completed';
+    return `${command ?? 'Statement'} completed`;
+}
+
 export function ScriptResults({ script, runs, activeRunId, onSelectRun, onCancel, cancelDisabled, cancelAfterCurrentStatement = false }: {
     script: Script;
     runs: Run[];
@@ -76,12 +91,7 @@ export function ScriptResults({ script, runs, activeRunId, onSelectRun, onCancel
             : <Button variant="danger" className="toolbar-small" onClick={onCancel} disabled={cancelDisabled}>{cancelAfterCurrentStatement ? 'Stop after current statement' : 'Cancel script'}</Button>)}</div>
         <div className="script-statement-list">{script.statements.map((statement, index) => {
             const run = statement.runId ? byId.get(statement.runId) : undefined;
-            const outcome = run && (run.columns.length > 0 || run.rowCount > 0)
-                ? statementRowOutcome(run.rowCount, 'returned')
-                : run?.writtenRows !== undefined && run.writtenRows > 0
-                    ? statementRowOutcome(run.writtenRows, 'written')
-                    : 'Command completed';
-            const details = run?.error ? `${run.error.code}: ${run.error.message}` : statement.error ? `${statement.error.code}: ${statement.error.message}` : run ? `${outcome} · ${Math.round(run.elapsedMs)} ms` : statement.status === 'pending' ? 'Waiting to run' : statement.status === 'running' ? 'Running' : statement.status === 'skipped' ? 'Skipped' : 'Not executed';
+            const details = run?.error ? `${run.error.code}: ${run.error.message}` : statement.error ? `${statement.error.code}: ${statement.error.message}` : run ? `${statementOutcome(run)} · ${Math.round(run.elapsedMs)} ms` : statement.status === 'pending' ? 'Waiting to run' : statement.status === 'running' ? 'Running' : statement.status === 'skipped' ? 'Skipped' : 'Not executed';
             return <button key={`${script.id}-${index}`} type="button" className={cx('script-statement', statement.runId === activeRunId && 'is-active')} aria-label={`Statement ${index + 1}: ${statement.status}`} aria-pressed={statement.runId === activeRunId} title={details} disabled={!statement.runId} onClick={() => statement.runId && onSelectRun(statement.runId)}>
                 <span className="script-statement-index">{String(index + 1).padStart(2, '0')}</span><span className="script-statement-copy"><strong>Statement {index + 1}</strong><code>{statement.sql.replace(/\s+/g, ' ').slice(0, 72)}</code><small>{details}</small></span><span className={cx('script-status', `status-${statement.status}`)}>{statement.status}</span>
             </button>;
