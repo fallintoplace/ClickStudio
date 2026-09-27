@@ -160,7 +160,7 @@ function valueKey(value: Json | undefined): string {
     return value === null || value === undefined ? 'null' : JSON.stringify(value);
 }
 
-export function countRowsByCategory(rows: Row[], columnIndex: number, maxCategories = 12): Array<{ key: string; label: string; count: number }> {
+export function countRowsByCategory(rows: Row[], columnIndex: number): Array<{ key: string; label: string; count: number }> {
     const counts = new Map<string, { label: string; count: number }>();
     for (const row of rows) {
         const value = row[columnIndex];
@@ -172,10 +172,7 @@ export function countRowsByCategory(rows: Row[], columnIndex: number, maxCategor
     const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
     const sorted = [...counts].map(([key, group]) => ({ key, ...group }))
         .sort((left, right) => right.count - left.count || collator.compare(left.label, right.label));
-    const visible = sorted.slice(0, maxCategories);
-    const overflow = sorted.slice(maxCategories);
-    if (overflow.length) visible.push({ key: '__other__', label: `Other (${overflow.length})`, count: overflow.reduce((total, group) => total + group.count, 0) });
-    return visible;
+    return sorted;
 }
 
 export function countRowsOverTime(rows: Row[], timeIndex: number, groupByIndex?: number, maxSeries = 5): { unit: TimeBucketUnit; excludedRows: number; series: RowCountSeries[] } {

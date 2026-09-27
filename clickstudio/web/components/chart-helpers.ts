@@ -26,6 +26,26 @@ export function formatCount(value: number, locale: Locale) {
     return new Intl.NumberFormat(locale).format(value);
 }
 
+export function categoryAxisLayout(labels: readonly string[], minimumWidth = 652) {
+    const slotWidths = labels.map(label => Math.max(72, Array.from(label).length * 6 + 16));
+    const contentWidth = slotWidths.reduce((total, width) => total + width, 0);
+    const extraSpace = labels.length ? Math.max(0, minimumWidth - contentWidth) / labels.length : 0;
+    const positions: number[] = [];
+    let offset = 0;
+    let minimumSlotWidth = Number.POSITIVE_INFINITY;
+    for (const width of slotWidths) {
+        const expandedWidth = width + extraSpace;
+        positions.push(offset + expandedWidth / 2);
+        offset += expandedWidth;
+        minimumSlotWidth = Math.min(minimumSlotWidth, expandedWidth);
+    }
+    return {
+        width: Math.max(minimumWidth, contentWidth),
+        positions,
+        minimumSlotWidth: Number.isFinite(minimumSlotWidth) ? minimumSlotWidth : 72,
+    };
+}
+
 export function splitChartSegments(points: ChartPoint[]) {
     const segments: ChartPoint[][] = [];
     let current: ChartPoint[] = [];

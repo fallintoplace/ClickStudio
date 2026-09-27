@@ -854,7 +854,7 @@ test('Charts keep NULL missing and plot nullable negative values from zero', asy
     await expect(results.locator('.chart-zero-line')).toHaveAttribute('y1', '100');
 });
 
-test('Charts sample the full retained range and report the sampled row count', async ({ page }) => {
+test('Categorical charts show every retained row with a full x-axis label', async ({ page }) => {
     await page.route('**/api/runs/*/snapshot', async route => {
         const response = await route.fetch();
         const result = await response.json();
@@ -869,8 +869,10 @@ test('Charts sample the full retained range and report the sampled row count', a
     await useAdvancedMode(page);
     const results = await runQuery(page);
     await results.getByRole('tab', { name: 'Chart', exact: true }).click();
-    await expect(results.locator('.chart-bar')).toHaveCount(240);
-    await expect(results.locator('.chart-footer')).toContainText('240 sampled rows from 350 retained rows');
+    await expect(results.locator('.chart-bar')).toHaveCount(350);
+    await expect(results.locator('.chart-footer')).toContainText('350 retained rows across 1 measure');
+    await expect(results.locator('.chart-x-labels text')).toHaveCount(350);
+    await expect(results.locator('.chart-x-labels text').first()).toHaveText('row-1');
     await expect(results.locator('.chart-x-labels text').last()).toHaveText('row-350');
     expect(Number(await results.locator('.chart-bar').last().getAttribute('y'))).toBeCloseTo(40, 0);
 });

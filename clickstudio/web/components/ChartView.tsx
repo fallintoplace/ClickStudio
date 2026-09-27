@@ -6,7 +6,7 @@ import type { Copy, Locale } from '../i18n';
 import { CandlestickChart } from './CandlestickChart';
 import { RowCountChart } from './RowCountChart';
 import { ScrollEdgeFrame } from './ScrollEdgeShadows';
-import { chartKindOptions, chartText, chartTypeLabel, formatCount, seriesColor, splitChartSegments } from './chart-helpers';
+import { categoryAxisLayout, chartKindOptions, chartText, chartTypeLabel, formatCount, seriesColor, splitChartSegments } from './chart-helpers';
 
 export function ChartView({ result, loading, chart, onChart, copy, locale }: { result?: Result; loading: boolean; chart: Draft['chart']; onChart: (chart: Draft['chart']) => void; copy: Copy; locale: Locale }) {
     const chartCopy = copy.chart;
@@ -82,23 +82,27 @@ export function ChartView({ result, loading, chart, onChart, copy, locale }: { r
     const selectedMeasures = usableConfiguredMeasures.length ? usableConfiguredMeasures : [defaultMeasure];
     const measureIndexes = chartKind === 'line' || chartKind === 'bar' ? selectedMeasures : selectedMeasures.slice(0, 1);
     const yIndex = measureIndexes[0] ?? 0;
-    const chartRows = chartKind === 'heatmap' ? [] : sampleChartRows(result.rows, MAX_CHART_RENDER_POINTS);
+    const xType = result.columns[xIndex]?.type ?? '';
+    const categoricalAxis = chartKind === 'bar' || (chartKind === 'line' && !numericType(xType) && !temporalType(xType));
+    const chartRows = chartKind === 'heatmap' ? [] : categoricalAxis ? result.rows : sampleChartRows(result.rows, MAX_CHART_RENDER_POINTS);
     const plotSeries = measureIndexes.map((columnIndex, seriesIndex) => ({
         columnIndex,
         color: seriesColor(seriesIndex),
         points: chartRows.map((row, index) => ({ label: displayValue(row[xIndex]), value: chartNumber(row[columnIndex]), index })),
     }));
+    const categoryLayout = categoricalAxis ? categoryAxisLayout(plotSeries[0]?.points.map(point => point.label) ?? []) : undefined;
     const values = plotSeries.flatMap(series => series.points.flatMap(point => point.value === null ? [] : [point.value]));
     const min = Math.min(0, ...values), max = Math.max(0, ...values), range = max - min || 1;
-    const plotLeft = 80, plotRight = 732, plotWidth = plotRight - plotLeft;
+    const plotLeft = categoricalAxis ? 0 : 80, plotRight = categoryLayout?.width ?? 732, plotWidth = plotRight - plotLeft;
     const plotTop = 40, plotMiddle = 115, plotBottom = 190, plotHeight = plotBottom - plotTop;
     const zeroY = plotBottom - ((0 - min) / range) * plotHeight;
     const y = (value: number) => plotBottom - ((value - min) / range) * plotHeight;
-    const x = (index: number) => chartRows.length <= 1 ? (plotLeft + plotRight) / 2 : plotLeft + index * (plotWidth / (chartRows.length - 1));
+    const x = (index: number) => categoryLayout?.positions[index] ?? (chartRows.length <= 1 ? (plotLeft + plotRight) / 2 : plotLeft + index * (plotWidth / (chartRows.length - 1)));
     const rowSummary = chartRows.length < result.rows.length
         ? chartText(chartCopy.sampledRowsSummary, { sampled: formatCount(chartRows.length, locale), rows: formatCount(result.rows.length, locale) })
         : chartText(measureIndexes.length === 1 ? chartCopy.retainedRowsAcrossOneMeasure : chartCopy.retainedRowsAcrossManyMeasures, { rows: formatCount(chartRows.length, locale), measures: formatCount(measureIndexes.length, locale) });
-    const barWidth = Math.max(1, Math.min(28, (plotWidth / Math.max(1, chartRows.length)) * .68 / measureIndexes.length));
+    const categoryStep = categoryLayout?.minimumSlotWidth ?? plotWidth / Math.max(1, chartRows.length);
+    const barWidth = Math.max(1, Math.min(28, (categoryStep * .68) / measureIndexes.length));
     const collator = new Intl.Collator(locale, { numeric: true, sensitivity: 'base' });
     const heatmap = chartKind === 'heatmap' && groupByIndex !== undefined
         ? prepareHeatmap(result.rows, xIndex, groupByIndex, yIndex)
@@ -129,7 +133,9 @@ export function ChartView({ result, loading, chart, onChart, copy, locale }: { r
         ? scatterMinX === scatterMaxX
             ? [{ label: compactNumber.format(scatterMinX), position: (plotLeft + plotRight) / 2 }]
             : [{ label: compactNumber.format(scatterMinX), position: plotLeft }, { label: compactNumber.format((scatterMinX + scatterMaxX) / 2), position: (plotLeft + plotRight) / 2 }, { label: compactNumber.format(scatterMaxX), position: plotRight }]
-        : [...new Set([0, Math.floor((chartRows.length - 1) / 2), chartRows.length - 1])].map(index => ({ label: plotSeries[0]?.points[index]?.label ?? '', position: x(index) }));
+        : categoricalAxis
+            ? plotSeries[0]?.points.map((point, index) => ({ label: point.label, position: x(index) })) ?? []
+            : [...new Set([0, Math.floor((chartRows.length - 1) / 2), chartRows.length - 1])].map(index => ({ label: plotSeries[0]?.points[index]?.label ?? '', position: x(index) }));
     const suggestionReason = chartKind === 'heatmap'
         ? chartCopy.heatmapReturnedRows
         : result.rows.length === 1
@@ -138,8 +144,36 @@ export function ChartView({ result, loading, chart, onChart, copy, locale }: { r
                 ? chartCopy.reasonTimeMeasure
                 : chartCopy.reasonDimensionMeasure;
     const chartTitle = chart.title === 'Query result' ? chartCopy.queryResult : chart.title || result.columns[yIndex]?.name || chartCopy.queryResult;
+    const chartAriaLabel = chartText(chartCopy.chartComparing, { type: chartTypeLabel(chartKind, chartCopy).toLocaleLowerCase(locale), x: result.columns[xIndex]?.name ?? '', y: result.columns[yIndex]?.name ?? '' });
+    const renderChartSvg = (categoryAxisIsScrollable: boolean) => <svg
+        className={categoryAxisIsScrollable ? 'chart-category-plot' : undefined}
+        viewBox={categoryAxisIsScrollable ? `0 0 ${plotRight} 230` : '0 0 760 230'}
+        preserveAspectRatio={categoryAxisIsScrollable ? 'none' : undefined}
+        style={categoryAxisIsScrollable ? { '--chart-plot-width': `${plotRight}px` } as CSSProperties : undefined}
+        role="img"
+        aria-label={chartAriaLabel}>
+        {[plotTop, plotMiddle, plotBottom].map(value => <line key={value} x1={plotLeft} x2={plotRight} y1={value} y2={value} className="chart-gridline"/>)}
+        {!categoryAxisIsScrollable && chartYTicks.map(tick => <text key={`${tick.position}-${tick.value}`} className="chart-y-tick-label" x={plotLeft - 24} y={tick.position} textAnchor="end" dominantBaseline="middle">{compactNumber.format(tick.value)}</text>)}
+        {chartKind !== 'scatter' && <line x1={plotLeft} x2={plotRight} y1={zeroY} y2={zeroY} className="chart-zero-line"/>}
+        {chartKind === 'scatter' ? scatterPoints.map((point, index) => <circle key={index} cx={scatterX(point.x)} cy={scatterY(point.y)} r="3.5" className="chart-point" style={{ fill: seriesColor(0), stroke: seriesColor(0) }}><title>{`${result.columns[xIndex]?.name}: ${formatCount(point.x, locale)} · ${result.columns[yIndex]?.name}: ${formatCount(point.y, locale)}`}</title></circle>)
+            : chartKind === 'line' ? plotSeries.map(series => {
+                const segments = splitChartSegments(series.points);
+                return <g key={series.columnIndex} style={{ '--series-color': series.color } as CSSProperties}>
+                    {segments.filter(points => points.length > 1).map((points, index) => <polygon key={`area-${index}`} points={`${x(points[0]!.index)},${zeroY} ${points.map(point => `${x(point.index)},${y(point.value!)}`).join(' ')} ${x(points.at(-1)!.index)},${zeroY}`} className="chart-area-fill"/>)}
+                    {segments.map((points, index) => <polyline key={`line-${index}`} points={points.map(point => `${x(point.index)},${y(point.value!)}`).join(' ')} className="chart-line"/>)}
+                    {series.points.filter(point => point.value !== null).map(point => <circle key={point.index} cx={x(point.index)} cy={y(point.value!)} r="3.5" className="chart-point"/>)}
+                </g>;
+            }) : plotSeries.flatMap((series, seriesIndex) => series.points.flatMap(point => {
+                if (point.value === null) return [];
+                const valueY = y(point.value), top = Math.min(zeroY, valueY), height = Math.max(1, Math.abs(valueY - zeroY));
+                const groupOffset = (seriesIndex - (plotSeries.length - 1) / 2) * barWidth;
+                const disableBarAnimation = categoryAxisIsScrollable && chartRows.length > MAX_CHART_RENDER_POINTS;
+                return [<rect key={`${series.columnIndex}-${point.index}`} x={x(point.index) + groupOffset - barWidth / 2} y={top} width={barWidth} height={height} rx="3" className={`chart-bar${disableBarAnimation ? ' chart-bar--static' : ''}`} style={{ '--series-color': series.color, ...(disableBarAnimation ? {} : { animationDelay: `${point.index * 20}ms` }) } as CSSProperties}/>];
+            }))}
+        <g className="chart-x-labels">{chartXTicks.map((tick, index) => <text key={`${tick.position}-${categoryAxisIsScrollable ? index : tick.label}`} x={tick.position} y="218" textAnchor={categoryAxisIsScrollable ? 'middle' : chartXTicks.length === 1 ? 'middle' : index === 0 ? 'start' : index === chartXTicks.length - 1 ? 'end' : 'middle'}>{tick.label}</text>)}</g>
+    </svg>;
     return <ScrollEdgeFrame<HTMLDivElement> className="chart-workspace-frame">{ref => <div ref={ref} className="chart-workspace animate-enter">
-        <div className="chart-title-row"><div><span className="eyebrow">{chartCopy.visualExploration}</span><h3>{chartTitle}</h3><p>{suggestionReason}{chartKind === 'heatmap' ? '' : ` ${chartCopy.sampledForDisplay}`}</p></div><div className="chart-controls">
+        <div className="chart-title-row"><div><span className="eyebrow">{chartCopy.visualExploration}</span><h3>{chartTitle}</h3><p>{suggestionReason}{chartKind !== 'heatmap' && chartRows.length < result.rows.length ? ` ${chartCopy.sampledForDisplay}` : ''}</p></div><div className="chart-controls">
             {chartKind !== 'number' && <label>{chartKind === 'scatter' ? chartCopy.xAxisMeasure : chartCopy.xAxis}<select value={xIndex} onChange={event => {
                 const nextX = Number(event.target.value);
                 const nextGroupCandidate = chartKind === 'heatmap' && nextX === groupByIndex ? result.columns.findIndex((_column, index) => index !== nextX && index !== yIndex) : groupByIndex;
@@ -186,26 +220,13 @@ export function ChartView({ result, loading, chart, onChart, copy, locale }: { r
                         </table><div className="heatmap-caption">{chartText(chartCopy.heatmapCaption, { measure: result.columns[yIndex]?.name ?? '', rows: formatCount(heatmapYLabels.length, locale), columns: formatCount(heatmapXLabels.length, locale), note: result.completeness === 'truncated' ? chartCopy.heatmapTruncatedNote : chartCopy.heatmapCompleteNote })}</div></div>}</ScrollEdgeFrame>
                 : chartKind === 'scatter' && (xIndex === yIndex || !numericIndexes.includes(xIndex) || !numericIndexes.includes(yIndex)) ? <div className="chart-empty">{chartCopy.scatterNeedsTwoNumeric}</div>
                     : !values.length ? <div className="chart-empty">{chartCopy.chooseNumericMeasure}</div>
-                    : <div className="chart-canvas">
-                        <svg viewBox="0 0 760 230" role="img" aria-label={chartText(chartCopy.chartComparing, { type: chartTypeLabel(chartKind, chartCopy).toLocaleLowerCase(locale), x: result.columns[xIndex]?.name ?? '', y: result.columns[yIndex]?.name ?? '' })}>
-                            {[plotTop, plotMiddle, plotBottom].map(value => <line key={value} x1={plotLeft} x2={plotRight} y1={value} y2={value} className="chart-gridline"/>)}
-                            {chartYTicks.map(tick => <text key={`${tick.position}-${tick.value}`} className="chart-y-tick-label" x={plotLeft - 24} y={tick.position} textAnchor="end" dominantBaseline="middle">{compactNumber.format(tick.value)}</text>)}
-                            {chartKind !== 'scatter' && <line x1={plotLeft} x2={plotRight} y1={zeroY} y2={zeroY} className="chart-zero-line"/>}
-                            {chartKind === 'scatter' ? scatterPoints.map((point, index) => <circle key={index} cx={scatterX(point.x)} cy={scatterY(point.y)} r="3.5" className="chart-point" style={{ fill: seriesColor(0), stroke: seriesColor(0) }}><title>{`${result.columns[xIndex]?.name}: ${formatCount(point.x, locale)} · ${result.columns[yIndex]?.name}: ${formatCount(point.y, locale)}`}</title></circle>)
-                                : chartKind === 'line' ? plotSeries.map(series => {
-                                    const segments = splitChartSegments(series.points);
-                                    return <g key={series.columnIndex} style={{ '--series-color': series.color } as CSSProperties}>
-                                        {segments.filter(points => points.length > 1).map((points, index) => <polygon key={`area-${index}`} points={`${x(points[0]!.index)},${zeroY} ${points.map(point => `${x(point.index)},${y(point.value!)}`).join(' ')} ${x(points.at(-1)!.index)},${zeroY}`} className="chart-area-fill"/>)}
-                                        {segments.map((points, index) => <polyline key={`line-${index}`} points={points.map(point => `${x(point.index)},${y(point.value!)}`).join(' ')} className="chart-line"/>)}
-                                        {series.points.filter(point => point.value !== null).map(point => <circle key={point.index} cx={x(point.index)} cy={y(point.value!)} r="3.5" className="chart-point"/>)}</g>;
-                                }) : plotSeries.flatMap((series, seriesIndex) => series.points.flatMap(point => {
-                                    if (point.value === null) return [];
-                                    const valueY = y(point.value), top = Math.min(zeroY, valueY), height = Math.max(1, Math.abs(valueY - zeroY));
-                                    const groupOffset = (seriesIndex - (plotSeries.length - 1) / 2) * barWidth;
-                                    return [<rect key={`${series.columnIndex}-${point.index}`} x={x(point.index) + groupOffset - barWidth / 2} y={top} width={barWidth} height={height} rx="3" className="chart-bar" style={{ '--series-color': series.color, animationDelay: `${point.index * 20}ms` } as CSSProperties}/>];
-                                }))}
-                            <g className="chart-x-labels">{chartXTicks.map((tick, index) => <text key={`${tick.position}-${tick.label}`} x={tick.position} y="218" textAnchor={chartXTicks.length === 1 ? 'middle' : index === 0 ? 'start' : index === chartXTicks.length - 1 ? 'end' : 'middle'}>{tick.label}</text>)}</g>
-                        </svg>
+                    : <div className={`chart-canvas${categoricalAxis ? ' chart-canvas--categorical' : ''}`}>
+                        {categoricalAxis && <svg className="chart-category-y-axis" viewBox="0 0 80 230" preserveAspectRatio="none" aria-hidden="true">
+                            {chartYTicks.map(tick => <text key={`${tick.position}-${tick.value}`} className="chart-y-tick-label" x="72" y={tick.position} textAnchor="end" dominantBaseline="middle">{compactNumber.format(tick.value)}</text>)}
+                        </svg>}
+                        {categoricalAxis
+                            ? <ScrollEdgeFrame<HTMLDivElement> className="chart-category-scroll-frame">{ref => <div ref={ref} className="chart-category-scroll" tabIndex={0}>{renderChartSvg(true)}</div>}</ScrollEdgeFrame>
+                            : renderChartSvg(false)}
                     </div>}
         <div className="chart-footer"><span className="chart-legend">{chartKind === 'heatmap'
             ? <><span className="chart-legend-dot"/>{result.columns[yIndex]?.name}</>
