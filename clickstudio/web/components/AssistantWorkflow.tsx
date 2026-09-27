@@ -1,5 +1,7 @@
 import { useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { diffLines } from 'diff';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import type { Proposal } from '../../shared/types';
 import type { AssistantChat, AssistantChatTurn } from '../assistant-chat-state';
 import { safeStatementCount } from '../workspace-helpers';
@@ -131,7 +133,9 @@ function AssistantOutput({ mode, sql, turn, busy, onDecideProposal, onRunQuery, 
     return <div className={cx('proposal-card', beginner && 'beginner-proposal-card')}>
         <div className="proposal-heading">
             {proposalSql !== null && <span className={cx('proposal-quality', proposal.quality?.status)}>{proposal.quality?.score ?? '—'}<small>QUALITY</small></span>}
-            <div><span className="eyebrow">{proposalSql === null ? 'ANSWER' : `SQL PROPOSAL · ${proposal.decision.toUpperCase()}`}</span><strong>{proposal.summary}</strong></div>
+            <div><span className="eyebrow">{proposalSql === null ? 'ANSWER' : `SQL PROPOSAL · ${proposal.decision.toUpperCase()}`}</span>{proposalSql === null
+                ? <div className="assistant-answer-markdown" data-testid="assistant-answer-markdown"><ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ href, children, ...props }) => <a {...props} href={href} target="_blank" rel="noreferrer">{children}</a> }}>{proposal.summary}</ReactMarkdown></div>
+                : <strong>{proposal.summary}</strong>}</div>
         </div>
         {stale && <p className="assistant-stale-proposal" role="status">This accepted query comes from an earlier SQL draft. Running it uses the SQL shown here.</p>}
         {proposal.clarification && <div className="callout">{proposal.clarification}</div>}

@@ -196,6 +196,12 @@ test('SQL-focused context allows a starter dataset when its source is absent', (
     assert.match(built.payload.instructions, /If a requested source table is absent.*do not query or claim data from the missing source/i);
     assert.match(built.payload.instructions, /label them as examples/i);
 });
+test('Plain-language assistant answers request concise Markdown list formatting', () => {
+    const f = aiFixture();
+    const built = buildContext({ ...f.input, action: 'ask', question: 'List the top songs.' });
+    assert.match(built.payload.instructions, /summary contains a plain-language answer.*concise Markdown/i);
+    assert.match(built.payload.instructions, /put each ordered or bulleted list item on its own line/i);
+});
 test('SQL context preserves all columns and rows when copying a known source table', () => {
     const f = aiFixture();
     const copySchema = {

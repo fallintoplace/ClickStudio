@@ -1071,6 +1071,33 @@ test('Ask AI keeps chat history when SQL changes and sends prior messages with f
     await expect(page.locator('.assistant-empty-chat')).toBeVisible();
 });
 
+test('Ask AI renders answer lists, emphasis, and safe links as Markdown', async ({ page }) => {
+    await page.route('**/api/assistant/sql', async route => {
+        const body = route.request().postDataJSON() as Record<string, unknown>;
+        await route.fulfill({ json: {
+            id: 'markdown-answer', owner: 'local-owner', connectionId: 'demo', action: 'ask', createdAt: '2026-09-23T00:00:00.000Z',
+            baseSql: String(body.sql ?? ''), responseId: 'test-response', model: 'test-model', promptVersion: 'test', contextSummary: [], decision: 'pending',
+            sql: null,
+            summary: 'A short ranking:\n\n1. **Avicii** — “The Nights”\n2. **Kasabian** — “Stevie”\n\nSee the [source](https://example.com/ranking).\n\n<img src=x onerror=alert(1)>',
+            assumptions: [], tables: [], caveats: [], clarification: null, findings: [],
+        } });
+    });
+    await trust(page);
+    await useAdvancedMode(page);
+    await page.getByTestId('open-ai').click();
+    await page.getByRole('textbox', { name: 'Ask AI', exact: true }).fill('Give me a short ranked list');
+    await page.getByRole('button', { name: 'Send', exact: true }).click();
+
+    const answer = page.getByTestId('assistant-answer-markdown');
+    await expect(answer.locator('ol > li')).toHaveCount(2);
+    await expect(answer.locator('ol > li').first().locator('strong')).toHaveText('Avicii');
+    const source = answer.getByRole('link', { name: 'source', exact: true });
+    await expect(source).toHaveAttribute('href', 'https://example.com/ranking');
+    await expect(source).toHaveAttribute('target', '_blank');
+    await expect(source).toHaveAttribute('rel', 'noreferrer');
+    await expect(answer.locator('img')).toHaveCount(0);
+});
+
 test('Ask AI shows a stop action while a response is in progress', async ({ page }) => {
     let releaseResponse: (() => void) | undefined;
     let markRequestStarted: (() => void) | undefined;

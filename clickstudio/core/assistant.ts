@@ -5,7 +5,7 @@ import { canWrite, mustOwn } from './guards.js';
 import { audit, hash, type Store } from './store.js';
 import { choice, record, text } from './validation.js';
 import { buildEvaluationReport, evaluateProposal } from './assistant-evaluation.js';
-export const PROMPT_VERSION = 'clickstudio-assistant-v9';
+export const PROMPT_VERSION = 'clickstudio-assistant-v10';
 export const MAX_ASSISTANT_CONVERSATION_MESSAGES = 40;
 export const MAX_ASSISTANT_CONVERSATION_BYTES = 80_000;
 export const PLAYBOOKS = {
@@ -186,6 +186,7 @@ export function buildContext(input: ContextInput): {
         'When the request asks to copy a named source table into a new table with all rows and columns, use the source and target names from the request and supplied schema, and propose one ClickHouse-valid CREATE TABLE target ENGINE = MergeTree ORDER BY tuple() AS SELECT * FROM source statement. This copies every source column and row into a new MergeTree table; ClickHouse Cloud uses its SharedMergeTree-backed implementation. Do not omit the ENGINE clause. Do not answer with a standalone SELECT, choose a subset, rename columns, or invent a source schema. ' +
         'If a requested source table is absent from the supplied schema, say it is absent. For a request to create a new table about that subject, draft a useful starter table with sample rows when reasonable, label them as examples, and do not query or claim data from the missing source. Ask one focused clarification only when a missing detail cannot reasonably be assumed. ' +
         'Use web search when current or external information can improve the answer, and cite any web sources used. Keep claims about this ClickHouse connection grounded in the supplied workspace data. ' +
+        'When the summary contains a plain-language answer, format it as concise Markdown: separate paragraphs and put each ordered or bulleted list item on its own line. For SQL proposals, keep the summary to one short sentence. ' +
         'For explain, result, performance analysis without a concrete fix, and review, sql may be null. ' +
         'For review and explain actions sql MUST be null. Return the requested structured object.';
     return { payload: { instructions, question: input.question, context: encoded(), ...(conversation.length ? { conversation } : {}), image }, summary };
