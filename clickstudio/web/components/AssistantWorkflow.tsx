@@ -39,9 +39,6 @@ export type AssistantWorkflowProps = {
     runId?: string;
     includeResult: boolean;
     onIncludeResult: (include: boolean) => void;
-    onVoiceInput: () => void;
-    voiceListening: boolean;
-    voiceError: string;
     onPreview: () => void;
     onGenerateSql: () => void;
     schemaReady: boolean;
@@ -84,30 +81,26 @@ function AssistantOutput({ mode, sql, context, proposal, busy, error, onRequestP
     </>;
 }
 
-export function AssistantWorkflow({ mode, sql, action, onActionChange, question, onQuestionChange, context, proposal, busy, error, trusted, runId, includeResult, onIncludeResult, onVoiceInput, voiceListening, voiceError, onPreview, onGenerateSql, schemaReady, schemaLoading, schemaStatus, onRefreshSchema, onRequestProposal, onDecideProposal, onRunQuery, runDisabled }: AssistantWorkflowProps) {
+export function AssistantWorkflow({ mode, sql, action, onActionChange, question, onQuestionChange, context, proposal, busy, error, trusted, runId, includeResult, onIncludeResult, onPreview, onGenerateSql, schemaReady, schemaLoading, schemaStatus, onRefreshSchema, onRequestProposal, onDecideProposal, onRunQuery, runDisabled }: AssistantWorkflowProps) {
     const beginner = mode === 'beginner';
-    const speechAvailable = Boolean(window.SpeechRecognition ?? window.webkitSpeechRecognition);
-    const voiceButton = <Button variant="ghost" className={cx('voice-button', voiceListening && 'is-listening')} title={speechAvailable ? (voiceListening ? 'Stop dictation' : 'Dictate your question') : 'Voice input is not available in this browser'} aria-label={voiceListening ? 'Stop dictation' : 'Dictate question'} disabled={!speechAvailable} onClick={onVoiceInput}><Icon name="mic"/>{voiceListening ? 'Listening…' : 'Use voice'}</Button>;
     const output = <AssistantOutput mode={mode} sql={sql} context={context} proposal={proposal} busy={busy} error={error} onRequestProposal={onRequestProposal} onDecideProposal={onDecideProposal} onRunQuery={onRunQuery} runDisabled={runDisabled}/>;
 
     if (beginner) return <section className="assistant-panel beginner-ai-panel animate-enter" aria-label="Ask AI to write a query">
         <div className="assistant-safety"><span className="assistant-glyph"><Icon name="assistant"/></span><div><strong>Start with a question</strong><p>Review the ClickHouse context and proposed SQL before adding it to your draft.</p></div></div>
         <AssistantFlowSteps context={context} proposal={proposal}/>
-        <label className="field-label" htmlFor="beginner-query-prompt">YOUR QUESTION<textarea id="beginner-query-prompt" className="field-textarea" aria-label="Describe your data question" value={question} onChange={event => onQuestionChange(event.target.value)} readOnly={voiceListening} placeholder="For example: show event counts by day" rows={4}/></label>
-        <div className="flex flex-wrap items-center justify-between gap-2">{voiceButton}<Button variant="secondary" disabled={!trusted || busy || !question.trim()} onClick={onPreview}>{busy ? 'Preparing…' : context ? 'Refresh preview' : 'Review context'}</Button></div>
+        <label className="field-label" htmlFor="beginner-query-prompt">YOUR QUESTION<textarea id="beginner-query-prompt" className="field-textarea" aria-label="Describe your data question" value={question} onChange={event => onQuestionChange(event.target.value)} placeholder="For example: show event counts by day" rows={4}/></label>
+        <div className="flex flex-wrap items-center justify-end gap-2"><Button variant="secondary" disabled={!trusted || busy || !question.trim()} onClick={onPreview}>{busy ? 'Preparing…' : context ? 'Refresh preview' : 'Review context'}</Button></div>
         {!trusted && <div className="callout">Trust this connection to include its schema.</div>}
-        {voiceError && <div className="callout callout-error" role="alert">{voiceError}</div>}
         <div className="assistant-actions">{output}</div>
     </section>;
 
     if (action === 'generate') return <section className="assistant-panel assistant-generate-panel animate-enter" aria-label="Generate SQL with AI">
         <div className="assistant-safety"><span className="assistant-glyph"><Icon name="assistant"/></span><div><strong>Write SQL</strong><p>Describe what you need. Review the diff before adding it to your draft.</p></div></div>
-        <label className="field-label" htmlFor="expert-sql-prompt">YOUR QUESTION<textarea id="expert-sql-prompt" className="field-textarea" aria-label="YOUR QUESTION" value={question} onChange={event => onQuestionChange(event.target.value)} onKeyDown={event => { if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') { event.preventDefault(); if (trusted && schemaReady && question.trim() && !busy) onGenerateSql(); } }} readOnly={voiceListening} placeholder="For example: show event counts by day" rows={4}/></label>
-        <div className="flex flex-wrap items-center justify-between gap-2">{voiceButton}<Button variant="primary" disabled={!trusted || !schemaReady || busy || !question.trim()} onClick={onGenerateSql}>{busy ? 'Generating SQL…' : 'Generate SQL'}</Button></div>
+        <label className="field-label" htmlFor="expert-sql-prompt">YOUR QUESTION<textarea id="expert-sql-prompt" className="field-textarea" aria-label="YOUR QUESTION" value={question} onChange={event => onQuestionChange(event.target.value)} onKeyDown={event => { if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') { event.preventDefault(); if (trusted && schemaReady && question.trim() && !busy) onGenerateSql(); } }} placeholder="For example: show event counts by day" rows={4}/></label>
+        <div className="flex flex-wrap items-center justify-end gap-2"><Button variant="primary" disabled={!trusted || !schemaReady || busy || !question.trim()} onClick={onGenerateSql}>{busy ? 'Generating SQL…' : 'Generate SQL'}</Button></div>
         <p className="assistant-generation-disclosure">Your question, current SQL, and available schema are sent to OpenAI to draft SQL. The query is not run automatically.</p>
         {!trusted && <div className="callout">Trust this connection before generating SQL from its schema.</div>}
         {!schemaReady && trusted && <div className="callout assistant-schema-refresh"><span>{schemaStatus || 'Load the ClickHouse schema before generating SQL.'}</span><Button variant="secondary" disabled={schemaLoading} onClick={onRefreshSchema}>{schemaLoading ? 'Loading…' : 'Refresh schema'}</Button></div>}
-        {voiceError && <div className="callout callout-error" role="alert">{voiceError}</div>}
         <AssistantOutput mode={mode} sql={sql} context={undefined} proposal={proposal} busy={busy} error={error} onRequestProposal={onRequestProposal} onDecideProposal={onDecideProposal} onRunQuery={onRunQuery} runDisabled={runDisabled}/>
     </section>;
 
@@ -121,9 +114,8 @@ export function AssistantWorkflow({ mode, sql, action, onActionChange, question,
                 <span><strong>{option.label}</strong><small>{option.description}</small></span>
             </label>)}</div>
         </fieldset>
-        <label className="field-label">YOUR QUESTION OR FOCUS<textarea className="field-textarea" value={question} onChange={event => onQuestionChange(event.target.value)} readOnly={voiceListening} placeholder="Describe what you want to understand or improve…" rows={3}/></label>
+        <label className="field-label">YOUR QUESTION OR FOCUS<textarea className="field-textarea" value={question} onChange={event => onQuestionChange(event.target.value)} placeholder="Describe what you want to understand or improve…" rows={3}/></label>
         <label className="include-result"><input type="checkbox" checked={includeResult} onChange={event => onIncludeResult(event.target.checked)} disabled={!runId}/><span><strong>Include selected result</strong><small>Its retained rows will appear in the context preview.</small></span></label>
-        {voiceError && <div className="callout callout-error" role="alert">{voiceError}</div>}
-        <div className="assistant-actions"><div className="flex flex-wrap items-center justify-between gap-2">{voiceButton}<Button variant="secondary" disabled={!trusted || busy} onClick={onPreview}>{busy && !context ? 'Preparing context…' : context ? 'Refresh context preview' : 'Preview context'}</Button></div>{output}</div>
+        <div className="assistant-actions"><div className="flex flex-wrap items-center justify-end gap-2"><Button variant="secondary" disabled={!trusted || busy} onClick={onPreview}>{busy && !context ? 'Preparing context…' : context ? 'Refresh context preview' : 'Preview context'}</Button></div>{output}</div>
     </section>;
 }

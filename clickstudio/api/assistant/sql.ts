@@ -8,7 +8,7 @@ import { OpenAIDriver } from '../../server/openai.js';
 
 const MAX_BODY_BYTES = 300_000;
 const MAX_REQUESTS_PER_DAY = 20;
-const MODEL = process.env.OPENAI_MODEL?.trim() || 'gpt-5-mini';
+const MODEL = process.env.OPENAI_MODEL?.trim() || 'gpt-6-luna';
 const requestsByIp = new Map<string, { day: string; count: number }>();
 
 function isRecord(value: unknown): value is Record<string, unknown> {

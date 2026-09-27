@@ -1,9 +1,8 @@
-import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { AssistantAction, Proposal, Schema } from '../shared/types';
 import { isFrontendDemoPreview, message, post } from './api';
 import { checkpoint, type Draft, type WorkspaceState } from './workspace-state';
-import type { Locale } from './i18n';
-import type { AssistantContext, SpeechRecognitionLike } from './workspace-types';
+import type { AssistantContext } from './workspace-types';
 import { useScopedValue } from './useScopedValue';
 
 function isAssistantContext(value: unknown): value is Pick<AssistantContext, 'id' | 'summary'> {
@@ -48,7 +47,6 @@ export function useWorkspaceAssistant({
     activeRunId,
     connectionId,
     trusted,
-    locale,
     workspaceRef,
     setWorkspace,
 }: {
@@ -56,7 +54,6 @@ export function useWorkspaceAssistant({
     activeRunId?: string;
     connectionId: string;
     trusted: boolean;
-    locale: Locale;
     workspaceRef: { current: WorkspaceState };
     setWorkspace: Dispatch<SetStateAction<WorkspaceState>>;
 }) {
@@ -67,10 +64,6 @@ export function useWorkspaceAssistant({
     const [assistantBusyKey, setAssistantBusyKey] = useState<string>();
     const [assistantErrors, setAssistantErrors] = useState<Record<string, string>>({});
     const [includeResult, setIncludeResultState] = useState(false);
-    const [voiceListening, setVoiceListening] = useState(false);
-    const [voiceError, setVoiceError] = useState('');
-    const recognitionRef = useRef<SpeechRecognitionLike | undefined>(undefined);
-    const promptBeforeVoiceRef = useRef('');
     const requestRef = useRef(0);
 
     const assistantKey = assistantContextKey(
@@ -93,8 +86,6 @@ export function useWorkspaceAssistant({
         assistantProposalState.key === assistantKey ||
         (assistantProposalState.value.decision === 'accepted' && assistantProposalState.value.sql === active.sql)
     ) ? assistantProposalState.value : undefined;
-
-    useEffect(() => () => recognitionRef.current?.abort(), []);
 
     const clearAssistantReview = () => {
         requestRef.current++;
@@ -135,52 +126,6 @@ export function useWorkspaceAssistant({
         if (include === includeResult) return;
         setIncludeResultState(include);
         clearAssistantReview();
-    };
-
-    const startVoiceInput = () => {
-        if (voiceListening) {
-            recognitionRef.current?.stop();
-            return;
-        }
-        const SpeechRecognition = window.SpeechRecognition ?? window.webkitSpeechRecognition;
-        if (!SpeechRecognition) {
-            setVoiceError('Voice input is not available in this browser. You can type your question instead.');
-            return;
-        }
-        setVoiceError('');
-        promptBeforeVoiceRef.current = assistantQuestion.trimEnd();
-        const recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = ({ en: 'en-US', de: 'de-DE', es: 'es-ES', nl: 'nl-NL', zh: 'zh-CN', ru: 'ru-RU' } as const)[locale];
-        recognition.onresult = event => {
-            const transcript = Array.from(event.results)
-                .map(result => result[0]?.transcript ?? '')
-                .join(' ')
-                .replace(/\s+/g, ' ')
-                .trim();
-            const base = promptBeforeVoiceRef.current;
-            setAssistantQuestion(`${base}${base && transcript ? ' ' : ''}${transcript}`);
-            requestRef.current++;
-            setAssistantBusyKey(undefined);
-            setAssistantContextForDraft(active.id, undefined);
-            setAssistantProposalForDraft(active.id, undefined);
-        };
-        recognition.onerror = event => {
-            setVoiceError(event.error === 'not-allowed'
-                ? 'Microphone access was denied. Allow access or type your question instead.'
-                : `Voice input stopped (${event.error}). You can continue by typing.`);
-            setVoiceListening(false);
-        };
-        recognition.onend = () => setVoiceListening(false);
-        recognitionRef.current = recognition;
-        try {
-            recognition.start();
-            setVoiceListening(true);
-        } catch {
-            setVoiceError('Voice input could not start. Check microphone access or type your question instead.');
-            setVoiceListening(false);
-        }
     };
 
     const prepareAssistantContext = async (action = assistantAction, question = assistantQuestion) => {
@@ -347,9 +292,6 @@ export function useWorkspaceAssistant({
         assistantError,
         includeResult,
         setIncludeResult,
-        voiceListening,
-        voiceError,
-        startVoiceInput,
         prepareAssistantContext,
         requestAssistantProposal,
         requestAssistantSql,

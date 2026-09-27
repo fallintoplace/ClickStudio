@@ -21,9 +21,16 @@ export class OpenAIDriver implements AssistantDriver {
             content.push({ type: 'input_image', image_url: context.payload.image, detail: 'auto' });
         try {
             const response = await this.client.responses.create({ model: this.model, store: false, instructions: context.payload.instructions, input: [{ role: 'user', content }],
-                max_output_tokens: 3000, text: { format: { type: 'json_schema', name: 'clickhouse_proposal', strict: true, schema } } }, { signal });
-            if (response.status !== 'completed' || !response.output_text)
-                throw new AppError(502, 'AI_INCOMPLETE', 'The model did not return a complete proposal. No draft was changed.');
+                max_output_tokens: 12_000, text: { format: { type: 'json_schema', name: 'clickhouse_proposal', strict: true, schema } } }, { signal });
+            if (response.status !== 'completed' || !response.output_text) {
+                const reason = response.incomplete_details?.reason;
+                const message = reason === 'max_output_tokens'
+                    ? 'The SQL proposal reached the response length limit. Try asking for a smaller part at a time. No draft was changed.'
+                    : reason === 'content_filter'
+                        ? 'The response was stopped by the content filter. No draft was changed.'
+                        : 'The model stopped before completing the SQL proposal. No draft was changed.';
+                throw new AppError(502, 'AI_INCOMPLETE', message);
+            }
             return { content: validateProposal(JSON.parse(response.output_text)), responseId: response.id };
         }
         catch (error) {

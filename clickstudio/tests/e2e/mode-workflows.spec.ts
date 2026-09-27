@@ -224,38 +224,3 @@ test('Advanced editor, insights, pipeline and AI copilot stay read-only until a 
     expect(runRequests).toHaveLength(1);
     await expect(page.locator('.execution-bar code')).toHaveText(queryId);
 });
-
-test('Advanced voice dictation fills the question without sending it automatically', async ({ page }) => {
-    await page.addInitScript(() => {
-        class MockRecognition {
-            continuous = false;
-            interimResults = false;
-            lang = '';
-            onresult?: (event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void;
-            onend?: () => void;
-            start() { (window as Window & { testRecognition?: MockRecognition }).testRecognition = this; }
-            stop() { this.onend?.(); }
-            abort() { this.onend?.(); }
-        }
-        (window as Window & { SpeechRecognition?: typeof MockRecognition }).SpeechRecognition = MockRecognition;
-    });
-    let contextRequests = 0;
-    page.on('request', request => {
-        if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/assistant/context') contextRequests++;
-    });
-
-    await trust(page);
-    await useAdvancedMode(page);
-    await page.getByTestId('open-ai').click();
-    const prompt = page.getByRole('textbox', { name: 'YOUR QUESTION OR FOCUS', exact: true });
-    await page.getByRole('button', { name: 'Dictate question', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Stop dictation', exact: true })).toBeVisible();
-    await page.evaluate(() => {
-        const recognition = (window as Window & { testRecognition?: { onresult?: (event: unknown) => void } }).testRecognition;
-        recognition?.onresult?.({ results: [[{ transcript: 'show weekly revenue' }]] });
-    });
-    await expect(prompt).toHaveValue('show weekly revenue');
-    await page.getByRole('button', { name: 'Stop dictation', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Dictate question', exact: true })).toBeVisible();
-    expect(contextRequests).toBe(0);
-});
