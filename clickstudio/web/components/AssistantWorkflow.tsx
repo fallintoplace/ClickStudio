@@ -9,12 +9,16 @@ export type AssistantWorkflowProps = {
     onQuestionChange: (question: string) => void;
     proposal?: Proposal;
     busy: boolean;
+    cancelable: boolean;
+    phase?: 'preparing' | 'generating' | 'deciding';
     error: string;
+    notice: string;
     trusted: boolean;
     runId?: string;
     includeRun: boolean;
     onIncludeRun: (include: boolean) => void;
     onAskAI: () => void;
+    onCancelRequest: () => void;
     schemaReady: boolean;
     schemaLoading: boolean;
     schemaStatus: string;
@@ -51,14 +55,15 @@ function AssistantOutput({ mode, sql, proposal, busy, error, onDecideProposal, o
 
 export function AssistantWorkflow(props: AssistantWorkflowProps) {
     const { mode, sql, question, onQuestionChange, proposal, busy, error, trusted, runId, includeRun, onIncludeRun,
-        onAskAI, schemaReady, schemaLoading, schemaStatus, onRefreshSchema, onDecideProposal, onRunQuery, runDisabled } = props;
+        cancelable, phase, notice, onAskAI, onCancelRequest, schemaReady, schemaLoading, schemaStatus, onRefreshSchema, onDecideProposal, onRunQuery, runDisabled } = props;
     const output = <AssistantOutput mode={mode} sql={sql} proposal={proposal} busy={busy} error={error} onDecideProposal={onDecideProposal} onRunQuery={onRunQuery} runDisabled={runDisabled}/>;
     const ask = () => { void onAskAI(); };
     return <section className="assistant-panel animate-enter" aria-label="Ask AI">
         <div className="assistant-safety"><span className="assistant-glyph"><Icon name="assistant"/></span><div><strong>Ask AI</strong><p>Ask about your SQL or results, request a query, or get help fixing and improving one.</p></div></div>
         <div className="field-label"><label htmlFor="assistant-question">YOUR QUESTION</label><ScrollEdgeFrame<HTMLTextAreaElement> className="assistant-question-frame">{ref => <textarea ref={ref} id="assistant-question" className="field-textarea" aria-label="Ask AI" value={question} onChange={event => onQuestionChange(event.target.value)} placeholder="For example: explain this query, help fix this error, or show event counts by day…" rows={4}/>}</ScrollEdgeFrame></div>
         <label className="include-result"><input type="checkbox" checked={includeRun} onChange={event => onIncludeRun(event.target.checked)} disabled={!runId}/><span><strong>Include latest run</strong><small>Send its SQL, retained rows when available, and any error.</small></span></label>
-        <div className="flex flex-wrap items-center justify-end gap-2"><Button variant="primary" disabled={!trusted || !schemaReady || busy || !question.trim()} onClick={ask}>{busy ? 'Thinking…' : 'Ask AI'}</Button></div>
+        <div className="flex flex-wrap items-center justify-end gap-2"><Button variant="primary" disabled={!trusted || !schemaReady || busy || !question.trim()} onClick={ask}>{busy ? phase === 'preparing' ? 'Preparing run…' : phase === 'deciding' ? 'Saving…' : 'Thinking…' : 'Ask AI'}</Button>{cancelable && <Button variant="secondary" onClick={onCancelRequest}>Cancel</Button>}</div>
+        {notice && <div className="callout" role="status">{notice}</div>}
         <p className="assistant-generation-disclosure">Your question, current SQL, and available schema are sent to OpenAI. The latest run’s SQL, retained rows when available, and error are included only when selected. Any SQL proposal must be reviewed before it is applied, and is never run automatically.</p>
         {!trusted && <div className="callout">Trust this connection before sharing its schema with the assistant.</div>}
         {!schemaReady && trusted && <div className="callout assistant-schema-refresh"><span>{schemaStatus || 'Load the ClickHouse schema before asking the assistant.'}</span><Button variant="secondary" disabled={schemaLoading} onClick={onRefreshSchema}>{schemaLoading ? 'Loading…' : 'Refresh schema'}</Button></div>}

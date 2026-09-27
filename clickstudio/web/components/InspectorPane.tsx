@@ -58,7 +58,10 @@ export type InspectorPaneProps = {
     onAssistantQuestion: (question: string) => void;
     assistantProposal?: Proposal;
     assistantBusy: boolean;
+    assistantCancelable: boolean;
+    assistantPhase?: 'preparing' | 'generating' | 'deciding';
     assistantError: string;
+    assistantNotice: string;
     nativeParserEnabled: boolean;
     nativeParserStatus: NativeParserStatus;
     nativeParseSnapshot?: NativeParseSnapshot;
@@ -66,6 +69,7 @@ export type InspectorPaneProps = {
     includeRun: boolean;
     onIncludeRun: (include: boolean) => void;
     onAskAI: (schema?: Schema, serverVersion?: string, database?: string) => void;
+    onCancelAssistantRequest: () => void;
     onDecideProposal: (decision: 'accepted' | 'rejected') => void;
     onRunQuery: () => void;
     runDisabled: boolean;
@@ -85,7 +89,7 @@ const inspectorTabs = [
     { id: 'assistant', icon: 'assistant' },
 ] as const satisfies readonly { id: Inspector; icon: IconName }[];
 
-export function InspectorPane({ comparisonProfiles, comparisonPipelines, copy, inspector, setInspector, connection, schema, schemaLoading, schemaError, search, setSearch, history, documents, revisions, revisionsDocumentId, revisionLoading, revisionError, currentRevision, unsavedDraft, canRestoreRevision, run, profile, pipeline, onRefreshSchema, onRefreshHistory, onInsert, onOpenSqlDraft, onOpenImport, onExportResult, exportDisabled, onOpenRun, onOpenDocument, onLoadProfile, onLoadPipeline, onOpenGraph, connectionId, sql, trusted, runId, onRefreshDocuments, onRefreshRevisions, onRestoreRevision, assistantQuestion, onAssistantQuestion, assistantProposal, assistantBusy, assistantError, nativeParserEnabled, nativeParserStatus, nativeParseSnapshot, onRetryParser, includeRun, onIncludeRun, onAskAI, onDecideProposal, onRunQuery, runDisabled, expert = false, drawer = false, onClose }: InspectorPaneProps) {
+export function InspectorPane({ comparisonProfiles, comparisonPipelines, copy, inspector, setInspector, connection, schema, schemaLoading, schemaError, search, setSearch, history, documents, revisions, revisionsDocumentId, revisionLoading, revisionError, currentRevision, unsavedDraft, canRestoreRevision, run, profile, pipeline, onRefreshSchema, onRefreshHistory, onInsert, onOpenSqlDraft, onOpenImport, onExportResult, exportDisabled, onOpenRun, onOpenDocument, onLoadProfile, onLoadPipeline, onOpenGraph, connectionId, sql, trusted, runId, onRefreshDocuments, onRefreshRevisions, onRestoreRevision, assistantQuestion, onAssistantQuestion, assistantProposal, assistantBusy, assistantCancelable, assistantPhase, assistantError, assistantNotice, nativeParserEnabled, nativeParserStatus, nativeParseSnapshot, onRetryParser, includeRun, onIncludeRun, onAskAI, onCancelAssistantRequest, onDecideProposal, onRunQuery, runDisabled, expert = false, drawer = false, onClose }: InspectorPaneProps) {
     const visibleDocuments = documents.filter(document => document.connectionId === connectionId && !document.deletedAt);
     const [selectedRevisionNumber, setSelectedRevisionNumber] = useState<number>();
     const [referenceTarget, setReferenceTarget] = useState<{ name: string; type: string }>();
@@ -135,7 +139,7 @@ export function InspectorPane({ comparisonProfiles, comparisonPipelines, copy, i
             {inspector === 'parser' && <NativeParserInspector enabled={nativeParserEnabled} status={nativeParserStatus} snapshot={nativeParseSnapshot} onRetry={onRetryParser}/>}
             {inspector === 'details' && <RunDetails run={run} profile={profile} onLoad={onLoadProfile} unavailableReason={connection.manifest?.queryLog.available === false ? connection.manifest.queryLog.reason : undefined}/>}
             {inspector === 'pipeline' && <PipelineView run={run} profile={profile} pipeline={pipeline} onLoad={onLoadPipeline} onOpenGraph={onOpenGraph} available={connection.manifest?.pipeline.available !== false} unavailableReason={connection.manifest?.pipeline.available === false ? connection.manifest.pipeline.reason : undefined}/>}
-            {inspector === 'assistant' && <AssistantWorkflow mode={expert ? 'expert' : 'beginner'} sql={sql} question={assistantQuestion} onQuestionChange={onAssistantQuestion} proposal={assistantProposal} busy={assistantBusy} error={assistantError} trusted={trusted} runId={runId} includeRun={includeRun} onIncludeRun={onIncludeRun} onAskAI={() => onAskAI(schema, connection.manifest?.serverVersion, connection.database)} schemaReady={Boolean(schema) && !schemaLoading && !schemaError} schemaLoading={schemaLoading} schemaStatus={schemaError} onRefreshSchema={onRefreshSchema} onDecideProposal={onDecideProposal} onRunQuery={onRunQuery} runDisabled={runDisabled}/>}
+            {inspector === 'assistant' && <AssistantWorkflow mode={expert ? 'expert' : 'beginner'} sql={sql} question={assistantQuestion} onQuestionChange={onAssistantQuestion} proposal={assistantProposal} busy={assistantBusy} cancelable={assistantCancelable} phase={assistantPhase} error={assistantError} notice={assistantNotice} trusted={trusted} runId={runId} includeRun={includeRun} onIncludeRun={onIncludeRun} onAskAI={() => onAskAI(schema, connection.manifest?.serverVersion, connection.database)} onCancelRequest={onCancelAssistantRequest} schemaReady={Boolean(schema) && !schemaLoading && !schemaError} schemaLoading={schemaLoading} schemaStatus={schemaError} onRefreshSchema={onRefreshSchema} onDecideProposal={onDecideProposal} onRunQuery={onRunQuery} runDisabled={runDisabled}/>}
         </div>
         <footer className="inspector-footer">{expert && <div className="inspector-footer-actions"><Button variant="secondary" className="toolbar-small" onClick={onOpenImport}>{copy.import}</Button><Button variant="secondary" className="toolbar-small" onClick={onExportResult} disabled={exportDisabled}>{copy.export}</Button></div>}<div className="inspector-footer-meta"><span className="connection-readonly"><Icon name={connection.readonly ? 'lock' : 'database'}/> {connection.readonly ? copy.readOnly : 'Read/write'}</span><span title={`${connection.name} · ${connection.database}`}>{connection.name} <i>·</i> {connection.database}</span></div></footer>
     </aside>;

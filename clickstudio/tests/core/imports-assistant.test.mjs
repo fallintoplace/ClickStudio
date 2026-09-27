@@ -115,6 +115,55 @@ test('Insert requires exact confirmation', async () => { const imports = new Imp
 test('Preview refuses empty CSV rather than a zero-row mutation', () => { const imports = new ImportService(new MemoryStore(), {}, () => true); assert.throws(() => imports.preview(owner, 'a.csv', 'n\n', 'csv'), { code: 'IMPORT_EMPTY' }); });
 test('AI context preview does not call a model', () => { const f = aiFixture(); f.ai.prepare(owner, f.input); assert.equal(f.calls, 0); });
 test('AI requires consent to the exact prepared context', async () => { const f = aiFixture(), c = f.ai.prepare(owner, f.input); await assert.rejects(f.ai.propose(owner, c.id, false), { code: 'AI_CONSENT_REQUIRED' }); assert.equal(f.calls, 0); });
+test('Cancelling before model dispatch leaves context cancelled without a model call', async () => {
+    const f = aiFixture(), c = f.ai.prepare(owner, f.input), controller = new AbortController();
+    controller.abort();
+
+    await assert.rejects(f.ai.propose(owner, c.id, true, controller.signal), { name: 'AbortError' });
+
+    assert.equal(f.calls, 0);
+    assert.equal(f.store.get('ai-contexts', c.id).state, 'cancelled');
+    assert.equal(f.store.count('proposals'), 0);
+    assert.ok(f.store.list('audit').some(event => event.action === 'ai.cancel-context' && event.resourceId === c.id));
+});
+test('Cancelling an in-flight model request aborts it and records the cancelled context', async () => {
+    const store = new MemoryStore();
+    let calls = 0, receivedSignal;
+    const driver = {
+        available: true,
+        model: 'fixture',
+        propose(_context, signal) {
+            calls++;
+            receivedSignal = signal;
+            return new Promise((_resolve, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true }));
+        },
+    };
+    const ai = new AssistantService(store, driver, () => true), c = ai.prepare(owner, { connectionId: 'local', sql: 'SELECT 2', action: 'generate', question: 'Count events', schema });
+    const controller = new AbortController(), pending = ai.propose(owner, c.id, true, controller.signal);
+    controller.abort();
+
+    await assert.rejects(pending, { name: 'AbortError' });
+
+    assert.equal(calls, 1);
+    assert.equal(receivedSignal.aborted, true);
+    assert.equal(store.get('ai-contexts', c.id).state, 'cancelled');
+    assert.equal(store.count('proposals'), 0);
+});
+test('A late model response after cancellation cannot create a proposal', async () => {
+    const store = new MemoryStore();
+    let resolveModel;
+    const modelResponse = new Promise(resolve => { resolveModel = resolve; });
+    const driver = { available: true, model: 'fixture', propose: async () => modelResponse };
+    const ai = new AssistantService(store, driver, () => true), c = ai.prepare(owner, { connectionId: 'local', sql: 'SELECT 2', action: 'generate', question: 'Count events', schema });
+    const controller = new AbortController(), pending = ai.propose(owner, c.id, true, controller.signal);
+    controller.abort();
+    resolveModel({ content: proposal, responseId: 'late-response' });
+
+    await assert.rejects(pending, { name: 'AbortError' });
+
+    assert.equal(store.get('ai-contexts', c.id).state, 'cancelled');
+    assert.equal(store.count('proposals'), 0);
+});
 test('Sending twice returns the same proposal and makes one model request', async () => { const f = aiFixture(), c = f.ai.prepare(owner, f.input); const a = await f.ai.propose(owner, c.id, true), b = await f.ai.propose(owner, c.id, true); assert.equal(a.id, b.id); assert.equal(f.calls, 1); });
 test('Review lane cannot return applicable SQL even if model proposes it', async () => { const f = aiFixture(), c = f.ai.prepare(owner, { ...f.input, action: 'review' }), p = await f.ai.propose(owner, c.id, true); assert.equal(p.sql, null); assert.throws(() => f.ai.decide(owner, p.id, 'accepted', 'local', 'SELECT 2'), { code: 'REVIEW_ONLY' }); });
 test('Proposal cannot be applied to changed SQL or another connection', async () => { const f = aiFixture(), c = f.ai.prepare(owner, f.input), p = await f.ai.propose(owner, c.id, true); assert.throws(() => f.ai.decide(owner, p.id, 'accepted', 'second', 'SELECT 2'), { code: 'CONNECTION_MISMATCH' }); assert.throws(() => f.ai.decide(owner, p.id, 'accepted', 'local', 'SELECT 3'), { code: 'DRAFT_CHANGED' }); });

@@ -40,6 +40,6 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
     }
     return content as T;
 }
-export const post = <T,>(path: string, body: unknown = {}) => api<T>(path, { method: 'POST', body });
+export const post = <T,>(path: string, body: unknown = {}, options: Pick<ApiOptions, 'signal'> = {}) => api<T>(path, { method: 'POST', body, ...options });
 export function download(name: string, value: unknown, type = 'application/json') { const text = typeof value === 'string' ? value : JSON.stringify(value, null, 2); const url = URL.createObjectURL(new Blob([text], { type })); const a = document.createElement('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
 export function message(error: unknown) { return error instanceof RequestError ? `${error.detail.code}: ${error.message}` : error instanceof Error ? error.message : String(error); }
