@@ -11,19 +11,8 @@
     .workspace-content.has-panel-split { display: flex; min-height: 0; flex-direction: column; gap: 0; overflow: hidden; }
     .workspace-content.has-panel-split > .editor-surface { flex: 0 0 var(--query-panel-basis, 54%); }
     .workspace-content.has-panel-split > .results-surface { flex: 1 1 0; }
-    .application:has(.workspace-root .sql-proposal-diff) > .topbar,
-    .workspace-root:has(.sql-proposal-diff) > .workspace-layout > .icon-rail,
-    .workspace-root:has(.sql-proposal-diff) > .workspace-layout > .inspector-pane:not(.is-drawer),
-    .workspace-root:has(.sql-proposal-diff) .workspace-main > .document-tabs,
-    .workspace-root:has(.sql-proposal-diff) > .execution-bar,
-    .workspace-content:has(.sql-proposal-diff) > .editor-surface .editor-heading,
-    .workspace-content:has(.sql-proposal-diff) > .editor-surface .editor-main-column > :not(.sql-proposal-diff),
-    .workspace-content:has(.sql-proposal-diff) > .editor-surface .editor-control-rail,
-    .workspace-content:has(.sql-proposal-diff) > .workspace-panel-splitter,
-    .workspace-content:has(.sql-proposal-diff) > .results-surface,
-    .detached-query-window-root:has(.sql-proposal-diff) .editor-surface .editor-heading,
-    .detached-query-window-root:has(.sql-proposal-diff) .editor-surface .editor-main-column > :not(.sql-proposal-diff),
-    .detached-query-window-root:has(.sql-proposal-diff) .editor-surface .editor-control-rail { filter: blur(2px); opacity: .4; transition: filter .18s ease, opacity .18s ease; }
+    .workspace-content:has(.sql-proposal-diff) > .editor-surface .editor-frame,
+    .detached-query-window-root:has(.sql-proposal-diff) .editor-surface .editor-frame { filter: blur(2px); opacity: .4; transition: filter .18s ease, opacity .18s ease; }
     .workspace-panel-splitter { position: relative; z-index: var(--z-local-intersection); display: grid; min-height: 10px; flex: 0 0 10px; place-items: center; cursor: row-resize; touch-action: none; }
     .workspace-panel-splitter::before { width: min(180px, 32%); height: 3px; border-radius: 99px; background: var(--line-bright); content: ""; transition: width .16s ease, background .16s ease, box-shadow .16s ease; }
     .workspace-panel-splitter:hover::before, .workspace-panel-splitter:focus-visible::before { width: min(220px, 40%); background: color-mix(in srgb, var(--accent) 62%, var(--line-bright)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent); }
