@@ -175,7 +175,6 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
     const {
         assistantQuestion,
         changeAssistantQuestion,
-        assistantProposal,
         assistantChats, activeAssistantChatId, assistantTurns, assistantChatStorageError,
         newAssistantChat, selectAssistantChat, renameAssistantChat, deleteAssistantChat,
         assistantBusy,
@@ -764,7 +763,6 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         onSelectAssistantChat: selectAssistantChat,
         onRenameAssistantChat: renameAssistantChat,
         onDeleteAssistantChat: deleteAssistantChat,
-        assistantProposal,
         assistantBusy,
         assistantCancelable,
         assistantPhase,
@@ -787,7 +785,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
     } satisfies InspectorPaneProps;
 
     const queryPanel = <WorkspaceQueryPanel
-        state={{ active, connection, schema, assistantProposal, assistantBusy, copy, experience, dark, nativeParserEnabled, nativeParserStatus,
+        state={{ active, connection, schema, copy, experience, dark, nativeParserEnabled, nativeParserStatus,
             trusted, unsupportedParameters, parameters, busy, inspector, demoMode, view }}
         actions={{
             onPatch: patch,
@@ -796,7 +794,6 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
                 setResultsCollapsed(false);
             },
             onOpenAssistant: () => showInspector('assistant'),
-            onDecideAssistantProposal: (decision: 'accepted' | 'rejected') => void decideAssistantProposal(assistantProposal?.id ?? '', decision),
             onSave: saveDraft,
             onFormat: formatActiveSql,
             onRun: execute,

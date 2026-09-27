@@ -169,7 +169,6 @@
     .pipeline-stage.stage-estimated .stage-evidence { background: color-mix(in srgb, var(--amber) 7%, transparent); color: var(--amber); }
     .pipeline-stage.stage-planned .stage-evidence { background: color-mix(in srgb, var(--accent) 8%, transparent); color: var(--accent); }
     .assistant-panel { display: flex; min-width: 0; min-height: 0; flex: 1; flex-direction: column; gap: 9px; overflow: hidden; padding: 10px 12px; }
-    .proposal-review-hint { margin: 0; color: var(--muted); font-size: 8px; line-height: 1.55; }
     .assistant-chat-toolbar { display: flex; min-width: 0; flex: none; align-items: center; gap: 7px; }
     .assistant-chat-switcher { position: relative; min-width: 0; flex: 1; }
     .assistant-chat-history-trigger { display: flex; width: 100%; min-width: 0; min-height: 34px; align-items: center; justify-content: space-between; gap: 8px; padding: 0 10px; text-align: left; }
@@ -226,6 +225,36 @@
     .assistant-user-message p { margin: 0; color: var(--text); font-size: 9px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
     .assistant-response { display: grid; min-width: 0; gap: 5px; }
     .assistant-response .proposal-card { min-width: 0; }
+    .assistant-sql-review { display: grid; min-width: 0; gap: 6px; }
+    .sql-proposal-diff { min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: color-mix(in srgb, var(--page-raised) 76%, var(--panel)); }
+    .sql-proposal-diff-toggle { display: flex; min-width: 0; min-height: 35px; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 8px; list-style: none; cursor: pointer; }
+    .sql-proposal-diff-toggle::-webkit-details-marker { display: none; }
+    .sql-proposal-diff-title { display: flex; min-width: 0; align-items: center; gap: 7px; }
+    .sql-proposal-diff-title > .eyebrow { white-space: nowrap; }
+    .sql-proposal-review-status { flex: none; padding: 3px 6px; border: 1px solid color-mix(in srgb, var(--amber) 36%, var(--line)); border-radius: 999px; background: color-mix(in srgb, var(--amber) 9%, transparent); color: var(--amber); font-size: 7px; font-weight: 720; letter-spacing: .04em; }
+    .sql-proposal-review-status.is-accepted { border-color: color-mix(in srgb, var(--green) 30%, var(--line)); background: color-mix(in srgb, var(--green) 7%, transparent); color: var(--green); }
+    .sql-proposal-review-status.is-rejected { border-color: var(--line); background: var(--panel); color: var(--muted); }
+    .sql-proposal-diff-count { display: flex; min-width: 0; flex: none; flex-wrap: wrap; justify-content: flex-end; gap: 4px; font-family: var(--font-mono); font-size: 7px; }
+    .sql-proposal-diff-count > span { padding: 3px 5px; border: 1px solid var(--line); border-radius: 5px; background: color-mix(in srgb, var(--panel) 68%, transparent); color: var(--muted); }
+    .sql-proposal-diff-count .is-added i { color: var(--green); font-style: normal; }
+    .sql-proposal-diff-count .is-removed i { color: var(--red); font-style: normal; }
+    .sql-proposal-diff-chevron { flex: none; color: var(--muted); font-size: 14px; line-height: 1; transition: transform .16s ease; }
+    .sql-proposal-diff[open] .sql-proposal-diff-chevron { transform: rotate(180deg); }
+    .sql-proposal-diff-scroll-frame { min-width: 0; margin: 0 7px 7px; border-radius: 6px; }
+    .sql-proposal-diff-code { min-height: 38px; max-height: 220px; overflow: auto; margin: 0; padding: 5px 0; border: 1px solid var(--line); border-radius: 6px; background: var(--page); color: var(--text-soft); font-family: var(--font-mono); font-size: 8px; line-height: 1.55; }
+    .sql-proposal-diff-code code { display: block; min-width: max-content; }
+    .sql-proposal-diff-line { display: grid; grid-template-columns: 48px 14px minmax(0, 1fr); min-height: 15px; white-space: pre; }
+    .sql-proposal-diff-line.is-added { background: color-mix(in srgb, var(--green) 13%, transparent); color: var(--green); }
+    .sql-proposal-diff-line.is-removed { background: color-mix(in srgb, var(--red) 12%, transparent); color: var(--red); }
+    .sql-proposal-diff-gutter { padding: 0 6px 0 2px; border-right: 1px solid var(--line); color: var(--muted); text-align: right; }
+    .sql-proposal-diff-sign { text-align: center; }
+    .sql-proposal-diff-line > span:last-child { padding-right: 10px; }
+    .sql-proposal-diff-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 7px; line-height: 1.45; }
+    .sql-proposal-diff-footer > span { min-width: 0; }
+    .sql-proposal-diff-footer > span.is-blocked { color: var(--amber); }
+    .sql-proposal-diff-footer > div { display: flex; flex: none; gap: 5px; }
+    .sql-proposal-diff-footer .button-base { min-height: 27px; padding-inline: 8px; font-size: 8px; }
+    .sql-proposal-diff-toggle:focus-visible { outline: 2px solid color-mix(in srgb, var(--focus-color) 70%, transparent); outline-offset: -2px; }
     .assistant-pending { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 9px; }
     .assistant-pending .loading-orbit { width: 14px; height: 14px; }
     .assistant-pending .loading-orbit::after { inset: 3px; }
@@ -282,9 +311,6 @@
     .proposal-finding { display: grid; gap: 4px; margin: 0; padding: 8px; border-radius: 7px; background: var(--panel); color: var(--text-soft); font-size: 8px; line-height: 1.5; }
     .proposal-finding strong { color: var(--amber); font-size: 7px; text-transform: uppercase; }
     .proposal-finding small { color: var(--muted); font-size: 7px; }
-    .proposal-sql { max-height: 180px; overflow: auto; padding: 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--page); color: var(--text-soft); font-family: var(--font-mono); font-size: 8px; line-height: 1.6; white-space: pre-wrap; }
-    .proposal-buttons { display: flex; gap: 6px; }
-    .proposal-buttons > * { flex: 1; }
     .inspector-footer { display: grid; flex: none; gap: 8px; padding: 9px 11px; border-top: 1px solid var(--line); color: var(--muted); font-size: 8px; }
     .inspector-footer-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
     .inspector-footer-actions > button { min-width: 0; min-height: 29px; padding: 0 8px; }

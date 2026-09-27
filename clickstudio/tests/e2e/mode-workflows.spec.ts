@@ -180,8 +180,8 @@ test('Switching to Experimental keeps the AI chat, query and run evidence', asyn
     const prompt = page.getByRole('textbox', { name: 'Ask AI', exact: true });
     await prompt.fill('Show event counts by day');
     await page.locator('.assistant-panel').getByRole('button', { name: 'Send', exact: true }).click();
-    await expect(page.getByTestId('sql-proposal-diff').getByText('Show the sample event counts by day.', { exact: true })).toBeVisible();
-    await expect(page.getByTestId('sql-proposal-diff')).toBeVisible();
+    await expect(page.locator('.proposal-card').getByText('Show the sample event counts by day.', { exact: true })).toBeVisible();
+    await expect(page.locator('.proposal-card').getByTestId('sql-proposal-diff')).toBeVisible();
     expect(generations).toHaveLength(1);
     expect(generations[0]).toMatchObject({ action: 'ask', question: 'Show event counts by day', connectionId: 'demo' });
     expect(generations[0]?.schema).toBeTruthy();

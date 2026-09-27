@@ -173,8 +173,6 @@ export function useWorkspaceAssistant({
     const assistantPhase = assistantBusy ? activity.phase : undefined;
     const assistantCancelable = assistantBusy && assistantPhase !== 'deciding';
     const assistantError = assistantErrors[activeChat.id] ?? '';
-    const assistantProposal = [...activeChat.turns].reverse().find(turn => turn.proposal &&
-        (turn.proposal.baseSql === active.sql || (turn.proposal.decision === 'accepted' && turn.proposal.sql === active.sql)))?.proposal;
     const setAssistantError = (error: string, chatId = activeChat.id) => setAssistantErrors(current => ({ ...current, [chatId]: error }));
 
     const cancelAssistantRequest = (reason: 'cancelled' | 'context-changed', expectedRequestId?: number) => {
@@ -351,7 +349,7 @@ export function useWorkspaceAssistant({
     const decideAssistantProposal = async (turnId: string, decision: 'accepted' | 'rejected') => {
         const turn = activeChat.turns.find(item => item.id === turnId || item.proposal?.id === turnId);
         const proposal = turn?.proposal;
-        if (!turn || !proposal || proposal.decision !== 'pending' || proposal.baseSql !== active.sql) return;
+        if (!turn || !proposal || proposal.decision !== 'pending' || (decision === 'accepted' && proposal.baseSql !== active.sql)) return;
         if (activeRequestRef.current)
             cancelAssistantRequest('context-changed', activeRequestRef.current.id);
         const chatId = activeChat.id;
@@ -391,7 +389,6 @@ export function useWorkspaceAssistant({
     return {
         assistantQuestion,
         changeAssistantQuestion,
-        assistantProposal,
         assistantTurns: activeChat.turns,
         assistantChats,
         activeAssistantChatId: activeChat.id,
