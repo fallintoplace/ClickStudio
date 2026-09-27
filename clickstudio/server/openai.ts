@@ -19,8 +19,12 @@ export class OpenAIDriver implements AssistantDriver {
         const content: OpenAI.Responses.ResponseInputContent[] = [{ type: 'input_text', text: JSON.stringify({ question: context.payload.question, context: JSON.parse(context.payload.context) }) }];
         if (context.payload.image)
             content.push({ type: 'input_image', image_url: context.payload.image, detail: 'auto' });
+        const input: OpenAI.Responses.ResponseInput = [
+            ...(context.payload.conversation ?? []).map(message => ({ role: message.role, content: message.content })),
+            { role: 'user', content },
+        ];
         try {
-            const response = await this.client.responses.create({ model: this.model, store: false, instructions: context.payload.instructions, input: [{ role: 'user', content }],
+            const response = await this.client.responses.create({ model: this.model, store: false, instructions: context.payload.instructions, input,
                 max_output_tokens: 12_000, text: { format: { type: 'json_schema', name: 'clickhouse_proposal', strict: true, schema } } }, { signal });
             if (response.status !== 'completed' || !response.output_text) {
                 const reason = response.incomplete_details?.reason;

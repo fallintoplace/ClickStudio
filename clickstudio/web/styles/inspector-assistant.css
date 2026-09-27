@@ -167,8 +167,37 @@
     .stage-evidence { padding: 4px 5px; border-radius: 4px; background: color-mix(in srgb, var(--green) 7%, transparent); color: var(--green); font-size: 6px; font-weight: 740; letter-spacing: .07em; text-transform: uppercase; }
     .pipeline-stage.stage-estimated .stage-evidence { background: color-mix(in srgb, var(--amber) 7%, transparent); color: var(--amber); }
     .pipeline-stage.stage-planned .stage-evidence { background: color-mix(in srgb, var(--accent) 8%, transparent); color: var(--accent); }
-    .assistant-panel { display: grid; align-content: start; gap: 13px; padding: 12px; }
+    .assistant-panel { display: grid; min-width: 0; align-content: start; gap: 13px; padding: 12px; }
     .assistant-generation-disclosure, .proposal-review-hint { margin: 0; color: var(--muted); font-size: 8px; line-height: 1.55; }
+    .assistant-chat-toolbar { display: grid; min-width: 0; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 7px; }
+    .assistant-chat-tabs-frame { min-width: 0; border-bottom: 1px solid var(--line); }
+    .assistant-chat-tabs { display: flex; width: 100%; min-width: 0; gap: 4px; overflow-x: auto; padding: 0 2px 5px; scrollbar-width: thin; }
+    .assistant-chat-tabs > button { display: inline-flex; min-width: 0; max-width: 210px; min-height: 29px; flex: none; align-items: center; gap: 7px; padding: 0 9px; border: 1px solid transparent; border-radius: 7px 7px 0 0; background: transparent; color: var(--muted); font-size: 8px; cursor: pointer; }
+    .assistant-chat-tabs > button:hover { background: var(--panel-hover); color: var(--text); }
+    .assistant-chat-tabs > button[aria-selected="true"] { border-color: var(--line-bright); border-bottom-color: var(--panel); background: var(--panel-raised); color: var(--text); }
+    .assistant-chat-tabs > button > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .assistant-chat-tabs > button > small { display: grid; min-width: 16px; height: 16px; flex: none; place-items: center; border-radius: 8px; background: var(--control-well); color: var(--muted); font-size: 7px; }
+    .assistant-chat-actions { display: flex; align-items: center; gap: 4px; }
+    .assistant-chat-actions .button-base { min-height: 27px; padding-inline: 8px; font-size: 8px; }
+    .assistant-chat-panel { min-width: 0; }
+    .assistant-transcript-frame { display: flex; height: min(48vh, 430px); min-height: 170px; border: 1px solid var(--line); border-radius: 10px; background: color-mix(in srgb, var(--page) 62%, var(--panel-raised)); }
+    .assistant-transcript { display: grid; width: 100%; min-width: 0; align-content: start; gap: 14px; overflow: auto; padding: 11px; scrollbar-width: thin; }
+    .assistant-empty-chat { display: grid; min-height: 145px; align-content: center; justify-items: center; gap: 7px; color: var(--muted); text-align: center; }
+    .assistant-empty-chat .assistant-glyph { width: 34px; height: 34px; }
+    .assistant-empty-chat strong { color: var(--text-soft); font-size: 9px; }
+    .assistant-empty-chat p { max-width: 260px; margin: 0; font-size: 8px; line-height: 1.5; }
+    .assistant-turn { display: grid; min-width: 0; gap: 8px; }
+    .assistant-user-message { display: grid; max-width: 92%; justify-self: end; gap: 4px; padding: 8px 10px; border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--line)); border-radius: 9px 9px 3px 9px; background: color-mix(in srgb, var(--accent) 7%, var(--panel-raised)); }
+    .assistant-user-message > span, .assistant-response-label { color: var(--muted); font-size: 7px; font-weight: 730; letter-spacing: .1em; text-transform: uppercase; }
+    .assistant-user-message p { margin: 0; color: var(--text); font-size: 9px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .assistant-response { display: grid; min-width: 0; gap: 5px; }
+    .assistant-response .proposal-card { min-width: 0; }
+    .assistant-pending { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 9px; }
+    .assistant-pending .loading-orbit { width: 14px; height: 14px; }
+    .assistant-pending .loading-orbit::after { inset: 3px; }
+    .assistant-turn-error { padding: 8px 9px; border: 1px solid color-mix(in srgb, var(--red) 24%, var(--line)); border-radius: 8px; background: color-mix(in srgb, var(--red) 4%, var(--panel)); color: color-mix(in srgb, var(--red) 82%, var(--text)); font-size: 8px; line-height: 1.5; overflow-wrap: anywhere; }
+    .assistant-turn-error.is-cancelled { border-color: var(--line); background: var(--panel-raised); color: var(--muted); }
+    .assistant-stale-proposal { margin: 0; color: var(--amber); font-size: 8px; line-height: 1.5; }
     .assistant-schema-refresh { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     .assistant-schema-refresh .button-base { min-height: 27px; flex: none; padding-inline: 8px; font-size: 8px; }
     .beginner-workspace-content { grid-template-rows: minmax(390px, 1.25fr) minmax(180px, .75fr); }
@@ -192,6 +221,7 @@
     .field-label .field-input { letter-spacing: normal; text-transform: none; }
     .field-textarea { min-height: 82px; resize: vertical; line-height: 1.5; }
     .assistant-question-frame > .field-textarea { display: block; box-sizing: border-box; }
+    .assistant-question-frame .field-textarea { min-height: 68px; max-height: 180px; }
     .include-result { display: flex; align-items: flex-start; gap: 8px; padding: 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-raised); cursor: pointer; }
     .include-result input { margin: 2px 0 0; accent-color: var(--accent); }
     .include-result span { display: grid; gap: 4px; }

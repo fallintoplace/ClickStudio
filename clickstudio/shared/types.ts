@@ -383,6 +383,10 @@ export interface AuditEvent {
     ruleId?: string;
 }
 export type AssistantAction = 'ask' | 'generate' | 'explain' | 'repair' | 'result' | 'performance' | 'review';
+export interface AssistantConversationMessage {
+    role: 'user' | 'assistant';
+    content: string;
+}
 export interface ProposalContent {
     sql: string | null;
     summary: string;

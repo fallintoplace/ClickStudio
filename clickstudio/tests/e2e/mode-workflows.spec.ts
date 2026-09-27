@@ -108,7 +108,7 @@ test('Standard shows a single document tab and keeps tabs for multiple queries',
     await expect(page.locator('.restore-sql-trigger')).toHaveCount(0);
 });
 
-test('Switching to Experimental keeps the same AI question, query and run evidence', async ({ page }) => {
+test('Switching to Experimental keeps the AI chat, query and run evidence', async ({ page }) => {
     const generations: Record<string, unknown>[] = [];
     const runRequests: Record<string, unknown>[] = [];
     let proposalBaseSql = '';
@@ -146,14 +146,14 @@ test('Switching to Experimental keeps the same AI question, query and run eviden
     await page.getByTestId('open-ai').click();
     const prompt = page.getByRole('textbox', { name: 'Ask AI', exact: true });
     await prompt.fill('Show event counts by day');
-    await page.getByRole('button', { name: 'Ask AI', exact: true }).click();
+    await page.locator('.assistant-panel').getByRole('button', { name: 'Send', exact: true }).click();
     await expect(page.getByTestId('sql-proposal-diff').getByText('Show the sample event counts by day.', { exact: true })).toBeVisible();
     await expect(page.getByTestId('sql-proposal-diff')).toBeVisible();
     expect(generations).toHaveLength(1);
     expect(generations[0]).toMatchObject({ action: 'ask', question: 'Show event counts by day', connectionId: 'demo' });
     expect(generations[0]?.schema).toBeTruthy();
     expect(runRequests).toHaveLength(0);
-    await page.getByRole('button', { name: 'Accept SQL', exact: true }).click();
+    await page.getByRole('button', { name: 'Apply to draft', exact: true }).click();
     await expect(page.locator('.cm-content')).toContainText(generatedSql);
     expect(runRequests).toHaveLength(0);
     await page.getByTestId('run-statement').click();
@@ -179,7 +179,8 @@ test('Switching to Experimental keeps the same AI question, query and run eviden
     await expect(results.getByRole('table', { name: 'Retained query rows', exact: true })).toBeVisible();
     await expect(page.locator('.execution-bar code')).toHaveText(queryId);
     await useAdvancedMode(page);
-    await expect(prompt).toHaveValue('Show event counts by day');
+    await expect(page.locator('.assistant-user-message')).toContainText('Show event counts by day');
+    await expect(prompt).toHaveValue('');
     await expect(results.getByRole('tab', { name: 'Insights', exact: true })).toHaveAttribute('aria-selected', 'true');
 });
 
@@ -265,7 +266,7 @@ test('Experimental editor, insights, pipeline and AI copilot stay read-only unti
     });
     expect(await aiShortcutRequest).toBe(false);
     await page.getByRole('checkbox', { name: /Include latest run/ }).check();
-    await page.locator('.assistant-panel').getByRole('button', { name: 'Ask AI', exact: true }).click();
+    await page.locator('.assistant-panel').getByRole('button', { name: 'Send', exact: true }).click();
     await expect(page.getByText('The fixture has no measured performance data.', { exact: true })).toBeVisible();
     expect(assistantRequests).toHaveLength(1);
     expect(assistantRequests[0]).toMatchObject({ action: 'ask', question: 'Why is this query slow?', runId: activeRunId, includeRun: true });

@@ -93,6 +93,15 @@ function isSchemaChangingSql(sql: string) {
     }
 }
 
+async function loadAssistantRunContext(run: Run | undefined, snapshot: Result | undefined, signal: AbortSignal) {
+    if (!run || !terminal(run)) throw new Error('Wait for the latest run to finish before including it.');
+    const result = run.resultState === 'reopenable'
+        ? snapshot?.runId === run.id ? snapshot : await api<Result>(`/runs/${encodeURIComponent(run.id)}/snapshot`, { signal })
+        : undefined;
+    signal.throwIfAborted();
+    return { result, evidenceSql: run.sql, error: run.error?.message };
+}
+
 export function Workspace({ connection, connectionLabel, connections, onSelectConnection, onRefreshConnections, trustActionRef, testConnectionActionRef, demoMode, experience, nativeParserEnabled, dark, copy, locale }: WorkspaceProps) {
     const key = workspaceStateKey(connection.id);
     const [workspace, setWorkspace] = useState(() => initialWorkspaceState(connection.id));
@@ -165,6 +174,8 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         assistantQuestion,
         changeAssistantQuestion,
         assistantProposal,
+        assistantChats, activeAssistantChatId, assistantTurns, assistantChatStorageError,
+        newAssistantChat, selectAssistantChat, deleteAssistantChat,
         assistantBusy,
         assistantCancelable,
         assistantPhase,
@@ -726,6 +737,16 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         onRestoreRevision: restoreDocumentRevision,
         assistantQuestion,
         onAssistantQuestion: changeAssistantQuestion,
+        assistantChats,
+        activeAssistantChatId,
+        assistantTurns,
+        assistantChatStorageError,
+        onNewAssistantChat: () => {
+            newAssistantChat();
+            if (selectableRunId) setIncludeRun(true);
+        },
+        onSelectAssistantChat: selectAssistantChat,
+        onDeleteAssistantChat: deleteAssistantChat,
         assistantProposal,
         assistantBusy,
         assistantCancelable,
@@ -738,21 +759,9 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         onRetryParser: () => editor.current?.retryNativeParser(),
         includeRun,
         onIncludeRun: setIncludeRun,
-        onAskAI: (currentSchema?: Schema, serverVersion?: string, database?: string) => {
-            const loadRunContext = includeRun ? async (signal: AbortSignal) => {
-                if (!run || !terminal(run)) throw new Error('Wait for the latest run to finish before including it.');
-                const selectedResult = run.resultState === 'reopenable'
-                    ? snapshot?.runId === run.id
-                        ? snapshot
-                        : await api<Result>(`/runs/${encodeURIComponent(run.id)}/snapshot`, { signal })
-                    : undefined;
-                signal.throwIfAborted();
-                return { result: selectedResult, evidenceSql: run.sql, error: run.error?.message };
-            } : undefined;
-            void requestAssistantSql(currentSchema, serverVersion, database, loadRunContext);
-        },
+        onAskAI: (currentSchema?: Schema, serverVersion?: string, database?: string) => void requestAssistantSql(currentSchema, serverVersion, database, includeRun ? signal => loadAssistantRunContext(run, snapshot, signal) : undefined),
         onCancelAssistantRequest: cancelAssistantRequest,
-        onDecideProposal: (decision: 'accepted' | 'rejected') => void decideAssistantProposal(decision),
+        onDecideProposal: (turnId: string, decision: 'accepted' | 'rejected') => void decideAssistantProposal(turnId, decision),
         onRunQuery: () => void execute(),
         runDisabled: !trusted || Boolean(busy) || unsupportedParameters,
         expert: experience === 'expert',
@@ -768,7 +777,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
                 setResultsCollapsed(false);
             },
             onOpenAssistant: () => showInspector('assistant'),
-            onDecideAssistantProposal: (decision: 'accepted' | 'rejected') => void decideAssistantProposal(decision),
+            onDecideAssistantProposal: (decision: 'accepted' | 'rejected') => void decideAssistantProposal(assistantProposal?.id ?? '', decision),
             onSave: saveDraft,
             onFormat: formatActiveSql,
             onRun: execute,

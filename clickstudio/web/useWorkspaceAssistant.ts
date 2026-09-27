@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import type { Proposal, Result, Schema } from '../shared/types';
+import type { AssistantConversationMessage, Proposal, Result, Schema } from '../shared/types';
 import { isFrontendDemoPreview, message, post } from './api';
+import { useAssistantChats } from './useAssistantChats';
+import type { AssistantChatTurn } from './assistant-chat-state';
 import { checkpoint, type Draft, type WorkspaceState } from './workspace-state';
-import { useScopedValue } from './useScopedValue';
 
 function isProposal(value: unknown): value is Proposal {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
@@ -28,30 +29,56 @@ function boundedAssistantResult(result?: Result): Result | undefined {
     return bounded;
 }
 
-function assistantRequestKey(
+function assistantContextKey(
     connectionId: string,
     draftId: string,
+    chatId: string,
     sql: string,
     parameters: Record<string, string>,
     runId: string | undefined,
     includeRun: boolean,
-    question: string,
 ) {
     return JSON.stringify({
         connectionId,
         draftId,
+        chatId,
         sql,
         parameters: Object.entries(parameters).sort(([left], [right]) => left.localeCompare(right)),
         runId,
         includeRun,
-        question,
     });
+}
+
+function conversationHistory(turns: readonly AssistantChatTurn[]): AssistantConversationMessage[] {
+    return turns.flatMap(turn => {
+        if (turn.status === 'pending') return [];
+        const messages: AssistantConversationMessage[] = [{ role: 'user', content: JSON.stringify({
+            question: turn.question,
+            sql: turn.contextSql,
+            includeRun: turn.includeRun,
+            ...(turn.runId ? { runId: turn.runId } : {}),
+            ...(turn.runContext ? { runContext: turn.runContext } : {}),
+        }) }];
+        if (turn.proposal) {
+            const { summary, clarification, sql, assumptions, tables, caveats, findings, decision, quality } = turn.proposal;
+            messages.push({ role: 'assistant', content: JSON.stringify({ summary, clarification, sql, assumptions, tables, caveats, findings, decision, quality }) });
+        } else if (turn.error) {
+            messages.push({ role: 'assistant', content: turn.error });
+        }
+        return messages;
+    });
+}
+
+function chatTitle(question: string) {
+    const title = question.replace(/\s+/g, ' ').trim();
+    return title.length > 48 ? `${title.slice(0, 47).trimEnd()}…` : title;
 }
 
 type AssistantPhase = 'preparing' | 'generating' | 'deciding';
 type AssistantRunContext = { result?: Result; evidenceSql?: string; error?: string };
 type AssistantRunContextLoader = (signal: AbortSignal) => Promise<AssistantRunContext>;
-type ActiveAssistantRequest = { id: number; key: string; draftId: string; controller: AbortController };
+type AssistantActivity = { chatId: string; turnId: string; phase: AssistantPhase };
+type ActiveAssistantRequest = { id: number; contextKey: string; chatId: string; draftId: string; turnId: string; controller: AbortController };
 
 export function useDefaultAssistantRunContext(
     runId: string | undefined,
@@ -87,36 +114,32 @@ export function useWorkspaceAssistant({
     workspaceRef: { current: WorkspaceState };
     setWorkspace: Dispatch<SetStateAction<WorkspaceState>>;
 }) {
-    const [assistantQuestion, setAssistantQuestion] = useState('');
-    const [assistantProposalState, setAssistantProposalForDraft] = useScopedValue<{ key: string; value: Proposal } | undefined>(active.id);
-    const [assistantBusyKey, setAssistantBusyKey] = useState<string>();
-    const [assistantPhase, setAssistantPhase] = useState<AssistantPhase>();
+    const {
+        chats: assistantChats,
+        activeChat,
+        storageError: assistantChatStorageError,
+        updateChat,
+        selectChat,
+        createChat,
+        deleteChat,
+    } = useAssistantChats(connectionId);
+    const [questionDrafts, setQuestionDrafts] = useState<Record<string, string>>({});
+    const [activity, setActivity] = useState<AssistantActivity>();
     const [assistantErrors, setAssistantErrors] = useState<Record<string, string>>({});
-    const [assistantNotices, setAssistantNotices] = useState<Record<string, string>>({});
     const [includeRun, setIncludeRunState] = useState(false);
     const requestRef = useRef(0);
     const activeRequestRef = useRef<ActiveAssistantRequest | undefined>(undefined);
-
-    const assistantKey = assistantRequestKey(
-        connectionId,
-        active.id,
-        active.sql,
-        active.parameters,
-        activeRunId,
-        includeRun,
-        assistantQuestion,
-    );
-    const assistantKeyRef = useRef(assistantKey);
-    assistantKeyRef.current = assistantKey;
-    const assistantBusy = assistantBusyKey === assistantKey;
-    const assistantCancelable = activeRequestRef.current?.key === assistantKey;
-    const assistantError = assistantErrors[active.id] ?? '';
-    const assistantNotice = assistantNotices[active.id] ?? '';
-    const setAssistantError = (error: string) => setAssistantErrors(current => ({ ...current, [active.id]: error }));
-    const assistantProposal = assistantProposalState && (
-        assistantProposalState.key === assistantKey ||
-        (assistantProposalState.value.decision === 'accepted' && assistantProposalState.value.sql === active.sql)
-    ) ? assistantProposalState.value : undefined;
+    const assistantQuestion = questionDrafts[activeChat.id] ?? '';
+    const contextKey = assistantContextKey(connectionId, active.id, activeChat.id, active.sql, active.parameters, activeRunId, includeRun);
+    const contextKeyRef = useRef(contextKey);
+    contextKeyRef.current = contextKey;
+    const assistantBusy = activity?.chatId === activeChat.id;
+    const assistantPhase = assistantBusy ? activity.phase : undefined;
+    const assistantCancelable = assistantBusy && assistantPhase !== 'deciding';
+    const assistantError = assistantErrors[activeChat.id] ?? '';
+    const assistantProposal = [...activeChat.turns].reverse().find(turn => turn.proposal &&
+        (turn.proposal.baseSql === active.sql || (turn.proposal.decision === 'accepted' && turn.proposal.sql === active.sql)))?.proposal;
+    const setAssistantError = (error: string, chatId = activeChat.id) => setAssistantErrors(current => ({ ...current, [chatId]: error }));
 
     const cancelAssistantRequest = (reason: 'cancelled' | 'context-changed', expectedRequestId?: number) => {
         const request = activeRequestRef.current;
@@ -124,14 +147,15 @@ export function useWorkspaceAssistant({
         activeRequestRef.current = undefined;
         request.controller.abort();
         requestRef.current++;
-        setAssistantBusyKey(undefined);
-        setAssistantPhase(undefined);
-        setAssistantErrors(current => ({ ...current, [request.draftId]: '' }));
-        setAssistantNotices(current => ({
-            ...current,
-            [request.draftId]: reason === 'cancelled'
-                ? 'Request cancelled.'
-                : 'Request cancelled because the question or context changed. Ask again to use the updated context.',
+        setActivity(current => current?.turnId === request.turnId ? undefined : current);
+        updateChat(request.chatId, chat => ({
+            ...chat,
+            updatedAt: new Date().toISOString(),
+            turns: chat.turns.map(turn => turn.id === request.turnId && turn.status === 'pending'
+                ? { ...turn, status: 'cancelled', error: reason === 'cancelled'
+                    ? 'Request cancelled.'
+                    : 'Request cancelled because the workspace context changed. Send another message to use the current context.' }
+                : turn),
         }));
         return true;
     };
@@ -140,9 +164,9 @@ export function useWorkspaceAssistant({
 
     useEffect(() => {
         const request = activeRequestRef.current;
-        if (request && request.key !== assistantKey)
+        if (request && request.contextKey !== contextKey)
             cancelAssistantRequestRef.current('context-changed', request.id);
-    }, [assistantKey]);
+    }, [contextKey]);
 
     useEffect(() => () => {
         activeRequestRef.current?.controller.abort();
@@ -150,12 +174,7 @@ export function useWorkspaceAssistant({
     }, []);
 
     const changeAssistantQuestion = (question: string) => {
-        cancelAssistantRequest('context-changed');
-        requestRef.current++;
-        setAssistantBusyKey(undefined);
-        setAssistantPhase(undefined);
-        setAssistantQuestion(question);
-        setAssistantProposalForDraft(active.id, undefined);
+        setQuestionDrafts(current => ({ ...current, [activeChat.id]: question }));
         setAssistantError('');
     };
 
@@ -163,16 +182,37 @@ export function useWorkspaceAssistant({
         if (include === includeRun) return;
         cancelAssistantRequest('context-changed');
         requestRef.current++;
-        setAssistantBusyKey(undefined);
-        setAssistantPhase(undefined);
+        setActivity(undefined);
         setIncludeRunState(include);
-        setAssistantProposalForDraft(active.id, undefined);
         setAssistantError('');
+    };
+
+    const newAssistantChat = () => {
+        cancelAssistantRequest('context-changed');
+        const chatId = createChat(Boolean(assistantQuestion.trim()));
+        setAssistantError('', chatId);
+        return chatId;
+    };
+
+    const selectAssistantChat = (chatId: string) => {
+        if (chatId === activeChat.id) return;
+        cancelAssistantRequest('context-changed');
+        selectChat(chatId);
+    };
+
+    const deleteAssistantChat = (chatId: string) => {
+        if (activeRequestRef.current?.chatId === chatId)
+            cancelAssistantRequest('context-changed');
+        deleteChat(chatId);
+        if (assistantChats.length === 1 && activeRunId) setIncludeRunState(true);
+        setQuestionDrafts(current => { const next = { ...current }; delete next[chatId]; return next; });
+        setAssistantErrors(current => { const next = { ...current }; delete next[chatId]; return next; });
     };
 
     const requestAssistantSql = async (schema?: Schema, serverVersion?: string, database?: string, loadRunContext?: AssistantRunContextLoader) => {
         if (!trusted) return;
-        if (!assistantQuestion.trim()) {
+        const question = assistantQuestion.trim();
+        if (!question) {
             setAssistantError('Ask a question or describe the SQL you want first.');
             return;
         }
@@ -184,37 +224,55 @@ export function useWorkspaceAssistant({
             setAssistantError('Run a query before including its run context.');
             return;
         }
+        const chatId = activeChat.id;
         const draftId = active.id;
-        const requestKey = assistantRequestKey(
-            connectionId,
-            draftId,
-            active.sql,
-            active.parameters,
-            activeRunId,
+        const turnId = crypto.randomUUID();
+        const requestContextKey = contextKey;
+        const history = conversationHistory(activeChat.turns);
+        const now = new Date().toISOString();
+        const turn: AssistantChatTurn = {
+            id: turnId,
+            question,
+            contextSql: active.sql,
             includeRun,
-            assistantQuestion,
-        );
-        const activeRequest = activeRequestRef.current;
-        if (activeRequest?.key === requestKey) return;
-        if (activeRequest)
-            cancelAssistantRequest('context-changed', activeRequest.id);
+            ...(includeRun && activeRunId ? { runId: activeRunId } : {}),
+            status: 'pending' as const,
+        };
+        if (activeRequestRef.current)
+            cancelAssistantRequest('context-changed', activeRequestRef.current.id);
         const requestId = ++requestRef.current;
         const controller = new AbortController();
-        activeRequestRef.current = { id: requestId, key: requestKey, draftId, controller };
-        assistantKeyRef.current = requestKey;
-        setAssistantBusyKey(requestKey);
-        setAssistantPhase(includeRun ? 'preparing' : 'generating');
+        activeRequestRef.current = { id: requestId, contextKey: requestContextKey, chatId, draftId, turnId, controller };
+        setActivity({ chatId, turnId, phase: includeRun ? 'preparing' : 'generating' });
         setAssistantError('');
-        setAssistantNotices(current => ({ ...current, [draftId]: '' }));
-        setAssistantProposalForDraft(draftId, undefined);
+        setQuestionDrafts(current => ({ ...current, [chatId]: '' }));
+        updateChat(chatId, chat => ({
+            ...chat,
+            title: chat.turns.length ? chat.title : chatTitle(question),
+            updatedAt: now,
+            turns: [...chat.turns, turn],
+        }));
         try {
             const runContext = includeRun ? await loadRunContext?.(controller.signal) : undefined;
             controller.signal.throwIfAborted();
             if (includeRun && !runContext) throw new Error('Could not load the selected run context. Try again.');
-            setAssistantPhase('generating');
+            const storedRunContext = includeRun && runContext ? {
+                ...(runContext.result ? { result: boundedAssistantResult(runContext.result) } : {}),
+                ...(runContext.evidenceSql ? { evidenceSql: runContext.evidenceSql } : {}),
+                ...(runContext.error ? { error: runContext.error } : {}),
+            } : undefined;
+            if (storedRunContext && JSON.stringify(storedRunContext).length > 60_000)
+                throw new Error('The selected run context is too large to keep in this chat. Start a new chat or select a smaller run.');
+            if (storedRunContext)
+                updateChat(chatId, chat => ({
+                    ...chat,
+                    turns: chat.turns.map(current => current.id === turnId ? { ...current, runContext: storedRunContext } : current),
+                }));
+            setActivity({ chatId, turnId, phase: 'generating' });
             const proposal = await post<unknown>('/assistant/sql', {
                 connectionId,
-                question: assistantQuestion,
+                question,
+                conversation: history,
                 sql: active.sql,
                 schema: { ...schema, columns: schema.columns.map(({ database: columnDatabase, table, name, type }) => ({ database: columnDatabase, table, name, type })) },
                 serverVersion,
@@ -222,50 +280,49 @@ export function useWorkspaceAssistant({
                 action: 'ask',
                 runId: includeRun ? activeRunId : undefined,
                 includeRun,
-                result: includeRun ? boundedAssistantResult(runContext?.result) : undefined,
-                evidenceSql: includeRun ? runContext?.evidenceSql : undefined,
-                error: includeRun ? runContext?.error : undefined,
+                result: storedRunContext?.result,
+                evidenceSql: storedRunContext?.evidenceSql,
+                error: storedRunContext?.error,
             }, { signal: controller.signal });
             if (!isProposal(proposal)) throw new Error('The assistant returned incomplete data. Try again.');
             if (requestRef.current !== requestId) return;
-            if (assistantKeyRef.current !== requestKey) {
+            if (contextKeyRef.current !== requestContextKey) {
                 cancelAssistantRequest('context-changed', requestId);
                 return;
             }
-            setAssistantProposalForDraft(draftId, { key: requestKey, value: proposal });
+            updateChat(chatId, chat => ({
+                ...chat,
+                updatedAt: new Date().toISOString(),
+                turns: chat.turns.map(current => current.id === turnId ? { ...current, status: 'complete', proposal } : current),
+            }));
         } catch (caught) {
             if (activeRequestRef.current?.id === requestId && requestRef.current === requestId) {
-                if (assistantKeyRef.current !== requestKey)
-                    cancelAssistantRequest('context-changed', requestId);
-                else setAssistantError(message(caught));
+                const error = message(caught);
+                updateChat(chatId, chat => ({
+                    ...chat,
+                    updatedAt: new Date().toISOString(),
+                    turns: chat.turns.map(current => current.id === turnId ? { ...current, status: 'failed', error } : current),
+                }));
             }
         } finally {
             if (activeRequestRef.current?.id === requestId) {
                 activeRequestRef.current = undefined;
-                setAssistantBusyKey(undefined);
-                setAssistantPhase(undefined);
+                setActivity(current => current?.turnId === turnId ? undefined : current);
             }
         }
     };
 
-    const decideAssistantProposal = async (decision: 'accepted' | 'rejected') => {
-        if (!assistantProposal || assistantProposal.decision !== 'pending' || assistantProposal.baseSql !== active.sql) return;
+    const decideAssistantProposal = async (turnId: string, decision: 'accepted' | 'rejected') => {
+        const turn = activeChat.turns.find(item => item.id === turnId || item.proposal?.id === turnId);
+        const proposal = turn?.proposal;
+        if (!turn || !proposal || proposal.decision !== 'pending' || proposal.baseSql !== active.sql) return;
         if (activeRequestRef.current)
             cancelAssistantRequest('context-changed', activeRequestRef.current.id);
-        const proposal = assistantProposal;
+        const chatId = activeChat.id;
         const draftId = active.id;
-        const requestKey = assistantRequestKey(
-            connectionId,
-            draftId,
-            active.sql,
-            active.parameters,
-            activeRunId,
-            includeRun,
-            assistantQuestion,
-        );
         const requestId = ++requestRef.current;
-        setAssistantBusyKey(requestKey);
-        setAssistantPhase('deciding');
+        const chatTurnId = turn.id;
+        setActivity({ chatId, turnId: chatTurnId, phase: 'deciding' });
         setAssistantError('');
         try {
             const reviewed = isFrontendDemoPreview && proposal.owner === 'vercel-session'
@@ -274,7 +331,11 @@ export function useWorkspaceAssistant({
                     `/assistant/proposals/${encodeURIComponent(proposal.id)}/decision`,
                     { decision, connectionId, currentSql: active.sql },
                 );
-            setAssistantProposalForDraft(draftId, { key: requestKey, value: reviewed }, true);
+            updateChat(chatId, chat => ({
+                ...chat,
+                updatedAt: new Date().toISOString(),
+                turns: chat.turns.map(current => current.id === chatTurnId ? { ...current, proposal: reviewed } : current),
+            }));
             const currentDraft = workspaceRef.current.tabs.find(draft => draft.id === draftId);
             if (decision === 'accepted' && reviewed.sql !== null && currentDraft?.sql === proposal.baseSql) {
                 setWorkspace(current => ({
@@ -285,12 +346,9 @@ export function useWorkspaceAssistant({
                 }));
             }
         } catch (caught) {
-            if (requestRef.current === requestId && assistantKeyRef.current === requestKey) setAssistantError(message(caught));
+            if (requestRef.current === requestId) setAssistantError(message(caught));
         } finally {
-            if (requestRef.current === requestId) {
-                setAssistantBusyKey(undefined);
-                setAssistantPhase(undefined);
-            }
+            setActivity(current => current?.turnId === chatTurnId ? undefined : current);
         }
     };
 
@@ -298,11 +356,18 @@ export function useWorkspaceAssistant({
         assistantQuestion,
         changeAssistantQuestion,
         assistantProposal,
+        assistantTurns: activeChat.turns,
+        assistantChats,
+        activeAssistantChatId: activeChat.id,
+        assistantChatStorageError,
+        newAssistantChat,
+        selectAssistantChat,
+        deleteAssistantChat,
         assistantBusy,
         assistantCancelable,
         assistantPhase,
         assistantError,
-        assistantNotice,
+        assistantNotice: '',
         includeRun,
         setIncludeRun,
         requestAssistantSql,

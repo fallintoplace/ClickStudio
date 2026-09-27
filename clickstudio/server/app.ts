@@ -7,7 +7,7 @@ import type { AssistantAction, AuditEvent, ClickHouseDocumentationEntry, ClickHo
 import type { QueryDriver } from '../core/runs.js';
 import { RunService, terminal } from '../core/runs.js';
 import { ArtifactService } from '../core/artifacts.js';
-import { AssistantService, type AssistantDriver } from '../core/assistant.js';
+import { AssistantService, type AssistantDriver, validateAssistantConversation } from '../core/assistant.js';
 import { ImportService, type ImportDriver } from '../core/imports.js';
 import { MonitorService } from '../core/monitors.js';
 import { SessionService } from '../core/sessions.js';
@@ -57,6 +57,7 @@ function registerAssistantSqlRoute(app: Express, dependencies: {
             canWrite(p);
             requireThat(authorized(p, connectionId), 403, 'WORKSPACE_UNTRUSTED', 'Trust this connection before sharing context');
             const question = text(v.question, 'question', 4000), sql = text(v.sql, 'SQL', 200000, true);
+            const conversation = validateAssistantConversation(v.conversation);
             const schema = await driver.schema(connectionId), connection = driver.connection(p, connectionId);
             let run: Run | undefined;
             if (v.includeRun === true) {
@@ -66,7 +67,7 @@ function registerAssistantSqlRoute(app: Express, dependencies: {
             }
             const documentation = await assistantReferenceDocs(driver, p, connectionId, question, sql, schema, connection.database);
             const result = run?.resultState === 'reopenable' ? runs.result(p, run.id) : undefined;
-            const context = ai.prepare(p, { connectionId, database: connection.database, action: 'ask', question, sql, schema, result,
+            const context = ai.prepare(p, { connectionId, database: connection.database, action: 'ask', question, conversation, sql, schema, result,
                 evidenceSql: run?.sql, error: run?.error?.message, serverVersion: connection.manifest?.serverVersion,
                 documentation, sensitiveColumns: config.sensitiveColumns });
             preparedContextId = context.id;
