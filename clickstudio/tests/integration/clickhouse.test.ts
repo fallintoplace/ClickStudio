@@ -53,7 +53,8 @@ test('LIVE ClickHouse: MergeTree CTAS copies every source column and row', { ski
             ],
         });
         await client.command({ query: `CREATE TABLE ${target} ENGINE = MergeTree ORDER BY tuple() AS SELECT * FROM ${source}` });
-        const rows = await client.query({ query: `SELECT * FROM ${target} ORDER BY country`, format: 'JSONEachRow' }).json<Record<string, unknown>>();
+        const result = await client.query({ query: `SELECT * FROM ${target} ORDER BY country`, format: 'JSONEachRow' });
+        const rows = await result.json<Record<string, unknown>>();
         assert.deepEqual(rows, [
             { country: 'Japan', place: 'Tokyo', latitude: 35.6762, longitude: 139.6503 },
             { country: 'Poland', place: 'Warsaw', latitude: 52.2297, longitude: 21.0122 },
