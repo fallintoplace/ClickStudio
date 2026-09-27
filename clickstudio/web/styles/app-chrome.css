@@ -101,6 +101,7 @@
     .document-tabs-scroll::-webkit-scrollbar { display: none; }
     .document-tab { position: relative; display: flex; width: max-content; min-width: 160px; max-width: 340px; flex: 0 0 auto; align-items: center; gap: 7px; padding: 0 9px; border: 1px solid transparent; border-bottom: 0; border-radius: 7px 7px 0 0; color: var(--muted); font-size: 10px; cursor: pointer; transition: .18s ease; }
     .document-tab-actions { position: relative; z-index: 1; display: flex; flex: none; align-items: stretch; gap: 2px; padding-left: 5px; background: color-mix(in srgb, var(--page-raised) 94%, transparent); }
+    .document-tab-actions:has(.restore-sql-trigger[aria-expanded="true"]) { z-index: var(--z-app-chrome); }
     .document-tabs.has-tab-overflow .document-tab-actions { box-shadow: -14px 0 18px color-mix(in srgb, var(--page-raised) 94%, transparent); }
     .document-tabs-scroll-button { display: grid; width: 27px; height: 31px; flex: none; align-self: center; place-items: center; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); color: var(--text-soft); cursor: pointer; transition: .16s ease; }
     .document-tabs-scroll-button:hover:not(:disabled) { border-color: var(--active-border); background: var(--active-surface); color: var(--accent); }
