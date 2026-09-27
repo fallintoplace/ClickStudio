@@ -34,8 +34,8 @@ export type AssistantWorkflowProps = {
     schemaStatus: string;
     onRefreshSchema: () => void;
     onDecideProposal: (turnId: string, decision: 'accepted' | 'rejected') => void;
-    onRunQuery: () => void;
-    runDisabled: boolean;
+    onRunQuery: (sql: string) => void;
+    runDisabled: (sql: string) => boolean;
 };
 
 function AssistantOutput({ mode, sql, turn, busy, editorProposalId, onDecideProposal, onRunQuery, runDisabled }: {
@@ -45,38 +45,39 @@ function AssistantOutput({ mode, sql, turn, busy, editorProposalId, onDecideProp
     busy: boolean;
     editorProposalId?: string;
     onDecideProposal: AssistantWorkflowProps['onDecideProposal'];
-    onRunQuery: () => void;
-    runDisabled: boolean;
+    onRunQuery: (sql: string) => void;
+    runDisabled: (sql: string) => boolean;
 }) {
     const proposal = turn.proposal;
     if (turn.status === 'pending') return <div className="assistant-pending" role="status"><span className="loading-orbit"/>Thinking…</div>;
     if (turn.error) return <div className={cx('assistant-turn-error', turn.status === 'cancelled' && 'is-cancelled')} role={turn.status === 'failed' ? 'alert' : 'status'}>{turn.error}</div>;
     if (!proposal) return null;
 
+    const proposalSql = proposal.sql;
     const beginner = mode === 'beginner';
     const currentProposal = proposal.id === editorProposalId;
     const diffInEditor = !beginner && currentProposal && proposal.decision === 'pending' &&
         (proposal.action === 'ask' || proposal.action === 'generate');
-    const stale = proposal.decision === 'accepted' ? proposal.sql !== sql : proposal.baseSql !== sql;
+    const stale = proposal.decision === 'accepted' ? proposalSql !== sql : proposal.baseSql !== sql;
     return <div className={cx('proposal-card', beginner && 'beginner-proposal-card')}>
         <div className="proposal-heading">
-            {proposal.sql !== null && <span className={cx('proposal-quality', proposal.quality?.status)}>{proposal.quality?.score ?? '—'}<small>QUALITY</small></span>}
-            <div><span className="eyebrow">{proposal.sql === null ? 'ANSWER' : `SQL PROPOSAL · ${proposal.decision.toUpperCase()}`}</span><strong>{proposal.summary}</strong></div>
+            {proposalSql !== null && <span className={cx('proposal-quality', proposal.quality?.status)}>{proposal.quality?.score ?? '—'}<small>QUALITY</small></span>}
+            <div><span className="eyebrow">{proposalSql === null ? 'ANSWER' : `SQL PROPOSAL · ${proposal.decision.toUpperCase()}`}</span><strong>{proposal.summary}</strong></div>
         </div>
-        {stale && <p className="assistant-stale-proposal" role="status">This response used an earlier SQL draft. It stays in the chat, but its SQL cannot be applied to the current draft.</p>}
+        {stale && <p className="assistant-stale-proposal" role="status">{proposal.decision === 'accepted' ? 'This accepted query comes from an earlier SQL draft. Running it uses the SQL shown here.' : 'This response used an earlier SQL draft. It stays in the chat, but its SQL cannot be applied to the current draft.'}</p>}
         {proposal.clarification && <div className="callout">{proposal.clarification}</div>}
         {proposal.assumptions.map((item, index) => <p className="proposal-point" key={`${index}-${item}`}><span>ASSUMPTION</span>{item}</p>)}
         {proposal.caveats.map((item, index) => <p className="proposal-point" key={`${index}-${item}`}><span>NOTE</span>{item}</p>)}
         {proposal.findings.map((item, index) => <p className="proposal-finding" key={`${index}-${item.severity}-${item.message}`}><strong>{item.severity}</strong>{item.message}<small>{item.evidence}</small></p>)}
-        {proposal.sql !== null && <>
+        {proposalSql !== null && <>
             {diffInEditor
                 ? <p className="proposal-review-hint">Review the SQL diff above the editor, then accept or reject it there.</p>
-                : <><span className="eyebrow mt-4">PROPOSED SQL</span><pre className="proposal-sql">{proposal.sql}</pre></>}
+                : <><span className="eyebrow mt-4">PROPOSED SQL</span><pre className="proposal-sql">{proposalSql}</pre></>}
             {proposal.decision === 'pending' && <>
                 {stale && <div className="callout callout-error">The SQL draft changed. This proposal can no longer be applied.</div>}
                 {!diffInEditor && <div className="proposal-buttons"><Button variant="secondary" onClick={() => onDecideProposal(turn.id, 'rejected')} disabled={busy || stale}>Reject</Button><Button variant="primary" onClick={() => onDecideProposal(turn.id, 'accepted')} disabled={busy || stale}>{beginner ? 'Use this query' : 'Apply to editor'}</Button></div>}
             </>}
-            {beginner && proposal.decision === 'accepted' && <div className="beginner-run-ready"><span><span className="status-light is-trusted"/> Added to your SQL draft</span><Button variant="primary" onClick={onRunQuery} disabled={runDisabled || busy}><Icon name="play"/>{busy ? 'Starting…' : 'Run this query'}</Button></div>}
+            {beginner && proposal.decision === 'accepted' && <div className="beginner-run-ready"><span><span className="status-light is-trusted"/> {stale ? 'Accepted from an earlier draft' : 'Added to your SQL draft'}</span><Button variant="primary" onClick={() => onRunQuery(proposalSql)} disabled={runDisabled(proposalSql) || busy}><Icon name="play"/>{busy ? 'Starting…' : 'Run this query'}</Button></div>}
         </>}
     </div>;
 }

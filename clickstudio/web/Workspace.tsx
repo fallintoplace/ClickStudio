@@ -350,12 +350,10 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         return true;
     };
 
-    const execute = (wholeScript = false, kind: RunKind = 'query') => performExecution(async () => {
+    const execute = (wholeScript = false, kind: RunKind = 'query', sqlOverride?: string) => performExecution(async () => {
         if (!trusted) throw new Error('Review and trust this read only connection before running SQL.');
         if (wholeScript && connection.manifest?.scripts.available === false)
             throw new Error(connection.manifest.scripts.reason ?? 'Scripts are unavailable on this connection.');
-        if (unsupportedParameters)
-            throw new Error(connection.manifest?.parameters.reason ?? 'Query parameters are unavailable on this connection.');
         if (kind === 'explain' && connection.manifest?.explain.available === false)
             throw new Error(connection.manifest.explain.reason ?? 'EXPLAIN is unavailable on this connection.');
         const explainPlan = connection.manifest?.explainPlan ?? connection.manifest?.explain;
@@ -368,14 +366,20 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         if (kind === 'analyze' && explainAnalyze?.available === false)
             throw new Error(explainAnalyze.reason ?? 'EXPLAIN ANALYZE is unavailable on this connection.');
         const editorSnapshot = editor.current?.snapshot() ?? { sql: active.sql, from: active.from, to: active.to };
-        const statement = wholeScript ? undefined : selectedStatement(editorSnapshot.sql, editorSnapshot.from, editorSnapshot.to);
+        const explicitStatements = sqlOverride === undefined ? undefined : splitSql(sqlOverride);
+        if (explicitStatements && explicitStatements.length !== 1)
+            throw new Error('An assistant proposal must contain exactly one SQL statement to run directly.');
+        const statement = wholeScript ? undefined : explicitStatements?.[0] ?? selectedStatement(editorSnapshot.sql, editorSnapshot.from, editorSnapshot.to);
         if (!wholeScript && !statement) throw new Error('Write or select a SQL statement before running it.');
+        const executionSql = sqlOverride ?? editorSnapshot.sql;
+        if (parameterNames(executionSql).length && connection.manifest?.parameters.available === false)
+            throw new Error(connection.manifest.parameters.reason ?? 'Query parameters are unavailable on this connection.');
         const payload = {
             clientRequestId: crypto.randomUUID(), connectionId: connection.id, documentId: active.serverId,
             sql: wholeScript ? editorSnapshot.sql : statement!.sql, parameters: active.parameters,
             parentRunId: active.parentRunId, kind, limits: { rows: connection.limits.rows || DEFAULT_LIMITS.rows, seconds: connection.limits.seconds || DEFAULT_LIMITS.seconds },
             tags: { workspace: 'clickstudio', experience },
-            ...(wholeScript ? {} : { sourceFrom: statement!.from, sourceTo: statement!.to }),
+            ...(wholeScript || sqlOverride !== undefined ? {} : { sourceFrom: statement!.from, sourceTo: statement!.to }),
         };
         clearFailedQueryError(active.id);
         if (wholeScript) {
@@ -409,7 +413,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
                 created = await post<Run>('/runs', payload);
             } catch (caught) {
                 pendingExecution.clear(payload.clientRequestId);
-                if (statement) recordFailedQueryError({ draftId: active.id, draftSql: editorSnapshot.sql, statementSql: statement.sql, sourceFrom: statement.from, error: apiErrorDetail(caught) });
+                if (statement) recordFailedQueryError({ draftId: active.id, draftSql: editorSnapshot.sql, statementSql: statement.sql, sourceFrom: sqlOverride === undefined ? statement.from : 0, error: apiErrorDetail(caught) });
                 throw caught;
             }
             pendingExecution.acceptRun(payload.clientRequestId, created.id);
@@ -763,8 +767,12 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         onAskAI: (currentSchema?: Schema, serverVersion?: string, database?: string) => void requestAssistantSql(currentSchema, serverVersion, database, includeRun ? signal => loadAssistantRunContext(run, snapshot, signal) : undefined),
         onCancelAssistantRequest: cancelAssistantRequest,
         onDecideProposal: (turnId: string, decision: 'accepted' | 'rejected') => void decideAssistantProposal(turnId, decision),
-        onRunQuery: () => void execute(),
-        runDisabled: !trusted || Boolean(busy) || unsupportedParameters,
+        onRunQuery: sql => void execute(false, 'query', sql),
+        runDisabled: sql => {
+            if (!trusted || busy) return true;
+            if (connection.manifest?.parameters.available !== false) return false;
+            try { return parameterNames(sql).length > 0; } catch { return true; }
+        },
         expert: experience === 'expert',
     } satisfies InspectorPaneProps;
 

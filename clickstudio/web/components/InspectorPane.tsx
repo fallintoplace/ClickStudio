@@ -80,8 +80,8 @@ export type InspectorPaneProps = {
     onAskAI: (schema?: Schema, serverVersion?: string, database?: string) => void;
     onCancelAssistantRequest: () => void;
     onDecideProposal: (turnId: string, decision: 'accepted' | 'rejected') => void;
-    onRunQuery: () => void;
-    runDisabled: boolean;
+    onRunQuery: (sql: string) => void;
+    runDisabled: (sql: string) => boolean;
     expert?: boolean;
     drawer?: boolean;
     onClose?: () => void;
