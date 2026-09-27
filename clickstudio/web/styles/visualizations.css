@@ -178,6 +178,7 @@
     .explain-plan-inspection .explain-plan-properties { max-height: 180px; overflow: auto; padding-right: 2px; }
     .explain-indexes-view { display: flex; min-width: 0; min-height: 0; flex: 1; padding: 8px; }
     .explain-indexes-view .pipeline-graph-card { width: 100%; align-content: start; }
+    .explain-indexes-view .pipeline-graph-viewport-frame { min-height: 150px; }
     .pipeline-node-inspector.is-index-analysis { display: block; }
     .explain-index-inspection { display: grid; min-width: 0; gap: 7px; }
     .explain-index-hint { margin: 0; color: var(--muted); font-size: 8px; }

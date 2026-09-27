@@ -986,7 +986,7 @@ test('Ask AI keeps chat history when SQL changes and sends prior messages with f
     await useAdvancedMode(page);
     await runQuery(page);
     await page.getByTestId('open-ai').click();
-    await expect(page.getByRole('checkbox', { name: /Include latest run/ })).toBeChecked();
+    await expect(page.getByRole('checkbox', { name: /Also include latest query run/ })).toBeChecked();
     const question = page.getByRole('textbox', { name: 'Ask AI', exact: true });
     await question.fill('Show the old question');
     await page.getByRole('button', { name: 'Send', exact: true }).click();
