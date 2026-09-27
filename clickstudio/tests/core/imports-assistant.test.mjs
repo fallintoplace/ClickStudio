@@ -133,26 +133,16 @@ test('Assistant reference retrieval selects docs for SQL functions and named tab
     assert.ok(!docs.some(entry => entry.name === 'query_log' && entry.type === 'Server Setting'));
     assert.equal(new Set(docs.map(entry => `${entry.type}:${entry.name}`)).size, docs.length);
 });
-test('Assistant reference retrieval selects the integer-overflow note for arrayProduct results', () => {
-    const sql = 'SELECT arrayProduct(range(1, 101)) AS product';
-    const docs = selectAssistantReferenceDocs('Why does this result return zero?', sql);
-    assert.ok(docs.some(entry => entry.name === 'arrayProduct'));
-    assert.ok(docs.some(entry => entry.name === 'range'));
-    const overflowNote = docs.find(entry => entry.name === 'arrayProduct integer input overflow');
-    assert.ok(overflowNote);
-    assert.match(overflowNote.description, /100! is divisible by 2\^64/);
-    assert.match(overflowNote.description, /toFloat64/);
-    assert.ok(!docs.some(entry => entry.type === 'Setting'));
-    assert.deepEqual(selectAssistantReferenceDocs('Why does this result return zero?', 'SELECT 1'), []);
-    const runDocs = selectAssistantReferenceDocs('Why does this result return zero?', 'SELECT 1', {
-        evidenceSql: 'SELECT arrayProduct(range(1, 101)) AS product',
+test('Assistant reference retrieval considers SQL from the selected run', () => {
+    const runDocs = selectAssistantReferenceDocs('Explain the exact percentile in this result', 'SELECT 1', {
+        evidenceSql: 'SELECT quantileExact(0.5)(latency_ms) FROM events', schema,
     });
-    assert.ok(runDocs.some(entry => entry.name === 'arrayProduct integer input overflow'));
-    assert.ok(runDocs.some(entry => entry.name === 'range'));
+    assert.ok(runDocs.some(entry => entry.name === 'quantileExact'));
+    assert.ok(!runDocs.some(entry => entry.type === 'Setting'));
 });
-test('Assistant sends the selected function behavior and retained value to its context', () => {
-    const sql = 'SELECT arrayProduct(range(1, 101)) AS product';
-    const question = 'Why does this result return zero?';
+test('Assistant gives general numeric overflow guidance with retained results', () => {
+    const sql = 'SELECT amount * quantity AS total FROM orders';
+    const question = 'Why is this result unexpectedly small?';
     const documentation = selectAssistantReferenceDocs(question, sql);
     const ctx = buildContext({
         connectionId: 'playground', action: 'ask', question, sql, schema,
@@ -161,8 +151,9 @@ test('Assistant sends the selected function behavior and retained value to its c
     });
     const context = JSON.parse(ctx.payload.context);
     assert.equal(context.result.rows[0][0], '0');
-    assert.ok(context.referenceDocs.some(entry => entry.name === 'arrayProduct integer input overflow'));
-    assert.ok(ctx.summary.some(item => item.includes('arrayProduct integer input overflow')));
+    assert.match(ctx.payload.instructions, /intermediate or accumulator, and result types/);
+    assert.match(ctx.payload.instructions, /overflow or truncation/);
+    assert.match(ctx.payload.instructions, /casts that need to affect an operation belong before it/);
 });
 test('Assistant reference retrieval ignores SQL literals and comments', () => {
     const docs = selectAssistantReferenceDocs('', "SELECT 'quantileExact' AS note -- sum(1)\n/* uniqExact(id) */");

@@ -134,20 +134,20 @@ test('Assistant context selects documentation from the included run SQL', async 
     t.after(() => s.stop());
     await s.call('/connections/demo/trust', { trusted: true, confirmation: 'demo' });
     const run = await (await s.call('/runs', {
-        clientRequestId: randomUUID(), connectionId: 'demo', sql: 'SELECT arrayProduct(range(1, 101)) AS product',
+        clientRequestId: randomUUID(), connectionId: 'demo', sql: 'SELECT quantileExact(0.5)(latency_ms) FROM events',
     })).json() as Run;
     await s.runs.wait(owner, run.id);
 
     const response = await s.call('/assistant/context', {
-        connectionId: 'demo', action: 'ask', question: 'Why does this result return zero?',
+        connectionId: 'demo', action: 'ask', question: 'Explain the exact percentile in this result',
         sql: 'SELECT 1', runId: run.id, includeResult: true,
     });
     assert.equal(response.status, 201);
     const prepared = await response.json() as { payload: { context: string }; evidenceSql: string | null };
     const context = JSON.parse(prepared.payload.context) as { evidenceSql: string; referenceDocs: Array<{ name: string }> };
-    assert.match(prepared.evidenceSql ?? '', /arrayProduct/);
-    assert.match(context.evidenceSql, /arrayProduct/);
-    assert.ok(context.referenceDocs.some(entry => entry.name === 'arrayProduct integer input overflow'));
+    assert.match(prepared.evidenceSql ?? '', /quantileExact/);
+    assert.match(context.evidenceSql, /quantileExact/);
+    assert.ok(context.referenceDocs.some(entry => entry.name === 'quantileExact'));
 });
 
 test('Voice sessions require trust and keep the provider behind the server', async (t) => {
