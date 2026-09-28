@@ -21,6 +21,7 @@
 .import-kind-button > small { color: var(--muted); font-size: 10px; line-height: 1.4; }
 
 .import-destination-choice { display: grid; min-width: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 0; border: 0; }
+.import-mapping-step { display: grid; min-width: 0; gap: 16px; }
 .import-destination-choice legend { grid-column: 1 / -1; margin-bottom: 2px; color: var(--text-soft); font-size: 12px; font-weight: 600; }
 .import-destination-option { display: flex; min-width: 0; min-height: 62px; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--page); color: var(--text-soft); cursor: pointer; transition: border-color .16s ease, background .16s ease, box-shadow .16s ease; }
 .import-destination-option:hover:not(.is-disabled) { border-color: var(--line-bright); background: var(--panel-hover); }

@@ -197,7 +197,7 @@ export function ImportWizard({ onImportQuery, ...controllerProps }: ImportWizard
                     {preview && availableTargets.length === 0 && !browserCloudImport && <div role="status" className="rounded-lg border border-[var(--line)] p-3 text-xs text-[var(--muted)]">No configured import destination is available for this connection.</div>}
                 </section>}
 
-                {recoveryState === 'ready' && !importUnavailable && step === 'mapping' && preview && <section aria-label="Map source columns" className="import-mapping-step space-y-4">
+                {recoveryState === 'ready' && !importUnavailable && step === 'mapping' && preview && <section aria-label="Map source columns" className="import-mapping-step">
                     {browserCloudImport && <fieldset className="import-destination-choice">
                         <legend>Where should the rows go?</legend>
                         <label className={`import-destination-option${!creatingTable ? ' is-selected' : ''}${!availableTargets.length ? ' is-disabled' : ''}`}>
