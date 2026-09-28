@@ -11,6 +11,37 @@ import { join } from 'node:path';
 const header = '["id","text"]\n["UInt64","String"]\n';
 test('Compact streaming preserves large integer strings and UTF-8 across byte boundaries', async () => { const buffer = Buffer.from(header + '["18446744073709551615","árvíztűrő"]\n'); const output = await collectCompactStream(Readable.from([...buffer].map(n => Buffer.from([n]))), DEFAULT_LIMITS); assert.equal(output.rows[0][0], '18446744073709551615'); assert.equal(output.rows[0][1], 'árvíztűrő'); assert.equal(output.truncated, false); });
 test('Streaming distinguishes exactly-at-limit complete results', async () => { const output = await collectCompactStream(Readable.from([header + '["1","a"]\n']), { ...DEFAULT_LIMITS, rows: 1 }); assert.equal(output.truncated, false); assert.equal(output.rows.length, 1); });
+test('Cloud LIMIT results with three or five rows stay complete', async () => {
+    for (const count of [3, 5]) {
+        const result = header + Array.from({ length: count }, (_, index) => `["${index + 1}","row-${index + 1}"]\n`).join('');
+        const output = await collectCompactStream(Readable.from([result]), { rows: 1_000, bytes: 2_000_000 });
+        assert.equal(output.rows.length, count);
+        assert.equal(output.truncated, false);
+    }
+});
+test('Cloud results below the display caps stay complete', async () => {
+    const result = header + Array.from({ length: 34 }, (_, index) => `["${index + 1}","row-${index + 1}"]\n`).join('');
+    const output = await collectCompactStream(Readable.from([result]), { rows: 1_000, bytes: 2_000_000 });
+    assert.equal(output.rows.length, 34);
+    assert.equal(output.truncated, false);
+});
+test('Cloud result caps retain the row prefix and flag an extra row', async () => {
+    const result = header + Array.from({ length: 1_001 }, (_, index) => `["${index + 1}","row-${index + 1}"]\n`).join('');
+    const output = await collectCompactStream(Readable.from([result]), { rows: 1_000, bytes: 2_000_000 });
+    assert.equal(output.rows.length, 1_000);
+    assert.equal(output.rows[999]?.[0], '1000');
+    assert.equal(output.truncated, true);
+});
+test('Cloud results at the byte cap are complete until another row arrives', async () => {
+    const firstRow = '["1","one"]\n', secondRow = '["2","two"]\n';
+    const cap = Buffer.byteLength(header + firstRow);
+    const complete = await collectCompactStream(Readable.from([header + firstRow]), { rows: 10, bytes: cap });
+    const bounded = await collectCompactStream(Readable.from([header + firstRow + secondRow]), { rows: 10, bytes: cap });
+    assert.equal(complete.truncated, false);
+    assert.equal(complete.rows.length, 1);
+    assert.equal(bounded.truncated, true);
+    assert.deepEqual(bounded.rows, [['1', 'one']]);
+});
 test('Streaming closes the source after observing an extra row', async () => { let closed = false; async function* source() { try {
     yield Buffer.from(header + '["1","a"]\n["2","b"]\n');
     yield Buffer.alloc(1e6);

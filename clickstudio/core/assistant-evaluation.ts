@@ -52,21 +52,23 @@ export function evaluateProposal(content: ProposalContent, action: AssistantActi
     const checks: ProposalQualityCheck[] = [];
     const inspectOnly = action === 'review' || action === 'explain';
     const flexible = action === 'ask';
-    if (inspectOnly && content.sql !== null)
+    const alternatives = content.alternatives ?? [];
+    const sqlOptions = [content.sql, ...alternatives.map(option => option.sql)].filter((sql): sql is string => sql !== null);
+    if (inspectOnly && (content.sql !== null || alternatives.length > 0))
         checks.push({ id: 'contract', status: 'fail', message: 'This playbook must not return replacement SQL.' });
-    else if (!inspectOnly && !flexible && content.sql === null)
+    else if (!inspectOnly && !flexible && sqlOptions.length === 0)
         checks.push({ id: 'contract', status: 'warn', message: 'No SQL was proposed; the response needs clarification before it can be applied.' });
     else
-        checks.push({ id: 'contract', status: 'pass', message: inspectOnly ? 'Inspect-only playbook returned no replacement SQL.' : flexible && content.sql === null ? 'The request was answered without replacement SQL.' : 'The playbook returned an applicable SQL proposal.' });
+        checks.push({ id: 'contract', status: 'pass', message: inspectOnly ? 'Inspect-only playbook returned no replacement SQL.' : flexible && sqlOptions.length === 0 ? 'The request was answered without replacement SQL.' : 'The playbook returned an applicable SQL proposal.' });
 
-    if (content.sql === null) {
+    if (sqlOptions.length === 0) {
         checks.push({ id: 'safety', status: 'pass', message: 'No SQL was returned, so there is no draft to review or run.' });
         checks.push({ id: 'grounding', status: 'pass', message: 'No table references were introduced.' });
         checks.push({ id: 'semantic', status: content.clarification || flexible ? 'pass' : 'warn', message: content.clarification ? 'The response asks for clarification instead of guessing.' : flexible ? 'The request was answered without returning SQL.' : 'No SQL was returned and no clarification was recorded.' });
     }
     else {
-        checks.push({ id: 'safety', status: 'pass', message: 'The SQL stays in the draft until the user reviews and runs it.' });
-        const references = referencedTables(content.sql), known = knownTableSet(context), unknown = references.filter(table => !known.has(table));
+        checks.push({ id: 'safety', status: 'pass', message: 'The SQL options stay in the draft until the user reviews and runs one.' });
+        const references = [...new Set(sqlOptions.flatMap(referencedTables))], known = knownTableSet(context), unknown = references.filter(table => !known.has(table));
         if (!references.length)
             checks.push({ id: 'grounding', status: 'pass', message: 'The proposal does not introduce a table reference that needs schema grounding.' });
         else if (!unknown.length)
@@ -86,6 +88,8 @@ export interface AssistantBenchmarkCase {
         sqlAbsent?: string[];
         sqlNull?: boolean;
         minimumFindings?: number;
+        alternativeCount?: number;
+        alternativeSqlIncludes?: string[];
     };
     candidate: ProposalContent;
 }
@@ -97,6 +101,7 @@ export const ASSISTANT_BENCHMARK_CASES: readonly AssistantBenchmarkCase[] = [
     { id: 'explain-no-edit', action: 'explain', expected: { sqlNull: true }, candidate: { sql: null, summary: 'The query reads a bounded event sample.', assumptions: [], tables: [], caveats: [], clarification: null, findings: [] } },
     { id: 'review-finding', action: 'review', expected: { sqlNull: true, minimumFindings: 1 }, candidate: { sql: null, summary: 'The query is bounded but should be checked for freshness.', assumptions: [], tables: ['default.events'], caveats: [], clarification: null, findings: [{ severity: 'medium', message: 'Freshness is not stated.', evidence: 'The SQL has no freshness predicate.' }] } },
     { id: 'missing-definition', action: 'generate', expected: { sqlNull: true }, candidate: { sql: null, summary: 'I need the metric definition before proposing SQL.', assumptions: [], tables: [], caveats: [], clarification: 'Which event field defines a conversion?', findings: [] } },
+    { id: 'separate-update-delete-options', action: 'ask', expected: { sqlIncludes: ['ALTER TABLE', 'UPDATE'], sqlAbsent: ['DELETE'], alternativeCount: 1, alternativeSqlIncludes: ['ALTER TABLE', 'DELETE'] }, candidate: { sql: 'ALTER TABLE default.events UPDATE status = \'reviewed\' WHERE id = 1', alternatives: [{ title: 'Delete instead', summary: 'Remove the matching event.', sql: 'ALTER TABLE default.events DELETE WHERE id = 1' }], summary: 'Choose whether to update or delete the matching event.', assumptions: [], tables: ['default.events'], caveats: [], clarification: null, findings: [] } },
 ];
 
 export interface AssistantBenchmarkResult {
@@ -109,12 +114,15 @@ export interface AssistantBenchmarkResult {
 export function gradeBenchmarkCase(testCase: AssistantBenchmarkCase): AssistantBenchmarkResult {
     const quality = evaluateProposal(testCase.candidate, testCase.action, { schema: benchmarkSchema });
     const sql = testCase.candidate.sql?.toLowerCase() ?? '';
+    const alternativeSql = (testCase.candidate.alternatives ?? []).map(option => option.sql.toLowerCase()).join('\n');
     const expected = testCase.expected;
     const includes = (expected.sqlIncludes ?? []).every(value => sql.includes(value.toLowerCase()));
     const absent = (expected.sqlAbsent ?? []).every(value => !sql.includes(value.toLowerCase()));
     const nullShape = expected.sqlNull === undefined || (expected.sqlNull ? testCase.candidate.sql === null : testCase.candidate.sql !== null);
     const findings = (testCase.candidate.findings.length >= (expected.minimumFindings ?? 0));
-    const passed = includes && absent && nullShape && findings && quality.status !== 'fail';
+    const alternativeCount = expected.alternativeCount === undefined || (testCase.candidate.alternatives ?? []).length === expected.alternativeCount;
+    const alternativesInclude = (expected.alternativeSqlIncludes ?? []).every(value => alternativeSql.includes(value.toLowerCase()));
+    const passed = includes && absent && nullShape && findings && alternativeCount && alternativesInclude && quality.status !== 'fail';
     return { id: testCase.id, passed, score: passed ? 100 : Math.max(0, quality.score - 25), quality };
 }
 

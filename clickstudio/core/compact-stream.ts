@@ -19,7 +19,7 @@ function isRow(value: unknown): value is Row {
     return Array.isArray(value) && value.every(isJson);
 }
 /** Bounded parsing before JSON.parse: even one very large string cannot grow without limit. */
-export async function collectCompactStream(stream: AsyncIterable<Buffer | string>, limits: Limits): Promise<DriverResult> {
+export async function collectCompactStream(stream: AsyncIterable<Buffer | string>, limits: Pick<Limits, 'rows' | 'bytes'>): Promise<DriverResult> {
     const decoder = new StringDecoder('utf8');
     let pending = '', stage = 0, names: string[] = [], columns: Column[] = [];
     let bytes = 0, truncated = false;

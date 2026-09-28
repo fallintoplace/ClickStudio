@@ -14,6 +14,15 @@ test('Existing version-1 drafts preserve SQL, parameters, evidence and saved rev
     for (const [key, value] of Object.entries(draft)) assert.deepEqual(result[key], value, key);
 });
 
+test('A deleted table marker survives recovery only with valid source and run identity', () => {
+    const source = { database: 'analytics', table: 'events', runId: 'run-1' };
+    const draft = { ...newDraft('Preview events.sql', 'SELECT * FROM `analytics`.`events`'), activeRunId: 'run-1', invalidatedSource: source };
+    assert.deepEqual(recover('key', read(workspace(draft))).tabs[0].invalidatedSource, source);
+
+    const malformed = recover('key', read(workspace({ ...draft, invalidatedSource: { ...source, runId: '../bad' } }))).tabs[0];
+    assert.equal(malformed.invalidatedSource, undefined);
+});
+
 test('Opening a saved metric preserves its revision, run, parent and dependency semantics', () => {
     const metric = { definition: 'sum(amount)', grain: 'day', dimensions: ['region'], timezone: 'UTC', filters: 'paid', nullTreatment: 'exclude', sourceColumns: ['orders.amount'] };
     const document = { id: 'metric-document', owner: 'owner', name: 'Daily revenue', connectionId: 'demo', sql: 'SELECT sum(amount) FROM orders', revision: 4,

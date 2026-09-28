@@ -360,7 +360,7 @@ test('Assistant evaluation report is available without a provider and keeps SQL 
     assert.equal(response.status, 200);
     const report = await response.json() as { total: number; benchmark: { total: number; passed: number; score: number; mode: string }; latest: unknown[] };
     assert.equal(report.total, 0);
-    assert.deepEqual(report.benchmark, { total: 5, passed: 5, score: 100, mode: 'static' });
+    assert.deepEqual(report.benchmark, { total: 6, passed: 6, score: 100, mode: 'static' });
     assert.deepEqual(report.latest, []);
 });
 test('Cookie login and request intent are enforced', async (t) => {

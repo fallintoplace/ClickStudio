@@ -15,6 +15,7 @@ function validProposal(overrides = {}) {
         promptVersion: 'v1',
         contextSummary: ['One table is available'],
         sql: 'SELECT 1 AS result',
+        alternatives: [],
         summary: 'Returns one row',
         assumptions: [],
         tables: [],
@@ -28,6 +29,7 @@ function validProposal(overrides = {}) {
 
 test('Assistant proposal parsing returns a typed, normalized proposal', () => {
     const parsed = parseAssistantProposal(validProposal({
+        alternatives: [{ title: 'Delete instead', summary: 'Remove matching rows.', sql: 'ALTER TABLE events DELETE WHERE id = 1' }],
         sources: [{ title: 'Docs', url: 'https://example.com/path' }],
         findings: [{ severity: 'low', message: 'Small note', evidence: 'SELECT 1' }],
         quality: {
@@ -43,6 +45,7 @@ test('Assistant proposal parsing returns a typed, normalized proposal', () => {
 
     assert.deepEqual(parsed, {
         ...validProposal(),
+        alternatives: [{ title: 'Delete instead', summary: 'Remove matching rows.', sql: 'ALTER TABLE events DELETE WHERE id = 1' }],
         sources: [{ title: 'Docs', url: 'https://example.com/path' }],
         findings: [{ severity: 'low', message: 'Small note', evidence: 'SELECT 1' }],
         quality: {
@@ -60,6 +63,7 @@ test('Assistant proposal parsing keeps nullable and empty optional fields', () =
     const parsed = parseAssistantProposal(validProposal({ sql: null, clarification: 'Which table?', sources: [] }));
 
     assert.equal(parsed.sql, null);
+    assert.deepEqual(parsed.alternatives, []);
     assert.equal(parsed.clarification, 'Which table?');
     assert.deepEqual(parsed.sources, []);
 });
@@ -74,6 +78,9 @@ test('Assistant proposal parsing rejects missing or invalid required fields', ()
         validProposal({ clarification: false }),
         validProposal({ assumptions: 'none' }),
         validProposal({ findings: [{ severity: 'critical', message: 'Invalid', evidence: 'x' }] }),
+        validProposal({ alternatives: [{ title: '', summary: 'Bad choice', sql: 'DELETE FROM events' }] }),
+        validProposal({ alternatives: Array.from({ length: 5 }, (_, index) => ({ title: `Option ${index}`, summary: '', sql: 'SELECT 1' })) }),
+        validProposal({ alternatives: [{ title: 'Delete instead', summary: 'Remove rows.', sql: 'DELETE FROM events' }], sql: null }),
     ];
 
     for (const proposal of invalidProposals)

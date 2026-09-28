@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parseCsv, parseInput, ImportService } from '../../.core-build/core/imports.js';
-import { AssistantService, buildContext, MAX_ASSISTANT_CONVERSATION_MESSAGES, validateAssistantConversation } from '../../.core-build/core/assistant.js';
+import { AssistantService, buildContext, MAX_ASSISTANT_CONVERSATION_MESSAGES, validateAssistantConversation, validateProposal } from '../../.core-build/core/assistant.js';
 import { evaluateProposal, runAssistantBenchmarks } from '../../.core-build/core/assistant-evaluation.js';
 import { selectAssistantReferenceDocs } from '../../.core-build/shared/reference-data.js';
 import { MemoryStore } from '../../.core-build/core/store.js';
@@ -335,7 +335,18 @@ test('Write SQL proposals can be applied to the draft without running them', asy
 test('AssistantService grounds generated SQL against the prepared schema', async () => { const f = aiFixture({ ...proposal, sql: 'SELECT * FROM default.events' }), c = f.ai.prepare(owner, f.input), p = await f.ai.propose(owner, c.id, true); assert.equal(p.quality.checks.find(check => check.id === 'grounding').status, 'pass'); });
 test('Evaluation report counts accepted and rejected proposals without exposing SQL', async () => { const f = aiFixture(), first = f.ai.prepare(owner, f.input), firstProposal = await f.ai.propose(owner, first.id, true); f.ai.decide(owner, firstProposal.id, 'accepted', 'local', 'SELECT 2'); const second = f.ai.prepare(owner, f.input), secondProposal = await f.ai.propose(owner, second.id, true); f.ai.decide(owner, secondProposal.id, 'rejected', 'local', 'SELECT 2'); const report = f.ai.evaluation(owner); assert.equal(report.total, 2); assert.equal(report.accepted, 1); assert.equal(report.rejected, 1); assert.equal(report.acceptanceRate, 50); assert.equal(report.latest[0].score, 100); assert.equal(Object.hasOwn(report.latest[0], 'sql'), false); });
 test('Static semantic checks warn on schema references that need execution evidence', () => { const quality = evaluateProposal({ ...proposal, sql: 'SELECT * FROM missing_table' }, 'generate', { schema: { truncated: false, tables: [{ database: 'default', name: 'events' }] } }); assert.equal(quality.status, 'warn'); assert.equal(quality.checks.find(check => check.id === 'grounding').status, 'warn'); });
-test('Assistant benchmark suite stays green and deterministic', () => { const report = runAssistantBenchmarks(); assert.equal(report.total, 5); assert.equal(report.passed, 5); assert.equal(report.score, 100); });
+test('Assistant proposals validate named, independently runnable alternatives', () => {
+    const content = validateProposal({ ...proposal, alternatives: [{ title: 'Delete instead', summary: 'Remove matching rows.', sql: 'ALTER TABLE events DELETE WHERE id = 1' }] });
+    assert.deepEqual(content.alternatives, [{ title: 'Delete instead', summary: 'Remove matching rows.', sql: 'ALTER TABLE events DELETE WHERE id = 1' }]);
+    assert.throws(() => validateProposal({ ...proposal, sql: null, alternatives: [{ title: 'Delete instead', summary: 'Remove rows.', sql: 'DELETE FROM events' }] }), { code: 'AI_OUTPUT' });
+    assert.throws(() => validateProposal({ ...proposal, alternatives: Array.from({ length: 5 }, (_, index) => ({ title: `Option ${index}`, summary: '', sql: 'SELECT 1' })) }), { code: 'AI_OUTPUT' });
+});
+test('Assistant grounding checks cover SQL alternatives', () => {
+    const quality = evaluateProposal({ ...proposal, sql: 'SELECT 1', alternatives: [{ title: 'Other table', summary: 'Read another source.', sql: 'SELECT * FROM missing_table' }] }, 'generate', { schema: { truncated: false, tables: [{ database: 'default', name: 'events' }] } });
+    assert.equal(quality.status, 'warn');
+    assert.equal(quality.checks.find(check => check.id === 'grounding').status, 'warn');
+});
+test('Assistant benchmark suite stays green and deterministic', () => { const report = runAssistantBenchmarks(); assert.equal(report.total, 6); assert.equal(report.passed, 6); assert.equal(report.score, 100); });
 test('Context masks configured sensitive columns and result fields', () => { const result = { columns: [{ name: 'secret', type: 'String' }, { name: 'n', type: 'UInt64' }], rows: [['sensitive', '1']], completeness: 'complete', createdAt: 'now', queryId: 'q' }; const ctx = buildContext({ connectionId: 'local', sql: 'SELECT n', action: 'result', question: 'Explain', schema, result, sensitiveColumns: ['secret'] }); assert.ok(!ctx.payload.context.includes('sensitive')); assert.ok(ctx.payload.context.includes('"1"')); });
 test('Assistant reference retrieval selects docs for SQL functions and named tables', () => {
     const docs = selectAssistantReferenceDocs('Explain quantileExact', 'SELECT quantileExact(0.5)(latency) FROM system.query_log', { schema, limit: 20 });

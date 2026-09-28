@@ -76,7 +76,13 @@ export function useWorkspaceViewState({
     const editorErrorRange = editorErrorContext
         ? sqlErrorRangeInDraft(active.sql, editorErrorContext.statementSql, editorErrorContext.sourceFrom, editorErrorContext.error)
         : undefined;
-    const staleResult = Boolean(run && (!runSourceSql || run.connectionId !== connection.id || !matchesDraft(run, runSourceSql, active.parameters)));
+    const invalidatedSource = run && active.activeRunId === run.id && active.invalidatedSource?.runId === run.id
+        ? active.invalidatedSource
+        : undefined;
+    const staleResult = Boolean(run && (invalidatedSource || !runSourceSql || run.connectionId !== connection.id || !matchesDraft(run, runSourceSql, active.parameters)));
+    const staleResultReason = invalidatedSource
+        ? `The source table ${invalidatedSource.database}.${invalidatedSource.table} was deleted after this run.`
+        : staleResult ? 'SQL text, selection, or bound parameters changed since this run.' : undefined;
     const requestedResultsView = experience === 'beginner' && view === 'insights' ? 'results' : view;
     const sqlMapStatement = safeSelectedStatement(active.sql, active.from, active.from);
     const queryTreeCapability = connection.manifest?.queryTree ?? connection.manifest?.explain;
@@ -116,6 +122,8 @@ export function useWorkspaceViewState({
         editorErrorContext,
         editorErrorRange,
         staleResult,
+        staleResultReason,
+        sourceDeleted: Boolean(invalidatedSource),
         requestedResultsView,
         sqlMapStatement,
         queryTreeAvailable,

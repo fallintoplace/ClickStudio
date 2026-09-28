@@ -1,6 +1,8 @@
 import { createClient } from '@clickhouse/client';
 import { randomUUID } from 'node:crypto';
 import { AppError } from '../core/errors.js';
+import { cloudResultStreamQuery } from '../core/cloud-query.js';
+import { collectCompactStream } from '../core/compact-stream.js';
 import { parseInput } from '../core/imports.js';
 import type { Capability, ClickHouseDocumentationEntry, ClickHouseDocumentationSummary, Column, Json, Row, Schema, SchemaColumn, SchemaTable } from '../shared/types.js';
 import { lexSql, quoteIdentifier, quoteStringLiteral, splitSql } from '../shared/sql.js';
@@ -28,6 +30,13 @@ const clickhouseSettings = {
     result_overflow_mode: 'break' as const,
     max_threads: 4 as const,
     output_format_json_quote_64bit_integers: 1 as const,
+};
+const clickhouseRunSettings = {
+    ...clickhouseSettings,
+    max_result_rows: '0',
+    max_result_bytes: '0',
+    result_overflow_mode: 'throw' as const,
+    output_format_json_quote_decimals: 1 as const,
 };
 
 type CloudImportJob = { id: string; connectionId: 'clickhouse-cloud'; table: string; queryId: string; rows: number; createdAt: string; status: 'running' | 'succeeded' | 'unknown'; error?: string; reviewedAt?: string; reconciliationRequired?: boolean; tableCreated?: boolean; tableExists?: boolean };
@@ -322,7 +331,8 @@ async function runSql(credentials: CloudCredentials, url: string, sql: string, s
     const statement = sql.trim();
     if (!statement || statement.length > MAX_SQL_LENGTH)
         throw new Error(`Enter one SQL statement under ${MAX_SQL_LENGTH.toLocaleString()} characters.`);
-    if (splitSql(statement).length !== 1)
+    const statements = splitSql(statement);
+    if (statements.length !== 1)
         throw new Error('Run one SQL statement at a time on ClickHouse Cloud.');
 
     const client = makeClient(credentials, url, sessionId);
@@ -349,33 +359,24 @@ async function runSql(credentials: CloudCredentials, url: string, sql: string, s
             };
         }
 
-        const result = await client.query({
-            query: statement,
-            format: 'JSON',
+        const result = await client.exec({
+            query: cloudResultStreamQuery(statements[0]!),
             query_id: queryId,
             query_params: parameters,
             abort_signal: AbortSignal.timeout(48_000),
-            clickhouse_settings: clickhouseSettings,
+            clickhouse_settings: clickhouseRunSettings,
         });
-        const payload = await result.json<Record<string, unknown>>();
-        const columns: Column[] = Array.isArray(payload.meta)
-            ? payload.meta.flatMap(column => typeof column.name === 'string' && typeof column.type === 'string' ? [{ name: column.name, type: column.type }] : [])
-            : [];
-        const data = Array.isArray(payload.data) ? payload.data : [];
-        const rows: Row[] = data.slice(0, MAX_RESULT_ROWS).map(row => columns.map(column => {
-            const value = row[column.name];
-            return value === undefined ? null : value as Json;
-        }));
-        const reportedRows = typeof payload.rows_before_limit_at_least === 'number' ? payload.rows_before_limit_at_least : payload.rows ?? data.length;
-        const serverBytes = Number(payload.statistics?.bytes_read);
-        const bytes = Number.isFinite(serverBytes) ? serverBytes : Buffer.byteLength(JSON.stringify(data));
+        const bounded = await collectCompactStream(result.stream, { rows: MAX_RESULT_ROWS, bytes: MAX_RESULT_BYTES });
+        if (bounded.truncated)
+            void cancelCloudQuery(credentials, url, queryId).catch(() => undefined);
+        const serverBytes = Number(result.summary?.read_bytes);
         return {
             queryId: result.query_id || queryId,
-            columns,
-            rows,
+            columns: bounded.columns,
+            rows: bounded.rows,
             elapsedMs: performance.now() - startedAt,
-            bytes,
-            truncated: reportedRows > rows.length || data.length > MAX_RESULT_ROWS,
+            bytes: Number.isFinite(serverBytes) ? serverBytes : bounded.bytes,
+            truncated: bounded.truncated,
         };
     } finally {
         await client.close();

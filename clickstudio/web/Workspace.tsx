@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { createPortal } from 'react-dom';
-import type { ProfilePipeline, QueryDocument, QueryProfile, Result, Run, RunKind, Schema, Script } from '../shared/types';
+import type { ProfilePipeline, QueryDocument, QueryProfile, Result, Run, RunKind, Schema, SchemaTable, Script } from '../shared/types';
 import { DEFAULT_LIMITS } from '../shared/types';
 import { exportCsv, recommendChart } from '../shared/results';
 import { parameterNames, selectedStatement, splitSql } from '../shared/sql';
+import { sqlReferencesQualifiedTable } from '../shared/table-deletion';
 import { api, download, isFrontendDemoPreview, message, post } from './api';
 import { PLAYGROUND_CONNECTION_ID } from './playground';
 import type { EditorHandle } from './components/SqlEditor';
@@ -53,6 +54,7 @@ import type {
     WorkspaceRunCapabilityAction,
 } from './workspace-types';
 import { initialWorkspaceState, workspaceStateKey } from './workspace-initial-state';
+import type { WorkspaceState } from './workspace-state';
 
 import {
     apiErrorDetail,
@@ -104,6 +106,35 @@ function openImportedSqlQuery(name: string, sql: string, openDraft: (draft: Draf
     const opened = openDraft(draft);
     if (opened) { markImported(draft.id); setNotice(`${name} opened in a new query tab. It has not been run.`); }
     return opened;
+}
+
+function createExampleDraft(example: SqlExample, locale: Locale, copy: Copy['common']) {
+    const name = example.category === 'schema'
+        ? copy.examplePreviewTable.replace('{table}', example.name.replace(/^Preview /, ''))
+        : localizeSqlExample(example, locale).name;
+    const draft = newDraft(`${name}.sql`, example.sql);
+    draft.chart = { ...example.chart, title: locale === 'en' ? example.chart.title : name, ys: [...example.chart.ys], ...(example.chart.candlestick ? { candlestick: { ...example.chart.candlestick } } : {}) };
+    return draft;
+}
+
+function workspaceAfterTableDeleted(state: WorkspaceState, table: Pick<SchemaTable, 'database' | 'name'>): WorkspaceState {
+    return { ...state, tabs: state.tabs.map(draft => draft.activeRunId && sqlReferencesQualifiedTable(draft.sql, table.database, table.name)
+        ? { ...draft, invalidatedSource: { database: table.database, table: table.name, runId: draft.activeRunId } }
+        : draft) };
+}
+
+function activateMatchingPreviewDraft(
+    tabs: readonly Draft[],
+    name: string,
+    sql: string,
+    activate: (draftId: string) => void,
+    runPreview: (draft: Draft) => void,
+) {
+    const existing = tabs.find(draft => draft.name === name && draft.sql === sql);
+    if (!existing) return false;
+    activate(existing.id);
+    runPreview(existing);
+    return true;
 }
 
 type WorkspaceRunActionTitleContext = Readonly<{
@@ -342,15 +373,6 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         panels.revealPanelTemporarily('results', failure.draftId);
     };
 
-    const createExampleDraft = (example: SqlExample) => {
-        const name = example.category === 'schema'
-            ? copy.common.examplePreviewTable.replace('{table}', example.name.replace(/^Preview /, ''))
-            : localizeSqlExample(example, locale).name;
-        const draft = newDraft(`${name}.sql`, example.sql);
-        draft.chart = { ...example.chart, title: locale === 'en' ? example.chart.title : name, ys: [...example.chart.ys], ...(example.chart.candlestick ? { candlestick: { ...example.chart.candlestick } } : {}) };
-        return draft;
-    };
-
     const executeSqlForDraft = (draft: Draft, sql: string, options: {
         kind?: RunKind;
         view?: ResultsView;
@@ -458,7 +480,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
     const runExample = (example: SqlExample, output: 'results' | 'chart' | 'map') => {
         if (busy || executionInFlightRef.current) { setError(copy.common.runActionWait); return true; }
         if (!trusted) { setError(copy.common.runActionTrustRequired); return true; }
-        const draft = createExampleDraft(example);
+        const draft = createExampleDraft(example, locale, copy.common);
         if (!openNewDraft(draft, true)) return true;
         void executeSqlForDraft(draft, draft.sql, { view: output, expandResults: true, trackChartRun: true });
         return true;
@@ -715,9 +737,14 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
     const openDocument = (document: QueryDocument) => {
         addDraft(draftFromDocument(document));
     };
-    const openSqlDraft = (name: string, sql: string, run: boolean) => {
+    const openSqlDraft = (name: string, sql: string, run: boolean, reuseExisting = false) => {
         if (run && (busy || executionInFlightRef.current)) { setError(copy.common.runActionWait); return; }
         if (run && !trusted) { setError(copy.common.runActionTrustRequired); return; }
+        if (run && reuseExisting && activateMatchingPreviewDraft(
+            workspaceRef.current.tabs, name, sql,
+            id => setWorkspace(current => ({ ...current, activeId: id })),
+            draft => { void executeSqlForDraft(draft, draft.sql, { expandResults: true, trackChartRun: true, preview: true }); },
+        )) return;
         const draft = newDraft(name, sql);
         if (!openNewDraft(draft, !run)) return;
         if (!run) {
@@ -767,6 +794,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         onRefreshHistory: () => void loadHistory(),
         onInsert: (value: string) => editor.current?.insert(value),
         onOpenSqlDraft: openSqlDraft,
+        onTableDeleted: table => setWorkspace(current => workspaceAfterTableDeleted(current, table)),
         onOpenImport: () => setImportOpen(true),
         onOpenExport: () => setExportOpen(true),
         onOpenRun: openRun,
@@ -967,7 +995,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
                                 window.requestAnimationFrame(() => focusEditor(editor));
                             }}
                             onOpenExample={example => {
-                                const draft = createExampleDraft(example);
+                                const draft = createExampleDraft(example, locale, copy.common);
                                 if (!openNewDraft(draft, true)) return false;
                                 window.requestAnimationFrame(() => editor.current?.focus());
                                 return true;

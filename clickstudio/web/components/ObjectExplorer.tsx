@@ -44,7 +44,8 @@ type ObjectExplorerProps = {
     importedTableTarget?: ImportedTableTarget;
     onImportedTableRevealed: (target: ImportedTableTarget) => void;
     onInsert: (value: string) => void;
-    onOpenSqlDraft: (name: string, sql: string, run: boolean) => void;
+    onOpenSqlDraft: (name: string, sql: string, run: boolean, reuseExisting?: boolean) => void;
+    onTableDeleted: (table: Pick<SchemaTable, 'database' | 'name'>) => void;
     onOpenReference: (name: string, type: string) => void;
     compact?: boolean;
 };
@@ -68,7 +69,7 @@ function recoverUiState(key: string): ExplorerUiState {
     }
 }
 
-export function ObjectExplorer({ copy, connection, expert, schema, schemaLoading, schemaLoadingMore = false, schemaError, search, setSearch, trusted, onRefreshSchema, onLoadMoreSchema, importedTableTarget, onImportedTableRevealed, onInsert, onOpenSqlDraft, onOpenReference, compact = false }: ObjectExplorerProps) {
+export function ObjectExplorer({ copy, connection, expert, schema, schemaLoading, schemaLoadingMore = false, schemaError, search, setSearch, trusted, onRefreshSchema, onLoadMoreSchema, importedTableTarget, onImportedTableRevealed, onInsert, onOpenSqlDraft, onTableDeleted, onOpenReference, compact = false }: ObjectExplorerProps) {
     const model = useMemo(() => buildObjectExplorer(schema, search, connection.database), [schema, search, connection.database]);
     const storageKey = uiStateKey(connection.id);
     const recovered = useMemo(() => recoverUiState(storageKey), [storageKey]);
@@ -285,7 +286,7 @@ export function ObjectExplorer({ copy, connection, expert, schema, schemaLoading
         {trusted && lineageOpen && <OverlayPortal><MaterializedViewExplorer connection={connection} database={connection.database} databases={schema?.databases} onClose={() => setLineageOpen(false)}/></OverlayPortal>}
         {trusted && createTableOpen && <OverlayPortal><CreateTableDialog connection={connection} databases={schema?.databases ?? []} onClose={() => setCreateTableOpen(false)} onCreated={target => { setSearch(''); setCreatedTableTarget(target); onRefreshSchema(); }}/></OverlayPortal>}
         {trusted && insertRowTarget && <OverlayPortal><InsertRowDialog key={`${insertRowTarget.table.database}.${insertRowTarget.table.name}`} connectionId={connection.id} table={insertRowTarget.table} columns={insertRowTarget.columns} onClose={() => setInsertRowTarget(undefined)} onInserted={onRefreshSchema}/></OverlayPortal>}
-        {trusted && deleteTableTarget && <OverlayPortal><DeleteTableDialog connectionId={connection.id} table={deleteTableTarget} onClose={() => setDeleteTableTarget(undefined)} onDeleted={() => { setSelectedId(undefined); setDetailsOpen(false); onRefreshSchema(); }}/></OverlayPortal>}
+        {trusted && deleteTableTarget && <OverlayPortal><DeleteTableDialog connectionId={connection.id} table={deleteTableTarget} onClose={() => setDeleteTableTarget(undefined)} onDeleted={table => { onTableDeleted(table); setSelectedId(undefined); setDetailsOpen(false); onRefreshSchema(); }}/></OverlayPortal>}
     </section>;
 }
 

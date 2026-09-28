@@ -6,8 +6,9 @@ import type { AssistantSource } from '../shared/types.js';
 const MAX_OUTPUT_TOKENS = 12_000;
 const DEFAULT_MAX_INPUT_TOKENS = 48_000;
 const strings = { type: 'array', items: { type: 'string' } };
-const schema = { type: 'object', additionalProperties: false, required: ['sql', 'summary', 'assumptions', 'tables', 'caveats', 'clarification', 'findings'], properties: {
-        sql: { type: ['string', 'null'] }, summary: { type: 'string' }, assumptions: strings, tables: strings, caveats: strings, clarification: { type: ['string', 'null'] },
+const schema = { type: 'object', additionalProperties: false, required: ['sql', 'alternatives', 'summary', 'assumptions', 'tables', 'caveats', 'clarification', 'findings'], properties: {
+        sql: { type: ['string', 'null'] }, alternatives: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['title', 'summary', 'sql'], properties: { title: { type: 'string' }, summary: { type: 'string' }, sql: { type: 'string' } } } },
+        summary: { type: 'string' }, assumptions: strings, tables: strings, caveats: strings, clarification: { type: ['string', 'null'] },
         findings: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['severity', 'message', 'evidence'], properties: { severity: { type: 'string', enum: ['high', 'medium', 'low'] }, message: { type: 'string' }, evidence: { type: 'string' } } } },
     } };
 

@@ -36,6 +36,7 @@
     "shared/result-columns.ts",
     "shared/schema-browser.ts",
     "shared/object-explorer.ts",
+    "shared/table-deletion.ts",
     "shared/reference.ts",
     "web/reference-data.ts"
   ]
