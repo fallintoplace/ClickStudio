@@ -9,6 +9,7 @@ import { createTableSql } from '../core/table-creation.js';
 import { canDropTableTarget, dropTableSql, isSystemDatabaseName, isViewEngine, tableDeletionConfirmation } from '../shared/table-deletion.js';
 import { parseReplicationSnapshot, replicationQueueQuery, replicationReplicasQuery, type ReplicationCapabilities } from '../shared/replication.js';
 import { parseWorkloadSnapshot, WORKLOAD_WINDOWS, workloadFamiliesQuery, workloadPointsQuery, type QueryLogSource, type WorkloadWindow } from '../shared/workload.js';
+import { loadNativeExplorer, type NativeExplorerRequest, type NativeExplorerSnapshot } from '../shared/native-explorers.js';
 
 type CloudCredentials = { host: string; database: string; username: string; password: string };
 const MAX_SQL_LENGTH = 200_000;
@@ -333,6 +334,15 @@ async function readWorkload(credentials: CloudCredentials, url: string, minutes:
     }
 }
 
+async function readNativeExplorer(credentials: CloudCredentials, url: string, request: NativeExplorerRequest): Promise<NativeExplorerSnapshot> {
+    const client = makeClient(credentials, url);
+    try {
+        return await loadNativeExplorer(request, (query, queryParams) => queryRows<Record<string, unknown>>(client, query, queryParams, 10_000, 8));
+    } finally {
+        await client.close();
+    }
+}
+
 async function readReplication(credentials: CloudCredentials, url: string) {
     const client = makeClient(credentials, url);
     try {
@@ -568,6 +578,22 @@ async function post(request: Request): Promise<Response> {
             return json(await testConnection(credentials, url));
         if (body.action === 'schema')
             return json(await readSchema(credentials, url));
+        if (body.action === 'native-explorer') {
+            if (typeof body.database !== 'string' || !body.database.trim() || body.database.length > 128)
+                return fail('NATIVE_EXPLORER_DATABASE', 'Choose a valid database to inspect.');
+            if (body.database !== credentials.database)
+                return fail('NATIVE_EXPLORER_DATABASE', 'The dependency view is limited to the connected database.');
+            if (body.kind !== 'lineage' && body.kind !== 'merges' && body.kind !== 'mutations')
+                return fail('NATIVE_EXPLORER_KIND', 'Choose a supported metadata view.');
+            let request: NativeExplorerRequest;
+            if (body.kind === 'lineage') request = { kind: 'lineage', database: body.database };
+            else {
+                if (typeof body.table !== 'string' || !body.table.trim() || body.table.length > 128)
+                    return fail('NATIVE_EXPLORER_TABLE', 'Choose a valid table to inspect.');
+                request = { kind: body.kind, database: body.database, table: body.table };
+            }
+            return json(await readNativeExplorer(credentials, url, request));
+        }
         if (body.action === 'run') {
             if (typeof body.sql !== 'string') return fail('SQL_REQUIRED', 'Enter SQL to run.');
             const sessionId = body.sessionId;
@@ -594,7 +620,7 @@ async function post(request: Request): Promise<Response> {
                 return fail('IMPORT_STATUS', 'The saved import details are invalid.');
             return json(await inspectCloudImport(credentials, url, body.queryId, targetTable, body.rows));
         }
-        return fail('CLOUD_ACTION', 'Choose test, schema, run, workload, replication, table creation, table deletion, or import status.');
+        return fail('CLOUD_ACTION', 'Choose test, schema, SQL, native metadata, workload, replication, table creation, table deletion, or import status.');
     } catch (error) {
         if (error instanceof AppError) return fail(error.code, error.message, error.status);
         return safeError(error, credentials.password);

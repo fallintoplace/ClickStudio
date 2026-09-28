@@ -3,6 +3,7 @@ import type { ReplicationSnapshot } from '../shared/replication.js';
 import type { QueryLogSource, WorkloadSnapshot, WorkloadWindow } from '../shared/workload.js';
 import type { CloudImportColumn } from './cloud-import.js';
 import type { CreateTableColumn } from '../shared/table-creation.js';
+import type { NativeExplorerRequest, NativeExplorerSnapshot } from '../shared/native-explorers.js';
 
 export const CLICKHOUSE_CLOUD_CONNECTION_ID = 'clickhouse-cloud';
 
@@ -158,6 +159,11 @@ export async function runClickHouseCloudSql(sql: string, sessionId?: string): Pr
 export async function loadClickHouseCloudSchema(): Promise<Schema> {
     if (!activeCloud) throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before loading its schema.', 401);
     return await requestCloud<Schema>({ action: 'schema', credentials: activeCloud.credentials });
+}
+
+export async function loadClickHouseCloudNativeExplorer(request: NativeExplorerRequest, signal: AbortSignal): Promise<NativeExplorerSnapshot> {
+    if (!activeCloud) throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before inspecting metadata.', 401);
+    return await requestCloud<NativeExplorerSnapshot>({ action: 'native-explorer', credentials: activeCloud.credentials, ...request }, signal);
 }
 
 export async function createClickHouseCloudTable(input: { database: string; name: string; columns: CreateTableColumn[]; orderBy: string }) {
