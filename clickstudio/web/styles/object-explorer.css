@@ -77,6 +77,7 @@
     .object-search-clear:hover, .object-search-clear:focus-visible { border-color: color-mix(in srgb, var(--explorer-signal) 25%, var(--line)); background: color-mix(in srgb, var(--explorer-signal) 9%, var(--panel)); color: var(--explorer-signal); outline: none; }
     .schema-heading.object-heading { min-height: 27px; gap: 8px; padding: 0 2px 5px; border-bottom: 1px solid color-mix(in srgb, var(--explorer-signal) 18%, var(--line)); }
     .schema-heading.object-heading > span { margin-left: auto; color: var(--muted); font-family: var(--font-mono); font-size: 9px; font-weight: 760; letter-spacing: .13em; text-transform: uppercase; }
+    .schema-heading.object-heading.is-standard-object-heading > span { margin-left: 0; }
     .object-heading .toolbar-small { color: var(--explorer-signal); }
     .object-heading .toolbar-small:hover:not(:disabled) { background: color-mix(in srgb, var(--explorer-signal) 10%, var(--panel)); }
     .object-heading .object-refresh-action { display: grid; width: 28px; min-width: 28px; height: 27px; place-items: center; padding: 4px; }

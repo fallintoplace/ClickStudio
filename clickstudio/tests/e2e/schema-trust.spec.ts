@@ -126,6 +126,35 @@ test('Object explorer shows ClickHouse metadata, searchable children, and genera
     await expect(page.getByLabel('Selected object')).toContainText('18.2K');
 });
 
+test('Standard hides advanced object actions and keeps the object header balanced', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('clickstudio:experience', 'beginner'));
+    await mockLiveWorkspace(page, route => route.fulfill({ json: schema }));
+    await page.locator('.icon-rail').getByRole('button', { name: 'Objects', exact: true }).click();
+
+    const heading = page.locator('.object-heading');
+    await expect(heading.getByRole('button', { name: 'View dependencies', exact: true })).toHaveCount(0);
+    const count = heading.locator(':scope > span');
+    const refresh = heading.getByRole('button', { name: 'Refresh', exact: true });
+    await expect(count).toContainText('OBJECTS');
+    await expect(refresh).toBeVisible();
+
+    const [headingBounds, countBounds, refreshBounds] = await Promise.all([
+        heading.boundingBox(), count.boundingBox(), refresh.boundingBox(),
+    ]);
+    expect(headingBounds).not.toBeNull();
+    expect(countBounds).not.toBeNull();
+    expect(refreshBounds).not.toBeNull();
+    expect(countBounds!.x - headingBounds!.x).toBeLessThanOrEqual(4);
+    expect(headingBounds!.x + headingBounds!.width - refreshBounds!.x - refreshBounds!.width).toBeLessThanOrEqual(4);
+
+    await page.getByText('events', { exact: true }).first().click();
+    const details = page.getByLabel('Selected object');
+    await expect(details.getByRole('button', { name: 'Preview rows', exact: true })).toBeVisible();
+    await expect(details.getByRole('button', { name: 'Generate SELECT', exact: true })).toBeVisible();
+    await expect(details.getByRole('button', { name: 'Visualize parts', exact: true })).toHaveCount(0);
+    await expect(page.locator('.object-reference-actions')).toHaveCount(0);
+});
+
 test('Preview Rows keeps the saved query panel preference on the previous tab', async ({ page }) => {
     await mockLiveWorkspace(page, route => route.fulfill({ json: schema }));
     await page.route('**/api/runs**', async route => {

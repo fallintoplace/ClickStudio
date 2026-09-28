@@ -31,6 +31,7 @@ import { DeleteTableDialog } from './DeleteTableDialog';
 type ObjectExplorerProps = {
     copy: Copy['common'];
     connection: Connected;
+    expert: boolean;
     schema?: Schema;
     schemaLoading: boolean;
     schemaLoadingMore?: boolean;
@@ -67,7 +68,7 @@ function recoverUiState(key: string): ExplorerUiState {
     }
 }
 
-export function ObjectExplorer({ copy, connection, schema, schemaLoading, schemaLoadingMore = false, schemaError, search, setSearch, trusted, onRefreshSchema, onLoadMoreSchema, importedTableTarget, onImportedTableRevealed, onInsert, onOpenSqlDraft, onOpenReference, compact = false }: ObjectExplorerProps) {
+export function ObjectExplorer({ copy, connection, expert, schema, schemaLoading, schemaLoadingMore = false, schemaError, search, setSearch, trusted, onRefreshSchema, onLoadMoreSchema, importedTableTarget, onImportedTableRevealed, onInsert, onOpenSqlDraft, onOpenReference, compact = false }: ObjectExplorerProps) {
     const model = useMemo(() => buildObjectExplorer(schema, search, connection.database), [schema, search, connection.database]);
     const storageKey = uiStateKey(connection.id);
     const recovered = useMemo(() => recoverUiState(storageKey), [storageKey]);
@@ -252,10 +253,10 @@ export function ObjectExplorer({ copy, connection, schema, schemaLoading, schema
         </div>
         {showCompactDetails ? <div className="object-compact-details">
             <button type="button" className="object-back-button" onClick={browseObjects}><span>‹</span>{copy.objects}</button>
-            <ObjectDetails copy={copy} selection={selected} trusted={trusted} copiedId={copiedId} onInsert={onInsert} onCopy={copyText} onOpenSqlDraft={onOpenSqlDraft} onOpenReference={onOpenReference} onOpenParts={setPartsTable}/>
+            <ObjectDetails copy={copy} selection={selected} trusted={trusted} expert={expert} copiedId={copiedId} onInsert={onInsert} onCopy={copyText} onOpenSqlDraft={onOpenSqlDraft} onOpenReference={onOpenReference} onOpenParts={setPartsTable}/>
         </div> : <>
         <div className="inspector-search object-search"><Icon name="search"/><input data-testid="schema-search" value={search} onChange={event => changeSearch(event.target.value)} placeholder={copy.objectSearch} aria-label={copy.objectSearch}/>{search && <button type="button" className="object-search-clear" aria-label="Clear object search" onClick={() => changeSearch('')}>×</button>}</div>
-        <div className="schema-heading object-heading"><Button variant="ghost" className="toolbar-small" disabled={!trusted} onClick={() => setLineageOpen(true)}>View dependencies</Button><span>{copy.objectCount.replace('{count}', (model.query ? model.visibleObjects : model.totalObjects).toLocaleString())}</span><Button variant="ghost" className={cx('toolbar-small', 'object-refresh-action', schemaLoading && 'is-loading')} aria-label={schemaLoading ? copy.loading : copy.refresh} aria-busy={schemaLoading} title={schemaLoading ? copy.loading : copy.refresh} onClick={onRefreshSchema} disabled={schemaLoading || !trusted}><Icon name="refresh"/></Button></div>
+        <div className={cx('schema-heading object-heading', !expert && 'is-standard-object-heading')}>{expert && <Button variant="ghost" className="toolbar-small" disabled={!trusted} onClick={() => setLineageOpen(true)}>View dependencies</Button>}<span>{copy.objectCount.replace('{count}', (model.query ? model.visibleObjects : model.totalObjects).toLocaleString())}</span><Button variant="ghost" className={cx('toolbar-small', 'object-refresh-action', schemaLoading && 'is-loading')} aria-label={schemaLoading ? copy.loading : copy.refresh} aria-busy={schemaLoading} title={schemaLoading ? copy.loading : copy.refresh} onClick={onRefreshSchema} disabled={schemaLoading || !trusted}><Icon name="refresh"/></Button></div>
         {schemaError && <div className="callout callout-error">{schemaError}</div>}
         {schema?.metadataWarnings?.map(warning => <div className="schema-metadata-warning" key={warning}>{warning}</div>)}
         {!trusted && <div className="inspector-empty"><Icon name="lock"/><strong>{copy.schemaPrivate}</strong><p>{copy.trustToInspect}</p></div>}
@@ -277,7 +278,7 @@ export function ObjectExplorer({ copy, connection, schema, schemaLoading, schema
                 </div>
             </div> : <div className="object-empty-search"><strong>{copy.noObjectsMatch}</strong><span>{search ? 'Try a different name, type, engine, index, or column.' : copy.metadataUnavailable}</span></div>}
             {schema.truncated && schema.pagination && <div className="schema-partial-state" role="status"><span>Showing part of this schema. Load the next page to see more tables and columns.</span><Button variant="secondary" className="toolbar-small" disabled={schemaLoadingMore || !onLoadMoreSchema} onClick={onLoadMoreSchema}>{schemaLoadingMore ? 'Loading…' : 'Load more metadata'}</Button></div>}
-            {!compact && detailsOpen && selected && <ObjectDetails copy={copy} selection={selected} trusted={trusted} copiedId={copiedId} onClose={browseObjects} onInsert={onInsert} onCopy={copyText} onOpenSqlDraft={onOpenSqlDraft} onOpenReference={onOpenReference} onOpenParts={setPartsTable}/>}
+            {!compact && detailsOpen && selected && <ObjectDetails copy={copy} selection={selected} trusted={trusted} expert={expert} copiedId={copiedId} onClose={browseObjects} onInsert={onInsert} onCopy={copyText} onOpenSqlDraft={onOpenSqlDraft} onOpenReference={onOpenReference} onOpenParts={setPartsTable}/>}
         </>}
         </>}
         {trusted && partsTable && <OverlayPortal><StorageExplorer connection={connection} table={partsTable} copy={copy} onClose={() => setPartsTable(undefined)}/></OverlayPortal>}

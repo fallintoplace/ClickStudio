@@ -4,10 +4,11 @@ import { quoteIdentifier } from '../../shared/sql';
 import type { Copy } from '../i18n';
 import { Button, cx, formatBytes, formatCount, Icon } from './ui';
 
-export function ObjectDetails({ copy, selection, trusted, copiedId, onClose, onInsert, onCopy, onOpenSqlDraft, onOpenReference, onOpenParts }: {
+export function ObjectDetails({ copy, selection, trusted, expert, copiedId, onClose, onInsert, onCopy, onOpenSqlDraft, onOpenReference, onOpenParts }: {
     copy: Copy['common'];
     selection: ExplorerSelection;
     trusted: boolean;
+    expert: boolean;
     copiedId?: string;
     onClose?: () => void;
     onInsert: (value: string) => void;
@@ -31,8 +32,8 @@ export function ObjectDetails({ copy, selection, trusted, copiedId, onClose, onI
                     <Button variant="ghost" className="toolbar-small" onClick={() => void onCopy(qualified, selection.id)}><Icon name="copy"/>{copiedId === selection.id ? copy.copied : copy.copyName}</Button>
                 </div>
             </div>
-            {(table.engine.endsWith('MergeTree') || table.database === 'system') && <div className="object-reference-actions">
-                {table.engine.endsWith('MergeTree') && <Button variant="secondary" className="toolbar-small object-parts-action" disabled={!trusted} title={!trusted ? copy.runActionTrustRequired : undefined} onClick={() => onOpenParts(table)}><Icon name="chart"/>{copy.partsVisualize}</Button>}
+            {((expert && table.engine.endsWith('MergeTree')) || table.database === 'system') && <div className="object-reference-actions">
+                {expert && table.engine.endsWith('MergeTree') && <Button variant="secondary" className="toolbar-small object-parts-action" disabled={!trusted} title={!trusted ? copy.runActionTrustRequired : undefined} onClick={() => onOpenParts(table)}><Icon name="chart"/>{copy.partsVisualize}</Button>}
                 {table.database === 'system' && <Button variant="ghost" className="toolbar-small" onClick={() => onOpenReference(table.name, 'System Table')}><Icon name="reference"/>{copy.referenceSystemTable}</Button>}
             </div>}
             <TableMetadata table={table}/>
