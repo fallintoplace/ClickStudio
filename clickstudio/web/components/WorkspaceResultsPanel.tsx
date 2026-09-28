@@ -147,9 +147,9 @@ export function WorkspaceResultsPanel({
     const failurePreview = failureError ? failureMessagePreview(failureError.message) : undefined;
     const resultProvenance = visibleResultsView !== 'sqlmap' && !execution
         ? failedAttempt && run
-            ? { detail: 'Latest attempt failed', description: 'The latest attempt failed. Showing the previous result.' }
+            ? { description: 'The latest attempt failed. Showing the previous result.' }
             : !failedAttempt && staleResult
-                ? { detail: 'SQL, selection, or parameters changed', description: 'SQL text, selection, or bound parameters changed since this run. Rerun to refresh the result.' }
+                ? { description: 'SQL text, selection, or bound parameters changed since this run. Rerun to refresh the result.' }
                 : undefined
         : undefined;
 
@@ -186,7 +186,7 @@ export function WorkspaceResultsPanel({
                 >
                     <span className="status-light is-warning" aria-hidden="true"/>
                     <strong>Previous result</strong>
-                    <small>{resultProvenance.detail}</small>
+                    <small>{resultProvenance.description}</small>
                 </span>}
             </div>
             <div className="results-actions">
@@ -220,7 +220,7 @@ export function WorkspaceResultsPanel({
                 {execution.sql.length > 180 && <details className="result-execution-details"><summary>{copy.common.expandQuery}</summary><pre className="result-execution-sql is-full">{execution.sql}</pre></details>}
             </div>}
             {visibleResultsView === 'results' && script && <ScriptResults script={script} runs={history} activeRunId={run?.id} onSelectRun={actions.onSelectScriptRun} onCancel={actions.onCancel} cancelDisabled={cancelling} cancelAfterCurrentStatement={connection.id === CLICKHOUSE_CLOUD_CONNECTION_ID}/>}
-            {resultsRun && visibleResultsView === 'results' && (!execution || showPreviousResult) && <ResultGrid key={resultsRun.id} run={resultsRun} page={resultsPage} pageIndex={resultsPageIndex} loading={!resultsPage && resultsRun.resultState === 'reopenable'} onPage={actions.onPage} showPagination={!showPreviousResult} previousRun={showPreviousResult || staleResult || Boolean(failedAttempt && run)} obscured={showPreviousResult}/>}
+            {resultsRun && visibleResultsView === 'results' && (!execution || showPreviousResult) && <ResultGrid key={resultsRun.id} run={resultsRun} page={resultsPage} pageIndex={resultsPageIndex} loading={!resultsPage && resultsRun.resultState === 'reopenable'} onPage={actions.onPage} showPagination={!showPreviousResult} obscured={showPreviousResult}/>}
             {run && visibleResultsView === 'indexes' && <ExplainIndexesView analysis={explainIndexAnalysis} loading={!retainedSnapshot && run.resultState === 'reopenable'} copy={copy.common}/>}
             {run && visibleResultsView === 'plan' && <ExplainPlanView plan={explainPlan} loading={!retainedSnapshot && run.resultState === 'reopenable'} copy={copy.common}/>}
             {run && visibleResultsView === 'pipeline' && (pipelineResult

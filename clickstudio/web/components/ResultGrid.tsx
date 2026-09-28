@@ -4,7 +4,7 @@ import type { ResultPage, Run } from '../../shared/types';
 import { ScrollEdgeFrame } from './ScrollEdgeShadows';
 import { Button, cx, terminal } from './ui';
 
-export function ResultGrid({ run, page, pageIndex, loading, onPage, showPagination = true, previousRun = false, obscured = false }: { run: Run; page?: ResultPage; pageIndex: number; loading: boolean; onPage: (page: number) => void; showPagination?: boolean; previousRun?: boolean; obscured?: boolean }) {
+export function ResultGrid({ run, page, pageIndex, loading, onPage, showPagination = true, obscured = false }: { run: Run; page?: ResultPage; pageIndex: number; loading: boolean; onPage: (page: number) => void; showPagination?: boolean; obscured?: boolean }) {
     const [filter, setFilter] = useState('');
     if (run.resultState === 'expired') return <div className="result-empty-state"><span className="empty-result-icon">⌛</span><strong>Result retention expired</strong><p>The SQL and query ID are still available. Run it again to fetch fresh data.</p></div>;
     if (run.resultState !== 'reopenable') return <div className="result-empty-state">{terminal(run) ? <span className="empty-result-icon">!</span> : <span className="loading-orbit"/>}<strong>{terminal(run) ? 'No retained result' : 'Query is running'}</strong><p>{terminal(run) ? 'This run did not produce result rows.' : 'The live execution status appears in the bottom bar.'}</p></div>;
@@ -21,9 +21,8 @@ export function ResultGrid({ run, page, pageIndex, loading, onPage, showPaginati
     return <div className={cx('result-grid-wrap animate-enter', obscured && 'is-pending-previous-result')} aria-busy={obscured || undefined} inert={obscured || undefined}>
         <div className="result-summary-row">
             <span><strong>{page.totalRows.toLocaleString()}</strong> rows <i>·</i> <strong>{page.columns.length}</strong> columns</span>
-            <span className={cx('result-completeness', previousRun && 'is-previous')}>
-                <span className={cx('status-light', previousRun || page.completeness === 'truncated' ? 'is-warning' : 'is-trusted')}/>
-                {previousRun && <span className="result-previous-run">Previous run ·</span>}
+            <span className="result-completeness">
+                <span className={cx('status-light', page.completeness === 'truncated' ? 'is-warning' : 'is-trusted')}/>
                 {page.completeness === 'truncated' ? 'Retained prefix · truncated' : 'Complete result'}
             </span>
             <label className="result-filter"><span>Find on this page</span><input type="search" aria-label="Filter current page" placeholder="Filter rows" value={filter} onChange={event => setFilter(event.target.value)}/></label>
