@@ -45,7 +45,8 @@ test('Copy interpolation accepts empty strings, numbers, and indexed placeholder
 
 test('Only explicitly supplied parameters are interpolated', () => {
     const inherited = Object.create({ table: 'inherited' });
-    assert.equal(formatCopy('{table} {constructor} {toString}', inherited), '{table} {constructor} {toString}');
+    const template = '{table} {constructor} {toString}';
+    assert.equal(formatCopy(template, inherited), template);
     assert.equal(formatCopy('{constructor}', { constructor: 'explicit' }), 'explicit');
     const parameters = Object.freeze({ table: 'events' });
     assert.equal(formatCopy('{table}', parameters), 'events');
