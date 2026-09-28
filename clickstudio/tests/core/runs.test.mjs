@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { DEFAULT_RECEIPT_RETENTION_MS, DEFAULT_SCRIPT_RETENTION_MS, RunService, boundResult } from '../../.core-build/core/runs.js';
+import { DEFAULT_RECEIPT_LIMIT, DEFAULT_RECEIPT_RETENTION_MS, DEFAULT_RUN_HISTORY_LIMIT, DEFAULT_SCRIPT_RETENTION_MS, RunService, boundResult } from '../../.core-build/core/runs.js';
 import { DEFAULT_LIMITS } from '../../.core-build/shared/types.js';
 import { fixture, owner, other, viewer, until, columns, connection } from './helpers.mjs';
 test('Lifecycle retains typed evidence and actual identity', async () => { const f = fixture(), r = f.runs.submit(owner, f.request()); const done = await f.runs.wait(owner, r.id); assert.equal(done.status, 'succeeded'); assert.equal(done.executedAs, 'reader'); assert.equal(f.runs.result(owner, r.id).rows[0][0], '1'); assert.equal(done.retryPolicy, 'never'); });
@@ -18,6 +18,55 @@ test('Run capacity checks use store counts without loading run or receipt record
     assert.equal((await f.runs.wait(owner, run.id)).status, 'succeeded');
     assert.equal(f.store.count('runs'), 1);
     assert.equal(f.store.count('receipts'), 1);
+});
+test('Run history keeps the newest entries and preserves idempotency after pruning', async () => {
+    assert.equal(DEFAULT_RUN_HISTORY_LIMIT, 10_000);
+    assert.equal(DEFAULT_RECEIPT_LIMIT, 100_000);
+    const f = fixture({ runHistoryLimit: 3 }), oldInput = f.request(), old = f.runs.submit(owner, oldInput);
+    await f.runs.wait(owner, old.id);
+    const finished = f.runs.get(owner, old.id);
+    f.store.put('runs', old.id, { ...finished, createdAt: '2000-01-01T00:00:00.000Z', status: 'failed', resultState: 'unavailable' });
+    f.store.put('runs', 'failed', { ...finished, id: 'failed', queryId: 'failed', createdAt: '2001-01-01T00:00:00.000Z', status: 'failed', finishedAt: '2001-01-01T00:00:01.000Z', resultState: 'unavailable' });
+    f.store.put('results', 'failed', { runId: 'failed' });
+    f.store.put('runs', 'active', { ...finished, id: 'active', queryId: 'active', createdAt: '2002-01-01T00:00:00.000Z', status: 'running', resultState: 'pending' });
+    const next = f.runs.submit(owner, f.request());
+    assert.equal(f.store.count('runs'), 3);
+    assert.equal(f.store.get('runs', old.id), undefined);
+    assert.ok(f.store.get('runs', 'failed'));
+    assert.equal(f.store.get('results', old.id), undefined);
+    assert.ok(f.store.get('results', 'failed'));
+    assert.ok(f.store.get('runs', 'active'));
+    assert.ok(f.store.get('runs', next.id));
+    assert.ok(f.store.keys('receipts').some(key => f.store.get('receipts', key).resourceId === old.id));
+    assert.throws(() => f.runs.submit(owner, oldInput), { code: 'RETIRED_REQUEST' });
+    await f.runs.wait(owner, next.id);
+});
+test('Concurrent run submissions prune only enough finished history to stay at the limit', async () => {
+    const f = fixture({ runHistoryLimit: 2 });
+    f.store.put('runs', 'oldest', { id: 'oldest', status: 'succeeded', createdAt: '2000-01-01T00:00:00.000Z' });
+    f.store.put('runs', 'newer', { id: 'newer', status: 'succeeded', createdAt: '2001-01-01T00:00:00.000Z' });
+    const first = f.runs.submit(owner, f.request()), second = f.runs.submit(owner, f.request());
+    assert.equal(f.store.count('runs'), 2);
+    assert.equal(f.store.get('runs', 'oldest'), undefined);
+    assert.equal(f.store.get('runs', 'newer'), undefined);
+    assert.ok(f.store.get('runs', first.id));
+    assert.ok(f.store.get('runs', second.id));
+    await Promise.all([f.runs.wait(owner, first.id), f.runs.wait(owner, second.id)]);
+});
+test('Run history stays intact when it is full and no finished run can be pruned', () => {
+    const f = fixture({ runHistoryLimit: 2 });
+    f.store.put('runs', 'queued', { id: 'queued', status: 'queued', createdAt: '2000-01-01T00:00:00.000Z' });
+    f.store.put('runs', 'running', { id: 'running', status: 'running', createdAt: '2001-01-01T00:00:00.000Z' });
+    assert.throws(() => f.runs.submit(owner, f.request()), { code: 'HISTORY_FULL' });
+    assert.equal(f.store.count('runs'), 2);
+    assert.equal(f.calls.length, 0);
+});
+test('Run history is not pruned when the separate receipt limit rejects a submission', async () => {
+    const f = fixture({ runHistoryLimit: 1, receiptLimit: 1 }), existing = f.runs.submit(owner, f.request());
+    await f.runs.wait(owner, existing.id);
+    assert.throws(() => f.runs.submit(owner, f.request()), { code: 'RECEIPT_CAPACITY' });
+    assert.ok(f.store.get('runs', existing.id));
+    assert.equal(f.store.count('runs'), 1);
 });
 test('Reusing an id for different SQL rejects', () => { const f = fixture(), input = f.request(); f.runs.submit(owner, input); assert.throws(() => f.runs.submit(owner, { ...input, sql: 'SELECT 9' }), { code: 'IDEMPOTENCY_CONFLICT' }); });
 test('Connection trust is required server-side', () => { const f = fixture(); f.runs.trust(owner, 'local', false); assert.throws(() => f.runs.submit(owner, f.request()), { code: 'WORKSPACE_UNTRUSTED' }); assert.equal(f.calls.length, 0); });

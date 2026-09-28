@@ -31,6 +31,8 @@ interface Receipt {
 const terminalStates = new Set(['succeeded', 'truncated', 'failed', 'cancelled', 'timed_out', 'interrupted']);
 export const DEFAULT_SCRIPT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 export const DEFAULT_RECEIPT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+export const DEFAULT_RUN_HISTORY_LIMIT = 10_000;
+export const DEFAULT_RECEIPT_LIMIT = 100_000;
 export function terminal(run: Pick<Run, 'status'>) { return terminalStates.has(run.status); }
 export class RunService {
     private readonly listeners = new Map<string, Set<(event: RunEvent) => void>>();
@@ -44,6 +46,8 @@ export class RunService {
         snapshotBytes?: number;
         scriptRetentionMs?: number;
         receiptRetentionMs?: number;
+        runHistoryLimit?: number;
+        receiptLimit?: number;
     } = {}) {
         // An interrupted query is never automatically replayed after a process restart.
         for (const run of store.list<Run>('runs'))
@@ -125,6 +129,22 @@ export class RunService {
             requireThat(old.fingerprint === hash(payload) && old.kind === kind, 409, 'IDEMPOTENCY_CONFLICT', 'This request ID was already used for different input. Review the action and use a new ID.');
         return old;
     }
+    private makeRunHistoryRoom(principal: Principal) {
+        const limit = this.options.runHistoryLimit ?? DEFAULT_RUN_HISTORY_LIMIT;
+        const count = this.store.count('runs');
+        if (count < limit)
+            return;
+        const removeCount = count - limit + 1;
+        const oldestFinished = this.store.list<Run>('runs').filter(terminal)
+            .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id))
+            .slice(0, removeCount);
+        requireThat(oldestFinished.length === removeCount, 507, 'HISTORY_FULL', 'Run history is full. No finished runs can be removed.');
+        for (const run of oldestFinished) {
+            this.store.delete('results', run.id);
+            this.store.delete('runs', run.id);
+            audit(this.store, principal, 'run.history_prune', run.id);
+        }
+    }
     submit(principal: Principal, input: unknown): Run {
         requireThat(!this.closed, 503, 'SHUTTING_DOWN', 'The server is shutting down');
         const request = runRequest(input), conn = this.authorize(principal, request);
@@ -134,11 +154,12 @@ export class RunService {
             return this.get(principal, previous.resourceId);
         }
         requireThat(this.queue.length + this.active < 50, 429, 'RUN_QUEUE_FULL', 'There are too many pending runs');
-        requireThat(this.store.count('runs') < 1000, 507, 'HISTORY_FULL', 'Run history is full. Export and delete older runs.');
-        if (this.store.count('receipts') >= 10000) {
+        const receiptLimit = this.options.receiptLimit ?? DEFAULT_RECEIPT_LIMIT;
+        if (this.store.count('receipts') >= receiptLimit) {
             this.sweep();
-            requireThat(this.store.count('receipts') < 10000, 507, 'RECEIPT_CAPACITY', 'Idempotency storage needs operator maintenance');
+            requireThat(this.store.count('receipts') < receiptLimit, 507, 'RECEIPT_CAPACITY', 'Idempotency storage needs operator maintenance');
         }
+        this.makeRunHistoryRoom(principal);
         const id = randomUUID();
         const run: Run = {
             id, queryId: `clickstudio-${randomUUID()}`, owner: principal.id, dataSource: conn.dataSource ?? 'clickhouse',
