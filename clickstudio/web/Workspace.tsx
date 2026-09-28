@@ -19,7 +19,7 @@ import { Button, cx, Icon, inspectorLabel, terminal } from './components/ui';
 import { ExecutionBar, RailButton } from './components/WorkspaceChrome';
 import { WorkspaceDocumentTabs } from './components/WorkspaceDocumentTabs';
 import { WorkspaceQueryPanel } from './components/WorkspaceQueryPanel';
-import { EXPERT_BROWSE_NAVIGATION, EXPERT_EXECUTION_NAVIGATION, isPrimaryInspector, PRIMARY_INSPECTOR_NAVIGATION } from './inspector-navigation';
+import { EXPERT_BROWSE_NAVIGATION, EXPERT_EXECUTION_NAVIGATION, PRIMARY_INSPECTOR_NAVIGATION } from './inspector-navigation';
 import { DetachedQueryPlaceholder } from './components/DetachedQueryPlaceholder';
 import { DetachedResultsPlaceholder } from './components/DetachedResultsPlaceholder';
 import { WorkspaceResultsPanel } from './components/WorkspaceResultsPanel';
@@ -319,7 +319,6 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         storeFailedQueryError(failure);
         if (workspaceRef.current.activeId !== failure.draftId) return;
         setView('results'); setResultsCollapsed(false);
-        if (!isPrimaryInspector(inspectorRef.current)) setDrawerOpen(false);
     };
 
     const createExampleDraft = (example: SqlExample) => {
@@ -429,7 +428,6 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
                 if (options.trackChartRun) setExampleChartRunId(options.view === 'chart' ? created.id : undefined);
             }
             if (options.expandResults) setResultsCollapsed(false);
-            if (!isPrimaryInspector(inspectorRef.current)) setDrawerOpen(false);
             if (!isFrontendDemoPreview)
                 setNotice(demoMode
                     ? isScript ? 'Sample results were generated. Script SQL was not sent to ClickHouse.' : options.preview ? 'Sample preview generated. SQL was not sent to ClickHouse.' : 'Sample results were generated. Query SQL was not sent to ClickHouse.'
@@ -487,7 +485,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         draft.activeRunId = selected.id;
         draft.runIds = [selected.id];
         if (!addDraft(draft)) return;
-        setView(selected.kind === 'plan' ? 'plan' : selected.kind === 'pipeline' ? 'pipeline' : selected.kind === 'analyze' ? 'runtime' : 'results'); setDrawerOpen(false); setNotice(`Opened retained run ${selected.queryId}. No query was rerun.`);
+        setView(selected.kind === 'plan' ? 'plan' : selected.kind === 'pipeline' ? 'pipeline' : selected.kind === 'analyze' ? 'runtime' : 'results'); setNotice(`Opened retained run ${selected.queryId}. No query was rerun.`);
     };
 
     const saveDraft = useWorkspaceDocumentSave({
@@ -704,7 +702,6 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         if (run && !trusted) { setError(copy.common.runActionTrustRequired); return; }
         const draft = newDraft(name, sql);
         if (!openNewDraft(draft)) return;
-        setDrawerOpen(false);
         if (!run) {
             window.requestAnimationFrame(() => editor.current?.focus());
             return;
@@ -754,7 +751,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         onOpenDocument: openDocument,
         onLoadProfile: () => void perform(loadProfile, 'save'),
         onLoadPipeline: () => void perform(loadPipeline, 'save'),
-        onOpenGraph: () => { setView('insights'); setDrawerOpen(false); },
+        onOpenGraph: () => { setView('insights'); },
         connectionId: connection.id,
         sql: active.sql,
         trusted,
