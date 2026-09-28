@@ -52,3 +52,8 @@ test('Only explicitly supplied parameters are interpolated', () => {
     assert.equal(formatCopy('{table}', parameters), 'events');
     assert.deepEqual(parameters, { table: 'events' });
 });
+
+test('Explicitly undefined parameters preserve their placeholders', () => {
+    const template = 'Preview {table}';
+    assert.equal(formatCopy(template, { table: undefined }), template);
+});
