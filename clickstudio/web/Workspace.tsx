@@ -790,8 +790,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
 
     const queryPanel = <WorkspaceQueryPanel
         state={{ active, connection, schema, copy, experience, dark, nativeParserEnabled, nativeParserStatus,
-            trusted, unsupportedParameters, parameters, busy, inspector, demoMode, view,
-            saveStatus, saveStatusLabel }}
+            trusted, unsupportedParameters, parameters, busy, inspector, demoMode, view }}
         actions={{
             onPatch: patch,
             onToggleSqlMap: () => {

@@ -145,7 +145,6 @@
     .restore-sql-item-copy strong { font-size: 9px; font-weight: 650; }
     .restore-sql-item-copy small { color: var(--muted); font-family: var(--font-mono); font-size: 8px; }
     .draft-status { display: inline-flex; align-items: center; gap: 7px; padding: 0 9px; color: var(--muted); font-size: 9px; white-space: nowrap; }
-    .standard-draft-status { flex: none; padding-inline: 4px; font-size: 8px; }
     .revision-history-trigger { display: inline-flex; min-height: 26px; flex: none; align-items: center; gap: 5px; padding: 0 8px; font-size: 8px; }
     .revision-history-trigger svg { width: 13px; height: 13px; }
     .revision-history-trigger[aria-pressed="true"] { color: var(--accent); }

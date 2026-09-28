@@ -93,8 +93,7 @@
     .document-tab { min-width: 140px; max-width: 260px; gap: 5px; padding: 0 7px; font-size: 9px; }
     .document-tab-actions { padding-left: 3px; }
     .document-tabs-scroll-button { width: 25px; }
-    .draft-status:not(.standard-draft-status) { display: none; }
-    .standard-draft-status { gap: 5px; padding-inline: 2px; font-size: 7px; }
+    .draft-status { display: none; }
     .editor-heading { min-height: 47px; padding: 6px 9px; }
     .editor-mode-label { gap: 6px; font-size: 8px; }
     .editor-control-rail { gap: 7px; padding: 8px; }
