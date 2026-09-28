@@ -8,7 +8,7 @@ type Props = {
     connectionId: string;
     table: Pick<SchemaTable, 'database' | 'name'>;
     onClose: () => void;
-    onDeleted: () => void;
+    onDeleted: (table: Pick<SchemaTable, 'database' | 'name'>) => void;
 };
 
 export function DeleteTableDialog({ connectionId, table, onClose, onDeleted }: Props) {
@@ -39,7 +39,7 @@ export function DeleteTableDialog({ connectionId, table, onClose, onDeleted }: P
                     method: 'DELETE', body: { database: table.database, table: table.name, confirmation },
                 });
             }
-            onDeleted();
+            onDeleted(table);
             onClose();
         } catch (caught) {
             setError(caught instanceof Error ? caught.message : String(caught));

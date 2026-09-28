@@ -10,6 +10,7 @@ import {
     relationKind,
     tableQuerySql,
 } from '../../.workspace-build/shared/object-explorer.js';
+import { sqlReferencesQualifiedTable } from '../../.workspace-build/shared/table-deletion.js';
 
 const schema = {
     connectionId: 'live',
@@ -82,6 +83,20 @@ test('Generated table SQL is quoted, bounded, and uses explicit columns when pra
 
     const manyColumns = Array.from({ length: 25 }, (_, index) => ({ database: 'analytics', table: 'events', name: `c${index}`, type: 'UInt8', defaultKind: '', comment: '' }));
     assert.match(tableQuerySql(table, manyColumns, 'select'), /SELECT\n {4}\*\nFROM/);
+});
+
+test('Dropped table matching finds exact FROM and JOIN identifiers outside comments and strings', () => {
+    const sql = "SELECT *\nFROM `analytics`.`events`\nJOIN `analytics`.`owners` ON owners.id = events.owner_id;";
+    assert.equal(sqlReferencesQualifiedTable(sql, 'analytics', 'events'), true);
+    assert.equal(sqlReferencesQualifiedTable(sql, 'analytics', 'owners'), true);
+    assert.equal(sqlReferencesQualifiedTable(sql, 'analytics', 'event'), false);
+    assert.equal(sqlReferencesQualifiedTable("SELECT 'FROM `analytics`.`events`' -- JOIN `analytics`.`events`", 'analytics', 'events'), false);
+});
+
+test('Dropped table matching keeps quoted identifier case and ignores malformed SQL', () => {
+    assert.equal(sqlReferencesQualifiedTable('select * from `Analytics`.`Events`', 'Analytics', 'Events'), true);
+    assert.equal(sqlReferencesQualifiedTable('select * from `analytics`.`events`', 'analytics', 'Events'), false);
+    assert.equal(sqlReferencesQualifiedTable('select * from `analytics`.`events', 'analytics', 'events'), false);
 });
 
 test('Undefined schema produces an empty explorer model', () => {

@@ -193,7 +193,7 @@ test('Standard hides advanced object actions and keeps the object header balance
     await expect(page.locator('.object-reference-actions')).toHaveCount(0);
 });
 
-test('Preview Rows keeps the saved query panel preference on the previous tab', async ({ page }) => {
+test('Preview Rows reuses the same draft and keeps the saved query panel preference', async ({ page }) => {
     await mockLiveWorkspace(page, route => route.fulfill({ json: schema }));
     await page.route('**/api/runs**', async route => {
         if (route.request().method() === 'POST') {
@@ -214,6 +214,118 @@ test('Preview Rows keeps the saved query panel preference on the previous tab', 
 
     await sqlTabs.getByRole('tab', { name: originalTabName!, exact: true }).click();
     await expect(page.locator('#sql-editor-content')).toBeHidden();
+
+    await page.getByText('events', { exact: true }).first().click();
+    const repeatedRun = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/runs');
+    await page.getByRole('button', { name: 'Preview rows', exact: true }).click();
+    await repeatedRun;
+    await expect(sqlTabs.getByRole('tab')).toHaveCount(2);
+    await expect(sqlTabs.getByRole('tab', { name: 'Preview events.sql', exact: true })).toHaveCount(1);
+});
+
+test('Preview Rows keeps an edited preview draft and opens a fresh one', async ({ page }) => {
+    await mockLiveWorkspace(page, route => route.fulfill({ json: schema }));
+    await page.route('**/api/runs**', async route => {
+        if (route.request().method() === 'POST') {
+            await route.fulfill({ status: 503, json: { error: { code: 'MOCK_RUN_FAILURE', message: 'The preview request is mocked.' } } });
+            return;
+        }
+        await route.fallback();
+    });
+
+    const sqlTabs = page.getByRole('tablist', { name: 'SQL documents', exact: true });
+    await page.getByText('events', { exact: true }).first().click();
+    const firstRun = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/runs');
+    await page.getByRole('button', { name: 'Preview rows', exact: true }).click();
+    await firstRun;
+    const previewTabs = sqlTabs.getByRole('tab', { name: 'Preview events.sql', exact: true });
+    await previewTabs.click();
+    const queryEditor = page.locator('#sql-editor-content');
+    const queryToggle = page.locator('button[aria-controls="sql-editor-content"]');
+    if (await queryEditor.isHidden()) await queryToggle.click();
+    await replaceSql(page, 'SELECT 42');
+
+    await page.getByText('events', { exact: true }).first().click();
+    const secondRun = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/runs');
+    await page.getByRole('button', { name: 'Preview rows', exact: true }).click();
+    await secondRun;
+    await expect(previewTabs).toHaveCount(2);
+    await previewTabs.nth(0).click();
+    if (await queryEditor.isHidden()) await queryToggle.click();
+    await expect(page.locator('.cm-content')).toContainText('SELECT 42');
+    await previewTabs.nth(1).click();
+    if (await queryEditor.isHidden()) await queryToggle.click();
+    await expect(page.locator('.cm-content')).toContainText('FROM `analytics`.`events`');
+});
+
+test('Deleting a table marks its cached preview result stale and keeps the warning after reload', async ({ page }) => {
+    let tableExists = true;
+    await mockLiveWorkspace(page, route => route.fulfill({ json: {
+        ...schema,
+        tables: tableExists ? schema.tables : [],
+        columns: tableExists ? schema.columns : [],
+    } }));
+
+    const previewSql = 'SELECT *\nFROM `analytics`.`events`\nLIMIT 100;';
+    const run = {
+        dataSource: 'clickhouse', id: 'deleted-source-run', queryId: 'deleted-source-query', owner: 'test-owner', connectionId: 'live',
+        sql: previewSql, kind: 'query', parameters: {}, limits: { rows: 5000, bytes: 2000000, seconds: 30, memory: 536870912, threads: 4 },
+        tags: {}, status: 'succeeded', createdAt: '2026-09-29T08:00:00.000Z', startedAt: '2026-09-29T08:00:00.000Z',
+        finishedAt: '2026-09-29T08:00:00.000Z', elapsedMs: 1, rowCount: 1, bytes: 8, columns: [{ name: 'day', type: 'Date' }],
+        warnings: [], sequence: 1, resultExpiresAt: '2027-01-01T00:00:00.000Z', resultState: 'reopenable',
+        requestedBy: 'test-owner', executedAs: 'test-reader', permissionSnapshot: { readonly: true, role: 'owner' }, retryPolicy: 'never',
+    };
+    await page.route('**/api/runs**', async route => {
+        const url = new URL(route.request().url());
+        if (route.request().method() === 'POST' && url.pathname === '/api/runs') {
+            await route.fulfill({ json: run });
+            return;
+        }
+        if (url.pathname === '/api/runs') {
+            await route.fulfill({ json: [run] });
+            return;
+        }
+        if (url.pathname === `/api/runs/${run.id}/result`) {
+            await route.fulfill({ json: {
+                runId: run.id, queryId: run.queryId, columns: run.columns, rows: [['2026-09-29']], completeness: 'complete',
+                createdAt: run.createdAt, expiresAt: run.resultExpiresAt, offset: 0, totalRows: 1, nextOffset: null,
+            } });
+            return;
+        }
+        if (url.pathname === `/api/runs/${run.id}`) {
+            await route.fulfill({ json: run });
+            return;
+        }
+        await route.fallback();
+    });
+    await page.route('**/api/connections/live/tables', async route => {
+        if (route.request().method() === 'DELETE') {
+            tableExists = false;
+            await route.fulfill({ json: { ok: true } });
+            return;
+        }
+        await route.fallback();
+    });
+
+    await page.getByText('events', { exact: true }).first().click();
+    await page.getByRole('button', { name: 'Preview rows', exact: true }).click();
+    const results = page.getByRole('region', { name: 'Query results', exact: true });
+    await expect(results.getByRole('table', { name: 'Retained query rows' })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Delete table', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Delete table', exact: true });
+    await dialog.getByRole('textbox', { name: 'Type analytics.events to confirm' }).fill('analytics.events');
+    const deleteRequest = page.waitForRequest(request => request.method() === 'DELETE' && new URL(request.url()).pathname === '/api/connections/live/tables');
+    await dialog.getByRole('button', { name: 'Delete table', exact: true }).click();
+    await deleteRequest;
+
+    const provenance = results.locator('.result-provenance-header');
+    await expect(provenance).toContainText('The source table analytics.events was deleted after this run.');
+    await expect(provenance).toHaveClass(/is-source-deleted/);
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'Run', exact: true })).toBeVisible();
+    const restoredResults = page.getByRole('region', { name: 'Query results', exact: true });
+    await expect(restoredResults.locator('.result-provenance-header')).toContainText('The source table analytics.events was deleted after this run.');
 });
 
 test('MergeTree storage opens a selectable, metric-switchable D3 parts explorer', async ({ page }) => {

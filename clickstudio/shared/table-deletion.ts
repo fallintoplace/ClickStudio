@@ -1,4 +1,4 @@
-import { quoteIdentifier } from './sql.js';
+import { lexSql, quoteIdentifier } from './sql.js';
 
 const systemDatabases = new Set(['system', 'information_schema']);
 
@@ -20,6 +20,19 @@ export function tableDeletionConfirmation(database: string, table: string) {
 
 export function dropTableSql(database: string, table: string) {
     return `DROP TABLE IF EXISTS ${quoteIdentifier(database)}.${quoteIdentifier(table)}`;
+}
+
+export function sqlReferencesQualifiedTable(sql: string, database: string, table: string) {
+    let tokens;
+    try {
+        tokens = lexSql(sql);
+    } catch {
+        return false;
+    }
+
+    const qualifiedName = [quoteIdentifier(database), '.', quoteIdentifier(table)];
+    return tokens.some((token, index) => token.kind === 'word' && /^(?:from|join)$/i.test(token.text)
+        && qualifiedName.every((part, offset) => tokens[index + offset + 1]?.text === part));
 }
 
 export function isViewEngine(engine: string) {

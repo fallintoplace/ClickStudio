@@ -122,6 +122,8 @@ export function WorkspaceResultsPanel({
         queryTreeAvailable,
         queryTreeUnavailableReason,
         staleResult,
+        staleResultReason,
+        sourceDeleted,
     } = viewState;
     const {
         resultsPanelRef,
@@ -149,7 +151,7 @@ export function WorkspaceResultsPanel({
         ? failedAttempt && run
             ? { description: 'The latest attempt failed. Showing the previous result.' }
             : !failedAttempt && staleResult
-                ? { description: 'SQL text, selection, or bound parameters changed since this run.' }
+                ? { description: staleResultReason ?? 'SQL text, selection, or bound parameters changed since this run.', sourceDeleted }
                 : undefined
         : undefined;
 
@@ -178,7 +180,7 @@ export function WorkspaceResultsPanel({
                     ? <span className="result-execution-header"><span className="loading-orbit" aria-hidden="true"/>{copy.common.statusRunning}</span>
                     : !failureError && !execution && run && visibleResultsView !== 'sqlmap' && <Status run={run} copy={copy.common}/>}
                 {resultProvenance && <span
-                    className="result-provenance-header"
+                    className={cx('result-provenance-header', resultProvenance.sourceDeleted && 'is-source-deleted')}
                     role="status"
                     aria-live="polite"
                     aria-label={resultProvenance.description}

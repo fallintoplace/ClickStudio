@@ -13,7 +13,7 @@ export function ObjectDetails({ copy, selection, trusted, expert, copiedId, onCl
     onClose?: () => void;
     onInsert: (value: string) => void;
     onCopy: (value: string, id: string) => void;
-    onOpenSqlDraft: (name: string, sql: string, run: boolean) => void;
+    onOpenSqlDraft: (name: string, sql: string, run: boolean, reuseExisting?: boolean) => void;
     onOpenReference: (name: string, type: string) => void;
     onOpenParts: (table: SchemaTable) => void;
 }) {
@@ -24,7 +24,7 @@ export function ObjectDetails({ copy, selection, trusted, expert, copiedId, onCl
             <div className="object-details-hero"><span className={cx('object-kind-badge', selection.relationKind === 'view' && 'is-view')}>{selection.relationKind === 'view' ? 'VIEW' : 'TABLE'}</span><strong>{table.name}</strong><code>{table.database}.{table.name}</code><small>{table.engine} · {tableSummary(table, copy)}</small></div>
             <div className="object-relation-actions">
                 <div className="object-action-grid">
-                    <Button variant="primary" className="toolbar-small object-preview-action" disabled={!trusted} title={!trusted ? copy.runActionTrustRequired : undefined} onClick={() => onOpenSqlDraft(`Preview ${table.name}.sql`, tableQuerySql(table, columns, 'preview'), true)}><Icon name="table"/>{copy.previewRows}</Button>
+                    <Button variant="primary" className="toolbar-small object-preview-action" disabled={!trusted} title={!trusted ? copy.runActionTrustRequired : undefined} onClick={() => onOpenSqlDraft(`Preview ${table.name}.sql`, tableQuerySql(table, columns, 'preview'), true, true)}><Icon name="table"/>{copy.previewRows}</Button>
                     <Button variant="secondary" className="toolbar-small object-generate-action" onClick={() => onOpenSqlDraft(`Select ${table.name}.sql`, tableQuerySql(table, columns, 'select'), false)}><Icon name="parser"/>{copy.generateSelect}</Button>
                 </div>
                 <div className="object-utility-actions">

@@ -10,6 +10,11 @@ export interface Checkpoint {
     to: number;
     parentRevision?: number;
 }
+export interface InvalidatedSource {
+    database: string;
+    table: string;
+    runId: string;
+}
 /** Saved fields follow the shared document contract; only browser state lives here. */
 export interface Draft extends SaveableDraft {
     id: string;
@@ -19,6 +24,7 @@ export interface Draft extends SaveableDraft {
     checkpoints: Checkpoint[];
     from: number;
     to: number;
+    invalidatedSource?: InvalidatedSource;
 }
 export interface WorkspaceState {
     version: 1;
@@ -82,6 +88,14 @@ export function recoverDraft(value: unknown): Draft | undefined {
     const chart = record(value.chart) ? value.chart : {};
     const candlestick = recoveredCandlestick(chart.candlestick);
     const metric = record(value.metric) ? value.metric : undefined;
+    const source = record(value.invalidatedSource) ? value.invalidatedSource : undefined;
+    const invalidatedRunId = source ? id(source.runId) : undefined;
+    const invalidatedSource = source
+        && typeof source.database === 'string' && source.database.length > 0 && source.database.length <= 128
+        && typeof source.table === 'string' && source.table.length > 0 && source.table.length <= 128
+        && invalidatedRunId
+        ? { database: source.database, table: source.table, runId: invalidatedRunId }
+        : undefined;
     const from = position(value.from, draft.sql.length), to = position(value.to, draft.sql.length);
     return {
         ...draft, id: id(value.id) ?? draft.id,
@@ -105,6 +119,7 @@ export function recoverDraft(value: unknown): Draft | undefined {
             sourceColumns: strings(metric.sourceColumns),
         } : undefined,
         dependencies: strings(value.dependencies).filter(v => id(v)),
+        invalidatedSource,
         checkpoints: array(value.checkpoints).flatMap((point): Checkpoint[] => {
             if (!record(point) || typeof point.sql !== 'string' || point.sql.length > 200000)
                 return [];
