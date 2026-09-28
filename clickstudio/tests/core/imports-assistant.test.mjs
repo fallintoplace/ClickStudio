@@ -201,8 +201,93 @@ test('SQL-focused context allows a starter dataset when its source is absent', (
     assert.doesNotMatch(rules, /read-only/i);
     assert.doesNotMatch(built.payload.instructions, /SELECT\/WITH only/i);
     assert.match(built.payload.instructions, /fixed list of SQL statement types/i);
-    assert.match(built.payload.instructions, /If a requested source table is absent.*do not query or claim data from the missing source/i);
+    assert.match(built.payload.instructions, /If a requested source table is not listed and tablesIncomplete is false, say it is absent/i);
+    assert.match(built.payload.instructions, /If it is not listed and tablesIncomplete is true.*existence cannot be confirmed/i);
+    assert.match(built.payload.instructions, /Never infer that a table is absent because its columns are missing/i);
     assert.match(built.payload.instructions, /label them as examples/i);
+});
+test('Assistant prioritizes tables named in the question, current SQL, or selected run SQL', () => {
+    const f = aiFixture();
+    const fillerTables = Array.from({ length: 250 }, (_, index) => ({ database: 'default', name: `table_${index}`, engine: 'MergeTree' }));
+    const targetTable = { database: 'default', name: 'target', engine: 'MergeTree' };
+    const wideSchema = { ...schema, tables: [...fillerTables, targetTable], columns: [
+        ...fillerTables.map(table => ({ database: table.database, table: table.name, name: 'value', type: 'String' })),
+        { database: targetTable.database, table: targetTable.name, name: 'value', type: 'String' },
+    ] };
+    const sources = [
+        { question: 'Inspect default.target', sql: 'SELECT 1' },
+        { question: 'Inspect the selected SQL', sql: 'SELECT value FROM default.target' },
+        { question: 'Inspect the selected run', sql: 'SELECT 1', evidenceSql: 'SELECT value FROM default.target' },
+    ];
+
+    for (const source of sources) {
+        const built = buildContext({ ...f.input, ...source, action: 'ask', database: 'default', schema: wideSchema });
+        const context = JSON.parse(built.payload.context);
+
+        assert.equal(context.schema.length, 250);
+        assert.ok(context.schema.some(column => column.table === 'target'));
+        assert.equal(context.tables[0].name, 'target');
+        assert.equal(context.schemaIncomplete, true);
+    }
+});
+test('Assistant only prioritizes an unqualified table name when it is unambiguous', () => {
+    const f = aiFixture();
+    const fillerTables = Array.from({ length: 250 }, (_, index) => ({ database: 'default', name: `table_${index}`, engine: 'MergeTree' }));
+    const duplicateTables = [
+        { database: 'default', name: 'events', engine: 'MergeTree' },
+        { database: 'analytics', name: 'events', engine: 'MergeTree' },
+    ];
+    const wideSchema = { ...schema, tables: [...fillerTables, ...duplicateTables], columns: [
+        ...fillerTables.map(table => ({ database: table.database, table: table.name, name: 'value', type: 'String' })),
+        { database: 'default', table: 'events', name: 'default_value', type: 'String' },
+        { database: 'analytics', table: 'events', name: 'analytics_value', type: 'String' },
+    ] };
+    const unqualified = buildContext({ ...f.input, action: 'ask', question: 'Inspect events', schema: wideSchema });
+    assert.equal(JSON.parse(unqualified.payload.context).schema.some(column => column.table === 'events'), false);
+
+    const qualified = buildContext({ ...f.input, action: 'ask', question: 'Inspect analytics.events', schema: wideSchema });
+    assert.ok(JSON.parse(qualified.payload.context).schema.some(column => column.database === 'analytics' && column.table === 'events'));
+});
+test('Assistant uses complete table identities even when sensitive columns are omitted', () => {
+    const f = aiFixture();
+    const sensitiveSchema = {
+        ...schema,
+        tables: [...schema.tables, { database: 'default', name: 'private_events', engine: 'MergeTree' }],
+        columns: [...schema.columns, { database: 'default', table: 'private_events', name: 'token', type: 'String' }],
+    };
+    const built = buildContext({ ...f.input, action: 'ask', question: 'Does private_events exist?', schema: sensitiveSchema, sensitiveColumns: ['token'] });
+    const context = JSON.parse(built.payload.context);
+
+    assert.ok(context.tables.some(table => table.name === 'private_events'));
+    assert.equal(context.tablesIncomplete, false);
+    assert.equal(context.schemaIncomplete, true);
+    assert.equal(context.schema.some(column => column.table === 'private_events'), false);
+    assert.doesNotMatch(built.payload.context, /"token"/);
+});
+test('Assistant distinguishes a missing table in complete and incomplete table lists', () => {
+    const f = aiFixture();
+    const complete = buildContext({ ...f.input, action: 'ask', question: 'Does missing_events exist?' });
+    assert.equal(JSON.parse(complete.payload.context).tablesIncomplete, false);
+    assert.match(complete.payload.instructions, /If a requested source table is not listed and tablesIncomplete is false, say it is absent/i);
+
+    const incomplete = buildContext({ ...f.input, action: 'ask', question: 'Does missing_events exist?', schema: { ...schema, truncated: true } });
+    assert.equal(JSON.parse(incomplete.payload.context).tablesIncomplete, true);
+    assert.match(incomplete.payload.instructions, /If it is not listed and tablesIncomplete is true.*existence cannot be confirmed/i);
+});
+test('Assistant keeps the named table while bounding table names to 60 KB', () => {
+    const f = aiFixture();
+    const targetTable = { database: 'default', name: 'target', engine: 'MergeTree' };
+    const largeSchema = {
+        ...schema,
+        tables: [targetTable, ...Array.from({ length: 1000 }, (_, index) => ({ database: `database_${index}_${'x'.repeat(40)}`, name: `table_${index}_${'y'.repeat(40)}`, engine: 'MergeTree' }))],
+        columns: [],
+    };
+    const built = buildContext({ ...f.input, action: 'ask', question: 'Inspect target', schema: largeSchema });
+    const context = JSON.parse(built.payload.context);
+
+    assert.ok(Buffer.byteLength(built.payload.context) <= 60000);
+    assert.equal(context.tables[0].name, 'target');
+    assert.equal(context.tablesIncomplete, true);
 });
 test('Plain-language assistant answers request concise Markdown list formatting', () => {
     const f = aiFixture();

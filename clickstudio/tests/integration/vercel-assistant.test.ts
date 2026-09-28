@@ -77,7 +77,8 @@ test('Vercel assistant returns a requested table proposal with example geography
         const payload = JSON.parse(String(init?.body)) as { instructions?: string };
         assert.doesNotMatch(payload.instructions ?? '', /SQL must be SELECT\/WITH only/i);
         assert.match(payload.instructions ?? '', /fixed list of SQL statement types/i);
-        assert.match(payload.instructions ?? '', /If a requested source table is absent.*do not query or claim data from the missing source/i);
+        assert.match(payload.instructions ?? '', /If a requested source table is not listed and tablesIncomplete is false, say it is absent/i);
+        assert.match(payload.instructions ?? '', /If it is not listed and tablesIncomplete is true.*existence cannot be confirmed/i);
         return Response.json({ id: 'resp_interview', status: 'completed', output_text: content, output: [] });
     };
     try {
