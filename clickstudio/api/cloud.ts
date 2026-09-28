@@ -4,7 +4,8 @@ import { AppError } from '../core/errors.js';
 import { parseInput } from '../core/imports.js';
 import type { Column, Json, Row, Schema, SchemaColumn, SchemaTable } from '../shared/types.js';
 import { lexSql, quoteIdentifier, splitSql } from '../shared/sql.js';
-import { CREATE_TABLE_COLUMN_TYPES, type CreateTableColumnType } from '../shared/table-creation.js';
+import { CREATE_TABLE_COLUMN_TYPES, type CreateTableColumn, type CreateTableColumnType } from '../shared/table-creation.js';
+import { createTableSql } from '../core/table-creation.js';
 import { parseReplicationSnapshot, replicationQueueQuery, replicationReplicasQuery, type ReplicationCapabilities } from '../shared/replication.js';
 import { parseWorkloadSnapshot, WORKLOAD_WINDOWS, workloadFamiliesQuery, workloadPointsQuery, type QueryLogSource, type WorkloadWindow } from '../shared/workload.js';
 
@@ -192,6 +193,30 @@ async function readSchema(credentials: CloudCredentials, url: string): Promise<S
     } finally {
         await client.close();
     }
+}
+
+async function createCloudTable(credentials: CloudCredentials, url: string, body: Record<string, unknown>) {
+    if (!isImportIdentifier(body.name)) throw new AppError(400, 'TABLE_NAME', 'Use a valid table name.');
+    if (!Array.isArray(body.columns) || body.columns.length > 50) throw new AppError(400, 'TABLE_COLUMNS', 'A table needs 1–50 columns.');
+    const columns: CreateTableColumn[] = body.columns.map(value => {
+        if (!isRecord(value) || !isImportIdentifier(value.name) || typeof value.type !== 'string' ||
+            !(CREATE_TABLE_COLUMN_TYPES as readonly string[]).includes(value.type))
+            throw new AppError(400, 'TABLE_COLUMNS', 'Check the table column names and types.');
+        return { name: value.name, type: value.type as CreateTableColumnType };
+    });
+    const orderBy = typeof body.orderBy === 'string' ? body.orderBy : '';
+    const table = `${credentials.database}.${body.name}`;
+    if (body.confirmation !== `CREATE TABLE ${table}`)
+        throw new AppError(400, 'TABLE_CREATE_CONFIRMATION', 'Confirm the exact table name before creating it.');
+    const query = createTableSql(table, columns, orderBy);
+    const queryId = `clickstudio-create-table-${randomUUID()}`;
+    const client = makeClient(credentials, url);
+    try {
+        await client.command({ query, query_id: queryId, abort_signal: AbortSignal.timeout(48_000), clickhouse_settings: clickhouseSettings });
+    } finally {
+        await client.close();
+    }
+    return { database: credentials.database, table: body.name, columns, orderBy, queryId };
 }
 
 function isReadQuery(sql: string) {
@@ -522,6 +547,8 @@ async function post(request: Request): Promise<Response> {
         }
         if (body.action === 'replication')
             return json(await readReplication(credentials, url));
+        if (body.action === 'create-table')
+            return json(await createCloudTable(credentials, url, body));
         if (body.action === 'import-status') {
             const tablePrefix = `${credentials.database}.`;
             const targetTable = typeof body.table === 'string' ? body.table : '';
@@ -533,6 +560,7 @@ async function post(request: Request): Promise<Response> {
         }
         return fail('CLOUD_ACTION', 'Choose test, schema, run, workload, replication, or import status.');
     } catch (error) {
+        if (error instanceof AppError) return fail(error.code, error.message, error.status);
         return safeError(error, credentials.password);
     }
 }

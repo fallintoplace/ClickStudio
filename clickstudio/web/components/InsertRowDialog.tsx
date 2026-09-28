@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import type { SchemaColumn, SchemaTable } from '../../shared/types';
 import { api, message, post } from '../api';
+import { checkClickHouseCloudImport, CLICKHOUSE_CLOUD_CONNECTION_ID, CloudRequestError, getClickHouseCloudConnection, insertClickHouseCloudRow } from '../cloud-connection';
 
 type Props = {
     connectionId: string;
@@ -12,7 +13,7 @@ type Props = {
 
 type Preview = { id: string; rowCount: number };
 type Mapping = { id: string; table: string; rowCount: number };
-type ImportJob = { id: string; table: string; rows: number; status: 'running' | 'succeeded' | 'unknown'; error?: string; reconciliationRequired?: boolean; reviewedAt?: string };
+type ImportJob = { id: string; table: string; rows: number; status: 'running' | 'succeeded' | 'unknown'; error?: string; reconciliationRequired?: boolean; reviewedAt?: string; queryId?: string; connectionId?: string };
 type Step = 'edit' | 'review' | 'status';
 
 function optionalColumn(column: SchemaColumn) {
@@ -36,6 +37,7 @@ export function InsertRowDialog({ connectionId, table, columns, onClose, onInser
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
     const [setupError, setSetupError] = useState('');
+    const cloudConnection = connectionId === CLICKHOUSE_CLOUD_CONNECTION_ID;
     const row = useMemo(() => Object.fromEntries(writableColumns.filter(column => included[column.name]).map(column => [column.name, values[column.name] ?? ''])), [writableColumns, included, values]);
     const confirmationPhrase = 'INSERT 1 ROWS';
     const reportSuccess = useCallback(() => {
@@ -49,7 +51,16 @@ export function InsertRowDialog({ connectionId, table, columns, onClose, onInser
         if (!element) return;
         element.showModal();
         let active = true;
+        if (cloudConnection) {
+            if (getClickHouseCloudConnection()) setAllowed(true);
+            else setSetupError('Reconnect to ClickHouse Cloud before inserting a row.');
+            setLoading(false);
+            return () => {
+                if (element.open) element.close();
+            };
+        }
         void api<string[]>(`/connections/${encodeURIComponent(connectionId)}/import-targets`).then(targets => {
+            if (!Array.isArray(targets) || targets.some(target => typeof target !== 'string')) throw new Error('The connection returned an invalid list of insert targets.');
             if (active) setAllowed(targets.includes(name));
         }).catch(caught => {
             if (active) setSetupError(message(caught));
@@ -58,17 +69,24 @@ export function InsertRowDialog({ connectionId, table, columns, onClose, onInser
             active = false;
             if (element.open) element.close();
         };
-    }, [connectionId, name]);
+    }, [connectionId, cloudConnection, name]);
 
     useEffect(() => {
         if (step !== 'status' || job?.status !== 'running' || busy) return;
         let active = true;
         const timer = window.setTimeout(() => {
-            void api<ImportJob>(`/imports/${encodeURIComponent(job.id)}`).then(next => {
+            const status = job.queryId
+                ? checkClickHouseCloudImport(job.queryId, job.table, job.rows)
+                : api<ImportJob>(`/imports/${encodeURIComponent(job.id)}`);
+            void status.then(next => {
                 if (!active) return;
                 setJob(next);
                 if (next.status === 'succeeded') reportSuccess();
-            }).catch(caught => { if (active) setError(message(caught)); });
+            }).catch(caught => {
+                if (!active) return;
+                if (job.queryId) setJob(current => current ? { ...current, status: 'unknown', error: `Could not confirm the insert status. Inspect ${name} before trying again.` } : current);
+                setError(message(caught));
+            });
         }, 1200);
         return () => { active = false; window.clearTimeout(timer); };
     }, [step, job, busy, reportSuccess]);
@@ -80,6 +98,11 @@ export function InsertRowDialog({ connectionId, table, columns, onClose, onInser
         setError('');
         let nextPreview: Preview | undefined;
         try {
+            if (cloudConnection) {
+                setMapping({ id: crypto.randomUUID(), table: name, rowCount: 1 });
+                setStep('review');
+                return;
+            }
             nextPreview = await post<Preview>('/imports/preview', { name: `${table.name}-row.json`, source: JSON.stringify([row]), format: 'json' });
             const nextMapping = await post<Mapping>(`/imports/${encodeURIComponent(nextPreview.id)}/mapping`, {
                 connectionId,
@@ -101,21 +124,38 @@ export function InsertRowDialog({ connectionId, table, columns, onClose, onInser
         if (!mapping || confirmation !== confirmationPhrase || busy) return;
         setBusy(true);
         setError('');
-        setJob({ id: mapping.id, table: name, rows: 1, status: 'running' });
+        const queryId = cloudConnection ? `clickstudio-import-${crypto.randomUUID()}` : undefined;
+        setJob({ id: mapping.id, table: name, rows: 1, status: 'running', ...(queryId ? { queryId, connectionId } : {}) });
         setStep('status');
         try {
-            const next = await post<ImportJob>(`/imports/${encodeURIComponent(mapping.id)}/commit`, { confirmation });
+            const next = cloudConnection && queryId
+                ? await insertClickHouseCloudRow({ table: name, columns, row, queryId })
+                : await post<ImportJob>(`/imports/${encodeURIComponent(mapping.id)}/commit`, { confirmation });
             setJob(next);
             if (next.status === 'succeeded') reportSuccess();
         } catch (caught) {
-            try {
-                const recovered = await api<ImportJob>(`/imports/${encodeURIComponent(mapping.id)}`);
-                setJob(recovered);
-                if (recovered.status === 'succeeded') reportSuccess();
-            } catch {
+            if (cloudConnection && caught instanceof CloudRequestError && caught.status < 500) {
                 setStep('review');
                 setJob(undefined);
                 setError(message(caught));
+            } else if (cloudConnection && queryId) {
+                try {
+                    const recovered = await checkClickHouseCloudImport(queryId, name, 1);
+                    setJob(recovered);
+                    if (recovered.status === 'succeeded') reportSuccess();
+                } catch {
+                    setJob({ id: mapping.id, table: name, rows: 1, queryId, connectionId, status: 'unknown', error: `Could not confirm whether the row reached ${name}. Inspect the table before trying again.` });
+                }
+            } else {
+                try {
+                    const recovered = await api<ImportJob>(`/imports/${encodeURIComponent(mapping.id)}`);
+                    setJob(recovered);
+                    if (recovered.status === 'succeeded') reportSuccess();
+                } catch {
+                    setStep('review');
+                    setJob(undefined);
+                    setError(message(caught));
+                }
             }
         } finally {
             setBusy(false);
@@ -127,7 +167,9 @@ export function InsertRowDialog({ connectionId, table, columns, onClose, onInser
         setBusy(true);
         setError('');
         try {
-            const next = await post<ImportJob>(`/imports/${encodeURIComponent(job.id)}/reconcile`);
+            const next = job.queryId
+                ? await checkClickHouseCloudImport(job.queryId, job.table, job.rows)
+                : await post<ImportJob>(`/imports/${encodeURIComponent(job.id)}/reconcile`);
             setJob(next);
             if (next.status === 'succeeded') reportSuccess();
         } catch (caught) {
@@ -142,8 +184,12 @@ export function InsertRowDialog({ connectionId, table, columns, onClose, onInser
         setBusy(true);
         setError('');
         try {
-            const next = await post<ImportJob>(`/imports/${encodeURIComponent(job.id)}/review`, { inspected: true, noActiveInsert: true });
-            setJob(next);
+            const next = job.queryId
+                ? await checkClickHouseCloudImport(job.queryId, job.table, job.rows)
+                : await post<ImportJob>(`/imports/${encodeURIComponent(job.id)}/review`, { inspected: true, noActiveInsert: true });
+            const reviewed = job.queryId && next.status === 'unknown' ? { ...next, reviewedAt: new Date().toISOString() } : next;
+            setJob(reviewed);
+            if (reviewed.status === 'succeeded') reportSuccess();
         } catch (caught) {
             setError(message(caught));
         } finally {

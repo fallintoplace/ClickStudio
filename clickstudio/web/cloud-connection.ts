@@ -2,6 +2,7 @@ import { DEFAULT_LIMITS, type Capability, type Column, type Connection, type Row
 import type { ReplicationSnapshot } from '../shared/replication.js';
 import type { QueryLogSource, WorkloadSnapshot, WorkloadWindow } from '../shared/workload.js';
 import type { CloudImportColumn } from './cloud-import.js';
+import type { CreateTableColumn } from '../shared/table-creation.js';
 
 export const CLICKHOUSE_CLOUD_CONNECTION_ID = 'clickhouse-cloud';
 
@@ -160,6 +161,13 @@ export async function loadClickHouseCloudSchema(): Promise<Schema> {
     return await requestCloud<Schema>({ action: 'schema', credentials: activeCloud.credentials });
 }
 
+export async function createClickHouseCloudTable(input: { name: string; columns: CreateTableColumn[]; orderBy: string; confirmation: string }) {
+    if (!activeCloud) throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before creating a table.', 401);
+    return await requestCloud<{ database: string; table: string; columns: CreateTableColumn[]; orderBy: string; queryId: string }>({
+        action: 'create-table', credentials: activeCloud.credentials, ...input,
+    });
+}
+
 export async function importClickHouseCloudFile(input: CloudImportInput): Promise<CloudImportJob> {
     if (!activeCloud) throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before importing data.', 401);
     const form = new FormData();
@@ -174,6 +182,24 @@ export async function importClickHouseCloudFile(input: CloudImportInput): Promis
     if (input.expectedColumns) form.set('expectedColumns', JSON.stringify(input.expectedColumns));
     if (input.createTable) form.set('createTable', JSON.stringify(input.createTable));
     return await requestCloudImport<CloudImportJob>(form);
+}
+
+export async function insertClickHouseCloudRow(input: {
+    table: string;
+    columns: readonly Pick<SchemaColumn, 'name' | 'type' | 'defaultKind'>[];
+    row: Record<string, unknown>;
+    queryId: string;
+}): Promise<CloudImportJob> {
+    const file = new File([JSON.stringify([input.row])], 'insert-row.json', { type: 'application/json' });
+    return importClickHouseCloudFile({
+        file,
+        format: 'json',
+        target: input.table,
+        fields: Object.fromEntries(Object.keys(input.row).map(column => [column, column])),
+        confirmation: 'INSERT 1 ROWS',
+        queryId: input.queryId,
+        expectedColumns: input.columns.map(({ name, type, defaultKind }) => ({ name, type, defaultKind })),
+    });
 }
 
 export async function checkClickHouseCloudImport(queryId: string, table: string, rows: number): Promise<CloudImportJob> {

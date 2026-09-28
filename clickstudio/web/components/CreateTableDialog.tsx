@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { CREATE_TABLE_COLUMN_TYPES, type CreateTableColumn } from '../../shared/table-creation';
 import type { Connected } from '../workspace-types';
 import { message, post } from '../api';
+import { CLICKHOUSE_CLOUD_CONNECTION_ID, createClickHouseCloudTable } from '../cloud-connection';
 
 type Props = {
     connection: Connected;
@@ -46,7 +47,11 @@ export function CreateTableDialog({ connection, onClose, onCreated }: Props) {
         setBusy(true);
         setError('');
         try {
-            await post(`/connections/${encodeURIComponent(connection.id)}/tables`, { table: table.trim(), columns, orderBy, confirmation });
+            if (connection.id === CLICKHOUSE_CLOUD_CONNECTION_ID) {
+                await createClickHouseCloudTable({ name: table.trim(), columns, orderBy, confirmation });
+            } else {
+                await post(`/connections/${encodeURIComponent(connection.id)}/tables`, { table: table.trim(), columns, orderBy, confirmation });
+            }
             setCreated(true);
             onCreated();
         } catch (caught) {
