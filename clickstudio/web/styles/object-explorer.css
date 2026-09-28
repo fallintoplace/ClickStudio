@@ -28,8 +28,11 @@
     .create-table-help.is-error { color: var(--red); }
     .create-table-target { display: flex; min-width: 0; min-height: 29px; align-items: center; gap: 8px; padding: 5px 9px; border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--line)); border-radius: 7px; background: color-mix(in srgb, var(--accent) 5%, var(--page)); color: var(--muted); font-size: 10px; font-weight: 500; }
     .create-table-target code { overflow: hidden; color: var(--text-soft); font-family: var(--font-mono); text-overflow: ellipsis; white-space: nowrap; }
-    .create-table-column-field { display: grid; min-width: 0; gap: 5px; color: var(--muted); font-size: 11px; font-weight: 500; }
+    .create-table-column-row { --create-table-column-label-height: 14px; --create-table-column-field-gap: 5px; align-items: start; }
+    .create-table-column-field { display: grid; min-width: 0; gap: var(--create-table-column-field-gap); color: var(--muted); font-size: 11px; font-weight: 500; }
+    .create-table-column-label { display: block; height: var(--create-table-column-label-height); line-height: var(--create-table-column-label-height); }
     .create-table-column-control { min-height: 36px; border-radius: 7px; background: var(--panel); }
+    .create-table-remove { align-self: start; margin-top: calc(var(--create-table-column-label-height) + var(--create-table-column-field-gap)); }
     .create-table-select-wrap { position: relative; display: block; min-width: 0; }
     .create-table-select { appearance: none; padding-right: 34px; }
     .create-table-select-wrap > svg { position: absolute; top: 50%; right: 10px; width: 15px; height: 15px; pointer-events: none; color: var(--muted); transform: translateY(-50%); }
@@ -50,7 +53,7 @@
         .create-table-footer { flex-wrap: wrap; }
         .create-table-submit-help { flex-basis: 100%; margin-right: 0; }
         .create-table-column-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-        .create-table-remove { grid-column: 1 / -1; justify-self: end; }
+        .create-table-remove { grid-column: 1 / -1; align-self: auto; justify-self: end; margin-top: 0; }
         .create-table-target { align-items: flex-start; flex-direction: column; gap: 2px; }
     }
 
