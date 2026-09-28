@@ -161,17 +161,17 @@ export async function loadClickHouseCloudSchema(): Promise<Schema> {
     return await requestCloud<Schema>({ action: 'schema', credentials: activeCloud.credentials });
 }
 
-export async function createClickHouseCloudTable(input: { name: string; columns: CreateTableColumn[]; orderBy: string; confirmation: string }) {
+export async function createClickHouseCloudTable(input: { name: string; columns: CreateTableColumn[]; orderBy: string }) {
     if (!activeCloud) throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before creating a table.', 401);
     return await requestCloud<{ database: string; table: string; columns: CreateTableColumn[]; orderBy: string; queryId: string }>({
         action: 'create-table', credentials: activeCloud.credentials, ...input,
     });
 }
 
-export async function dropClickHouseCloudTable(database: string, table: string) {
+export async function dropClickHouseCloudTable(database: string, table: string, confirmation: string) {
     if (!activeCloud) throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before deleting a table.', 401);
     return await requestCloud<{ database: string; table: string; queryId: string }>({
-        action: 'drop-table', credentials: activeCloud.credentials, database, table,
+        action: 'drop-table', credentials: activeCloud.credentials, database, table, confirmation,
     });
 }
 

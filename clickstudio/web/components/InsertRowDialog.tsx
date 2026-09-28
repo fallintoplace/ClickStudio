@@ -15,6 +15,7 @@ type Preview = { id: string; rowCount: number };
 type Mapping = { id: string; table: string; rowCount: number; fields: Record<string, string> };
 type ImportJob = { id: string; table: string; rows: number; status: 'running' | 'succeeded' | 'unknown'; error?: string; reconciliationRequired?: boolean; reviewedAt?: string; queryId?: string; connectionId?: string };
 type Step = 'edit' | 'review' | 'status';
+const INSERT_ROW_CONFIRMATION = 'INSERT 1 ROWS';
 
 function optionalColumn(column: SchemaColumn) {
     return Boolean(column.defaultKind) || /^Nullable\(/.test(column.type);
@@ -33,14 +34,12 @@ export function InsertRowDialog({ connectionId, table, columns, onClose, onInser
     const [preview, setPreview] = useState<Preview>();
     const [mapping, setMapping] = useState<Mapping>();
     const [job, setJob] = useState<ImportJob>();
-    const [confirmation, setConfirmation] = useState('');
     const [busy, setBusy] = useState(false);
     const [retryAttempted, setRetryAttempted] = useState(false);
     const [error, setError] = useState('');
     const [setupError, setSetupError] = useState('');
     const cloudConnection = connectionId === CLICKHOUSE_CLOUD_CONNECTION_ID;
     const row = useMemo(() => Object.fromEntries(writableColumns.filter(column => included[column.name]).map(column => [column.name, values[column.name] ?? ''])), [writableColumns, included, values]);
-    const confirmationPhrase = 'INSERT 1 ROWS';
     const reportSuccess = useCallback(() => {
         if (reported.current) return;
         reported.current = true;
@@ -122,7 +121,7 @@ export function InsertRowDialog({ connectionId, table, columns, onClose, onInser
     }
 
     async function insertRow() {
-        if (!mapping || confirmation !== confirmationPhrase || busy) return;
+        if (!mapping || busy) return;
         setBusy(true);
         setError('');
         const queryId = cloudConnection ? `clickstudio-import-${crypto.randomUUID()}` : undefined;
@@ -131,7 +130,7 @@ export function InsertRowDialog({ connectionId, table, columns, onClose, onInser
         try {
             const next = cloudConnection && queryId
                 ? await insertClickHouseCloudRow({ table: name, columns, row, queryId })
-                : await post<ImportJob>(`/imports/${encodeURIComponent(mapping.id)}/commit`, { confirmation });
+                : await post<ImportJob>(`/imports/${encodeURIComponent(mapping.id)}/commit`, { confirmation: INSERT_ROW_CONFIRMATION });
             setJob(next);
             if (next.status === 'succeeded') reportSuccess();
         } catch (caught) {
@@ -248,7 +247,7 @@ export function InsertRowDialog({ connectionId, table, columns, onClose, onInser
             writeStarted = true;
             const next = retryQueryId
                 ? await insertClickHouseCloudRow({ table: name, columns, row, queryId: retryQueryId })
-                : await post<ImportJob>(`/imports/${encodeURIComponent(retryMapping.id)}/commit`, { confirmation: confirmationPhrase });
+                : await post<ImportJob>(`/imports/${encodeURIComponent(retryMapping.id)}/commit`, { confirmation: INSERT_ROW_CONFIRMATION });
             setJob(next);
             if (next.status === 'succeeded') reportSuccess();
         } catch (caught) {
@@ -313,13 +312,13 @@ export function InsertRowDialog({ connectionId, table, columns, onClose, onInser
                     })}
                     {!writableColumns.length && <p role="status" className="rounded-lg border border-[var(--line)] p-3 text-xs text-[var(--muted)]">This table has no writable columns.</p>}
                 </form>}
-                {step === 'review' && <section aria-label="Review row" className="space-y-4"><p className="text-xs text-[var(--text-soft)]">Review the exact values before inserting.</p><pre className="max-h-64 overflow-auto rounded-lg border border-[var(--line)] bg-[var(--page)] p-4 font-mono text-xs">{JSON.stringify(row, null, 2)}</pre><label className="grid gap-1.5 text-xs text-[var(--text-soft)]">Type <code className="text-[var(--accent)]">{confirmationPhrase}</code> to confirm<input aria-label={`Type ${confirmationPhrase} to confirm`} value={confirmation} onChange={event => setConfirmation(event.target.value)} autoComplete="off" spellCheck={false} className="min-h-10 rounded-lg border border-[var(--line)] bg-[var(--page)] px-3 font-mono text-xs" /></label></section>}
+                {step === 'review' && <section aria-label="Review row" className="space-y-4"><p className="text-xs text-[var(--text-soft)]">Review the exact values before inserting.</p><pre className="max-h-64 overflow-auto rounded-lg border border-[var(--line)] bg-[var(--page)] p-4 font-mono text-xs">{JSON.stringify(row, null, 2)}</pre></section>}
                 {step === 'status' && job && <section aria-label="Insert status" className="space-y-3"><p role="status" className="rounded-xl border border-[var(--line)] bg-[var(--page)] p-4 text-sm">{job.status === 'succeeded' ? `Inserted one row into ${name}.` : job.status === 'running' ? 'ClickHouse still reports this insert as active. Wait for it to finish before sending another row.' : 'ClickHouse couldn’t confirm the insert. The row may already be there.'}</p>{job.status === 'unknown' && <><p className="text-xs leading-relaxed text-[var(--text-soft)]">{retryAttempted ? 'A retry was sent, but its result is also unclear. Check the table before sending another insert.' : 'Check the table before choosing. If you do not see the row, you can retry once. A late first insert may create a duplicate.'}</p><div className="flex flex-wrap gap-2"><button type="button" disabled={busy} onClick={() => void reconcile()} className="rounded-lg border border-[var(--line)] px-3 py-2 text-xs disabled:opacity-40">{busy ? 'Checking…' : 'Check status'}</button><button type="button" disabled={busy} onClick={() => void confirmInserted()} className="rounded-lg border border-[var(--line)] px-3 py-2 text-xs disabled:opacity-40">I see the row</button>{!retryAttempted && <button type="button" disabled={busy} onClick={() => void retryUnknown()} className="rounded-lg border border-[var(--amber)]/40 px-3 py-2 text-xs disabled:opacity-40">{busy ? 'Checking…' : 'Row absent; retry once'}</button>}</div></>}</section>}
                 {error && <p role="alert" className="rounded-lg border border-[var(--red)]/30 bg-[var(--red)]/5 px-3 py-2.5 text-xs text-[var(--red)]">{error}</p>}
             </main>
             <footer className="flex justify-end gap-2 border-t border-[var(--line)] bg-[var(--page)] px-5 py-3 sm:px-7">
                 {step === 'edit' && allowed && <button type="submit" form="insert-row-form" disabled={loading || busy || !writableColumns.length || !Object.keys(row).length} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] disabled:cursor-not-allowed disabled:opacity-40">{busy ? 'Preparing…' : 'Review row'}</button>}
-                {step === 'review' && <><button type="button" disabled={busy} onClick={() => { setStep('edit'); setConfirmation(''); }} className="rounded-lg border border-[var(--line)] px-3 py-2 text-xs disabled:opacity-40">Back</button><button type="button" disabled={busy || confirmation !== confirmationPhrase} onClick={() => void insertRow()} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] disabled:cursor-not-allowed disabled:opacity-40">{busy ? 'Inserting…' : 'Insert row'}</button></>}
+                {step === 'review' && <><button type="button" disabled={busy} onClick={() => setStep('edit')} className="rounded-lg border border-[var(--line)] px-3 py-2 text-xs disabled:opacity-40">Back</button><button type="button" disabled={busy} onClick={() => void insertRow()} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] disabled:cursor-not-allowed disabled:opacity-40">{busy ? 'Inserting…' : 'Insert row'}</button></>}
                 {step === 'status' && job?.status !== 'running' && <button type="button" onClick={close} disabled={busy} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] disabled:opacity-40">Done</button>}
             </footer>
         </div>

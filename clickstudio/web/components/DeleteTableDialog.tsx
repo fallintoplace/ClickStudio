@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { tableDeletionConfirmation } from '../../shared/table-deletion';
 import type { SchemaTable } from '../../shared/types';
 import { api } from '../api';
 import { CLICKHOUSE_CLOUD_CONNECTION_ID, dropClickHouseCloudTable } from '../cloud-connection';
@@ -13,8 +14,9 @@ type Props = {
 export function DeleteTableDialog({ connectionId, table, onClose, onDeleted }: Props) {
     const dialog = useRef<HTMLDialogElement>(null);
     const [busy, setBusy] = useState(false);
+    const [confirmation, setConfirmation] = useState('');
     const [error, setError] = useState('');
-    const name = `${table.database}.${table.name}`;
+    const name = tableDeletionConfirmation(table.database, table.name);
 
     useEffect(() => {
         const element = dialog.current;
@@ -26,15 +28,15 @@ export function DeleteTableDialog({ connectionId, table, onClose, onDeleted }: P
     }, []);
 
     async function dropTable() {
-        if (busy) return;
+        if (busy || confirmation !== name) return;
         setBusy(true);
         setError('');
         try {
             if (connectionId === CLICKHOUSE_CLOUD_CONNECTION_ID) {
-                await dropClickHouseCloudTable(table.database, table.name);
+                await dropClickHouseCloudTable(table.database, table.name, confirmation);
             } else {
                 await api(`/connections/${encodeURIComponent(connectionId)}/tables`, {
-                    method: 'DELETE', body: { database: table.database, table: table.name },
+                    method: 'DELETE', body: { database: table.database, table: table.name, confirmation },
                 });
             }
             onDeleted();
@@ -53,11 +55,14 @@ export function DeleteTableDialog({ connectionId, table, onClose, onDeleted }: P
         </header>
         <main className="space-y-3 px-5 py-5">
             <p id="delete-table-description" className="text-sm text-[var(--text-soft)]">Delete <code className="break-all text-[var(--text)]">{name}</code>? This cannot be undone.</p>
+            <label className="grid gap-1.5 text-xs text-[var(--text-soft)]">Type <code className="text-[var(--accent)]">{name}</code> to confirm
+                <input aria-label={`Type ${name} to confirm`} value={confirmation} onChange={event => setConfirmation(event.target.value)} autoComplete="off" spellCheck={false} className="min-h-10 rounded-lg border border-[var(--line)] bg-[var(--page)] px-3 font-mono text-xs" />
+            </label>
             {error && <p role="alert" className="rounded-lg border border-[var(--red)]/30 bg-[var(--red)]/5 px-3 py-2.5 text-xs text-[var(--red)]">{error}</p>}
         </main>
         <footer className="flex justify-end gap-2 border-t border-[var(--line)] bg-[var(--page)] px-5 py-3">
             <button type="button" disabled={busy} onClick={onClose} className="rounded-lg border border-[var(--line)] px-3 py-2 text-xs text-[var(--text-soft)] disabled:opacity-40">Cancel</button>
-            <button type="button" disabled={busy} onClick={() => void dropTable()} className="rounded-lg bg-[var(--red)] px-4 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">{busy ? 'Deleting…' : 'Delete table'}</button>
+            <button type="button" disabled={busy || confirmation !== name} onClick={() => void dropTable()} className="rounded-lg bg-[var(--red)] px-4 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">{busy ? 'Deleting…' : 'Delete table'}</button>
         </footer>
     </dialog>;
 }

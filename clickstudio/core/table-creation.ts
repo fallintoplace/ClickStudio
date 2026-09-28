@@ -29,13 +29,12 @@ export function createTableSql(table: string, columns: CreateTableColumn[], orde
 export class TableCreationService {
     constructor(private readonly store: Store, private readonly driver: CreateTableDriver, private readonly trusted: (principal: Principal, connectionId: string) => boolean) { }
 
-    async create(principal: Principal, connectionId: string, name: string, columns: CreateTableColumn[], orderBy: string, confirmation: string) {
+    async create(principal: Principal, connectionId: string, name: string, columns: CreateTableColumn[], orderBy: string) {
         canWrite(principal);
         requireThat(this.trusted(principal, connectionId), 403, 'WORKSPACE_UNTRUSTED', 'Trust the destination connection first');
         requireThat(/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(name), 400, 'TABLE_NAME', 'Use a valid table name');
         const database = this.driver.database(connectionId), table = `${database}.${name}`;
         createTableSql(table, columns, orderBy);
-        requireThat(confirmation === `CREATE TABLE ${table}`, 400, 'TABLE_CREATE_CONFIRMATION', 'Confirm the exact table name before creating it');
         const queryId = `clickstudio-create-table-${randomUUID()}`;
         audit(this.store, principal, 'table.create', table);
         await this.driver.createTable(connectionId, table, columns, orderBy, queryId);

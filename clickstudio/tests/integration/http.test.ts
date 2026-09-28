@@ -65,13 +65,12 @@ class TableCreationDemoDriver extends DemoDriver {
     }
 }
 
-test('Table creation needs trust, a valid table name, and an exact confirmation', async (t) => {
+test('Table creation needs trust and a valid table name', async (t) => {
     const driver = new TableCreationDemoDriver(), s = await start(undefined, undefined, undefined, driver);
     t.after(() => s.stop());
-    const request = { table: 'interview_events', columns: [{ name: 'id', type: 'UInt64' }], orderBy: 'id', confirmation: 'CREATE TABLE demo.interview_events' };
+    const request = { table: 'interview_events', columns: [{ name: 'id', type: 'UInt64' }], orderBy: 'id' };
     assert.equal((await s.call('/connections/demo/tables', request)).status, 403);
     await s.call('/connections/demo/trust', { trusted: true, confirmation: 'demo' });
-    assert.equal((await s.call('/connections/demo/tables', { ...request, confirmation: 'yes' })).status, 400);
     assert.equal((await s.call('/connections/demo/tables', { ...request, table: 'other.interview_events' })).status, 400);
     assert.equal((await s.call('/connections/demo/tables', { ...request, columns: [{ name: 'id); DROP TABLE x', type: 'UInt64' }] })).status, 400);
     assert.equal((await s.call('/connections/demo/tables', { ...request, columns: [{ name: 'id', type: 'String); DROP TABLE x' }] })).status, 400);

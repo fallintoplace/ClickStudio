@@ -17,12 +17,10 @@ export function CreateTableDialog({ connection, onClose, onCreated }: Props) {
     const [table, setTable] = useState('');
     const [columns, setColumns] = useState<CreateTableColumn[]>([firstColumn]);
     const [orderBy, setOrderBy] = useState(firstColumn.name);
-    const [confirmation, setConfirmation] = useState('');
     const [busy, setBusy] = useState(false);
     const [created, setCreated] = useState(false);
     const [error, setError] = useState('');
     const targetTable = useMemo(() => `${connection.database}.${table.trim()}`, [connection.database, table]);
-    const confirmationPhrase = `CREATE TABLE ${targetTable}`;
 
     useEffect(() => {
         const element = dialog.current;
@@ -43,14 +41,14 @@ export function CreateTableDialog({ connection, onClose, onCreated }: Props) {
 
     async function create(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
-        if (busy || !table.trim() || confirmation !== confirmationPhrase) return;
+        if (busy || !table.trim()) return;
         setBusy(true);
         setError('');
         try {
             if (connection.id === CLICKHOUSE_CLOUD_CONNECTION_ID) {
-                await createClickHouseCloudTable({ name: table.trim(), columns, orderBy, confirmation });
+                await createClickHouseCloudTable({ name: table.trim(), columns, orderBy });
             } else {
-                await post(`/connections/${encodeURIComponent(connection.id)}/tables`, { table: table.trim(), columns, orderBy, confirmation });
+                await post(`/connections/${encodeURIComponent(connection.id)}/tables`, { table: table.trim(), columns, orderBy });
             }
             setCreated(true);
             onCreated();
@@ -70,7 +68,7 @@ export function CreateTableDialog({ connection, onClose, onCreated }: Props) {
             <main className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-5 sm:px-7">
                 {!created && <>
                     <label className="grid gap-1.5 text-xs font-medium text-[var(--text-soft)]">Table name
-                        <div className="flex min-h-10 items-center overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--page)]"><span className="border-r border-[var(--line)] px-3 font-mono text-xs text-[var(--muted)]">{connection.database}.</span><input aria-label="Table name" value={table} onChange={event => { setTable(event.target.value); setConfirmation(''); }} required maxLength={128} pattern="[A-Za-z_][A-Za-z0-9_]{0,127}" className="min-w-0 flex-1 bg-transparent px-3 font-mono text-xs text-[var(--text)] outline-none" /></div>
+                        <div className="flex min-h-10 items-center overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--page)]"><span className="border-r border-[var(--line)] px-3 font-mono text-xs text-[var(--muted)]">{connection.database}.</span><input aria-label="Table name" value={table} onChange={event => setTable(event.target.value)} required maxLength={128} pattern="[A-Za-z_][A-Za-z0-9_]{0,127}" className="min-w-0 flex-1 bg-transparent px-3 font-mono text-xs text-[var(--text)] outline-none" /></div>
                     </label>
                     <section aria-label="Table columns" className="space-y-2">
                         <div className="flex items-center justify-between"><h3 className="text-xs font-semibold">Columns</h3><button type="button" onClick={() => setColumns(current => [...current, { name: `column_${current.length + 1}`, type: 'String' }])} disabled={columns.length >= 50} className="rounded-lg border border-[var(--line)] px-3 py-1.5 text-xs disabled:opacity-40">Add column</button></div>
@@ -83,16 +81,13 @@ export function CreateTableDialog({ connection, onClose, onCreated }: Props) {
                     <label className="grid gap-1.5 text-xs font-medium text-[var(--text-soft)]">Sorting key
                         <select aria-label="Sorting key" value={orderBy} onChange={event => setOrderBy(event.target.value)} className="min-h-10 rounded-lg border border-[var(--line)] bg-[var(--page)] px-3 text-[var(--text)]">{columns.map((column, index) => <option key={`${column.name}-${index}`} value={column.name}>{column.name || `Column ${index + 1}`}</option>)}</select>
                     </label>
-                    <label className="grid gap-1.5 text-xs text-[var(--text-soft)]">Type <code className="text-[var(--accent)]">{confirmationPhrase}</code> to confirm
-                        <input aria-label={`Type ${confirmationPhrase} to confirm`} value={confirmation} onChange={event => setConfirmation(event.target.value)} autoComplete="off" spellCheck={false} className="min-h-10 rounded-lg border border-[var(--line)] bg-[var(--page)] px-3 font-mono text-xs" />
-                    </label>
                     <p className="text-[11px] text-[var(--muted)]">Supported types: String, UInt64, Int64, Float64, Decimal(18, 2), Date, DateTime, UUID.</p>
                 </>}
                 {created && <p role="status" className="rounded-xl border border-[var(--green)]/30 bg-[var(--green)]/5 p-4 text-sm">Created <code>{targetTable}</code>.</p>}
                 {error && <p role="alert" className="rounded-lg border border-[var(--red)]/30 bg-[var(--red)]/5 px-3 py-2.5 text-xs text-[var(--red)]">{error}</p>}
             </main>
             <footer className="flex justify-end gap-2 border-t border-[var(--line)] bg-[var(--page)] px-5 py-3 sm:px-7">
-                {created ? <button type="button" onClick={onClose} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)]">Done</button> : <button type="submit" disabled={busy || !/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(table.trim()) || confirmation !== confirmationPhrase || columns.some(column => !column.name.trim()) || new Set(columns.map(column => column.name)).size !== columns.length || !orderBy} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] disabled:cursor-not-allowed disabled:opacity-40">{busy ? 'Creating…' : 'Create table'}</button>}
+                {created ? <button type="button" onClick={onClose} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)]">Done</button> : <button type="submit" disabled={busy || !/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(table.trim()) || columns.some(column => !column.name.trim()) || new Set(columns.map(column => column.name)).size !== columns.length || !orderBy} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] disabled:cursor-not-allowed disabled:opacity-40">{busy ? 'Creating…' : 'Create table'}</button>}
             </footer>
         </form>
     </dialog>;

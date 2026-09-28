@@ -6,7 +6,7 @@ import type { Column, Json, Row, Schema, SchemaColumn, SchemaTable } from '../sh
 import { lexSql, quoteIdentifier, splitSql } from '../shared/sql.js';
 import { CREATE_TABLE_COLUMN_TYPES, type CreateTableColumn, type CreateTableColumnType } from '../shared/table-creation.js';
 import { createTableSql } from '../core/table-creation.js';
-import { canDropTableTarget, dropTableSql, isViewEngine } from '../shared/table-deletion.js';
+import { canDropTableTarget, dropTableSql, isViewEngine, tableDeletionConfirmation } from '../shared/table-deletion.js';
 import { parseReplicationSnapshot, replicationQueueQuery, replicationReplicasQuery, type ReplicationCapabilities } from '../shared/replication.js';
 import { parseWorkloadSnapshot, WORKLOAD_WINDOWS, workloadFamiliesQuery, workloadPointsQuery, type QueryLogSource, type WorkloadWindow } from '../shared/workload.js';
 
@@ -207,8 +207,6 @@ async function createCloudTable(credentials: CloudCredentials, url: string, body
     });
     const orderBy = typeof body.orderBy === 'string' ? body.orderBy : '';
     const table = `${credentials.database}.${body.name}`;
-    if (body.confirmation !== `CREATE TABLE ${table}`)
-        throw new AppError(400, 'TABLE_CREATE_CONFIRMATION', 'Confirm the exact table name before creating it.');
     const query = createTableSql(table, columns, orderBy);
     const queryId = `clickstudio-create-table-${randomUUID()}`;
     const client = makeClient(credentials, url);
@@ -225,6 +223,7 @@ async function dropCloudTable(credentials: CloudCredentials, url: string, body: 
     const table = typeof body.table === 'string' ? body.table : '';
     if (!canDropTableTarget(database, table)) throw new AppError(400, 'TABLE_DROP_TARGET', 'Choose a regular table outside a system database.');
     if (database !== credentials.database) throw new AppError(403, 'TABLE_DROP_NOT_ALLOWED', 'Table deletion is limited to the connection database.');
+    if (body.confirmation !== tableDeletionConfirmation(database, table)) throw new AppError(400, 'TABLE_DROP_CONFIRMATION', 'Type the exact table name to confirm deletion.');
     const queryId = `clickstudio-drop-table-${randomUUID()}`;
     const client = makeClient(credentials, url);
     try {

@@ -14,6 +14,10 @@ export function canDropTableTarget(database: string, table: string) {
     return validName(database) && validName(table) && !isSystemDatabaseName(database);
 }
 
+export function tableDeletionConfirmation(database: string, table: string) {
+    return `${database}.${table}`;
+}
+
 export function dropTableSql(database: string, table: string) {
     return `DROP TABLE IF EXISTS ${quoteIdentifier(database)}.${quoteIdentifier(table)}`;
 }

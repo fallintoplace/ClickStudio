@@ -285,11 +285,11 @@ export function createApp(config: Config, overrides: {
             const column = record(value, 'column');
             return { name: text(column.name, 'column name', 128), type: choice(column.type, CREATE_TABLE_COLUMN_TYPES, 400, 'TABLE_COLUMN_TYPE', 'Choose a supported column type') };
         });
-        res.status(201).json(await tableCreation.create(principal(res), id(req), text(v.table, 'table', 128), columns, text(v.orderBy, 'sorting key', 128), text(v.confirmation, 'confirmation', 300)));
+        res.status(201).json(await tableCreation.create(principal(res), id(req), text(v.table, 'table', 128), columns, text(v.orderBy, 'sorting key', 128)));
     });
     app.delete('/api/connections/:id/tables', async (req, res) => {
         const v = body(req);
-        res.json(await tableDeletion.drop(principal(res), id(req), text(v.database, 'database', 128), text(v.table, 'table', 128)));
+        res.json(await tableDeletion.drop(principal(res), id(req), text(v.database, 'database', 128), text(v.table, 'table', 128), text(v.confirmation, 'confirmation', 300)));
     });
     app.get('/api/connections/:id/import-targets', async (req, res) => { driver.connection(principal(res), id(req)); res.json(await driver.targets(id(req))); });
     app.get('/api/runs', (req, res) => res.json(runs.list(principal(res), typeof req.query.connectionId === 'string' ? req.query.connectionId : undefined, typeof req.query.documentId === 'string' ? req.query.documentId : undefined)));
