@@ -285,7 +285,7 @@ export function createApp(config: Config, overrides: {
             const column = record(value, 'column');
             return { name: text(column.name, 'column name', 128), type: choice(column.type, CREATE_TABLE_COLUMN_TYPES, 400, 'TABLE_COLUMN_TYPE', 'Choose a supported column type') };
         });
-        res.status(201).json(await tableCreation.create(principal(res), id(req), text(v.table, 'table', 128), columns, text(v.orderBy, 'sorting key', 128)));
+        res.status(201).json(await tableCreation.create(principal(res), id(req), text(v.database, 'database', 128), text(v.table, 'table', 128), columns, text(v.orderBy, 'sorting key', 128)));
     });
     app.delete('/api/connections/:id/tables', async (req, res) => {
         const v = body(req);

@@ -68,7 +68,7 @@ class TableCreationDemoDriver extends DemoDriver {
 test('Table creation needs trust and a valid table name', async (t) => {
     const driver = new TableCreationDemoDriver(), s = await start(undefined, undefined, undefined, driver);
     t.after(() => s.stop());
-    const request = { table: 'interview_events', columns: [{ name: 'id', type: 'UInt64' }], orderBy: 'id' };
+    const request = { database: 'demo', table: 'interview_events', columns: [{ name: 'id', type: 'UInt64' }], orderBy: 'id' };
     assert.equal((await s.call('/connections/demo/tables', request)).status, 403);
     await s.call('/connections/demo/trust', { trusted: true, confirmation: 'demo' });
     assert.equal((await s.call('/connections/demo/tables', { ...request, table: 'other.interview_events' })).status, 400);
@@ -81,23 +81,24 @@ test('Table creation needs trust and a valid table name', async (t) => {
     assert.match(driver.createdTables[0].queryId, /^clickstudio-create-table-/);
 });
 
-test('Write targets are any valid table in the connection database', () => {
+test('Write targets accept valid tables in any non-system database', () => {
     const driver = new ClickHouseDriver(loadConfig({ CLICKHOUSE_DATABASE: 'analytics', CLICKHOUSE_USER: 'interview_user' }));
     assert.equal(driver.database('local'), 'analytics');
     assert.equal(driver.allowed('local', 'analytics.interview_events'), true);
-    assert.equal(driver.allowed('local', 'default.interview_events'), false);
+    assert.equal(driver.allowed('local', 'default.interview_events'), true);
+    assert.equal(driver.allowed('local', 'system.users'), false);
     assert.equal(driver.allowed('local', 'analytics.events; DROP TABLE x'), false);
 });
 
-test('Import targets list tables from the connection database', async () => {
+test('Import targets list tables from visible non-system databases', async () => {
     const driver = new ClickHouseDriver(loadConfig({ CLICKHOUSE_DATABASE: 'analytics', CLICKHOUSE_USER: 'interview_user' }));
-    const queryDriver = driver as unknown as { rows: (_id: string, query: string, parameters: Record<string, string>) => Promise<Array<{ name: string }>> };
-    queryDriver.rows = async (_id, query, parameters) => {
+    const queryDriver = driver as unknown as { rows: (_id: string, query: string, parameters?: Record<string, string>) => Promise<Array<{ database: string; name: string }>> };
+    queryDriver.rows = async (_id, query, parameters = {}) => {
         assert.match(query, /system\.tables/);
         assert.deepEqual(parameters, { database: 'analytics' });
-        return [{ name: 'events' }, { name: 'interview_events' }];
+        return [{ database: 'analytics', name: 'events' }, { database: 'default', name: 'interview_events' }, { database: 'system', name: 'users' }];
     };
-    assert.deepEqual(await driver.targets('local'), ['analytics.events', 'analytics.interview_events']);
+    assert.deepEqual(await driver.targets('local'), ['analytics.events', 'default.interview_events']);
 });
 
 test('Writes fall back to the connection identity when no writer is configured', async () => {

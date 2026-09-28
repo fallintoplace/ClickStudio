@@ -13,7 +13,7 @@ import { collectCompactStream } from '../core/compact-stream.js';
 import type { QueryDriver } from '../core/runs.js';
 import type { ImportDriver } from '../core/imports.js';
 import { createTableSql, type CreateTableColumn, type CreateTableDriver } from '../core/table-creation.js';
-import { canDropTableTarget, dropTableSql, isViewEngine } from '../shared/table-deletion.js';
+import { canDropTableTarget, dropTableSql, isSystemDatabaseName, isViewEngine } from '../shared/table-deletion.js';
 import { splitSql } from '../shared/sql.js';
 import { explainPrefixLength, sqlForRunKind } from '../shared/explain-plan.js';
 import { sourcePositionFromUtf8ByteOffset } from '../shared/native-parser.js';
@@ -118,8 +118,8 @@ export class ClickHouseDriver implements QueryDriver, ImportDriver, CreateTableD
                 return { warning: `${label} metadata is unavailable to this reader or ClickHouse version.` };
             }
         };
-        const emptyRows = <T>(): { rows: T[]; warning?: string } => ({ rows: [] });
-        const [columns, tables, systemColumns, systemTables, tableDetails, projections, skipIndexes, dictionaries] = await Promise.all([
+        const [databases, columns, tables, systemColumns, systemTables, tableDetails, projections, skipIndexes, dictionaries] = await Promise.all([
+            optionalRows<{ name: string }>('Database', "SELECT name FROM system.databases WHERE lower(name) NOT IN ('system', 'information_schema') ORDER BY (name = {database:String}) DESC, name LIMIT 1001", { database }),
             this.rows<{
                 database: string;
                 table: string;
@@ -127,13 +127,13 @@ export class ClickHouseDriver implements QueryDriver, ImportDriver, CreateTableD
                 type: string;
                 default_kind: string;
                 comment: string;
-            }>(id, 'SELECT database, table, name, type, default_kind, comment FROM system.columns WHERE database = {database:String} ORDER BY table, position LIMIT 5001', { database }),
+            }>(id, "SELECT database, table, name, type, default_kind, comment FROM system.columns WHERE lower(database) NOT IN ('system', 'information_schema') ORDER BY (database = {database:String}) DESC, database, table, position LIMIT 5001", { database }),
             this.rows<{
                 database: string;
                 name: string;
                 engine: string;
-            }>(id, 'SELECT database, name, engine FROM system.tables WHERE database = {database:String} ORDER BY name LIMIT 1001', { database }),
-            database === 'system' ? emptyRows<{ database: string; table: string; name: string; type: string; default_kind: string; comment: string }>() : optionalRows<{
+            }>(id, "SELECT database, name, engine FROM system.tables WHERE lower(database) NOT IN ('system', 'information_schema') ORDER BY (database = {database:String}) DESC, database, name LIMIT 1001", { database }),
+            optionalRows<{
                 database: string;
                 table: string;
                 name: string;
@@ -141,7 +141,7 @@ export class ClickHouseDriver implements QueryDriver, ImportDriver, CreateTableD
                 default_kind: string;
                 comment: string;
             }>('System table columns', 'SELECT database, table, name, type, default_kind, comment FROM system.columns WHERE database = {database:String} ORDER BY table, position LIMIT 5001', { database: 'system' }),
-            database === 'system' ? emptyRows<{ database: string; name: string; engine: string }>() : optionalRows<{
+            optionalRows<{
                 database: string;
                 name: string;
                 engine: string;
@@ -167,7 +167,7 @@ export class ClickHouseDriver implements QueryDriver, ImportDriver, CreateTableD
                 match(create_table_query, '(?i)(^|[^A-Za-z0-9_])TTL([^A-Za-z0-9_]|$)') > 0 AS ttl_configured,
                 if(target_database = '', '', concat(target_database, '.', target_table)) AS materialized_view_target,
                 skipping_indices_types AS skip_index_types
-                FROM system.tables WHERE database = {database:String} ORDER BY name LIMIT 1001`),
+                FROM system.tables WHERE lower(database) NOT IN ('system', 'information_schema') ORDER BY (database = {database:String}) DESC, database, name LIMIT 1001`, { database }),
             optionalRows<{
                 database: string;
                 table: string;
@@ -175,9 +175,9 @@ export class ClickHouseDriver implements QueryDriver, ImportDriver, CreateTableD
                 type: string;
                 sortingKey: string;
             }>('Projection', `SELECT database, table, name, type, arrayStringConcat(sorting_key, ', ') AS sortingKey
-                FROM system.projections WHERE database = {database:String} ORDER BY table, name LIMIT 5001`),
+                FROM system.projections WHERE lower(database) NOT IN ('system', 'information_schema') ORDER BY (database = {database:String}) DESC, database, table, name LIMIT 5001`, { database }),
             optionalRows<SchemaTableSkipIndex>('Skip-index', `SELECT database, table, name, type, expr AS expression, toString(granularity) AS granularity
-                FROM system.data_skipping_indices WHERE database = {database:String} ORDER BY table, name LIMIT 5001`),
+                FROM system.data_skipping_indices WHERE lower(database) NOT IN ('system', 'information_schema') ORDER BY (database = {database:String}) DESC, database, table, name LIMIT 5001`, { database }),
             optionalRows<{
                 database: string;
                 name: string;
@@ -191,11 +191,11 @@ export class ClickHouseDriver implements QueryDriver, ImportDriver, CreateTableD
             }>('Dictionary', `SELECT database, name, status, type, arrayStringConcat(key.names, ', ') AS key_columns,
                 arrayStringConcat(attribute.names, ', ') AS attribute_columns, toString(element_count) AS element_count,
                 toString(bytes_allocated) AS memory_bytes, toString(last_successful_update_time) AS last_successful_update
-                FROM system.dictionaries WHERE database = {database:String} OR database = '' ORDER BY database, name LIMIT 1001`),
+                FROM system.dictionaries WHERE (lower(database) NOT IN ('system', 'information_schema') OR database = '') ORDER BY database, name LIMIT 1001`, {}),
         ]);
         const allColumns = [...columns, ...(systemColumns.rows ?? [])], allTables = [...tables, ...(systemTables.rows ?? [])];
         const tableTruncated = allColumns.length > 10000 || allTables.length > 2000 || columns.length > 5000 || tables.length > 1000 || (systemColumns.rows?.length ?? 0) > 5000 || (systemTables.rows?.length ?? 0) > 1000;
-        const metadataWarnings = [systemColumns.warning, systemTables.warning, tableDetails.warning, projections.warning, skipIndexes.warning, dictionaries.warning].filter((warning): warning is string => Boolean(warning));
+        const metadataWarnings = [databases.warning, systemColumns.warning, systemTables.warning, tableDetails.warning, projections.warning, skipIndexes.warning, dictionaries.warning].filter((warning): warning is string => Boolean(warning));
         if ((tableDetails.rows?.length ?? 0) > 1000)
             metadataWarnings.push('Table metadata preview truncated.');
         if ((projections.rows?.length ?? 0) > 5000)
@@ -246,9 +246,10 @@ export class ClickHouseDriver implements QueryDriver, ImportDriver, CreateTableD
             lastSuccessfulUpdate: row.last_successful_update,
         }));
         const truncated = tableTruncated;
-        return { connectionId: id, fetchedAt: new Date().toISOString(), tables: enrichedTables, columns: allColumns.slice(0, 10000).map(c => ({ database: c.database, table: c.table, name: c.name, type: c.type, defaultKind: c.default_kind, comment: c.comment })),
+        const visibleDatabases = [...new Set([database, ...(databases.rows ?? []).map(row => row.name), ...allTables.map(table => table.database)])].filter(name => name && !isSystemDatabaseName(name));
+        return { connectionId: id, fetchedAt: new Date().toISOString(), databases: visibleDatabases, tables: enrichedTables, columns: allColumns.slice(0, 10000).map(c => ({ database: c.database, table: c.table, name: c.name, type: c.type, defaultKind: c.default_kind, comment: c.comment })),
             dictionaries: dictionaryRows, metadataWarnings: metadataWarnings.length ? metadataWarnings : undefined, truncated,
-            warnings: [database === 'system' ? 'Schema is scoped to the ClickHouse system database.' : `Schema includes ${database} and ClickHouse system tables. Configure another profile for another database.`, ...(truncated ? ['Schema preview truncated.'] : [])] };
+            warnings: [`Schema lists databases and tables visible to this ClickHouse user. ClickHouse permissions apply to writes.`, ...(truncated ? ['Schema preview truncated.'] : [])] };
     }
     private isMissingDocumentationSource(error: unknown) {
         return error instanceof Error && /\bsource\b.{0,80}(?:unknown identifier|unknown column|not found|doesn't exist|does not exist)|(?:missing columns|unknown identifier|unknown column|not found|doesn't exist|does not exist).{0,80}\bsource\b/i.test(error.message);
@@ -399,18 +400,17 @@ export class ClickHouseDriver implements QueryDriver, ImportDriver, CreateTableD
         return rows.map(row => String(Object.values(row)[0] ?? '')).filter(Boolean);
     }
     async targets(id: string) {
-        const database = this.profile(id).database;
-        const rows = await this.rows<{ name: string }>(id,
-            'SELECT name FROM system.tables WHERE database = {database:String} AND engine NOT IN (\'View\', \'MaterializedView\', \'LiveView\', \'WindowView\') ORDER BY name LIMIT 1000', { database });
-        return rows.map(row => `${database}.${row.name}`);
+        const rows = await this.rows<{ database: string; name: string }>(id,
+            "SELECT database, name FROM system.tables WHERE lower(database) NOT IN ('system', 'information_schema') AND is_temporary = 0 AND engine NOT IN ('View', 'MaterializedView', 'LiveView', 'WindowView') ORDER BY (database = {database:String}) DESC, database, name LIMIT 5001", { database: this.profile(id).database });
+        return rows.filter(row => this.allowed(id, `${row.database}.${row.name}`)).map(row => `${row.database}.${row.name}`);
     }
     allowed(id: string, table: string) {
         const [database, name, ...extra] = table.split('.');
-        return database === this.profile(id).database && extra.length === 0 && /^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(name ?? '');
+        return extra.length === 0 && /^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(database ?? '') && !isSystemDatabaseName(database ?? '') && /^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(name ?? '');
     }
     database(id: string) { return this.profile(id).database; }
     async createTable(id: string, table: string, columns: CreateTableColumn[], orderBy: string, queryId: string) {
-        requireThat(this.allowed(id, table), 403, 'TABLE_CREATE_NOT_ALLOWED', 'Table creation is limited to the connection database');
+        requireThat(this.allowed(id, table), 403, 'TABLE_CREATE_NOT_ALLOWED', 'Choose a valid table in a non-system database');
         try {
             await this.client(id, true).command({ query: createTableSql(table, columns, orderBy), query_id: queryId, abort_signal: AbortSignal.timeout(60000),
                 clickhouse_settings: { max_execution_time: 55, max_memory_usage: '536870912' } });
@@ -420,7 +420,7 @@ export class ClickHouseDriver implements QueryDriver, ImportDriver, CreateTableD
         }
     }
     async dropTable(id: string, database: string, table: string, queryId: string) {
-        requireThat(canDropTableTarget(database, table) && database === this.profile(id).database, 403, 'TABLE_DROP_NOT_ALLOWED', 'Table deletion is limited to the connection database');
+        requireThat(canDropTableTarget(database, table) && !isSystemDatabaseName(database), 403, 'TABLE_DROP_NOT_ALLOWED', 'Choose a regular table outside a system database');
         const target = (await this.rows<{ engine: string }>(id,
             'SELECT engine FROM system.tables WHERE database = {database:String} AND name = {table:String} LIMIT 1', { database, table }))[0];
         if (!target)
@@ -435,7 +435,7 @@ export class ClickHouseDriver implements QueryDriver, ImportDriver, CreateTableD
         }
     }
     async insert(id: string, table: string, rows: Record<string, Json>[], queryId: string) {
-        requireThat(this.allowed(id, table), 403, 'IMPORT_NOT_ALLOWED', 'Import destinations must belong to the connection database');
+        requireThat(this.allowed(id, table), 403, 'IMPORT_NOT_ALLOWED', 'Choose a valid table in a non-system database');
         try {
             await this.client(id, true).insert({ table: quotedTable(table), values: rows, format: 'JSONEachRow', query_id: queryId, abort_signal: AbortSignal.timeout(60000), clickhouse_settings: { max_execution_time: 55, max_memory_usage: '536870912' } });
         }

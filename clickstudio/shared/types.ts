@@ -110,6 +110,7 @@ export interface SchemaDictionary {
 export interface Schema {
     connectionId: string;
     fetchedAt: string;
+    databases?: string[];
     columns: SchemaColumn[];
     tables: SchemaTable[];
     dictionaries?: SchemaDictionary[];

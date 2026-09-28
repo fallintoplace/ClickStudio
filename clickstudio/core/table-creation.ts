@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { Principal } from '../shared/types.js';
 import { CREATE_TABLE_COLUMN_TYPES, type CreateTableColumn } from '../shared/table-creation.js';
 import { quoteIdentifier } from '../shared/sql.js';
+import { isSystemDatabaseName } from '../shared/table-deletion.js';
 import { requireThat } from './errors.js';
 import { canWrite } from './guards.js';
 import { audit, type Store } from './store.js';
@@ -10,7 +11,6 @@ export { CREATE_TABLE_COLUMN_TYPES } from '../shared/table-creation.js';
 export type { CreateTableColumn, CreateTableColumnType } from '../shared/table-creation.js';
 
 export interface CreateTableDriver {
-    database(connectionId: string): string;
     createTable(connectionId: string, table: string, columns: CreateTableColumn[], orderBy: string, queryId: string): Promise<void>;
 }
 
@@ -29,15 +29,16 @@ export function createTableSql(table: string, columns: CreateTableColumn[], orde
 export class TableCreationService {
     constructor(private readonly store: Store, private readonly driver: CreateTableDriver, private readonly trusted: (principal: Principal, connectionId: string) => boolean) { }
 
-    async create(principal: Principal, connectionId: string, name: string, columns: CreateTableColumn[], orderBy: string) {
+    async create(principal: Principal, connectionId: string, database: string, name: string, columns: CreateTableColumn[], orderBy: string) {
         canWrite(principal);
         requireThat(this.trusted(principal, connectionId), 403, 'WORKSPACE_UNTRUSTED', 'Trust the destination connection first');
+        requireThat(/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(database) && !isSystemDatabaseName(database), 400, 'TABLE_DATABASE', 'Choose a valid non-system database');
         requireThat(/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(name), 400, 'TABLE_NAME', 'Use a valid table name');
-        const database = this.driver.database(connectionId), table = `${database}.${name}`;
+        const table = `${database}.${name}`;
         createTableSql(table, columns, orderBy);
         const queryId = `clickstudio-create-table-${randomUUID()}`;
         audit(this.store, principal, 'table.create', table);
         await this.driver.createTable(connectionId, table, columns, orderBy, queryId);
-        return { database: table.split('.')[0], table: table.split('.')[1], columns, orderBy, queryId };
+        return { database, table: name, columns, orderBy, queryId };
     }
 }

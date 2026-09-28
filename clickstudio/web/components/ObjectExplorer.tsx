@@ -6,6 +6,8 @@ import {
     explorerColumnId,
     explorerColumnsId,
     explorerDictionaryId,
+    explorerDatabaseId,
+    explorerRelationId,
     explorerProjectionId,
     explorerProjectionsId,
     explorerSkipIndexId,
@@ -17,7 +19,7 @@ import { quoteIdentifier } from '../../shared/sql';
 import type { Connected } from '../workspace-types';
 import type { Copy } from '../i18n';
 import { Button, cx, Icon } from './ui';
-import { canDropTableTarget } from '../../shared/table-deletion';
+import { canDropTableTarget, isSystemDatabaseName } from '../../shared/table-deletion';
 import { ObjectDetails } from './ObjectExplorerDetails';
 import { OverlayPortal } from './OverlayPortal';
 import { StorageExplorer } from './StorageExplorer';
@@ -74,6 +76,8 @@ export function ObjectExplorer({ copy, connection, schema, schemaLoading, schema
     const [insertRowTarget, setInsertRowTarget] = useState<{ table: SchemaTable; columns: readonly SchemaColumn[] }>();
     const [deleteTableTarget, setDeleteTableTarget] = useState<SchemaTable>();
     const [createTableOpen, setCreateTableOpen] = useState(false);
+    const [createdTableTarget, setCreatedTableTarget] = useState<{ database: string; table: string }>();
+    const treeScroll = useRef<HTMLDivElement>(null);
     const copyTimer = useRef<number | undefined>(undefined);
 
     useEffect(() => () => {
@@ -95,6 +99,29 @@ export function ObjectExplorer({ copy, connection, schema, schemaLoading, schema
     }, [model.selectionById, selectedId]);
 
     useEffect(() => {
+        if (!createdTableTarget) return;
+        const id = explorerRelationId(createdTableTarget.database, createdTableTarget.table);
+        if (!model.selectionById.has(id)) return;
+        setSelectedId(id);
+        setDetailsOpen(true);
+        setExpandedIds(current => new Set([...current, explorerDatabaseId(createdTableTarget.database), explorerCategoryId(createdTableTarget.database, 'table')]));
+    }, [createdTableTarget, model.selectionById]);
+
+    useEffect(() => {
+        if (!createdTableTarget || search) return;
+        const id = explorerRelationId(createdTableTarget.database, createdTableTarget.table);
+        if (selectedId !== id || !expandedIds.has(explorerDatabaseId(createdTableTarget.database)) || !expandedIds.has(explorerCategoryId(createdTableTarget.database, 'table'))) return;
+        const frame = window.requestAnimationFrame(() => {
+            const rows = treeScroll.current?.querySelectorAll<HTMLElement>('[data-table-name]');
+            const row = rows && [...rows].find(item => item.dataset.database === createdTableTarget.database && item.dataset.tableName === createdTableTarget.table);
+            if (!row) return;
+            row.scrollIntoView({ block: 'nearest' });
+            setCreatedTableTarget(undefined);
+        });
+        return () => window.cancelAnimationFrame(frame);
+    }, [compact, createdTableTarget, detailsOpen, expandedIds, schemaLoading, search, selectedId]);
+
+    useEffect(() => {
         if (search || expandedIds.size || !model.databases.length) return;
         const database = model.databases[0]!;
         const firstCategory: ExplorerCategoryKind | undefined = database.tables.length ? 'table' : database.views.length ? 'view' : database.dictionaries.length ? 'dictionary' : undefined;
@@ -111,7 +138,8 @@ export function ObjectExplorer({ copy, connection, schema, schemaLoading, schema
     const expanded = (id: string, forced = false) => forced || expandedIds.has(id);
     const selected = selectedId ? model.selectionById.get(selectedId) : undefined;
     const selectedTable = selected?.kind === 'relation' && selected.relationKind === 'table' ? selected : undefined;
-    const deletableTable = selectedTable && selectedTable.table.database === connection.database && canDropTableTarget(selectedTable.table.database, selectedTable.table.name) ? selectedTable.table : undefined;
+    const insertableTable = selectedTable && !isSystemDatabaseName(selectedTable.table.database) ? selectedTable : undefined;
+    const deletableTable = selectedTable && canDropTableTarget(selectedTable.table.database, selectedTable.table.name) ? selectedTable.table : undefined;
     const selectObject = (id: string) => {
         setSelectedId(id);
         setDetailsOpen(true);
@@ -150,7 +178,7 @@ export function ObjectExplorer({ copy, connection, schema, schemaLoading, schema
         const hasChildren = relation.columns.length > 0 || (relation.table.projections?.length ?? 0) > 0 || (relation.table.skipIndexes?.length ?? 0) > 0;
 
         return <div className="object-tree-branch" key={relation.id}>
-            <div role="treeitem" aria-level={level} aria-expanded={hasChildren ? relationExpanded : undefined} aria-selected={selectedId === relation.id} className={cx('object-tree-row', 'is-object', selectedId === relation.id && 'is-selected')} style={{ paddingLeft: `${Math.max(0, level - 1) * 10}px` }}>
+            <div role="treeitem" aria-level={level} aria-expanded={hasChildren ? relationExpanded : undefined} aria-selected={selectedId === relation.id} data-database={relation.table.database} data-table-name={relation.table.name} className={cx('object-tree-row', 'is-object', selectedId === relation.id && 'is-selected')} style={{ paddingLeft: `${Math.max(0, level - 1) * 10}px` }}>
                 <button type="button" className="object-tree-toggle" aria-label={relationExpanded ? copy.collapse : copy.expand} disabled={!hasChildren} onClick={() => hasChildren && toggle(relation.id)}><span className={cx(relationExpanded && 'is-open')}>{hasChildren && <Icon name="chevron"/>}</span></button>
                 <button type="button" className="object-tree-main" title={`${relation.table.database}.${relation.table.name}`} onClick={() => selectObject(relation.id)}>
                     <span className={cx('object-kind-glyph', relation.kind === 'view' && 'is-view')}><Icon name={relation.kind === 'view' ? 'view' : 'table'}/></span>
@@ -187,24 +215,24 @@ export function ObjectExplorer({ copy, connection, schema, schemaLoading, schema
     const showCompactDetails = compact && detailsOpen && selected;
 
     return <section className={cx('inspector-section object-explorer-section', compact && 'is-compact', showCompactDetails && 'is-detail-mode')}>
-        <div className="object-explorer-action-bar" role="group" aria-label="Table actions">
+        <div className="object-explorer-action-bar" role="group" aria-label={selectedTable ? `Actions for ${selectedTable.table.database}.${selectedTable.table.name}` : 'Table actions'}>
             {connection.dataSource !== 'fixture' && <Button variant="secondary" className="toolbar-small object-create-table-action" disabled={!trusted} title={!trusted ? copy.runActionTrustRequired : undefined} onClick={() => setCreateTableOpen(true)}><Icon name="table"/>{copy.newTable}</Button>}
-            {connection.dataSource !== 'fixture' && selectedTable && <Button variant="secondary" className="toolbar-small" disabled={!trusted} title={!trusted ? copy.runActionTrustRequired : undefined} onClick={() => setInsertRowTarget({ table: selectedTable.table, columns: selectedTable.columns })}><Icon name="plus"/>{copy.insertRow}</Button>}
+            {connection.dataSource !== 'fixture' && insertableTable && <Button variant="secondary" className="toolbar-small" disabled={!trusted} title={!trusted ? copy.runActionTrustRequired : undefined} onClick={() => setInsertRowTarget({ table: insertableTable.table, columns: insertableTable.columns })}><Icon name="plus"/>{copy.insertRow}</Button>}
             {connection.dataSource !== 'fixture' && deletableTable && <Button variant="danger" className="toolbar-small object-delete-table-action" disabled={!trusted} title={!trusted ? copy.runActionTrustRequired : undefined} onClick={() => setDeleteTableTarget(deletableTable)}><Icon name="trash"/>{copy.deleteTable}</Button>}
-            <Button variant="ghost" className={cx('toolbar-small', 'object-refresh-action', !(connection.dataSource !== 'fixture' && deletableTable) && 'is-alone')} onClick={onRefreshSchema} disabled={schemaLoading || !trusted}>{schemaLoading ? copy.loading : copy.refresh}</Button>
+            {selectedTable && <span className="object-action-context" title={`${selectedTable.table.database}.${selectedTable.table.name}`}><span>Selected</span><code>{selectedTable.table.database}.{selectedTable.table.name}</code></span>}
         </div>
         {showCompactDetails ? <div className="object-compact-details">
             <button type="button" className="object-back-button" onClick={browseObjects}><span>‹</span>{copy.objects}</button>
             <ObjectDetails copy={copy} selection={selected} trusted={trusted} copiedId={copiedId} onInsert={onInsert} onCopy={copyText} onOpenSqlDraft={onOpenSqlDraft} onOpenReference={onOpenReference} onOpenParts={setPartsTable}/>
         </div> : <>
         <div className="inspector-search object-search"><Icon name="search"/><input data-testid="schema-search" value={search} onChange={event => changeSearch(event.target.value)} placeholder={copy.objectSearch} aria-label={copy.objectSearch}/>{search && <button type="button" className="object-search-clear" aria-label="Clear object search" onClick={() => changeSearch('')}>×</button>}</div>
-        <div className="schema-heading object-heading"><Button variant="ghost" className="toolbar-small" disabled={!trusted} onClick={() => setLineageOpen(true)}>View dependencies</Button><span>{copy.objectCount.replace('{count}', (model.query ? model.visibleObjects : model.totalObjects).toLocaleString())}</span></div>
+        <div className="schema-heading object-heading"><Button variant="ghost" className="toolbar-small" disabled={!trusted} onClick={() => setLineageOpen(true)}>View dependencies</Button><span>{copy.objectCount.replace('{count}', (model.query ? model.visibleObjects : model.totalObjects).toLocaleString())}</span><Button variant="ghost" className={cx('toolbar-small', 'object-refresh-action', schemaLoading && 'is-loading')} aria-label={schemaLoading ? copy.loading : copy.refresh} aria-busy={schemaLoading} title={schemaLoading ? copy.loading : copy.refresh} onClick={onRefreshSchema} disabled={schemaLoading || !trusted}><Icon name="refresh"/></Button></div>
         {schemaError && <div className="callout callout-error">{schemaError}</div>}
         {schema?.metadataWarnings?.map(warning => <div className="schema-metadata-warning" key={warning}>{warning}</div>)}
         {!trusted && <div className="inspector-empty"><Icon name="lock"/><strong>{copy.schemaPrivate}</strong><p>{copy.trustToInspect}</p></div>}
         {schemaLoading && <div className="inspector-empty"><span className="loading-orbit"/><p>{copy.readingSchema}</p></div>}
         {trusted && schema && !schemaLoading && <>
-            {model.databases.length ? <div className="object-tree-scroll">
+            {model.databases.length ? <div className="object-tree-scroll" ref={treeScroll}>
                 <div className="object-tree" role="tree" aria-label={copy.objects}>
                     {model.databases.map(database => {
                         const databaseExpanded = expanded(database.id, Boolean(model.query));
@@ -224,7 +252,7 @@ export function ObjectExplorer({ copy, connection, schema, schemaLoading, schema
         </>}
         {trusted && partsTable && <OverlayPortal><StorageExplorer connection={connection} table={partsTable} copy={copy} onClose={() => setPartsTable(undefined)}/></OverlayPortal>}
         {trusted && lineageOpen && <OverlayPortal><MaterializedViewExplorer connection={connection} database={connection.database} onClose={() => setLineageOpen(false)}/></OverlayPortal>}
-        {trusted && createTableOpen && <OverlayPortal><CreateTableDialog connection={connection} onClose={() => setCreateTableOpen(false)} onCreated={onRefreshSchema}/></OverlayPortal>}
+        {trusted && createTableOpen && <OverlayPortal><CreateTableDialog connection={connection} databases={schema?.databases ?? []} onClose={() => setCreateTableOpen(false)} onCreated={target => { setSearch(''); setCreatedTableTarget(target); onRefreshSchema(); }}/></OverlayPortal>}
         {trusted && insertRowTarget && <OverlayPortal><InsertRowDialog key={`${insertRowTarget.table.database}.${insertRowTarget.table.name}`} connectionId={connection.id} table={insertRowTarget.table} columns={insertRowTarget.columns} onClose={() => setInsertRowTarget(undefined)} onInserted={onRefreshSchema}/></OverlayPortal>}
         {trusted && deleteTableTarget && <OverlayPortal><DeleteTableDialog connectionId={connection.id} table={deleteTableTarget} onClose={() => setDeleteTableTarget(undefined)} onDeleted={() => { setSelectedId(undefined); setDetailsOpen(false); onRefreshSchema(); }}/></OverlayPortal>}
     </section>;

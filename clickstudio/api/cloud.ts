@@ -6,7 +6,7 @@ import type { Column, Json, Row, Schema, SchemaColumn, SchemaTable } from '../sh
 import { lexSql, quoteIdentifier, splitSql } from '../shared/sql.js';
 import { CREATE_TABLE_COLUMN_TYPES, type CreateTableColumn, type CreateTableColumnType } from '../shared/table-creation.js';
 import { createTableSql } from '../core/table-creation.js';
-import { canDropTableTarget, dropTableSql, isViewEngine, tableDeletionConfirmation } from '../shared/table-deletion.js';
+import { canDropTableTarget, dropTableSql, isSystemDatabaseName, isViewEngine, tableDeletionConfirmation } from '../shared/table-deletion.js';
 import { parseReplicationSnapshot, replicationQueueQuery, replicationReplicasQuery, type ReplicationCapabilities } from '../shared/replication.js';
 import { parseWorkloadSnapshot, WORKLOAD_WINDOWS, workloadFamiliesQuery, workloadPointsQuery, type QueryLogSource, type WorkloadWindow } from '../shared/workload.js';
 
@@ -156,16 +156,16 @@ async function testConnection(credentials: CloudCredentials, url: string) {
 async function readSchema(credentials: CloudCredentials, url: string): Promise<Schema> {
     const client = makeClient(credentials, url);
     try {
-        const [tableRows, columnRows] = await Promise.all([
+        const [databaseRows, tableRows, columnRows] = await Promise.all([
             queryRows<Record<string, unknown>>(client,
-                'SELECT name, engine, sorting_key, primary_key, partition_key, sampling_key, total_rows, total_bytes FROM system.tables WHERE database = {database:String} AND is_temporary = 0 ORDER BY name LIMIT 500',
-                { database: credentials.database }),
+                "SELECT name FROM system.databases WHERE lower(name) NOT IN ('system', 'information_schema') ORDER BY (name = {database:String}) DESC, name LIMIT 1000", { database: credentials.database }).catch(() => []),
             queryRows<Record<string, unknown>>(client,
-                'SELECT database, table, name, type, default_kind, comment FROM system.columns WHERE database = {database:String} ORDER BY table, position LIMIT 2_000',
-                { database: credentials.database }),
+                "SELECT database, name, engine, sorting_key, primary_key, partition_key, sampling_key, total_rows, total_bytes FROM system.tables WHERE lower(database) NOT IN ('system', 'information_schema') AND is_temporary = 0 ORDER BY (database = {database:String}) DESC, database, name LIMIT 1000", { database: credentials.database }),
+            queryRows<Record<string, unknown>>(client,
+                "SELECT database, table, name, type, default_kind, comment FROM system.columns WHERE lower(database) NOT IN ('system', 'information_schema') ORDER BY (database = {database:String}) DESC, database, table, position LIMIT 2000", { database: credentials.database }),
         ]);
         const tables: SchemaTable[] = tableRows.map(row => ({
-            database: credentials.database,
+            database: asString(row.database),
             name: asString(row.name),
             engine: asString(row.engine),
             orderBy: asString(row.sorting_key) || undefined,
@@ -186,10 +186,11 @@ async function readSchema(credentials: CloudCredentials, url: string): Promise<S
         return {
             connectionId: 'clickhouse-cloud',
             fetchedAt: new Date().toISOString(),
+            databases: [...new Set([credentials.database, ...databaseRows.map(row => asString(row.name)), ...tables.map(table => table.database)])].filter(name => name && !isSystemDatabaseName(name)),
             tables,
             columns,
             warnings: [],
-            truncated: tableRows.length >= 500 || columnRows.length >= 2_000,
+            truncated: tableRows.length >= 1000 || columnRows.length >= 2_000,
         };
     } finally {
         await client.close();
@@ -197,6 +198,7 @@ async function readSchema(credentials: CloudCredentials, url: string): Promise<S
 }
 
 async function createCloudTable(credentials: CloudCredentials, url: string, body: Record<string, unknown>) {
+    if (!isImportIdentifier(body.database) || isSystemDatabaseName(body.database)) throw new AppError(400, 'TABLE_DATABASE', 'Choose a valid non-system database.');
     if (!isImportIdentifier(body.name)) throw new AppError(400, 'TABLE_NAME', 'Use a valid table name.');
     if (!Array.isArray(body.columns) || body.columns.length > 50) throw new AppError(400, 'TABLE_COLUMNS', 'A table needs 1–50 columns.');
     const columns: CreateTableColumn[] = body.columns.map(value => {
@@ -206,7 +208,7 @@ async function createCloudTable(credentials: CloudCredentials, url: string, body
         return { name: value.name, type: value.type as CreateTableColumnType };
     });
     const orderBy = typeof body.orderBy === 'string' ? body.orderBy : '';
-    const table = `${credentials.database}.${body.name}`;
+    const table = `${body.database}.${body.name}`;
     const query = createTableSql(table, columns, orderBy);
     const queryId = `clickstudio-create-table-${randomUUID()}`;
     const client = makeClient(credentials, url);
@@ -215,14 +217,13 @@ async function createCloudTable(credentials: CloudCredentials, url: string, body
     } finally {
         await client.close();
     }
-    return { database: credentials.database, table: body.name, columns, orderBy, queryId };
+    return { database: body.database, table: body.name, columns, orderBy, queryId };
 }
 
 async function dropCloudTable(credentials: CloudCredentials, url: string, body: Record<string, unknown>) {
     const database = typeof body.database === 'string' ? body.database : '';
     const table = typeof body.table === 'string' ? body.table : '';
     if (!canDropTableTarget(database, table)) throw new AppError(400, 'TABLE_DROP_TARGET', 'Choose a regular table outside a system database.');
-    if (database !== credentials.database) throw new AppError(403, 'TABLE_DROP_NOT_ALLOWED', 'Table deletion is limited to the connection database.');
     if (body.confirmation !== tableDeletionConfirmation(database, table)) throw new AppError(400, 'TABLE_DROP_CONFIRMATION', 'Type the exact table name to confirm deletion.');
     const queryId = `clickstudio-drop-table-${randomUUID()}`;
     const client = makeClient(credentials, url);
@@ -367,6 +368,15 @@ function isImportTableName(value: string) {
     });
 }
 
+function parseImportTarget(value: unknown): { database: string; table: string } | undefined {
+    if (typeof value !== 'string' || value.length > 641 || Array.from(value).some(character => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127)) return undefined;
+    const separator = value.indexOf('.');
+    if (separator < 0) return undefined;
+    const database = value.slice(0, separator), table = value.slice(separator + 1);
+    if (!isImportIdentifier(database) || !isImportTableName(table) || isSystemDatabaseName(database)) return undefined;
+    return { database, table };
+}
+
 async function inspectCloudImport(credentials: CloudCredentials, url: string, queryId: string, table: string, rows: number): Promise<CloudImportJob> {
     const job: CloudImportJob = { id: queryId.slice('clickstudio-import-'.length), connectionId: 'clickhouse-cloud', table, queryId, rows, createdAt: new Date().toISOString(), status: 'unknown', error: 'ClickHouse could not confirm the insert. The rows may already be there.' };
     const client = makeClient(credentials, url);
@@ -412,6 +422,7 @@ async function commitCloudImport(form: FormData, credentials: CloudCredentials, 
     const createTable = parseFormJson<{ name?: unknown; columns?: unknown }>(form, 'createTable');
     const creating = createTable !== undefined;
     let tableName: string;
+    let tableDatabase = credentials.database;
     let destinationColumns: SchemaColumn[];
     let createColumns: { source: string; name: string; type: CreateTableColumnType }[] = [];
     let expectedColumns: { name: string; type: string; defaultKind: string }[] | undefined;
@@ -429,18 +440,18 @@ async function commitCloudImport(form: FormData, credentials: CloudCredentials, 
         if (new Set(createColumns.map(column => column.source)).size !== createColumns.length || new Set(createColumns.map(column => column.name)).size !== createColumns.length)
             throw new AppError(400, 'IMPORT_CREATE_TABLE', 'New table column names must be unique.');
         const schema = await readSchema(credentials, url);
-        if (schema.tables.some(table => table.name === tableName)) throw new AppError(409, 'TABLE_EXISTS', 'A table with this name already exists. Choose an existing table or a different name.');
+        if (schema.tables.some(table => table.database === credentials.database && table.name === tableName)) throw new AppError(409, 'TABLE_EXISTS', 'A table with this name already exists. Choose an existing table or a different name.');
         destinationColumns = createColumns.map(column => ({ database: credentials.database, table: tableName, name: column.name, type: column.type, defaultKind: '', comment: '' }));
     } else {
-        const databasePrefix = `${credentials.database}.`;
-        if (typeof target !== 'string' || !target.startsWith(databasePrefix)) throw new AppError(400, 'IMPORT_TABLE', 'Choose a table in the connected database.');
-        tableName = target.slice(databasePrefix.length);
-        if (!isImportTableName(tableName)) throw new AppError(400, 'IMPORT_TABLE', 'Choose a valid table in the connected database.');
+        const selectedTarget = parseImportTarget(target);
+        if (!selectedTarget) throw new AppError(400, 'IMPORT_TABLE', 'Choose a valid table in an accessible database.');
+        tableDatabase = selectedTarget.database;
+        tableName = selectedTarget.table;
         const schema = await readSchema(credentials, url);
-        const selectedTable = schema.tables.find(table => table.database === credentials.database && table.name === tableName);
+        const selectedTable = schema.tables.find(table => table.database === tableDatabase && table.name === tableName);
         if (!selectedTable || ['View', 'MaterializedView', 'LiveView', 'WindowView'].includes(selectedTable.engine))
             throw new AppError(404, 'IMPORT_TABLE', 'The selected table is not available for inserts.');
-        const allColumns = schema.columns.filter(column => column.database === credentials.database && column.table === tableName);
+        const allColumns = schema.columns.filter(column => column.database === tableDatabase && column.table === tableName);
         if (!allColumns.length) throw new AppError(404, 'IMPORT_TABLE', 'The selected table has no visible columns.');
         expectedColumns = parseFormJson<{ name: string; type: string; defaultKind: string }[]>(form, 'expectedColumns');
         if (!Array.isArray(expectedColumns) || JSON.stringify(expectedColumns) !== JSON.stringify(allColumns.map(({ name, type, defaultKind }) => ({ name, type, defaultKind }))))
@@ -476,14 +487,14 @@ async function commitCloudImport(form: FormData, credentials: CloudCredentials, 
         if (creating) {
             const definitions = createColumns.map(column => `${quoteIdentifier(column.name)} Nullable(${column.type})`).join(', ');
             await client.command({
-                query: `CREATE TABLE ${quoteIdentifier(credentials.database)}.${quoteIdentifier(tableName)} (${definitions}) ENGINE = MergeTree ORDER BY tuple()`,
+                query: `CREATE TABLE ${quoteIdentifier(tableDatabase)}.${quoteIdentifier(tableName)} (${definitions}) ENGINE = MergeTree ORDER BY tuple()`,
                 query_id: `clickstudio-create-${queryId.slice('clickstudio-import-'.length)}`,
                 abort_signal: AbortSignal.timeout(48_000),
                 clickhouse_settings: clickhouseSettings,
             });
         }
         await client.insert({
-            table: quoteIdentifier(tableName),
+            table: `${quoteIdentifier(tableDatabase)}.${quoteIdentifier(tableName)}`,
             values: mappedRows,
             format: 'JSONEachRow',
             query_id: queryId,
@@ -493,7 +504,7 @@ async function commitCloudImport(form: FormData, credentials: CloudCredentials, 
     } finally {
         await client.close();
     }
-    return { id: queryId.slice('clickstudio-import-'.length), connectionId: 'clickhouse-cloud', table: `${credentials.database}.${tableName}`, queryId, rows: parsed.rows.length, createdAt: new Date().toISOString(), status: 'succeeded' };
+    return { id: queryId.slice('clickstudio-import-'.length), connectionId: 'clickhouse-cloud', table: `${tableDatabase}.${tableName}`, queryId, rows: parsed.rows.length, createdAt: new Date().toISOString(), status: 'succeeded' };
 }
 
 async function postCloudImport(request: Request): Promise<Response> {
@@ -572,10 +583,8 @@ async function post(request: Request): Promise<Response> {
         if (body.action === 'drop-table')
             return json(await dropCloudTable(credentials, url, body));
         if (body.action === 'import-status') {
-            const tablePrefix = `${credentials.database}.`;
             const targetTable = typeof body.table === 'string' ? body.table : '';
-            const tableName = targetTable.startsWith(tablePrefix) ? targetTable.slice(tablePrefix.length) : '';
-            if (!validImportQueryId(body.queryId) || !isImportTableName(tableName) ||
+            if (!validImportQueryId(body.queryId) || !parseImportTarget(targetTable) ||
                 typeof body.rows !== 'number' || !Number.isSafeInteger(body.rows) || body.rows < 1 || body.rows > 10_000)
                 return fail('IMPORT_STATUS', 'The saved import details are invalid.');
             return json(await inspectCloudImport(credentials, url, body.queryId, targetTable, body.rows));
