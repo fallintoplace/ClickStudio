@@ -89,7 +89,7 @@ export function InsertRowDialog({ connectionId, table, columns, onClose, onInser
             });
         }, 1200);
         return () => { active = false; window.clearTimeout(timer); };
-    }, [step, job, busy, reportSuccess]);
+    }, [step, job, busy, name, reportSuccess]);
 
     async function reviewRow(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
