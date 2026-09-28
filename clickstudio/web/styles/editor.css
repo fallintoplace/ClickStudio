@@ -20,7 +20,9 @@
     .workspace-panel-splitter::before { width: min(180px, 32%); height: 3px; border-radius: 99px; background: var(--line-bright); content: ""; transition: width .16s ease, background .16s ease, box-shadow .16s ease; }
     .workspace-panel-splitter:hover::before, .workspace-panel-splitter:focus-visible::before { width: min(220px, 40%); background: color-mix(in srgb, var(--accent) 62%, var(--line-bright)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent); }
     .workspace-panel-splitter:focus-visible { outline: none; }
-    .editor-surface, .results-surface { position: relative; display: flex; min-width: 0; min-height: 0; flex-direction: column; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); box-shadow: 0 12px 36px #00000012, inset 0 1px #ffffff08; transition: border-color .2s ease, box-shadow .2s ease; }
+    .editor-surface, .results-surface { position: relative; display: flex; min-width: 0; min-height: 0; flex-direction: column; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); box-shadow: inset 0 1px #ffffff08; transition: border-color .2s ease, box-shadow .2s ease; }
+    .editor-surface { box-shadow: 0 12px 36px #00000012, inset 0 1px #ffffff08; }
+    .results-surface { box-shadow: none; }
     .editor-surface::before, .results-surface::before { position: absolute; z-index: var(--z-local-raised); top: 0; left: 16px; width: 88px; height: 1px; pointer-events: none; background: linear-gradient(90deg, transparent, var(--signal-accent), transparent); box-shadow: 0 0 9px color-mix(in srgb, var(--signal-accent) 48%, transparent); content: ""; }
     .editor-surface.is-floating, .results-surface.is-floating { position: fixed; margin: 0; border-color: var(--line-bright); box-shadow: 0 28px 90px #00000066, 0 0 0 1px #ffffff08; }
     .editor-surface.is-floating.is-front, .results-surface.is-floating.is-front { border-color: color-mix(in srgb, var(--accent) 34%, var(--line-bright)); box-shadow: 0 32px 100px #00000073, 0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent); }
@@ -46,7 +48,7 @@
     .panel-content { display: flex; min-width: 0; min-height: 0; flex: 1; flex-direction: column; }
     .panel-content[hidden] { display: none; }
     .results-content-scrollable { overflow: auto; scrollbar-gutter: stable; }
-    .editor-surface:focus-within, .results-surface:focus-within { border-color: var(--active-border); box-shadow: var(--focus-glow), 0 12px 42px #00000012, inset 0 1px #ffffff08; }
+    .editor-surface:focus-within { border-color: var(--active-border); box-shadow: var(--focus-glow), 0 12px 42px #00000012, inset 0 1px #ffffff08; }
     .detached-query-window-root { width: 100%; height: 100dvh; min-height: 0; padding: 10px; overflow: hidden; background: var(--page); }
     .detached-query-window-root > .editor-surface { width: 100%; height: 100%; min-height: 0; flex: 1; }
     .detached-query-window-root > .editor-surface.is-collapsed { height: auto; flex: 0 0 auto; }
