@@ -1,4 +1,5 @@
 import type { Copy, Locale } from '../i18n';
+import { formatCopy } from '../i18n-format';
 import type { SqlExample, SqlExampleCategory } from '../sql-examples';
 import { localizeSqlExample, localizeSqlExampleCategory } from '../sql-examples-locales';
 import type { IconName } from './ui';
@@ -6,34 +7,36 @@ import type { IconName } from './ui';
 export type HelpPanelSection = 'tour' | 'examples' | 'workflows' | 'assistant' | 'monitoring' | 'query' | 'geo' | 'explain' | 'storage' | 'dependencies' | 'compare' | 'reference';
 export type CategoryFilter = SqlExampleCategory | 'charts' | 'all' | 'featured';
 
-export const helpCategories: CategoryFilter[] = [
+export const helpCategories: readonly CategoryFilter[] = [
     'featured', 'all', 'business', 'observability', 'operations', 'engineering', 'markets', 'cities',
     'openSource', 'internet', 'datasets', 'clickhouse', 'writeOperations', 'charts', 'basics', 'aggregation',
     'timeSeries', 'schema',
 ];
 
-export function categoryLabel(category: CategoryFilter, copy: Copy['common'], locale: Locale) {
-    if (category === 'all') return copy.allExamples;
-    if (category === 'featured') return localizeSqlExampleCategory(category, locale, 'Featured');
-    if (category === 'business') return localizeSqlExampleCategory(category, locale, 'Business');
-    if (category === 'observability') return localizeSqlExampleCategory(category, locale, 'Observability');
-    if (category === 'operations') return localizeSqlExampleCategory(category, locale, 'Operations');
-    if (category === 'engineering') return localizeSqlExampleCategory(category, locale, 'Engineering');
-    if (category === 'markets') return localizeSqlExampleCategory(category, locale, 'Markets');
-    if (category === 'cities') return localizeSqlExampleCategory(category, locale, 'Cities');
-    if (category === 'openSource') return localizeSqlExampleCategory(category, locale, 'Open source');
-    if (category === 'internet') return localizeSqlExampleCategory(category, locale, 'Internet');
-    if (category === 'datasets') return localizeSqlExampleCategory(category, locale, 'Datasets');
-    if (category === 'writeOperations') return copy.exampleWriteOperations;
-    if (category === 'basics') return copy.exampleBasics;
-    if (category === 'aggregation') return copy.exampleAggregation;
-    if (category === 'timeSeries') return copy.exampleTimeSeries;
-    if (category === 'charts') return copy.exampleCharts;
-    if (category === 'clickhouse') return copy.exampleClickHouse;
-    return copy.exampleSchema;
+export function categoryLabel(category: CategoryFilter, copy: Copy['common'], locale: Locale): string {
+    switch (category) {
+        case 'all': return copy.allExamples;
+        case 'featured': return localizeSqlExampleCategory(category, locale, 'Featured');
+        case 'business': return localizeSqlExampleCategory(category, locale, 'Business');
+        case 'observability': return localizeSqlExampleCategory(category, locale, 'Observability');
+        case 'operations': return localizeSqlExampleCategory(category, locale, 'Operations');
+        case 'engineering': return localizeSqlExampleCategory(category, locale, 'Engineering');
+        case 'markets': return localizeSqlExampleCategory(category, locale, 'Markets');
+        case 'cities': return localizeSqlExampleCategory(category, locale, 'Cities');
+        case 'openSource': return localizeSqlExampleCategory(category, locale, 'Open source');
+        case 'internet': return localizeSqlExampleCategory(category, locale, 'Internet');
+        case 'datasets': return localizeSqlExampleCategory(category, locale, 'Datasets');
+        case 'writeOperations': return copy.exampleWriteOperations;
+        case 'basics': return copy.exampleBasics;
+        case 'aggregation': return copy.exampleAggregation;
+        case 'timeSeries': return copy.exampleTimeSeries;
+        case 'charts': return copy.exampleCharts;
+        case 'clickhouse': return copy.exampleClickHouse;
+        case 'schema': return copy.exampleSchema;
+    }
 }
 
-export function chartLabel(example: SqlExample, copy: Copy['common']) {
+export function chartLabel(example: SqlExample, copy: Copy['common']): string {
     switch (example.chart.kind) {
         case 'table': return copy.exampleChartTable;
         case 'number': return copy.exampleChartNumber;
@@ -46,23 +49,23 @@ export function chartLabel(example: SqlExample, copy: Copy['common']) {
     }
 }
 
-export function exampleText(example: SqlExample, locale: Locale, copy: Copy['common']) {
+export function exampleText(example: SqlExample, locale: Locale, copy: Copy['common']): Readonly<Pick<SqlExample, 'name' | 'description'>> {
     if (example.category === 'schema') {
         const tableName = example.name.replace(/^Preview /, '');
         return {
-            name: copy.examplePreviewTable.replace('{table}', tableName),
+            name: formatCopy(copy.examplePreviewTable, { table: tableName }),
             description: copy.exampleReadRows,
         };
     }
     return localizeSqlExample(example, locale);
 }
 
-export type HelpSectionDefinition = {
+export type HelpSectionDefinition = Readonly<{
     id: HelpPanelSection;
     label: string;
     description: string;
     icon: IconName;
-};
+}>;
 
 export function helpSections(copy: Copy['common']): HelpSectionDefinition[] {
     return [

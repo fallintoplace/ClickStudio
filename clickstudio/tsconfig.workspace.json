@@ -28,6 +28,7 @@
     "web/sql-examples.ts",
     "web/sql-examples-locales.ts",
     "web/i18n.ts",
+    "web/i18n-format.ts",
     "shared/evidence.ts",
     "shared/workspace-view.ts",
     "web/local-files.ts",

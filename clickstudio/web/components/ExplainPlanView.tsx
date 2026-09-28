@@ -4,6 +4,7 @@ import type { Json, ProfilePipeline, ProfilePipelineNode } from '../../shared/ty
 import { PipelineGraph } from './PipelineGraph';
 import { ScrollEdgeFrame } from './ScrollEdgeShadows';
 import type { Copy } from '../i18n';
+import { formatCopy } from '../i18n-format';
 
 const MAX_PROPERTY_TEXT = 12_000;
 
@@ -81,7 +82,13 @@ function PlanNode({ node, depth = 0, propertyLabel, unknownStep, depthLimit }: {
     </li>;
 }
 
-export function ExplainPlanView({ plan, loading, copy }: { plan?: ExplainPlan; loading: boolean; copy: Copy['common'] }) {
+type ExplainPlanViewProps = Readonly<{
+    plan?: ExplainPlan;
+    loading: boolean;
+    copy: Copy['common'];
+}>;
+
+export function ExplainPlanView({ plan, loading, copy }: ExplainPlanViewProps) {
     const [view, setView] = useState<'graph' | 'tree'>('graph');
     const graph = useMemo(() => plan ? planGraph(plan, copy.planUnknownStep, copy.planDepthLimit) : undefined, [plan, copy.planDepthLimit, copy.planUnknownStep]);
     if (loading) return <div className="pipeline-graph-empty" role="status">{copy.planLoading}</div>;
@@ -100,7 +107,7 @@ export function ExplainPlanView({ plan, loading, copy }: { plan?: ExplainPlan; l
                         {copy.planTreeView}
                     </button>
                 </div>
-                <strong>{copy.planNodeCount.replace('{count}', plan.nodeCount.toLocaleString())}</strong>
+                <strong>{formatCopy(copy.planNodeCount, { count: plan.nodeCount.toLocaleString() })}</strong>
             </div>
         </header>
         {plan.truncated && <p className="pipeline-graph-warning" role="status">{copy.planTruncated}</p>}
