@@ -106,11 +106,26 @@ function AssistantSqlProposalDiff({ proposal, currentSql, busy, mode, turnId, on
     </div>;
 }
 
-function AssistantSummary({ summary, proposal = false }: { summary: string; proposal?: boolean }) {
-    const className = proposal ? 'assistant-proposal-summary' : 'assistant-answer-markdown';
-    const testId = proposal ? 'assistant-proposal-summary' : 'assistant-answer-markdown';
+function normalizeCitationMarkdown(text: string, sources: readonly { url: string }[]) {
+    return sources.reduce((normalized, source) => {
+        let url: URL;
+        try { url = new URL(source.url); } catch { return normalized; }
+        if ((url.protocol !== 'http:' && url.protocol !== 'https:') || url.username || url.password) return normalized;
+        const canonicalUrl = url.href;
+        const escapedUrl = canonicalUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const nestedCitation = new RegExp(String.raw`\[([^\]]+)\]\\?\(\s*\[\s*${escapedUrl}\s*\]\(\s*${escapedUrl}\s*\)\s*\)`, 'g');
+        return normalized.replace(nestedCitation, (_match, label: string) => `[${label}](${canonicalUrl})`);
+    }, text);
+}
+
+function AssistantMarkdown({ text, sources, className, testId }: {
+    text: string;
+    sources: readonly { url: string }[];
+    className: string;
+    testId?: string;
+}) {
     return <div className={className} data-testid={testId}>
-        <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ href, children, ...props }) => <a {...props} href={href} target="_blank" rel="noreferrer">{children}</a> }}>{summary}</ReactMarkdown>
+        <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ href, children, ...props }) => <a {...props} href={href} target="_blank" rel="noreferrer">{children}</a> }}>{normalizeCitationMarkdown(text, sources)}</ReactMarkdown>
     </div>;
 }
 
@@ -141,13 +156,13 @@ function AssistantOutput({ mode, sql, turn, busy, onDecideProposal, onRunQuery, 
     return <div className={cx('proposal-card', beginner && 'beginner-proposal-card')}>
         <div className="proposal-heading">
             {proposalSql !== null && <span className={cx('proposal-quality', proposal.quality?.status)}>{proposal.quality?.score ?? '—'}<small>QUALITY</small></span>}
-            <div><span className="eyebrow">{proposalSql === null ? 'ANSWER' : `SQL PROPOSAL · ${proposal.decision.toUpperCase()}`}</span><AssistantSummary summary={proposal.summary} proposal={proposalSql !== null}/></div>
+            <div><span className="eyebrow">{proposalSql === null ? 'ANSWER' : `SQL PROPOSAL · ${proposal.decision.toUpperCase()}`}</span><AssistantMarkdown text={proposal.summary} sources={sources} className={proposalSql === null ? 'assistant-answer-markdown' : 'assistant-proposal-summary'} testId={proposalSql === null ? 'assistant-answer-markdown' : 'assistant-proposal-summary'}/></div>
         </div>
         {stale && <p className="assistant-stale-proposal" role="status">This accepted query comes from an earlier SQL draft. Running it uses the SQL shown here.</p>}
-        {proposal.clarification && <div className="callout">{proposal.clarification}</div>}
-        {proposal.assumptions.map((item, index) => <p className="proposal-point" key={`${index}-${item}`}><span>ASSUMPTION</span>{item}</p>)}
-        {proposal.caveats.map((item, index) => <p className="proposal-point" key={`${index}-${item}`}><span>NOTE</span>{item}</p>)}
-        {proposal.findings.map((item, index) => <p className="proposal-finding" key={`${index}-${item.severity}-${item.message}`}><strong>{item.severity}</strong>{item.message}<small>{item.evidence}</small></p>)}
+        {proposal.clarification && <div className="callout"><AssistantMarkdown text={proposal.clarification} sources={sources} className="assistant-proposal-markdown"/></div>}
+        {proposal.assumptions.map((item, index) => <div className="proposal-point" key={`${index}-${item}`}><span>ASSUMPTION</span><AssistantMarkdown text={item} sources={sources} className="assistant-proposal-markdown"/></div>)}
+        {proposal.caveats.map((item, index) => <div className="proposal-point" key={`${index}-${item}`}><span>NOTE</span><AssistantMarkdown text={item} sources={sources} className="assistant-proposal-markdown"/></div>)}
+        {proposal.findings.map((item, index) => <div className="proposal-finding" key={`${index}-${item.severity}-${item.message}`}><strong>{item.severity}</strong><AssistantMarkdown text={item.message} sources={sources} className="assistant-proposal-markdown"/><AssistantMarkdown text={item.evidence} sources={sources} className="assistant-proposal-markdown assistant-proposal-finding-evidence"/></div>)}
         {sources.length > 0 && <div className="assistant-web-sources"><span className="eyebrow">WEB SOURCES</span><ul>{sources.map(source => <li key={source.url}><a href={source.url} target="_blank" rel="noopener noreferrer">{source.label}</a></li>)}</ul></div>}
         {proposalSql !== null && <>
             <AssistantSqlProposalDiff key={`${proposal.id}:${proposal.decision}`} proposal={proposal} currentSql={sql} busy={busy} mode={mode} turnId={turn.id} onDecideProposal={onDecideProposal}/>

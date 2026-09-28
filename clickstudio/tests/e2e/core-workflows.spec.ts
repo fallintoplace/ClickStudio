@@ -1215,6 +1215,46 @@ test('Ask AI renders answer lists, emphasis, and safe links as Markdown', async 
     await expect(answer.locator('img')).toHaveCount(0);
 });
 
+test('Ask AI formats proposal citations in summaries and assumptions', async ({ page }) => {
+    await page.route('**/api/assistant/sql', async route => {
+        const body = route.request().postDataJSON() as Record<string, unknown>;
+        await route.fulfill({ json: {
+            id: 'markdown-proposal', owner: 'local-owner', connectionId: 'demo', action: 'ask', createdAt: '2026-09-23T00:00:00.000Z',
+            baseSql: String(body.sql ?? ''), responseId: 'test-response', model: 'test-model', promptVersion: 'test', contextSummary: [], decision: 'pending',
+            sql: 'SELECT 1',
+            summary: 'Since 1990 means seasons through 2025-26. ([laseriea.org]\\([https://www.laseriea.org/statistiche/albo-doro/](https://www.laseriea.org/statistiche/albo-doro/)))',
+            assumptions: ['The 2004-05 season is omitted because it had no official winner. ([channelnewsasia.com]\\([https://www.channelnewsasia.com/sport/list-seriea-champions-6097411](https://www.channelnewsasia.com/sport/list-seriea-champions-6097411)))\n\n<img src=x onerror=alert(1)>'],
+            tables: [], caveats: [], clarification: null, findings: [],
+            sources: [
+                { title: 'Serie A official history', url: 'https://www.laseriea.org/statistiche/albo-doro/' },
+                { title: 'Channel News Asia', url: 'https://www.channelnewsasia.com/sport/list-seriea-champions-6097411' },
+            ],
+        } });
+    });
+    await trust(page);
+    await useAdvancedMode(page);
+    await page.getByTestId('open-ai').click();
+    await page.getByRole('textbox', { name: 'Ask AI', exact: true }).fill('Show Serie A champions since 1990');
+    await page.getByRole('button', { name: 'Send', exact: true }).click();
+
+    const summary = page.getByTestId('assistant-proposal-summary');
+    const summaryCitation = summary.getByRole('link', { name: 'laseriea.org', exact: true });
+    await expect(summaryCitation).toHaveAttribute('href', 'https://www.laseriea.org/statistiche/albo-doro/');
+    await expect(summaryCitation).toHaveAttribute('target', '_blank');
+    await expect(summary).toContainText('(laseriea.org)');
+    await expect(summary).not.toContainText('[laseriea.org]');
+
+    const assumption = page.locator('.proposal-point').filter({ hasText: 'The 2004-05 season is omitted' });
+    await expect(assumption.locator(':scope > span')).toHaveText('ASSUMPTION');
+    const assumptionCitation = assumption.getByRole('link', { name: 'channelnewsasia.com', exact: true });
+    await expect(assumptionCitation).toHaveAttribute('href', 'https://www.channelnewsasia.com/sport/list-seriea-champions-6097411');
+    await expect(assumption).toContainText('(channelnewsasia.com)');
+    await expect(assumption).not.toContainText('[channelnewsasia.com]');
+    await expect(assumption.locator('img')).toHaveCount(0);
+    await expect(page.locator('.assistant-web-sources a')).toHaveCount(2);
+    await expect(page.locator('.proposal-card').getByTestId('sql-proposal-diff')).toBeVisible();
+});
+
 test('Ask AI shows a stop action while a response is in progress', async ({ page }) => {
     let releaseResponse: (() => void) | undefined;
     let markRequestStarted: (() => void) | undefined;
