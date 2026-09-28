@@ -37,6 +37,8 @@ export interface Manifest {
     explainAnalyze?: Capability;
     /** Server-side semantic tree produced by EXPLAIN QUERY TREE. */
     queryTree?: Capability;
+    /** Trace symbolization form used for profiler samples. */
+    traceLogSource?: 'symbolized' | 'addresses';
     /** Running EXPLAIN PIPELINE as a query is separate from loading structured pipeline evidence. */
     explainPipeline?: Capability;
     pipeline: Capability;
@@ -117,6 +119,11 @@ export interface Schema {
     warnings: string[];
     metadataWarnings?: string[];
     truncated: boolean;
+    pagination?: {
+        databases?: number;
+        tables?: number;
+        columns?: number;
+    };
 }
 export type ReferenceCategory = 'all' | 'functions' | 'types' | 'engines' | 'settings' | 'system' | 'formats' | 'sql';
 export interface ClickHouseDocumentationSummary {

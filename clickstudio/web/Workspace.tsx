@@ -227,7 +227,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         schema, schemaLoading, schemaError,
         documents, setDocuments, documentsLoaded, documentsReadError,
         documentRevisions, revisionsDocumentId, revisionLoading, revisionError,
-        history, loadHistory, loadDocuments, loadDocumentRevisions, loadSchema,
+        history, loadHistory, loadDocuments, loadDocumentRevisions, loadSchema, schemaLoadingMore, loadMoreSchema,
     } = useWorkspaceData({
         connectionId: connection.id,
         trusted,
@@ -720,6 +720,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         connection,
         schema,
         schemaLoading,
+        schemaLoadingMore,
         schemaError,
         search,
         setSearch,
@@ -740,6 +741,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         comparisonProfiles: profilesByRun,
         comparisonPipelines: pipelinesByRun,
         onRefreshSchema: () => void loadSchema(true),
+        onLoadMoreSchema: () => void loadMoreSchema(),
         importedTableTarget: importedReveal.importedTableTarget,
         onImportedTableRevealed: importedReveal.onImportedTableRevealed,
         onRefreshHistory: () => void loadHistory(),
@@ -905,6 +907,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
                             copy={copy.common}
                             locale={locale}
                             connection={connection}
+                            databases={schema?.databases ?? [connection.database]}
                             tables={schema?.tables ?? []}
                             schemaLoaded={schema !== undefined}
                             schemaLoading={schemaLoading}
@@ -1011,7 +1014,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
             {inspectorDocked && <InspectorPane {...inspectorProps} docked onClose={() => setDrawerOpen(false)}/>}
         </div>
         {observabilityOpen && <OverlayPortal><ObservabilityExplorer connectionId={connection.id} connectionLabel={connectionLabel} trusted={trusted} queryLog={connection.manifest?.queryLog} replication={connection.manifest?.replication} onClose={() => setObservabilityOpen(false)}/></OverlayPortal>}
-        <ImportWizard open={importOpen} connectionId={connection.id} trusted={trusted} demoMode={demoMode} onImportQuery={(name, sql) => openImportedSqlQuery(name, sql, openNewDraft, importedReveal.markImportedSqlDraft, setNotice)} onClose={() => setImportOpen(false)} onImported={importedReveal.onImported}/>
+        <ImportWizard open={importOpen} connectionId={connection.id} trusted={trusted} demoMode={demoMode} onImportQuery={(name, sql) => openImportedSqlQuery(name, sql, openNewDraft, importedReveal.markImportedSqlDraft, setNotice)} onClose={() => setImportOpen(false)} onImported={importedReveal.onImported} onTableNeedsInspection={importedReveal.onUnconfirmedDestination}/>
         <ExportDialog open={exportOpen} queryAvailable={Boolean(active.sql.trim())} rowsAvailable={run?.resultState === 'reopenable'} onClose={() => setExportOpen(false)} onExportQuery={() => { setExportOpen(false); exportCurrentQuery(); }} onExportRows={() => { setExportOpen(false); void exportCurrentCsv(); }}/>
         <ExecutionBar run={run} failedAttempt={Boolean(failedQueryError)} eventState={eventState} onCancel={() => void cancel()} cancelling={cancelling} scriptRunning={script?.status === 'running'} copy={copy.common} helpButton={<HelpButton copy={copy.common} open={helpPanelOpen} onOpen={openHelp}/>}/>
         {detachedEditor.detached && createPortal(queryPanel, detachedEditor.detached.container)}

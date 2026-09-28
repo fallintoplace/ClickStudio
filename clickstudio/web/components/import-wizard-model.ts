@@ -37,6 +37,8 @@ export type ImportJob = {
     status: 'running' | 'succeeded' | 'unknown';
     error?: string;
     reconciliationRequired?: boolean;
+    tableCreated?: boolean;
+    tableExists?: boolean;
     reviewedAt?: string;
     demoRows?: Record<string, Json>[];
     demoPersisted?: boolean;

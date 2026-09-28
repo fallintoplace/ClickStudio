@@ -2,8 +2,10 @@ import { createClient } from '@clickhouse/client';
 import { randomUUID } from 'node:crypto';
 import { AppError } from '../core/errors.js';
 import { parseInput } from '../core/imports.js';
-import type { Column, Json, Row, Schema, SchemaColumn, SchemaTable } from '../shared/types.js';
+import type { Capability, ClickHouseDocumentationEntry, ClickHouseDocumentationSummary, Column, Json, Row, Schema, SchemaColumn, SchemaTable } from '../shared/types.js';
 import { lexSql, quoteIdentifier, splitSql } from '../shared/sql.js';
+import { buildReferenceEntryQuery, buildReferenceSearchQuery, isReferenceCategory } from '../shared/reference.js';
+import { flamegraphQuery, parseFlamegraphRows, type FlamegraphSource } from '../shared/flamegraph.js';
 import { CREATE_TABLE_COLUMN_TYPES, type CreateTableColumn, type CreateTableColumnType } from '../shared/table-creation.js';
 import { createTableSql } from '../core/table-creation.js';
 import { canDropTableTarget, dropTableSql, isSystemDatabaseName, isViewEngine, tableDeletionConfirmation } from '../shared/table-deletion.js';
@@ -28,7 +30,7 @@ const clickhouseSettings = {
     output_format_json_quote_64bit_integers: 1 as const,
 };
 
-type CloudImportJob = { id: string; connectionId: 'clickhouse-cloud'; table: string; queryId: string; rows: number; createdAt: string; status: 'running' | 'succeeded' | 'unknown'; error?: string; reviewedAt?: string; reconciliationRequired?: boolean };
+type CloudImportJob = { id: string; connectionId: 'clickhouse-cloud'; table: string; queryId: string; rows: number; createdAt: string; status: 'running' | 'succeeded' | 'unknown'; error?: string; reviewedAt?: string; reconciliationRequired?: boolean; tableCreated?: boolean; tableExists?: boolean };
 
 function isSameOrigin(request: Request) {
     const origin = request.headers.get('origin');
@@ -124,18 +126,38 @@ async function probe(client: ReturnType<typeof makeClient>, query: string) {
 async function testConnection(credentials: CloudCredentials, url: string) {
     const client = makeClient(credentials, url);
     try {
-        const [rows, userQueryLog, queryLogFallback, replicas, replicationQueue] = await Promise.all([
+        const [rows, userQueryLog, queryLogFallback, replicas, replicationQueue,
+            progress, explain, explainPlan, queryTree, explainPipeline, explainAnalyze,
+            symbolizedTrace, addressTrace, documentation, parameters] = await Promise.all([
             queryRows<{ version: string; database: string }>(
             client,
             'SELECT version() AS version, currentDatabase() AS database',
             ),
-            probe(client, "SELECT query_id, type, event_time, query_duration_ms, read_rows, read_bytes, memory_usage, normalized_query_hash, query, user, is_initial_query, normalizeQuery('SELECT 1') FROM system.user_query_log LIMIT 0"),
-            probe(client, "SELECT query_id, type, event_time, query_duration_ms, read_rows, read_bytes, memory_usage, normalized_query_hash, query, user, is_initial_query, normalizeQuery('SELECT 1') FROM system.query_log LIMIT 0"),
+            probe(client, "SELECT query_id, type, event_time, query_duration_ms, read_rows, read_bytes, result_rows, result_bytes, memory_usage, exception_code, normalized_query_hash, query, user, is_initial_query, normalizeQuery('SELECT 1') FROM system.user_query_log LIMIT 0"),
+            probe(client, "SELECT query_id, type, event_time, query_duration_ms, read_rows, read_bytes, result_rows, result_bytes, memory_usage, exception_code, normalized_query_hash, query, user, is_initial_query, normalizeQuery('SELECT 1') FROM system.query_log LIMIT 0"),
             probe(client, 'SELECT database, table, replica_name, is_leader, is_readonly, is_session_expired, absolute_delay, queue_size, inserts_in_queue, merges_in_queue, future_parts, total_replicas, active_replicas FROM system.replicas LIMIT 0'),
             probe(client, 'SELECT database, table, type, create_time, num_tries, last_exception, postpone_reason, is_currently_executing FROM system.replication_queue LIMIT 0'),
+            probe(client, 'SELECT query_id, read_rows, read_bytes, elapsed, memory_usage FROM system.processes LIMIT 0'),
+            probe(client, 'EXPLAIN indexes = 1 SELECT 1'),
+            probe(client, 'EXPLAIN PLAN json = 1, indexes = 1, description = 1 SELECT 1'),
+            probe(client, 'EXPLAIN QUERY TREE SELECT 1'),
+            probe(client, 'EXPLAIN PIPELINE graph = 1, compact = 0 SELECT 1'),
+            probe(client, 'EXPLAIN ANALYZE SELECT 1'),
+            probe(client, 'SELECT query_id, trace_type, symbols, lines FROM system.trace_log LIMIT 0'),
+            probe(client, 'SELECT query_id, trace_type, trace, demangle(addressToSymbol(trace[1])), addressToLine(trace[1]) FROM system.trace_log LIMIT 0'),
+            probe(client, 'SELECT name, type, description FROM system.documentation LIMIT 0'),
+            queryRows(client, 'SELECT {value:UInt8} AS value', { value: '1' }, 8_000, 6).then(() => true).catch(() => false),
         ]);
         const queryLogSource: QueryLogSource | undefined = userQueryLog ? 'user_query_log' : queryLogFallback ? 'query_log' : undefined;
         const replicationCapabilities: ReplicationCapabilities = { replicas, queue: replicationQueue };
+        const traceLogSource: FlamegraphSource | undefined = symbolizedTrace ? 'symbolized' : addressTrace ? 'addresses' : undefined;
+        let cancellationAvailable = false;
+        try {
+            await client.command({ query: 'KILL QUERY WHERE query_id = {queryId:String} AND user = {user:String} SYNC',
+                query_params: { queryId: `clickstudio-probe-${randomUUID()}`, user: credentials.username }, abort_signal: AbortSignal.timeout(5_000) });
+            cancellationAvailable = true;
+        } catch { }
+        const unavailable = (reason: string): Capability => ({ available: false, reason });
         return {
             host: credentials.host,
             database: credentials.database,
@@ -149,22 +171,40 @@ async function testConnection(credentials: CloudCredentials, url: string) {
                 ? { available: true as const }
                 : { available: false as const, reason: 'No supported replication system tables are available to this user.' },
             replicationCapabilities,
+            progress: progress ? { available: true } : unavailable('This user cannot read live query progress from system.processes.'),
+            cancellation: cancellationAvailable ? { available: true } : unavailable('This user cannot cancel its own running queries; the server execution deadline still applies.'),
+            explain: explain ? { available: true } : unavailable('EXPLAIN indexes is unavailable on this ClickHouse version or account.'),
+            explainPlan: explainPlan ? { available: true } : unavailable('EXPLAIN PLAN is unavailable on this ClickHouse version or account.'),
+            queryTree: queryTree ? { available: true } : unavailable('EXPLAIN QUERY TREE is unavailable on this ClickHouse version or account.'),
+            explainPipeline: explainPipeline ? { available: true } : unavailable('EXPLAIN PIPELINE is unavailable on this ClickHouse version or account.'),
+            pipeline: explainPipeline ? { available: true } : unavailable('ClickHouse did not accept the EXPLAIN PIPELINE capability probe.'),
+            explainAnalyze: explainAnalyze ? { available: true } : unavailable('EXPLAIN ANALYZE is unavailable on this ClickHouse version or account.'),
+            traceLog: traceLogSource ? { available: true } : unavailable('This user cannot read symbolized ClickHouse trace samples.'),
+            ...(traceLogSource ? { traceLogSource } : {}),
+            documentation: documentation ? { available: true } : unavailable('system.documentation is unavailable to this ClickHouse user.'),
+            parameters: parameters ? { available: true } : unavailable('ClickHouse query parameters are unavailable on this connection.'),
         };
     } finally {
         await client.close();
     }
 }
 
-async function readSchema(credentials: CloudCredentials, url: string): Promise<Schema> {
+async function readSchema(credentials: CloudCredentials, url: string, offsets: { databases: number; tables: number; columns: number } = { databases: 0, tables: 0, columns: 0 }): Promise<Schema> {
     const client = makeClient(credentials, url);
     try {
+        const pageParams = {
+            database: credentials.database,
+            databaseOffset: String(offsets.databases),
+            tableOffset: String(offsets.tables),
+            columnOffset: String(offsets.columns),
+        };
         const [databaseRows, tableRows, columnRows] = await Promise.all([
             queryRows<Record<string, unknown>>(client,
-                "SELECT name FROM system.databases WHERE lower(name) NOT IN ('system', 'information_schema') ORDER BY (name = {database:String}) DESC, name LIMIT 1000", { database: credentials.database }).catch(() => []),
+                "SELECT name FROM system.databases WHERE lower(name) NOT IN ('system', 'information_schema') ORDER BY (name = {database:String}) DESC, name LIMIT 1000 OFFSET {databaseOffset:UInt64}", pageParams).catch(() => []),
             queryRows<Record<string, unknown>>(client,
-                "SELECT database, name, engine, sorting_key, primary_key, partition_key, sampling_key, total_rows, total_bytes FROM system.tables WHERE lower(database) NOT IN ('system', 'information_schema') AND is_temporary = 0 ORDER BY (database = {database:String}) DESC, database, name LIMIT 1000", { database: credentials.database }),
+                "SELECT database, name, engine, sorting_key, primary_key, partition_key, sampling_key, total_rows, total_bytes FROM system.tables WHERE lower(database) NOT IN ('system', 'information_schema') AND is_temporary = 0 ORDER BY (database = {database:String}) DESC, database, name LIMIT 1000 OFFSET {tableOffset:UInt64}", pageParams),
             queryRows<Record<string, unknown>>(client,
-                "SELECT database, table, name, type, default_kind, comment FROM system.columns WHERE lower(database) NOT IN ('system', 'information_schema') ORDER BY (database = {database:String}) DESC, database, table, position LIMIT 2000", { database: credentials.database }),
+                "SELECT database, table, name, type, default_kind, comment FROM system.columns WHERE lower(database) NOT IN ('system', 'information_schema') ORDER BY (database = {database:String}) DESC, database, table, position LIMIT 2000 OFFSET {columnOffset:UInt64}", pageParams),
         ]);
         const tables: SchemaTable[] = tableRows.map(row => ({
             database: asString(row.database),
@@ -185,6 +225,11 @@ async function readSchema(credentials: CloudCredentials, url: string): Promise<S
             defaultKind: asString(row.default_kind),
             comment: asString(row.comment),
         }));
+        const pagination = {
+            ...(databaseRows.length === 1000 ? { databases: offsets.databases + databaseRows.length } : {}),
+            ...(tableRows.length === 1000 ? { tables: offsets.tables + tableRows.length } : {}),
+            ...(columnRows.length === 2000 ? { columns: offsets.columns + columnRows.length } : {}),
+        };
         return {
             connectionId: 'clickhouse-cloud',
             fetchedAt: new Date().toISOString(),
@@ -192,7 +237,8 @@ async function readSchema(credentials: CloudCredentials, url: string): Promise<S
             tables,
             columns,
             warnings: [],
-            truncated: tableRows.length >= 1000 || columnRows.length >= 2_000,
+            pagination,
+            truncated: Object.keys(pagination).length > 0,
         };
     } finally {
         await client.close();
@@ -249,13 +295,30 @@ function isReadQuery(sql: string) {
     return ['SELECT', 'WITH', 'SHOW', 'DESCRIBE', 'DESC', 'EXPLAIN'].includes(first ?? '');
 }
 
+function isExplainableReadQuery(sql: string) {
+    return isReadQuery(sql) && lexSql(sql).find(token => token.kind === 'word')?.text.toUpperCase() !== 'EXPLAIN';
+}
+
 function safeRowCount(value: unknown): number | undefined {
     if (typeof value !== 'string' || !/^\d+$/.test(value)) return undefined;
     const count = Number(value);
     return Number.isSafeInteger(count) ? count : undefined;
 }
 
-async function runSql(credentials: CloudCredentials, url: string, sql: string, sessionId?: string) {
+function validRunQueryId(value: unknown): value is string {
+    return typeof value === 'string' && /^clickstudio-(?:run-)?[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(value);
+}
+
+function queryParameters(value: unknown): Record<string, string> {
+    if (value === undefined) return {};
+    if (!isRecord(value) || Object.keys(value).length > 50) throw new AppError(400, 'QUERY_PARAMETERS', 'Use up to 50 named query parameters.');
+    const entries = Object.entries(value);
+    if (entries.some(([name, item]) => !/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(name) || typeof item !== 'string' || item.length > 8_000))
+        throw new AppError(400, 'QUERY_PARAMETERS', 'Each query parameter needs a valid name and a text value under 8 KB.');
+    return Object.fromEntries(entries) as Record<string, string>;
+}
+
+async function runSql(credentials: CloudCredentials, url: string, sql: string, sessionId?: string, requestedQueryId?: string, parameters: Record<string, string> = {}) {
     const statement = sql.trim();
     if (!statement || statement.length > MAX_SQL_LENGTH)
         throw new Error(`Enter one SQL statement under ${MAX_SQL_LENGTH.toLocaleString()} characters.`);
@@ -263,13 +326,14 @@ async function runSql(credentials: CloudCredentials, url: string, sql: string, s
         throw new Error('Run one SQL statement at a time on ClickHouse Cloud.');
 
     const client = makeClient(credentials, url, sessionId);
-    const queryId = `clickstudio-${randomUUID()}`;
+    const queryId = requestedQueryId ?? `clickstudio-run-${randomUUID()}`;
     const startedAt = performance.now();
     try {
         if (!isReadQuery(statement)) {
             const result = await client.command({
                 query: statement,
                 query_id: queryId,
+                query_params: parameters,
                 abort_signal: AbortSignal.timeout(48_000),
                 clickhouse_settings: clickhouseSettings,
             });
@@ -289,6 +353,7 @@ async function runSql(credentials: CloudCredentials, url: string, sql: string, s
             query: statement,
             format: 'JSON',
             query_id: queryId,
+            query_params: parameters,
             abort_signal: AbortSignal.timeout(48_000),
             clickhouse_settings: clickhouseSettings,
         });
@@ -315,6 +380,99 @@ async function runSql(credentials: CloudCredentials, url: string, sql: string, s
     } finally {
         await client.close();
     }
+}
+
+async function readCloudProgress(credentials: CloudCredentials, url: string, queryId: string) {
+    const client = makeClient(credentials, url);
+    try {
+        const row = (await queryRows<Record<string, unknown>>(client,
+            'SELECT toString(read_rows) AS readRows, toString(read_bytes) AS readBytes, elapsed, toString(memory_usage) AS memory FROM system.processes WHERE query_id = {queryId:String} AND user = {user:String} LIMIT 1',
+            { queryId, user: credentials.username }, 8_000, 6))[0];
+        if (!row) return undefined;
+        const elapsed = Number(row.elapsed);
+        return {
+            readRows: asString(row.readRows || '0'), readBytes: asString(row.readBytes || '0'),
+            elapsedMs: Number.isFinite(elapsed) ? elapsed * 1000 : 0,
+            memory: asString(row.memory || '0'),
+        };
+    } finally { await client.close(); }
+}
+
+async function cancelCloudQuery(credentials: CloudCredentials, url: string, queryId: string) {
+    const client = makeClient(credentials, url);
+    try {
+        const rows = await queryRows<Record<string, unknown>>(client,
+            'KILL QUERY WHERE query_id = {queryId:String} AND user = {user:String} SYNC',
+            { queryId, user: credentials.username }, 8_000, 8);
+        return { cancelled: rows.some(row => Number(row.kill_status) === 1), queryId };
+    } finally { await client.close(); }
+}
+
+async function cloudQueryTree(credentials: CloudCredentials, url: string, sql: string, parameters: Record<string, string>) {
+    const client = makeClient(credentials, url);
+    try {
+        const rows = await queryRows<Record<string, unknown>>(client, `EXPLAIN QUERY TREE\n${sql}`, parameters);
+        return rows.map(row => String(Object.values(row)[0] ?? '')).filter(Boolean);
+    } finally { await client.close(); }
+}
+
+async function cloudQueryLogEvidence(credentials: CloudCredentials, url: string, queryId: string, source: QueryLogSource) {
+    const client = makeClient(credentials, url);
+    try {
+        return await queryRows<Record<string, unknown>>(client,
+            `SELECT query_id, type, toString(query_duration_ms) AS query_duration_ms, toString(read_rows) AS read_rows, toString(read_bytes) AS read_bytes, toString(result_rows) AS result_rows, toString(result_bytes) AS result_bytes, toString(memory_usage) AS memory_usage, toString(exception_code) AS exception_code FROM system.${source} WHERE query_id = {queryId:String} AND user = {user:String} AND type IN ('QueryFinish', 'ExceptionWhileProcessing', 'ExceptionBeforeStart') ORDER BY event_time DESC LIMIT 10`,
+            { queryId, user: credentials.username }, 10_000, 8);
+    } finally { await client.close(); }
+}
+
+async function cloudPipelineEvidence(credentials: CloudCredentials, url: string, sql: string, parameters: Record<string, string>) {
+    const client = makeClient(credentials, url);
+    try {
+        const rows = await queryRows<Record<string, unknown>>(client, `EXPLAIN PIPELINE graph = 1, compact = 0\n${sql}`, parameters);
+        return rows.map(row => String(Object.values(row)[0] ?? '')).filter(Boolean);
+    } finally { await client.close(); }
+}
+
+async function cloudFlamegraph(credentials: CloudCredentials, url: string, queryId: string, startDate: string, endDate: string, source: FlamegraphSource) {
+    const client = makeClient(credentials, url);
+    try {
+        const rows = await queryRows<Record<string, unknown>>(client, flamegraphQuery(source), { queryId, startDate, endDate }, 15_000, 12);
+        return parseFlamegraphRows(queryId, rows);
+    } finally { await client.close(); }
+}
+
+function missingDocumentationSource(error: unknown) {
+    return error instanceof Error && /\bsource\b.{0,80}(?:unknown identifier|unknown column|not found|doesn't exist|does not exist)|(?:missing columns|unknown identifier|unknown column|not found|doesn't exist|does not exist).{0,80}\bsource\b/i.test(error.message);
+}
+
+async function cloudReferenceSearch(credentials: CloudCredentials, url: string, query: string, category: string): Promise<ClickHouseDocumentationSummary[]> {
+    if (!isReferenceCategory(category)) throw new AppError(400, 'DOCUMENTATION_CATEGORY', 'Choose a valid ClickHouse reference category.');
+    const client = makeClient(credentials, url);
+    try {
+        const built = buildReferenceSearchQuery(query, category, true);
+        let rows: Omit<ClickHouseDocumentationSummary, 'origin'>[];
+        try { rows = await queryRows(client, built.sql, built.parameters, 12_000, 10); }
+        catch (error) {
+            if (!missingDocumentationSource(error)) throw error;
+            const fallback = buildReferenceSearchQuery(query, category, false);
+            rows = await queryRows(client, fallback.sql, fallback.parameters, 12_000, 10);
+        }
+        return rows.map(row => ({ ...row, origin: 'native' }));
+    } finally { await client.close(); }
+}
+
+async function cloudReferenceEntry(credentials: CloudCredentials, url: string, name: string, type: string, serverVersion: string): Promise<ClickHouseDocumentationEntry | undefined> {
+    const client = makeClient(credentials, url), parameters = { name, type };
+    try {
+        let rows: Omit<ClickHouseDocumentationEntry, 'origin'>[];
+        try { rows = await queryRows(client, buildReferenceEntryQuery(true), parameters, 12_000, 10); }
+        catch (error) {
+            if (!missingDocumentationSource(error)) throw error;
+            rows = await queryRows(client, buildReferenceEntryQuery(false), parameters, 12_000, 10);
+        }
+        const row = rows[0];
+        return row ? { ...row, serverVersion, origin: 'native' } : undefined;
+    } finally { await client.close(); }
 }
 
 function isWorkloadWindow(value: unknown): value is WorkloadWindow {
@@ -407,25 +565,45 @@ function parseImportTarget(value: unknown): { database: string; table: string } 
 async function inspectCloudImport(credentials: CloudCredentials, url: string, queryId: string, table: string, rows: number): Promise<CloudImportJob> {
     const job: CloudImportJob = { id: queryId.slice('clickstudio-import-'.length), connectionId: 'clickhouse-cloud', table, queryId, rows, createdAt: new Date().toISOString(), status: 'unknown', error: 'ClickHouse could not confirm the insert. The rows may already be there.' };
     const client = makeClient(credentials, url);
+    const createQueryId = `clickstudio-create-${job.id}`;
+    const target = parseImportTarget(table);
     try {
+        let tableCreated = false;
         try {
             const running = await queryRows<{ query_id: string }>(client,
-                'SELECT query_id FROM system.processes WHERE query_id = {queryId:String} LIMIT 1', { queryId }, 8_000, 6);
-            if (running.length) return { ...job, status: 'running', reconciliationRequired: true, error: 'ClickHouse still reports this insert as active.' };
+                'SELECT query_id FROM system.processes WHERE query_id IN ({queryId:String}, {createQueryId:String}) LIMIT 2', { queryId, createQueryId }, 8_000, 6);
+            if (running.length) return { ...job, status: 'running', reconciliationRequired: true, error: 'ClickHouse still reports an import step as active.' };
         } catch { }
         for (const source of ['user_query_log', 'query_log'] as const) {
             try {
-                const entries = await queryRows<{ type: string; event_time: string }>(client,
-                    `SELECT type, event_time FROM system.${source} WHERE query_id = {queryId:String} ORDER BY event_time DESC LIMIT 10`, { queryId }, 8_000, 6);
-                if (entries.some(entry => entry.type === 'QueryFinish')) return { ...job, status: 'succeeded', error: undefined };
-                if (entries.some(entry => entry.type.startsWith('Exception'))) return { ...job, error: 'ClickHouse recorded an insert error. Check the destination before retrying.' };
-                if (entries.some(entry => entry.type === 'QueryStart')) return { ...job, status: 'running', reconciliationRequired: true, error: 'ClickHouse still reports this insert as active.' };
+                const entries = await queryRows<{ query_id: string; type: string; event_time: string }>(client,
+                    `SELECT query_id, type, event_time FROM system.${source} WHERE query_id IN ({queryId:String}, {createQueryId:String}) ORDER BY event_time DESC LIMIT 20`, { queryId, createQueryId }, 8_000, 6);
+                const insertEntries = entries.filter(entry => entry.query_id === queryId);
+                const createEntries = entries.filter(entry => entry.query_id === createQueryId);
+                tableCreated = createEntries.some(entry => entry.type === 'QueryFinish');
+                const targetExists = Boolean(target && await tableExists(client, target.database, target.table));
+                if (insertEntries.some(entry => entry.type === 'QueryFinish'))
+                    return { ...job, status: 'succeeded', tableCreated, tableExists: targetExists, error: undefined };
+                if (insertEntries.some(entry => entry.type === 'QueryStart'))
+                    return { ...job, status: 'running', reconciliationRequired: true, tableCreated, tableExists: targetExists, error: 'ClickHouse still reports this import as active.' };
+                if (insertEntries.some(entry => entry.type.startsWith('Exception'))) {
+                    return { ...job, tableCreated, tableExists: targetExists, error: targetExists
+                        ? `The destination table ${table} exists, but ClickHouse did not confirm its rows. Inspect the table before deciding what to do.`
+                        : 'ClickHouse recorded an import error. Check the destination before retrying.' };
+                }
             } catch { }
         }
-        return job;
+        const targetExists = Boolean(target && await tableExists(client, target.database, target.table));
+        return { ...job, tableCreated, tableExists: targetExists, ...(targetExists ? { error: `The destination table ${table} exists, but ClickHouse has no success record for the imported rows. Inspect it before trying again.` } : {}) };
     } finally {
         await client.close();
     }
+}
+
+async function tableExists(client: ReturnType<typeof makeClient>, database: string, table: string) {
+    try {
+        return (await queryRows<{ name: string }>(client, 'SELECT name FROM system.tables WHERE database = {database:String} AND name = {table:String} LIMIT 1', { database, table }, 8_000, 6)).length > 0;
+    } catch { return false; }
 }
 
 async function commitCloudImport(form: FormData, credentials: CloudCredentials, url: string): Promise<CloudImportJob> {
@@ -443,7 +621,7 @@ async function commitCloudImport(form: FormData, credentials: CloudCredentials, 
     const source = await file.text();
     const parsed = parseInput(source, format);
     if (!parsed.rows.length) throw new AppError(400, 'IMPORT_EMPTY', 'The input contains no data rows.');
-    const createTable = parseFormJson<{ name?: unknown; columns?: unknown; generateId?: unknown }>(form, 'createTable');
+    const createTable = parseFormJson<{ database?: unknown; name?: unknown; columns?: unknown; generateId?: unknown }>(form, 'createTable');
     const creating = createTable !== undefined;
     let tableName: string;
     let tableDatabase = credentials.database;
@@ -452,9 +630,10 @@ async function commitCloudImport(form: FormData, credentials: CloudCredentials, 
     let expectedColumns: { name: string; type: string; defaultKind: string }[] | undefined;
 
     if (creating) {
-        if (!createTable || !isImportIdentifier(createTable.name) || !Array.isArray(createTable.columns) || createTable.columns.length === 0 || createTable.columns.length > 200 ||
+        if (!createTable || (createTable.database !== undefined && (!isImportIdentifier(createTable.database) || isSystemDatabaseName(createTable.database))) || !isImportIdentifier(createTable.name) || !Array.isArray(createTable.columns) || createTable.columns.length === 0 || createTable.columns.length > 200 ||
             (createTable.generateId !== undefined && typeof createTable.generateId !== 'boolean'))
             throw new AppError(400, 'IMPORT_CREATE_TABLE', 'Enter a table name and at least one column.');
+        tableDatabase = typeof createTable.database === 'string' ? createTable.database : credentials.database;
         tableName = createTable.name;
         createColumns = createTable.columns.map(value => {
             if (!isRecord(value) || typeof value.source !== 'string' || !parsed.columns.includes(value.source) || !isImportIdentifier(value.name) ||
@@ -466,9 +645,16 @@ async function commitCloudImport(form: FormData, credentials: CloudCredentials, 
             throw new AppError(400, 'IMPORT_CREATE_TABLE', 'New table column names must be unique.');
         if (createTable.generateId === true && createColumns.some(column => column.name.toLowerCase() === 'id'))
             throw new AppError(400, 'IMPORT_CREATE_TABLE', 'The file already has an id column. Map that column or rename it before adding a generated id.');
-        const schema = await readSchema(credentials, url);
-        if (schema.tables.some(table => table.database === credentials.database && table.name === tableName)) throw new AppError(409, 'TABLE_EXISTS', 'A table with this name already exists. Choose an existing table or a different name.');
-        destinationColumns = createColumns.map(column => ({ database: credentials.database, table: tableName, name: column.name, type: column.type, defaultKind: '', comment: '' }));
+        const client = makeClient(credentials, url);
+        try {
+            const [database, existing] = await Promise.all([
+                queryRows<{ name: string }>(client, 'SELECT name FROM system.databases WHERE name = {database:String} LIMIT 1', { database: tableDatabase }),
+                queryRows<{ name: string }>(client, 'SELECT name FROM system.tables WHERE database = {database:String} AND name = {table:String} LIMIT 1', { database: tableDatabase, table: tableName }),
+            ]);
+            if (!database.length) throw new AppError(403, 'IMPORT_DATABASE', 'The selected database is not visible to this Cloud user.');
+            if (existing.length) throw new AppError(409, 'TABLE_EXISTS', 'A table with this name already exists. Choose an existing table or a different name.');
+        } finally { await client.close(); }
+        destinationColumns = createColumns.map(column => ({ database: tableDatabase, table: tableName, name: column.name, type: column.type, defaultKind: '', comment: '' }));
     } else {
         const selectedTarget = parseImportTarget(target);
         if (!selectedTarget) throw new AppError(400, 'IMPORT_TABLE', 'Choose a valid table in an accessible database.');
@@ -534,7 +720,7 @@ async function commitCloudImport(form: FormData, credentials: CloudCredentials, 
     } finally {
         await client.close();
     }
-    return { id: queryId.slice('clickstudio-import-'.length), connectionId: 'clickhouse-cloud', table: `${tableDatabase}.${tableName}`, queryId, rows: parsed.rows.length, createdAt: new Date().toISOString(), status: 'succeeded' };
+    return { id: queryId.slice('clickstudio-import-'.length), connectionId: 'clickhouse-cloud', table: `${tableDatabase}.${tableName}`, queryId, rows: parsed.rows.length, createdAt: new Date().toISOString(), status: 'succeeded', tableExists: true, ...(creating ? { tableCreated: true } : {}) };
 }
 
 async function postCloudImport(request: Request): Promise<Response> {
@@ -591,8 +777,60 @@ async function post(request: Request): Promise<Response> {
     try {
         if (body.action === 'test')
             return json(await testConnection(credentials, url));
-        if (body.action === 'schema')
-            return json(await readSchema(credentials, url));
+        if (body.action === 'schema') {
+            const offset = (key: 'databaseOffset' | 'tableOffset' | 'columnOffset') => {
+                const value = body[key] === undefined ? 0 : Number(body[key]);
+                if (!Number.isSafeInteger(value) || value < 0 || value > 100_000_000) throw new AppError(400, 'SCHEMA_OFFSET', 'The schema page is invalid.');
+                return value;
+            };
+            return json(await readSchema(credentials, url, { databases: offset('databaseOffset'), tables: offset('tableOffset'), columns: offset('columnOffset') }));
+        }
+        if (body.action === 'query-tree') {
+            if (typeof body.sql !== 'string' || !body.sql.trim() || body.sql.length > MAX_SQL_LENGTH || splitSql(body.sql).length !== 1)
+                return fail('QUERY_TREE_SQL', 'Enter one SQL statement to inspect.');
+            if (!isExplainableReadQuery(body.sql.trim()))
+                return fail('QUERY_TREE_SQL', 'Query-tree inspection accepts one read query, such as SELECT or WITH.');
+            return json(await cloudQueryTree(credentials, url, body.sql.trim(), queryParameters(body.parameters)));
+        }
+        if (body.action === 'progress') {
+            if (!validRunQueryId(body.queryId)) return fail('RUN_QUERY_ID', 'The running query id is invalid.');
+            return json({ progress: await readCloudProgress(credentials, url, body.queryId) });
+        }
+        if (body.action === 'cancel') {
+            if (!validRunQueryId(body.queryId)) return fail('RUN_QUERY_ID', 'The running query id is invalid.');
+            return json(await cancelCloudQuery(credentials, url, body.queryId));
+        }
+        if (body.action === 'profile') {
+            if (!validRunQueryId(body.queryId)) return fail('RUN_QUERY_ID', 'The query id is invalid.');
+            if (body.source !== 'user_query_log' && body.source !== 'query_log') return fail('QUERY_LOG_UNAVAILABLE', 'Test the connection to check query-log access.', 409);
+            return json(await cloudQueryLogEvidence(credentials, url, body.queryId, body.source));
+        }
+        if (body.action === 'pipeline') {
+            if (typeof body.sql !== 'string' || !body.sql.trim() || body.sql.length > MAX_SQL_LENGTH || splitSql(body.sql).length !== 1)
+                return fail('PIPELINE_SQL', 'Enter one SQL statement to inspect.');
+            if (!isExplainableReadQuery(body.sql.trim()))
+                return fail('PIPELINE_SQL', 'Pipeline inspection accepts one read query, such as SELECT or WITH.');
+            return json(await cloudPipelineEvidence(credentials, url, body.sql.trim(), queryParameters(body.parameters)));
+        }
+        if (body.action === 'flamegraph') {
+            if (!validRunQueryId(body.queryId)) return fail('RUN_QUERY_ID', 'The query id is invalid.');
+            if (body.source !== 'symbolized' && body.source !== 'addresses') return fail('TRACE_UNAVAILABLE', 'Test the connection to check trace-log access.', 409);
+            const date = (value: unknown) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`)) ? value : undefined;
+            const startDate = date(body.startDate), endDate = date(body.endDate);
+            if (!startDate || !endDate) return fail('TRACE_DATE', 'The query time range is invalid.');
+            return json(await cloudFlamegraph(credentials, url, body.queryId, startDate, endDate, body.source));
+        }
+        if (body.action === 'documentation-search') {
+            const query = typeof body.query === 'string' ? body.query.slice(0, 128) : '';
+            const category = typeof body.category === 'string' ? body.category : 'all';
+            return json(await cloudReferenceSearch(credentials, url, query, category));
+        }
+        if (body.action === 'documentation-entry') {
+            if (typeof body.name !== 'string' || body.name.length > 128 || typeof body.type !== 'string' || body.type.length > 80)
+                return fail('DOCUMENTATION_ENTRY', 'Choose a valid ClickHouse reference entry.');
+            const version = typeof body.serverVersion === 'string' ? body.serverVersion.slice(0, 80) : 'unknown';
+            return json(await cloudReferenceEntry(credentials, url, body.name, body.type, version));
+        }
         if (body.action === 'native-explorer') {
             if (typeof body.database !== 'string' || !body.database.trim() || body.database.length > 128 || isSystemDatabaseName(body.database))
                 return fail('NATIVE_EXPLORER_DATABASE', 'Choose a valid non-system database to inspect.');
@@ -619,7 +857,8 @@ async function post(request: Request): Promise<Response> {
             const sessionId = body.sessionId;
             if (sessionId !== undefined && (typeof sessionId !== 'string' || !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(sessionId)))
                 return fail('SESSION_ID', 'The SQL session id is invalid.');
-            return json(await runSql(credentials, url, body.sql, sessionId));
+            if (body.queryId !== undefined && !validRunQueryId(body.queryId)) return fail('RUN_QUERY_ID', 'The query id is invalid.');
+            return json(await runSql(credentials, url, body.sql, sessionId, body.queryId as string | undefined, queryParameters(body.parameters)));
         }
         if (body.action === 'workload') {
             if (!isWorkloadWindow(body.minutes)) return fail('WORKLOAD_WINDOW', 'Choose a supported workload time window.');
@@ -640,7 +879,7 @@ async function post(request: Request): Promise<Response> {
                 return fail('IMPORT_STATUS', 'The saved import details are invalid.');
             return json(await inspectCloudImport(credentials, url, body.queryId, targetTable, body.rows));
         }
-        return fail('CLOUD_ACTION', 'Choose test, schema, SQL, native metadata, storage parts, workload, replication, table creation, table deletion, or import status.');
+        return fail('CLOUD_ACTION', 'Choose a supported ClickHouse Cloud workspace action.');
     } catch (error) {
         if (error instanceof AppError) return fail(error.code, error.message, error.status);
         return safeError(error, credentials.password);

@@ -56,6 +56,7 @@ async function runCommitImport(context: ImportActionSetters & {
     format?: ImportFormat;
     creatingTable: boolean;
     schema?: Schema;
+    createTableDatabase: string;
     createTableName: string;
     createColumns: CloudImportColumn[];
     generateId: boolean;
@@ -65,7 +66,7 @@ async function runCommitImport(context: ImportActionSetters & {
     clearPendingImport: () => void;
     rememberJob: (job: ImportJob) => void;
 }) {
-    const { mapping, busy, browserDemoImport, browserCloudImport, file, format, creatingTable, schema, createTableName, createColumns, generateId, importConnectionId, preview,
+    const { mapping, busy, browserDemoImport, browserCloudImport, file, format, creatingTable, schema, createTableDatabase, createTableName, createColumns, generateId, importConnectionId, preview,
         setJob, setStep, setBusy, setError, setMapping, setTargets, setSchema, setTarget, setFields, setRecoveryState, setRecoverableJobs, setPendingImport, savePendingImport, clearPendingImport, rememberJob } = context;
     if (!mapping || busy) return;
     const queryId = browserCloudImport ? `clickstudio-import-${mapping.id}` : undefined;
@@ -89,7 +90,7 @@ async function runCommitImport(context: ImportActionSetters & {
                 fields: mapping.fields,
                 queryId,
                 ...(expectedColumns ? { expectedColumns } : {}),
-                ...(creatingTable ? { createTable: { name: createTableName, columns: createColumns, generateId } } : {}),
+                ...(creatingTable ? { createTable: { database: createTableDatabase, name: createTableName, columns: createColumns, generateId } } : {}),
             });
         } else {
             next = await post<ImportJob>(`/imports/${encodeURIComponent(mapping.id)}/commit`);
@@ -270,6 +271,7 @@ export type ImportWizardControllerOptions = {
     demoMode: boolean;
     onClose: () => void;
     onImported: (job: ImportJob) => void;
+    onTableNeedsInspection: (job: ImportJob) => void;
 };
 
 function importUnavailableReason(connectionId: string) {
@@ -410,10 +412,12 @@ type RetryUnknownImportContext = ImportActionSetters & {
     target: string;
     creatingTable: boolean;
     cloudRows: Record<string, Json>[];
+    createTableDatabase: string;
     createTableName: string;
     createColumns: CloudImportColumn[];
     generateId: boolean;
     setCreateTableName: Dispatch<SetStateAction<string>>;
+    setCreateTableDatabase: Dispatch<SetStateAction<string>>;
     setCreateColumns: Dispatch<SetStateAction<CloudImportColumn[]>>;
     importConnectionId: string;
     browserDemoImport: boolean;
@@ -425,7 +429,7 @@ type RetryUnknownImportContext = ImportActionSetters & {
 
 async function runRetryUnknownImport(context: RetryUnknownImportContext) {
     const { job, busy, preview, mapping, browserCloudImport, file, format, reviewUnknownImport, schema, target, creatingTable,
-        cloudRows, createTableName, createColumns, generateId, setCreateTableName, setCreateColumns, importConnectionId,
+        cloudRows, createTableDatabase, createTableName, createColumns, generateId, setCreateTableName, setCreateColumns, setCreateTableDatabase, importConnectionId,
         browserDemoImport, setRetryAttemptedFor,
         savePendingImport, clearPendingImport, rememberJob,
         setJob, setStep, setBusy, setError, setMapping, setTargets, setSchema, setTarget, setFields, setRecoveryState,
@@ -464,6 +468,8 @@ async function runRetryUnknownImport(context: RetryUnknownImportContext) {
         let retrySchema = schema;
         let retryTarget = target;
         let retryCreatingTable = creatingTable;
+        let retryCreateTableDatabase = createTableDatabase;
+        let retryCreateTableName = createTableName;
         let retryMapping: ImportMapping;
         if (browserCloudImport) {
             retrySchema = await loadClickHouseCloudSchema();
@@ -487,7 +493,10 @@ async function runRetryUnknownImport(context: RetryUnknownImportContext) {
                 setTarget(CREATE_CLOUD_TABLE_TARGET);
                 const columns = inferCloudImportColumns(cloudRows.length ? cloudRows : preview.rows, preview.columns);
                 setCreateColumns(columns);
-                setCreateTableName(job.table.split('.').at(-1) ?? createTableName);
+                retryCreateTableDatabase = job.table.split('.')[0] || getClickHouseCloudConnection()?.database || 'default';
+                retryCreateTableName = job.table.split('.').at(-1) || createTableName;
+                setCreateTableDatabase(retryCreateTableDatabase);
+                setCreateTableName(retryCreateTableName);
                 setFields(Object.fromEntries(columns.map(column => [column.source, column.name])));
                 setMapping(undefined);
                 setJob(checked);
@@ -496,6 +505,12 @@ async function runRetryUnknownImport(context: RetryUnknownImportContext) {
                 return;
             } else {
                 retryTarget = retryCreatingTable ? CREATE_CLOUD_TABLE_TARGET : job.table;
+                if (retryCreatingTable) {
+                    retryCreateTableDatabase = job.table.split('.')[0] || getClickHouseCloudConnection()?.database || 'default';
+                    retryCreateTableName = job.table.split('.').at(-1) || createTableName;
+                    setCreateTableDatabase(retryCreateTableDatabase);
+                    setCreateTableName(retryCreateTableName);
+                }
             }
             retryMapping = { ...mapping, id: crypto.randomUUID(), table: job.table };
             setSchema(retrySchema);
@@ -517,7 +532,7 @@ async function runRetryUnknownImport(context: RetryUnknownImportContext) {
         await runCommitImport({
             mapping: retryMapping, busy: '',
             browserDemoImport, browserCloudImport, file, format, creatingTable: retryCreatingTable, schema: retrySchema,
-            createTableName, createColumns, generateId, importConnectionId, preview,
+            createTableDatabase: retryCreateTableDatabase, createTableName: retryCreateTableName, createColumns, generateId, importConnectionId, preview,
             setJob, setStep, setBusy, setError, setMapping, setTargets, setSchema, setTarget, setFields,
             setRecoveryState, setRecoverableJobs, setPendingImport, setImportUnavailable,
             savePendingImport, clearPendingImport, rememberJob,
@@ -528,14 +543,17 @@ async function runRetryUnknownImport(context: RetryUnknownImportContext) {
     } finally { setBusy(''); }
 }
 
-export function useImportWizardController({ open, connectionId, trusted, demoMode, onClose, onImported }: ImportWizardControllerOptions) {
+export function useImportWizardController({ open, connectionId, trusted, demoMode, onClose, onImported, onTableNeedsInspection }: ImportWizardControllerOptions) {
     const browserDemoImport = demoMode && isFrontendDemoPreview && connectionId === 'demo';
     const browserCloudImport = demoMode && isFrontendDemoPreview && connectionId === CLICKHOUSE_CLOUD_CONNECTION_ID;
     const importConnectionId = browserDemoImport ? 'demo' : connectionId;
     const dialogRef = useRef<HTMLDialogElement>(null);
     const onImportedRef = useRef(onImported);
+    const onTableNeedsInspectionRef = useRef(onTableNeedsInspection);
     const reportedJobRef = useRef<string | undefined>(undefined);
+    const reportedInspectionRef = useRef<string | undefined>(undefined);
     onImportedRef.current = onImported;
+    onTableNeedsInspectionRef.current = onTableNeedsInspection;
 
     const [step, setStep] = useState<Step>('file');
     const [file, setFile] = useState<File>();
@@ -546,6 +564,7 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
     const [targets, setTargets] = useState<string[]>([]);
     const [target, setTarget] = useState('');
     const [lastExistingTarget, setLastExistingTarget] = useState('');
+    const [createTableDatabase, setCreateTableDatabase] = useState(() => getClickHouseCloudConnection()?.database ?? '');
     const [createTableName, setCreateTableName] = useState('');
     const [createColumns, setCreateColumns] = useState<CloudImportColumn[]>([]);
     const [fields, setFields] = useState<Record<string, string>>({});
@@ -564,8 +583,8 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
     const availableTargets = useMemo(() => targets.filter(table => schema?.tables.some(item => `${item.database}.${item.name}` === table)), [schema, targets]);
     const creatingTable = browserCloudImport && target === CREATE_CLOUD_TABLE_TARGET;
     const destinationColumns = useMemo(() => creatingTable
-        ? createColumns.map(column => ({ database: getClickHouseCloudConnection()?.database ?? '', table: createTableName, name: column.name, type: column.type, defaultKind: '', comment: '' }))
-        : writableColumns(schema, target), [creatingTable, createColumns, createTableName, schema, target]);
+        ? createColumns.map(column => ({ database: createTableDatabase, table: createTableName, name: column.name, type: column.type, defaultKind: '', comment: '' }))
+        : writableColumns(schema, target), [creatingTable, createColumns, createTableDatabase, createTableName, schema, target]);
     const selectedFields = useMemo(() => Object.fromEntries(Object.entries(fields).filter(([, destination]) => Boolean(destination))), [fields]);
     const destinationNames = Object.values(selectedFields);
     const duplicateDestinations = new Set(destinationNames).size !== destinationNames.length;
@@ -597,6 +616,7 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
         setTarget('');
         setLastExistingTarget('');
         setCreateTableName('');
+        setCreateTableDatabase(getClickHouseCloudConnection()?.database ?? '');
         setCreateColumns([]);
         setFields({});
         setMapping(undefined);
@@ -645,6 +665,7 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
                         setStep('status');
                         try { localStorage.setItem(key, JSON.stringify(stored)); } catch { }
                         if (recovered.status === 'succeeded') reportImported(recovered);
+                        else reportDestinationNeedsInspection(recovered);
                         setRecoveryState('ready');
                         return;
                     }
@@ -731,6 +752,12 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
         onImportedRef.current(job);
     }
 
+    function reportDestinationNeedsInspection(job: ImportJob) {
+        if (job.status !== 'unknown' || !job.tableExists || !job.table || reportedInspectionRef.current === job.id) return;
+        reportedInspectionRef.current = job.id;
+        onTableNeedsInspectionRef.current(job);
+    }
+
     function rememberJob(next: ImportJob) {
         setJob(next);
         setRecoverableJobs(current => next.status === 'succeeded' || next.reviewedAt
@@ -739,6 +766,7 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
                 ? current.map(item => item.id === next.id ? next : item)
                 : [next, ...current]);
         if (next.status === 'succeeded') reportImported(next);
+        else reportDestinationNeedsInspection(next);
     }
 
     function savePendingImport(value: PendingImport) {
@@ -821,7 +849,8 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
             if (browserCloudImport) {
                 const cloud = getClickHouseCloudConnection();
                 if (!cloud) throw new Error('Reconnect to ClickHouse Cloud before reviewing the import.');
-                const table = creatingTable ? `${cloud.database}.${createTableName}` : target;
+                const table = creatingTable ? `${createTableDatabase}.${createTableName}` : target;
+                if (creatingTable && !schema?.databases?.includes(createTableDatabase)) throw new Error('Choose a database visible to this ClickHouse user.');
                 if (creatingTable && !/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(createTableName)) throw new Error('Use letters, numbers, and underscores for the new table name.');
                 next = { id: crypto.randomUUID(), inputId: preview.id, connectionId: importConnectionId, table, fields: selectedFields, rows: [], rowCount: preview.rowCount };
             } else {
@@ -841,7 +870,7 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
     async function commitImport() {
         await runCommitImport({
             mapping, busy, browserDemoImport, browserCloudImport, file, format,
-            creatingTable, schema, createTableName, createColumns, generateId, importConnectionId, preview,
+            creatingTable, schema, createTableDatabase, createTableName, createColumns, generateId, importConnectionId, preview,
             ...actionSetters,
             savePendingImport, clearPendingImport, rememberJob,
         });
@@ -875,8 +904,8 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
     async function retryUnknownImport() {
         await runRetryUnknownImport({
             job, busy, preview, mapping, browserCloudImport, file, format, reviewUnknownImport,
-            schema, target, creatingTable, cloudRows, createTableName, createColumns, generateId, importConnectionId,
-            setCreateTableName, setCreateColumns, browserDemoImport, setRetryAttemptedFor, ...actionSetters,
+            schema, target, creatingTable, cloudRows, createTableDatabase, createTableName, createColumns, generateId, importConnectionId,
+            setCreateTableName, setCreateTableDatabase, setCreateColumns, browserDemoImport, setRetryAttemptedFor, ...actionSetters,
             savePendingImport, clearPendingImport, rememberJob,
         });
     }
@@ -890,6 +919,7 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
         preview,
         setPreview,
         target,
+        schema,
         lastExistingTarget,
         fields,
         setFields,
@@ -917,6 +947,8 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
         creatingTable,
         createTableName,
         setCreateTableName,
+        createTableDatabase,
+        setCreateTableDatabase,
         createColumns,
         createColumnTypes: CREATE_TABLE_COLUMN_TYPES,
         updateCreateColumn,

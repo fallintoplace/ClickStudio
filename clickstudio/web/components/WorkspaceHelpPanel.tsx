@@ -56,7 +56,7 @@ function HelpSectionHeading({ eyebrow, title, description }: { eyebrow: string; 
     </header>;
 }
 
-export function WorkspaceHelpPanel({ examples, sourceLabel, copy, locale, open, section, onSectionChange, onClose, onOpenExample, onRunExample, onStartBlankSql, onOpenMonitoring, onOpenAssistant, connection, tables, schemaLoaded, schemaLoading, schemaError, onRefreshSchema, trusted, queryEngine, busy, unsupportedParameters, onRunExplain, comparison, onReferenceInsert }: {
+export function WorkspaceHelpPanel({ examples, sourceLabel, copy, locale, open, section, onSectionChange, onClose, onOpenExample, onRunExample, onStartBlankSql, onOpenMonitoring, onOpenAssistant, connection, databases = [connection.database], tables, schemaLoaded, schemaLoading, schemaError, onRefreshSchema, trusted, queryEngine, busy, unsupportedParameters, onRunExplain, comparison, onReferenceInsert }: {
     examples: SqlExample[];
     sourceLabel: string;
     copy: Copy['common'];
@@ -71,6 +71,7 @@ export function WorkspaceHelpPanel({ examples, sourceLabel, copy, locale, open, 
     onOpenMonitoring: () => void;
     onOpenAssistant: () => void;
     connection: Connected;
+    databases?: readonly string[];
     tables: SchemaTable[];
     schemaLoaded: boolean;
     schemaLoading: boolean;
@@ -457,7 +458,7 @@ export function WorkspaceHelpPanel({ examples, sourceLabel, copy, locale, open, 
 
                         {renderTabPanel('dependencies', 'workspace-help-feature-view workspace-help-dependencies', section === 'dependencies' ? <>
                             <HelpSectionHeading eyebrow="HOW DATA MOVES" title={copy.helpDependencies} description={copy.helpDependenciesDescription}/>
-                            {!trusted ? <div className="workspace-help-locked"><Icon name="lock"/><strong>{copy.schemaPrivate}</strong><p>{copy.trustToInspect}</p></div> : <div className="workspace-help-feature-scroll"><MaterializedViewExplorer embedded active={open && section === 'dependencies'} connection={connection} database={connection.database}/></div>}
+                            {!trusted ? <div className="workspace-help-locked"><Icon name="lock"/><strong>{copy.schemaPrivate}</strong><p>{copy.trustToInspect}</p></div> : <div className="workspace-help-feature-scroll"><MaterializedViewExplorer embedded active={open && section === 'dependencies'} connection={connection} database={connection.database} databases={databases}/></div>}
                         </> : null)}
 
                         {renderTabPanel('compare', 'workspace-help-feature-view workspace-help-compare', section === 'compare' ? <>

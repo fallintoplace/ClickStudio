@@ -77,6 +77,7 @@ function tooltip(part: MergeTreePart) {
 
 export function PartsExplorer({ connection, table, copy, onClose, embedded = false }: { connection: Pick<Connection, 'id' | 'dataSource'>; table: SchemaTable; copy: Copy['common']; onClose?: () => void; embedded?: boolean }) {
     const [state, setState] = useState<{ key: string; loading: boolean; snapshot?: MergeTreePartsSnapshot; error?: string }>();
+    const [retryCount, setRetryCount] = useState(0);
     const [metric, setMetric] = useState<PartsMetric>('compressedBytes');
     const [partState, setPartState] = useState<PartsState>('all');
     const [layoutMode, setLayoutMode] = useState<PartsLayout>('map');
@@ -96,7 +97,7 @@ export function PartsExplorer({ connection, table, copy, onClose, embedded = fal
             if (!controller.signal.aborted) setState({ key: requestKey, loading: false, error: message(error) });
         });
         return () => controller.abort();
-    }, [connection.id, requestKey, table.database, table.name]);
+    }, [connection.id, requestKey, retryCount, table.database, table.name]);
 
     const snapshot = state?.key === requestKey ? state.snapshot : undefined;
     const filteredParts = useMemo(() => snapshot?.parts?.filter(part => partState === 'all' || part.active === (partState === 'active')) ?? [], [partState, snapshot]);
@@ -206,7 +207,7 @@ export function PartsExplorer({ connection, table, copy, onClose, embedded = fal
                 <span className="parts-count-summary">{snapshot ? `${exactCount(snapshot.activeParts)} ${copy.partsStateActive.toLowerCase()} · ${exactCount(snapshot.inactiveParts)} ${copy.partsStateInactive.toLowerCase()} · ${partitions} ${copy.partsPartitions}` : current?.loading ? copy.partsLoading : ''}</span>
             </div>
             {current?.loading && <div className="parts-state" role="status">{copy.partsLoading}</div>}
-            {current?.error && <div className="parts-state is-error" role="alert">{current.error}</div>}
+            {current?.error && <div className="parts-state is-error" role="alert"><span>{current.error}</span><Button variant="secondary" className="toolbar-small" disabled={current.loading} onClick={() => setRetryCount(value => value + 1)}>Retry</Button></div>}
             {snapshot && !filteredParts.length && <div className="parts-state" role="status">{copy.partsEmpty}</div>}
             {snapshot && filteredParts.length > 0 && (layoutMode === 'map' || layout) && <>
                 <div className="parts-graph-meta">

@@ -38,6 +38,9 @@
 .native-sql, .native-warning pre { max-height: 230px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; font-family: var(--font-mono); font-size: 11px; }
 .native-search { display: flex; align-items: center; gap: 10px; color: var(--muted); }
 .native-search input, .native-run-picker select { min-height: 36px; color: var(--text); background: var(--panel); border: 1px solid var(--line-bright); border-radius: 8px; padding: 8px 12px; font: inherit; }
+.native-lineage-database { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 10px; }
+.native-lineage-database select { min-width: 132px; min-height: 36px; color: var(--text); background: var(--panel); border: 1px solid var(--line-bright); border-radius: 8px; padding: 7px 10px; font: inherit; }
+.native-lineage-database select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .native-lineage-primer { display: grid; gap: 11px; margin-bottom: 14px; padding: 13px 15px 11px; border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--line)); border-radius: 12px; background: linear-gradient(115deg, color-mix(in srgb, var(--accent) 5%, var(--panel-raised)), color-mix(in srgb, var(--violet) 3%, var(--panel-raised)) 58%, var(--panel-raised)); }
 .native-lineage-primer > header { display: flex; align-items: baseline; gap: 10px; }
 .native-lineage-primer > header .eyebrow { color: var(--accent); font-size: 9px; font-weight: 760; letter-spacing: .12em; }

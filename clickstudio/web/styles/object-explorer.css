@@ -231,6 +231,12 @@
     .parts-count-summary { margin-left: auto; color: var(--text-soft); font-family: var(--font-mono); font-size: 9px; }
     .parts-state { display: grid; min-height: 170px; flex: 1; place-items: center; border: 1px dashed var(--line-bright); border-radius: 12px; color: var(--muted); font-size: 10px; }
     .parts-state.is-error { border-color: color-mix(in srgb, var(--red) 48%, var(--line)); color: var(--red); }
+    .parts-state.is-error { grid-template-columns: minmax(0, 1fr) auto; gap: 12px; padding: 18px; text-align: left; }
+    .parts-state.is-error > span { overflow-wrap: anywhere; }
+    .parts-state.is-error .button-base { color: var(--text-soft); }
+    .schema-partial-state { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: color-mix(in srgb, var(--accent) 4%, var(--panel)); color: var(--muted); font-size: 9px; }
+    .schema-partial-state > span { min-width: 0; }
+    @media (max-width: 560px) { .schema-partial-state { align-items: flex-start; flex-direction: column; } }
     .parts-graph-meta { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--muted); font-family: var(--font-mono); font-size: 8px; }
     .parts-graph-meta strong { color: var(--text-soft); font-weight: 650; }
     .parts-breadcrumb { display: inline-flex; min-width: 0; align-items: center; gap: 7px; }

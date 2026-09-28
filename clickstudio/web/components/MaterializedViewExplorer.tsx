@@ -1,5 +1,5 @@
 import { linkHorizontal } from 'd3';
-import { useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import type { Connection } from '../../shared/types';
 import { layoutLineage, type LineageEdge, type LineageNode, type LineageSnapshot } from '../../shared/materialized-view-lineage';
 import { nativeCount, nativeTime } from '../../shared/native-format';
@@ -132,16 +132,19 @@ function LineageGraph({ snapshot, beginner }: { snapshot: LineageSnapshot; begin
             </div>{selectedNode && <NodeDetails node={selectedNode} snapshot={snapshot} beginner={beginner}/>}
         </div>}</>;
 }
-export function MaterializedViewExplorer({ connection, database, onClose, embedded = false, active = true }: { connection: Pick<Connection, 'id'>; database: string; onClose?: () => void; embedded?: boolean; active?: boolean }) {
-    const { snapshot, loading, error, refresh } = useNativeExplorer(connection.id, { kind: 'lineage', database }, active, false);
+export function MaterializedViewExplorer({ connection, database, databases = [database], onClose, embedded = false, active = true }: { connection: Pick<Connection, 'id'>; database: string; databases?: readonly string[]; onClose?: () => void; embedded?: boolean; active?: boolean }) {
+    const [selectedDatabase, setSelectedDatabase] = useState(database);
+    useEffect(() => setSelectedDatabase(database), [database]);
+    const { snapshot, loading, error, refresh } = useNativeExplorer(connection.id, { kind: 'lineage', database: selectedDatabase }, active, false);
     const current = snapshot?.kind === 'lineage' ? snapshot : undefined;
     const content = <>
-        <div className="native-toolbar native-lineage-meta-toolbar"><span className="native-snapshot-meta">{current?.source === 'fixture' ? 'SAMPLE DATA' : embedded ? 'LIVE SERVER DATA' : 'SERVER METADATA'}{current && ` · Updated ${nativeTime(current.observedAt)}`}</span><Button onClick={refresh} disabled={loading}>{embedded ? 'Refresh map' : 'Refresh metadata'}</Button></div>
+        <div className="native-toolbar native-lineage-meta-toolbar"><span className="native-snapshot-meta">{current?.source === 'fixture' ? 'SAMPLE DATA' : embedded ? 'LIVE SERVER DATA' : 'SERVER METADATA'}{current && ` · Updated ${nativeTime(current.observedAt)}`}</span><label className="native-lineage-database">Database<select aria-label="Lineage database" value={selectedDatabase} onChange={event => setSelectedDatabase(event.target.value)}>{databases.map(value => <option key={value} value={value}>{value}</option>)}</select></label><Button onClick={refresh} disabled={loading}>{embedded ? 'Refresh map' : 'Refresh metadata'}</Button></div>
         {error && <div role="alert" className="native-warning">{error}{current && <p>The previous snapshot is shown below.</p>}</div>}
         {loading && !current && <div className="native-empty" role="status">{embedded ? 'Loading the data map…' : 'Reading materialized-view metadata…'}</div>}
+        {!loading && !error && !current && <div className="native-empty" role="status">No metadata snapshot is loaded. Use Refresh metadata to check this database again.</div>}
         {current && <><LineageGraph snapshot={current} beginner={embedded}/>{embedded
             ? <footer className="native-notes"><details className="native-lineage-notes"><summary>About this map</summary>{current.notes.map(note => <p key={note}>{note}</p>)}<p>Server-reported links may not include every table referenced by a view query.</p></details></footer>
             : <footer className="native-notes">{current.notes.map(note => <p key={note}>{note}</p>)}</footer>}</>}
     </>;
-    return embedded ? content : <NativeExplorerDialog title="Materialized view dependencies" description={`${database} · Insert triggers, write targets, and refresh schedules`} onClose={() => onClose?.()}>{content}</NativeExplorerDialog>;
+    return embedded ? content : <NativeExplorerDialog title="Materialized view dependencies" description={`${selectedDatabase} · Insert triggers, write targets, and refresh schedules`} onClose={() => onClose?.()}>{content}</NativeExplorerDialog>;
 }

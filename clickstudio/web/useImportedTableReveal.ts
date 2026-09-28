@@ -110,11 +110,23 @@ export function useImportedTableReveal({ connectionId, demoMode, canRevealSqlTab
         });
     }, [connectionId, demoMode, loadSchema, revealInspector, setNotice, setSearch]);
 
+    const onUnconfirmedDestination = useCallback((job: ImportJob) => {
+        if (job.status !== 'unknown' || !job.tableExists || !job.table) return;
+        latestImportIdRef.current = job.id;
+        setSearch('');
+        setImportedTableTarget({ id: job.id, table: job.table, source: 'partial' });
+        revealInspector();
+        setNotice(`The destination ${job.table} exists, but the imported rows are not confirmed. Showing it in Objects so you can inspect it.`);
+        void loadSchema(true);
+    }, [loadSchema, revealInspector, setNotice, setSearch]);
+
     const onImportedTableRevealed = useCallback((target: ImportedTableTarget) => {
         if (latestImportIdRef.current !== target.id) return;
         latestImportIdRef.current = undefined;
         setImportedTableTarget(current => current?.id === target.id ? undefined : current);
-        setNotice(target.source === 'sql'
+        setNotice(target.source === 'partial'
+            ? `Showing ${target.table} in Objects. The imported rows are still unconfirmed.`
+            : target.source === 'sql'
             ? `Created ${target.table} from imported SQL. The table is selected in Objects.`
             : `Imported ${(target.rows ?? 0).toLocaleString()} ${target.rows === 1 ? 'row' : 'rows'} into ${target.table}. The table is selected in Objects.`);
     }, [setNotice]);
@@ -122,6 +134,7 @@ export function useImportedTableReveal({ connectionId, demoMode, canRevealSqlTab
     return {
         importedTableTarget,
         onImported,
+        onUnconfirmedDestination,
         onImportedTableRevealed,
         onImportedSqlTableCreated,
         markImportedSqlDraft,

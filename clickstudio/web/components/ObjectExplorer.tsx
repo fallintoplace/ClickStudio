@@ -33,11 +33,13 @@ type ObjectExplorerProps = {
     connection: Connected;
     schema?: Schema;
     schemaLoading: boolean;
+    schemaLoadingMore?: boolean;
     schemaError: string;
     search: string;
     setSearch: (search: string) => void;
     trusted: boolean;
     onRefreshSchema: () => void;
+    onLoadMoreSchema?: () => void;
     importedTableTarget?: ImportedTableTarget;
     onImportedTableRevealed: (target: ImportedTableTarget) => void;
     onInsert: (value: string) => void;
@@ -65,7 +67,7 @@ function recoverUiState(key: string): ExplorerUiState {
     }
 }
 
-export function ObjectExplorer({ copy, connection, schema, schemaLoading, schemaError, search, setSearch, trusted, onRefreshSchema, importedTableTarget, onImportedTableRevealed, onInsert, onOpenSqlDraft, onOpenReference, compact = false }: ObjectExplorerProps) {
+export function ObjectExplorer({ copy, connection, schema, schemaLoading, schemaLoadingMore = false, schemaError, search, setSearch, trusted, onRefreshSchema, onLoadMoreSchema, importedTableTarget, onImportedTableRevealed, onInsert, onOpenSqlDraft, onOpenReference, compact = false }: ObjectExplorerProps) {
     const model = useMemo(() => buildObjectExplorer(schema, search, connection.database), [schema, search, connection.database]);
     const storageKey = uiStateKey(connection.id);
     const recovered = useMemo(() => recoverUiState(storageKey), [storageKey]);
@@ -274,11 +276,12 @@ export function ObjectExplorer({ copy, connection, schema, schemaLoading, schema
                     })}
                 </div>
             </div> : <div className="object-empty-search"><strong>{copy.noObjectsMatch}</strong><span>{search ? 'Try a different name, type, engine, index, or column.' : copy.metadataUnavailable}</span></div>}
+            {schema.truncated && schema.pagination && <div className="schema-partial-state" role="status"><span>Showing part of this schema. Load the next page to see more tables and columns.</span><Button variant="secondary" className="toolbar-small" disabled={schemaLoadingMore || !onLoadMoreSchema} onClick={onLoadMoreSchema}>{schemaLoadingMore ? 'Loading…' : 'Load more metadata'}</Button></div>}
             {!compact && detailsOpen && selected && <ObjectDetails copy={copy} selection={selected} trusted={trusted} copiedId={copiedId} onClose={browseObjects} onInsert={onInsert} onCopy={copyText} onOpenSqlDraft={onOpenSqlDraft} onOpenReference={onOpenReference} onOpenParts={setPartsTable}/>}
         </>}
         </>}
         {trusted && partsTable && <OverlayPortal><StorageExplorer connection={connection} table={partsTable} copy={copy} onClose={() => setPartsTable(undefined)}/></OverlayPortal>}
-        {trusted && lineageOpen && <OverlayPortal><MaterializedViewExplorer connection={connection} database={connection.database} onClose={() => setLineageOpen(false)}/></OverlayPortal>}
+        {trusted && lineageOpen && <OverlayPortal><MaterializedViewExplorer connection={connection} database={connection.database} databases={schema?.databases} onClose={() => setLineageOpen(false)}/></OverlayPortal>}
         {trusted && createTableOpen && <OverlayPortal><CreateTableDialog connection={connection} databases={schema?.databases ?? []} onClose={() => setCreateTableOpen(false)} onCreated={target => { setSearch(''); setCreatedTableTarget(target); onRefreshSchema(); }}/></OverlayPortal>}
         {trusted && insertRowTarget && <OverlayPortal><InsertRowDialog key={`${insertRowTarget.table.database}.${insertRowTarget.table.name}`} connectionId={connection.id} table={insertRowTarget.table} columns={insertRowTarget.columns} onClose={() => setInsertRowTarget(undefined)} onInserted={onRefreshSchema}/></OverlayPortal>}
         {trusted && deleteTableTarget && <OverlayPortal><DeleteTableDialog connectionId={connection.id} table={deleteTableTarget} onClose={() => setDeleteTableTarget(undefined)} onDeleted={() => { setSelectedId(undefined); setDetailsOpen(false); onRefreshSchema(); }}/></OverlayPortal>}

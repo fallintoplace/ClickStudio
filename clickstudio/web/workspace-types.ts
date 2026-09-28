@@ -11,4 +11,4 @@ export type WorkspaceRunCapability = Readonly<{ available: boolean; reason?: str
 export type WorkspaceActionRef = { current: () => Promise<void> };
 export type RunEventState = 'idle' | 'live' | 'reconnecting';
 export type SelectOption<Value extends string> = { value: Value; label: string };
-export type ImportedTableTarget = { id: string; table: string; source: 'rows' | 'sql'; rows?: number };
+export type ImportedTableTarget = { id: string; table: string; source: 'rows' | 'sql' | 'partial'; rows?: number };
