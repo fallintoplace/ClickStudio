@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Principal } from '../shared/types.js';
-import { CREATE_TABLE_COLUMN_TYPES, type CreateTableColumn } from '../shared/table-creation.js';
-import { quoteIdentifier } from '../shared/sql.js';
+import { CREATE_TABLE_COLUMN_TYPES, isValidTableDatabase, type CreateTableColumn } from '../shared/table-creation.js';
+import { quoteIdentifier, quoteStringLiteral } from '../shared/sql.js';
 import { isSystemDatabaseName } from '../shared/table-deletion.js';
 import { requireThat } from './errors.js';
 import { canWrite } from './guards.js';
@@ -16,7 +16,7 @@ export interface CreateTableDriver {
 
 export function createTableSql(table: string, columns: CreateTableColumn[], orderBy: string): string {
     const parts = table.split('.');
-    requireThat(parts.length === 2 && parts.every(part => /^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(part)), 400, 'TABLE_NAME', 'Use a database.table name with valid identifiers');
+    requireThat(parts.length === 2 && isValidTableDatabase(parts[0]) && /^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(parts[1]!), 400, 'TABLE_NAME', 'Use a database.table name with valid identifiers');
     requireThat(columns.length > 0 && columns.length <= 50, 400, 'TABLE_COLUMNS', 'A table needs 1–50 columns');
     requireThat(columns.every(column => /^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(column.name)), 400, 'TABLE_COLUMN_NAME', 'Column names must use letters, numbers, and underscores');
     requireThat(new Set(columns.map(column => column.name)).size === columns.length, 400, 'TABLE_COLUMN_DUPLICATE', 'Column names must be unique');
@@ -26,7 +26,7 @@ export function createTableSql(table: string, columns: CreateTableColumn[], orde
     const [database, name] = parts;
     const definitions = columns.map(column => {
         const definition = `${quoteIdentifier(column.name)} ${column.type}`;
-        return column.generatedId ? `${definition} DEFAULT generateSerialID('${database}.${name}')` : definition;
+        return column.generatedId ? `${definition} DEFAULT generateSerialID(${quoteStringLiteral(`${database}.${name}`)})` : definition;
     });
     return `CREATE TABLE ${quoteIdentifier(database!)}.${quoteIdentifier(name!)} (\n    ${definitions.join(',\n    ')}\n) ENGINE = MergeTree ORDER BY ${quoteIdentifier(orderBy)}`;
 }
@@ -37,7 +37,7 @@ export class TableCreationService {
     async create(principal: Principal, connectionId: string, database: string, name: string, columns: CreateTableColumn[], orderBy: string) {
         canWrite(principal);
         requireThat(this.trusted(principal, connectionId), 403, 'WORKSPACE_UNTRUSTED', 'Trust the destination connection first');
-        requireThat(/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(database) && !isSystemDatabaseName(database), 400, 'TABLE_DATABASE', 'Choose a valid non-system database');
+        requireThat(isValidTableDatabase(database) && !isSystemDatabaseName(database), 400, 'TABLE_DATABASE', 'Choose a valid non-system database');
         requireThat(/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(name), 400, 'TABLE_NAME', 'Use a valid table name');
         const table = `${database}.${name}`;
         createTableSql(table, columns, orderBy);

@@ -1,5 +1,5 @@
 import type { Json, Schema, SchemaTable } from '../shared/types.js';
-import type { CreateTableColumnType } from '../shared/table-creation.js';
+import { isValidTableDatabase, type CreateTableColumnType } from '../shared/table-creation.js';
 
 export const CREATE_CLOUD_TABLE_TARGET = '__create_table_from_file__';
 
@@ -7,9 +7,18 @@ export type CloudImportColumn = { source: string; name: string; type: CreateTabl
 
 const nonInsertableEngines = new Set(['View', 'MaterializedView', 'LiveView', 'WindowView']);
 
+export function cloudImportDatabases(schema?: Schema): string[] {
+    return (schema?.databases ?? []).filter(isValidTableDatabase);
+}
+
+export function preferredCloudImportDatabase(schema: Schema, currentDatabase: string): string {
+    const databases = cloudImportDatabases(schema);
+    return databases.includes(currentDatabase) ? currentDatabase : databases[0] ?? '';
+}
+
 export function cloudImportTargets(schema: Schema): string[] {
     return schema.tables
-        .filter((table: SchemaTable) => !nonInsertableEngines.has(table.engine))
+        .filter((table: SchemaTable) => isValidTableDatabase(table.database) && !nonInsertableEngines.has(table.engine))
         .map(table => `${table.database}.${table.name}`);
 }
 

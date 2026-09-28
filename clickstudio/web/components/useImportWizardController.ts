@@ -5,7 +5,7 @@ import { api, isFrontendDemoPreview, message, post, RequestError } from '../api'
 import { checkClickHouseCloudImport, CLICKHOUSE_CLOUD_CONNECTION_ID, CloudRequestError, getClickHouseCloudConnection, importClickHouseCloudFile, loadClickHouseCloudSchema } from '../cloud-connection';
 import { CREATE_TABLE_COLUMN_TYPES } from '../../shared/table-creation';
 import { DEMO_IMPORT_SAMPLE_CSV, parseImportFile } from '../demo-import-data';
-import { CREATE_CLOUD_TABLE_TARGET, cloudImportTargets, inferCloudImportColumns, suggestCloudTableName, type CloudImportColumn } from '../cloud-import';
+import { CREATE_CLOUD_TABLE_TARGET, cloudImportTargets, inferCloudImportColumns, preferredCloudImportDatabase, suggestCloudTableName, type CloudImportColumn } from '../cloud-import';
 import {
     MAX_FILE_BYTES,
     fileFormat,
@@ -679,6 +679,7 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
                     if (!current) return;
                     setTargets(nextTargets);
                     setSchema(nextSchema);
+                    setCreateTableDatabase(preferredCloudImportDatabase(nextSchema, getClickHouseCloudConnection()?.database ?? ''));
                     setLastExistingTarget(nextTargets[0] ?? '');
                     setTarget(nextTargets[0] ?? CREATE_CLOUD_TABLE_TARGET);
                     setRecoveryState('ready');
@@ -743,6 +744,7 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
         setBusy,
         setError,
         onSucceeded: reportImported,
+        onNeedsInspection: reportDestinationNeedsInspection,
         cloudImport: browserCloudImport,
     });
 

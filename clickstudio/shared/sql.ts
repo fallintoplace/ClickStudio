@@ -210,6 +210,11 @@ export function formatSql(sql: string): string {
 export function quoteIdentifier(name: string): string {
     return '`' + name.replace(/\\/g, '\\\\').replace(/`/g, '\\`') + '`';
 }
+
+export function quoteStringLiteral(value: string): string {
+    return "'" + value.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
+}
+
 export interface SqlParameter {
     name: string;
     type: string;

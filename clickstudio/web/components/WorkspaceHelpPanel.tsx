@@ -56,7 +56,7 @@ function HelpSectionHeading({ eyebrow, title, description }: { eyebrow: string; 
     </header>;
 }
 
-export function WorkspaceHelpPanel({ examples, sourceLabel, copy, locale, open, section, onSectionChange, onClose, onOpenExample, onRunExample, onStartBlankSql, onOpenMonitoring, onOpenAssistant, connection, databases = [connection.database], tables, schemaLoaded, schemaLoading, schemaError, onRefreshSchema, trusted, queryEngine, busy, unsupportedParameters, onRunExplain, comparison, onReferenceInsert }: {
+type WorkspaceHelpPanelProps = {
     examples: SqlExample[];
     sourceLabel: string;
     copy: Copy['common'];
@@ -84,7 +84,15 @@ export function WorkspaceHelpPanel({ examples, sourceLabel, copy, locale, open, 
     onRunExplain: (kind: 'explain' | 'plan' | 'pipeline' | 'analyze') => void;
     comparison: RunComparisonProps;
     onReferenceInsert: (value: string) => void;
-}) {
+};
+
+export function WorkspaceHelpPanel(props: WorkspaceHelpPanelProps) {
+    const {
+        examples, sourceLabel, copy, locale, open, section, onSectionChange, onClose, onOpenExample,
+        onRunExample, onStartBlankSql, onOpenMonitoring, onOpenAssistant, connection,
+        databases = [props.connection.database], tables, schemaLoaded, schemaLoading, schemaError,
+        onRefreshSchema, trusted, queryEngine, busy, unsupportedParameters, onRunExplain, comparison, onReferenceInsert,
+    } = props;
     const panelRef = useRef<HTMLElement>(null);
     const searchRef = useRef<HTMLInputElement>(null);
     const tabRefs = useRef(new Map<HelpPanelSection, HTMLButtonElement>());

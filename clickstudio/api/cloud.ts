@@ -3,10 +3,10 @@ import { randomUUID } from 'node:crypto';
 import { AppError } from '../core/errors.js';
 import { parseInput } from '../core/imports.js';
 import type { Capability, ClickHouseDocumentationEntry, ClickHouseDocumentationSummary, Column, Json, Row, Schema, SchemaColumn, SchemaTable } from '../shared/types.js';
-import { lexSql, quoteIdentifier, splitSql } from '../shared/sql.js';
+import { lexSql, quoteIdentifier, quoteStringLiteral, splitSql } from '../shared/sql.js';
 import { buildReferenceEntryQuery, buildReferenceSearchQuery, isReferenceCategory } from '../shared/reference.js';
 import { flamegraphQuery, parseFlamegraphRows, type FlamegraphSource } from '../shared/flamegraph.js';
-import { CREATE_TABLE_COLUMN_TYPES, type CreateTableColumn, type CreateTableColumnType } from '../shared/table-creation.js';
+import { CREATE_TABLE_COLUMN_TYPES, isValidTableDatabase, type CreateTableColumn, type CreateTableColumnType } from '../shared/table-creation.js';
 import { createTableSql } from '../core/table-creation.js';
 import { canDropTableTarget, dropTableSql, isSystemDatabaseName, isViewEngine, tableDeletionConfirmation } from '../shared/table-deletion.js';
 import { parseReplicationSnapshot, replicationQueueQuery, replicationReplicasQuery, type ReplicationCapabilities } from '../shared/replication.js';
@@ -59,7 +59,7 @@ function validateCredentials(value: unknown): { credentials: CloudCredentials; u
     const database = typeof value.database === 'string' ? value.database.trim() : '';
     const username = typeof value.username === 'string' ? value.username.trim() : '';
     const password = typeof value.password === 'string' ? value.password : '';
-    if (!host || host.length > 512 || !database || database.length > 128 || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(database) ||
+    if (!host || host.length > 512 || !isValidTableDatabase(database) ||
         !username || username.length > 128 || !password || password.length > 1024)
         return fail('CLOUD_CREDENTIALS', 'Check the host, database, username, and password.');
 
@@ -246,7 +246,7 @@ async function readSchema(credentials: CloudCredentials, url: string, offsets: {
 }
 
 async function createCloudTable(credentials: CloudCredentials, url: string, body: Record<string, unknown>) {
-    if (!isImportIdentifier(body.database) || isSystemDatabaseName(body.database)) throw new AppError(400, 'TABLE_DATABASE', 'Choose a valid non-system database.');
+    if (!isValidTableDatabase(body.database) || isSystemDatabaseName(body.database)) throw new AppError(400, 'TABLE_DATABASE', 'Choose a valid non-system database.');
     if (!isImportIdentifier(body.name)) throw new AppError(400, 'TABLE_NAME', 'Use a valid table name.');
     if (!Array.isArray(body.columns) || body.columns.length > 50) throw new AppError(400, 'TABLE_COLUMNS', 'A table needs 1–50 columns.');
     const columns: CreateTableColumn[] = body.columns.map(value => {
@@ -558,7 +558,7 @@ function parseImportTarget(value: unknown): { database: string; table: string } 
     const separator = value.indexOf('.');
     if (separator < 0) return undefined;
     const database = value.slice(0, separator), table = value.slice(separator + 1);
-    if (!isImportIdentifier(database) || !isImportTableName(table) || isSystemDatabaseName(database)) return undefined;
+    if (!isValidTableDatabase(database) || !isImportTableName(table) || isSystemDatabaseName(database)) return undefined;
     return { database, table };
 }
 
@@ -630,7 +630,7 @@ async function commitCloudImport(form: FormData, credentials: CloudCredentials, 
     let expectedColumns: { name: string; type: string; defaultKind: string }[] | undefined;
 
     if (creating) {
-        if (!createTable || (createTable.database !== undefined && (!isImportIdentifier(createTable.database) || isSystemDatabaseName(createTable.database))) || !isImportIdentifier(createTable.name) || !Array.isArray(createTable.columns) || createTable.columns.length === 0 || createTable.columns.length > 200 ||
+        if (!createTable || (createTable.database !== undefined && (!isValidTableDatabase(createTable.database) || isSystemDatabaseName(createTable.database))) || !isImportIdentifier(createTable.name) || !Array.isArray(createTable.columns) || createTable.columns.length === 0 || createTable.columns.length > 200 ||
             (createTable.generateId !== undefined && typeof createTable.generateId !== 'boolean'))
             throw new AppError(400, 'IMPORT_CREATE_TABLE', 'Enter a table name and at least one column.');
         tableDatabase = typeof createTable.database === 'string' ? createTable.database : credentials.database;
@@ -700,7 +700,7 @@ async function commitCloudImport(form: FormData, credentials: CloudCredentials, 
         if (creating) {
             const definitions = [
                 ...createColumns.map(column => `${quoteIdentifier(column.name)} Nullable(${column.type})`),
-                ...(createTable?.generateId === true ? [`\`id\` UInt64 DEFAULT generateSerialID('${tableDatabase}.${tableName}')`] : []),
+                ...(createTable?.generateId === true ? [`\`id\` UInt64 DEFAULT generateSerialID(${quoteStringLiteral(`${tableDatabase}.${tableName}`)})`] : []),
             ].join(', ');
             await client.command({
                 query: `CREATE TABLE ${quoteIdentifier(tableDatabase)}.${quoteIdentifier(tableName)} (${definitions}) ENGINE = MergeTree ORDER BY tuple()`,

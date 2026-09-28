@@ -599,7 +599,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
     };
 
     const exportCurrentQuery = () => {
-        const baseName = active.name.trim().replace(/\.sql$/i, '').replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').trim();
+        const baseName = active.name.trim().replace(/\.sql$/i, '').replace(/[<>:"/\\|?*\p{Cc}]/gu, '_').trim();
         download(`${baseName || 'query'}.sql`, active.sql, 'application/sql;charset=utf-8');
     };
 

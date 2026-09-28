@@ -87,6 +87,7 @@ export class DemoPreviewApi {
 
     constructor() {
         this.restore();
+        this.interruptRestoredCloudRuns();
         this.interruptRestoredCloudScripts();
         if (!this.runs.has(DEMO_PREVIEW_RUN_ID)) this.addRun(DEMO_PREVIEW_RUN_ID, DEMO_PREVIEW_SQL, 'query', {});
         for (const starter of DEMO_PREVIEW_STARTERS) {
@@ -193,6 +194,24 @@ export class DemoPreviewApi {
                 }
                 : statement.status === 'pending' ? { ...statement, status: 'skipped' as const } : statement);
             this.scripts.set(script.id, { ...script, status: 'interrupted', statements });
+        }
+    }
+
+    private interruptRestoredCloudRuns() {
+        for (const run of this.runs.values()) {
+            if (run.connectionId !== CLICKHOUSE_CLOUD_CONNECTION_ID || !['running', 'queued'].includes(run.status)) continue;
+            this.runs.set(run.id, {
+                ...run,
+                status: 'interrupted',
+                finishedAt: now(),
+                resultState: 'unavailable',
+                error: {
+                    code: 'RUN_INTERRUPTED',
+                    message: 'The page closed before ClickHouse returned the result. The query may have finished on the server, but its result was not saved or retried.',
+                },
+                sequence: ++this.sequence,
+            });
+            this.results.delete(run.id);
         }
     }
 
@@ -699,97 +718,7 @@ export class DemoPreviewApi {
             const connectionId = url.searchParams.get('connectionId');
             return [...this.runs.values()].filter(run => !connectionId || run.connectionId === connectionId).sort((left, right) => right.createdAt.localeCompare(left.createdAt) || right.sequence - left.sequence);
         }
-        if (parts[0] === 'runs' && parts[1]) {
-            let run = this.getRun(parts[1]);
-            if (parts.length === 2 && method === 'GET' && run.connectionId === CLICKHOUSE_CLOUD_CONNECTION_ID)
-                run = await this.refreshCloudRunProgress(run);
-            if (parts[2] === 'result' || parts[2] === 'snapshot') {
-                const result = this.results.get(run.id);
-                if (!result && run.connectionId === PLAYGROUND_CONNECTION_ID)
-                    throw new Error('This retained Playground result is no longer available in this browser. Run the SQL again.');
-                const retained = result ?? resultFor(run);
-                if (parts[2] === 'snapshot') return retained;
-                const offset = Math.max(0, Number(url.searchParams.get('offset') ?? 0) || 0);
-                const count = Math.max(1, Math.min(500, Number(url.searchParams.get('count') ?? 200) || 200));
-                return { ...retained, rows: retained.rows.slice(offset, offset + count), offset, totalRows: retained.rows.length, nextOffset: offset + count < retained.rows.length ? offset + count : null } satisfies ResultPage;
-            }
-            if (parts[2] === 'cancel' && method === 'POST') {
-                if (run.connectionId === CLICKHOUSE_CLOUD_CONNECTION_ID && run.status === 'running') {
-                    const cloud = getClickHouseCloudConnection();
-                    if (!cloud) throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before stopping SQL.', 401);
-                    if (!cloud.manifest?.cancellation.available)
-                        throw new CloudRequestError('CAPABILITY_UNAVAILABLE', cloud.manifest?.cancellation.reason ?? 'ClickHouse query cancellation is unavailable.', 409);
-                    const cancellation = await cancelClickHouseCloudQuery(run.queryId);
-                    const current = this.runs.get(run.id) ?? run;
-                    if (current.status !== 'running' || !cancellation.cancelled) return current;
-                    const cancelled: Run = { ...current, status: 'cancelled', resultState: 'unavailable', finishedAt: now(), sequence: ++this.sequence };
-                    this.runs.set(run.id, cancelled);
-                    this.results.delete(run.id);
-                    this.persist();
-                    return cancelled;
-                }
-                const cancelled = { ...run, status: 'cancelled' as const, resultState: 'unavailable' as const, finishedAt: now() };
-                this.runs.set(run.id, cancelled);
-                this.results.delete(run.id);
-                this.persist();
-                return cancelled;
-            }
-            if (parts[2] === 'profile') {
-                if (run.connectionId === PLAYGROUND_CONNECTION_ID)
-                    throw new Error('Query-log and pipeline profiling are unavailable on ClickHouse Playground.');
-                if (run.connectionId === CLICKHOUSE_CLOUD_CONNECTION_ID) {
-                    const cloud = getClickHouseCloudConnection();
-                    if (!cloud) throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before inspecting the query.', 401);
-                    if (parts[3] === 'flamegraph') {
-                        if (!cloud.manifest?.traceLog?.available) throw new CloudRequestError('CAPABILITY_UNAVAILABLE', cloud.manifest?.traceLog?.reason ?? 'Profiler samples are unavailable.', 409);
-                        if (run.status === 'running' || run.status === 'queued') throw new Error('Wait for the query to finish before loading its flamegraph.');
-                        return await loadClickHouseCloudFlamegraph(run.queryId, run.createdAt, run.finishedAt);
-                    }
-                    if (parts[3] === 'pipeline') {
-                        if (!cloud.manifest?.pipeline.available) throw new CloudRequestError('CAPABILITY_UNAVAILABLE', cloud.manifest?.pipeline.reason ?? 'ClickHouse pipeline evidence is unavailable.', 409);
-                        const prefix = sqlForRunKind('', run.kind);
-                        const sql = run.kind !== 'query' && run.sql.startsWith(prefix)
-                            ? run.sql.slice(explainPrefixLength(run.kind))
-                            : run.sql;
-                        const raw = await loadClickHouseCloudPipeline(sql, run.parameters);
-                        const parsed = parsePipelineResult(raw);
-                        if (!parsed) throw new Error('ClickHouse returned no structured EXPLAIN PIPELINE graph for this query.');
-                        return parsed satisfies ProfilePipeline;
-                    }
-                    const queryLogAvailable = Boolean(cloud.manifest?.queryLog.available && cloud.manifest.queryLogSource);
-                    const evidence = queryLogAvailable ? await loadClickHouseCloudProfileEvidence(run.queryId).catch(() => []) : [];
-                    return buildQueryProfile(run, evidence, {
-                        queryLogAvailable,
-                        pipelineAvailable: Boolean(cloud.manifest?.pipeline.available),
-                        notice: queryLogAvailable
-                            ? 'ClickHouse query-log rows may arrive after a server flush interval. Missing rows are shown as unavailable, not estimated.'
-                            : cloud.manifest?.queryLog.reason ?? 'Query-log access is unavailable. Only retained run metrics are shown.',
-                    }) satisfies QueryProfile;
-                }
-                if (parts[3] === 'flamegraph') {
-                    if (!this.trusted) throw new Error('Trust this connection before inspecting profiler samples.');
-                    if (run.status === 'running' || run.status === 'queued') throw new Error('Wait for the query to finish before loading its flamegraph.');
-                    return demoFlamegraph(run.queryId);
-                }
-                const pipeline = {
-                    available: true, source: 'query_shape' as const, truncated: false,
-                    nodes: [
-                        { id: 'read', label: 'Sample rows', kind: 'read' as const, status: 'estimated' as const, rows: String(run.rowCount) },
-                        { id: 'output', label: 'Output', kind: 'output' as const, status: 'estimated' as const, rows: String(run.rowCount) },
-                    ],
-                    edges: [{ source: 'read', target: 'output' }],
-                };
-                if (parts[3] === 'pipeline') return pipeline;
-                return {
-                    version: 1, queryId: run.queryId, runId: run.id,
-                    summary: { durationMs: run.elapsedMs, resultRows: run.rowCount, readRows: String(run.rowCount), readBytes: String(run.bytes) },
-                    insights: [], pipeline,
-                    capabilities: { queryLog: false, pipelineGraph: true, indexAnalysis: false, runtimePlan: false },
-                    evidence: [], notice: 'Generated preview data only. This is not a ClickHouse profile.',
-                };
-            }
-            return run;
-        }
+        if (parts[0] === 'runs' && parts[1]) return this.requestRun(parts, method, url);
 
         if (pathname === '/scripts' && method === 'POST') {
             if (body.connectionId === PLAYGROUND_CONNECTION_ID)
@@ -894,5 +823,99 @@ export class DemoPreviewApi {
         if (pathname === '/imports' || pathname === '/monitors' || pathname === '/notices' || pathname === '/audit' || pathname === '/published') return [];
         if (pathname === '/health') return { ok: true, demo: true, version: '0.1.0' };
         return {};
+    }
+
+    private async requestRun(parts: string[], method: string, url: URL): Promise<unknown> {
+        let run = this.getRun(parts[1]!);
+        if (parts.length === 2 && method === 'GET' && run.connectionId === CLICKHOUSE_CLOUD_CONNECTION_ID)
+            run = await this.refreshCloudRunProgress(run);
+        if (parts[2] === 'result' || parts[2] === 'snapshot') {
+            const result = this.results.get(run.id);
+            if (!result && run.connectionId === PLAYGROUND_CONNECTION_ID)
+                throw new Error('This retained Playground result is no longer available in this browser. Run the SQL again.');
+            const retained = result ?? resultFor(run);
+            if (parts[2] === 'snapshot') return retained;
+            const offset = Math.max(0, Number(url.searchParams.get('offset') ?? 0) || 0);
+            const count = Math.max(1, Math.min(500, Number(url.searchParams.get('count') ?? 200) || 200));
+            return { ...retained, rows: retained.rows.slice(offset, offset + count), offset, totalRows: retained.rows.length, nextOffset: offset + count < retained.rows.length ? offset + count : null } satisfies ResultPage;
+        }
+        if (parts[2] === 'cancel' && method === 'POST') {
+            if (run.connectionId === CLICKHOUSE_CLOUD_CONNECTION_ID && run.status === 'running') {
+                const cloud = getClickHouseCloudConnection();
+                if (!cloud) throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before stopping SQL.', 401);
+                if (!cloud.manifest?.cancellation.available)
+                    throw new CloudRequestError('CAPABILITY_UNAVAILABLE', cloud.manifest?.cancellation.reason ?? 'ClickHouse query cancellation is unavailable.', 409);
+                const cancellation = await cancelClickHouseCloudQuery(run.queryId);
+                const current = this.runs.get(run.id) ?? run;
+                if (current.status !== 'running' || !cancellation.cancelled) return current;
+                const cancelled: Run = { ...current, status: 'cancelled', resultState: 'unavailable', finishedAt: now(), sequence: ++this.sequence };
+                this.runs.set(run.id, cancelled);
+                this.results.delete(run.id);
+                this.persist();
+                return cancelled;
+            }
+            const cancelled = { ...run, status: 'cancelled' as const, resultState: 'unavailable' as const, finishedAt: now() };
+            this.runs.set(run.id, cancelled);
+            this.results.delete(run.id);
+            this.persist();
+            return cancelled;
+        }
+        if (parts[2] === 'profile') return this.requestRunProfile(run, parts[3]);
+        return run;
+    }
+
+    private async requestRunProfile(run: Run, view?: string): Promise<unknown> {
+        if (run.connectionId === PLAYGROUND_CONNECTION_ID)
+            throw new Error('Query-log and pipeline profiling are unavailable on ClickHouse Playground.');
+        if (run.connectionId === CLICKHOUSE_CLOUD_CONNECTION_ID) {
+            const cloud = getClickHouseCloudConnection();
+            if (!cloud) throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before inspecting the query.', 401);
+            if (view === 'flamegraph') {
+                if (!cloud.manifest?.traceLog?.available) throw new CloudRequestError('CAPABILITY_UNAVAILABLE', cloud.manifest?.traceLog?.reason ?? 'Profiler samples are unavailable.', 409);
+                if (run.status === 'running' || run.status === 'queued') throw new Error('Wait for the query to finish before loading its flamegraph.');
+                return await loadClickHouseCloudFlamegraph(run.queryId, run.createdAt, run.finishedAt);
+            }
+            if (view === 'pipeline') {
+                if (!cloud.manifest?.pipeline.available) throw new CloudRequestError('CAPABILITY_UNAVAILABLE', cloud.manifest?.pipeline.reason ?? 'ClickHouse pipeline evidence is unavailable.', 409);
+                const prefix = sqlForRunKind('', run.kind);
+                const sql = run.kind !== 'query' && run.sql.startsWith(prefix)
+                    ? run.sql.slice(explainPrefixLength(run.kind))
+                    : run.sql;
+                const raw = await loadClickHouseCloudPipeline(sql, run.parameters);
+                const parsed = parsePipelineResult(raw);
+                if (!parsed) throw new Error('ClickHouse returned no structured EXPLAIN PIPELINE graph for this query.');
+                return parsed satisfies ProfilePipeline;
+            }
+            const queryLogAvailable = Boolean(cloud.manifest?.queryLog.available && cloud.manifest.queryLogSource);
+            const evidence = queryLogAvailable ? await loadClickHouseCloudProfileEvidence(run.queryId).catch(() => []) : [];
+            return buildQueryProfile(run, evidence, {
+                queryLogAvailable,
+                pipelineAvailable: Boolean(cloud.manifest?.pipeline.available),
+                notice: queryLogAvailable
+                    ? 'ClickHouse query-log rows may arrive after a server flush interval. Missing rows are shown as unavailable, not estimated.'
+                    : cloud.manifest?.queryLog.reason ?? 'Query-log access is unavailable. Only retained run metrics are shown.',
+            }) satisfies QueryProfile;
+        }
+        if (view === 'flamegraph') {
+            if (!this.trusted) throw new Error('Trust this connection before inspecting profiler samples.');
+            if (run.status === 'running' || run.status === 'queued') throw new Error('Wait for the query to finish before loading its flamegraph.');
+            return demoFlamegraph(run.queryId);
+        }
+        const pipeline = {
+            available: true, source: 'query_shape' as const, truncated: false,
+            nodes: [
+                { id: 'read', label: 'Sample rows', kind: 'read' as const, status: 'estimated' as const, rows: String(run.rowCount) },
+                { id: 'output', label: 'Output', kind: 'output' as const, status: 'estimated' as const, rows: String(run.rowCount) },
+            ],
+            edges: [{ source: 'read', target: 'output' }],
+        };
+        if (view === 'pipeline') return pipeline;
+        return {
+            version: 1, queryId: run.queryId, runId: run.id,
+            summary: { durationMs: run.elapsedMs, resultRows: run.rowCount, readRows: String(run.rowCount), readBytes: String(run.bytes) },
+            insights: [], pipeline,
+            capabilities: { queryLog: false, pipelineGraph: true, indexAnalysis: false, runtimePlan: false },
+            evidence: [], notice: 'Generated preview data only. This is not a ClickHouse profile.',
+        };
     }
 }

@@ -12,6 +12,7 @@ export function useImportJobPolling({
     setBusy,
     setError,
     onSucceeded,
+    onNeedsInspection,
     cloudImport = false,
 }: {
     open: boolean;
@@ -22,10 +23,13 @@ export function useImportJobPolling({
     setBusy: Dispatch<SetStateAction<BusyAction>>;
     setError: Dispatch<SetStateAction<string>>;
     onSucceeded: (job: ImportJob) => void;
+    onNeedsInspection: (job: ImportJob) => void;
     cloudImport?: boolean;
 }) {
     const onSucceededRef = useRef(onSucceeded);
+    const onNeedsInspectionRef = useRef(onNeedsInspection);
     onSucceededRef.current = onSucceeded;
+    onNeedsInspectionRef.current = onNeedsInspection;
 
     useEffect(() => {
         if (!open || step !== 'status' || job?.status !== 'running') return;
@@ -47,6 +51,7 @@ export function useImportJobPolling({
                     : items.map(item => item.id === next.id ? next : item));
                 setBusy('');
                 if (next.status === 'succeeded') onSucceededRef.current(next);
+                else if (next.status === 'unknown' && next.tableExists) onNeedsInspectionRef.current(next);
             } catch (caught) {
                 if (current) setError(`Could not refresh import status: ${message(caught)}`);
             } finally {

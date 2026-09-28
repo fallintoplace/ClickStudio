@@ -6,3 +6,11 @@ export interface CreateTableColumn {
     type: CreateTableColumnType;
     generatedId?: boolean;
 }
+
+export function isValidTableDatabase(value: unknown): value is string {
+    return typeof value === 'string' && value.length > 0 && value.length <= 128 && !value.includes('.') &&
+        [...value].every(character => {
+            const code = character.charCodeAt(0);
+            return code >= 0x20 && code !== 0x7f;
+        });
+}
