@@ -116,6 +116,7 @@ test('Object explorer shows ClickHouse metadata, searchable children, and genera
     await sqlTabs.getByRole('tab', { name: originalTabName!, exact: true }).click();
     await expect(page.locator('#sql-editor-content')).toBeHidden();
 
+    await page.getByRole('button', { name: '‹ Objects', exact: true }).click();
     const search = page.getByTestId('schema-search');
     await search.fill('tenant_bloom');
     await expect(page.getByText('tenant_bloom', { exact: true })).toBeVisible();

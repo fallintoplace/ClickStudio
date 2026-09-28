@@ -56,7 +56,6 @@ test('Experimental mode uses the Standard right inspector layout', async ({ page
     await inspector.getByRole('button', { name: 'More workspace panels', exact: true }).click();
     await page.getByRole('menuitem', { name: 'Queries', exact: true }).click();
     await expect(inspector.getByRole('heading', { name: 'Queries', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Ask AI', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Run', exact: true })).toBeVisible();
 });
@@ -234,13 +233,13 @@ test('EXPLAIN PIPELINE opens an interactive ClickHouse operator graph', async ({
     await expect(controls.getByLabel('Zoom level')).toHaveText(zoomBeforeEditorFocus);
 });
 
-test('Experimental panels stay reachable through Ask AI and More', async ({ page }) => {
+test('Experimental panels stay reachable through the workspace rail and More', async ({ page }) => {
     await trust(page);
     await page.getByRole('button', { name: 'More workspace panels', exact: true }).click();
     await page.getByRole('menuitem', { name: 'Runs', exact: true }).click();
     await expect(page.locator('.inspector-header h2')).toHaveText('Run history');
 
-    await page.getByRole('button', { name: 'Ask AI', exact: true }).click();
+    await page.locator('.icon-rail').getByRole('button', { name: 'AI', exact: true }).click();
     await expect(page.locator('.inspector-header h2')).toHaveText('AI');
     await expect(page.locator('.assistant-panel')).toBeVisible();
     await expect(page.locator('.cm-content')).toContainText('SELECT');

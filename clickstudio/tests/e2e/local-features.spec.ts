@@ -52,9 +52,12 @@ test('Result export downloads the complete retained CSV from the server', async 
     const runs = countRuns(page);
     await trust(page);
     await run(page);
+    await page.locator('.inspector-footer').getByRole('button', { name: 'Export', exact: true }).click();
+    const exportDialog = page.getByRole('dialog', { name: 'Export', exact: true });
+    await expect(exportDialog).toBeVisible();
     const [download] = await Promise.all([
         page.waitForEvent('download'),
-        page.locator('.inspector-footer').getByRole('button', { name: 'Export', exact: true }).click(),
+        exportDialog.getByRole('button', { name: /Export rows \(\.csv\)/ }).click(),
     ]);
     const csv = await downloadedText(download);
     expect(csv.split('\r\n')).toHaveLength(8);

@@ -152,6 +152,7 @@
     .sql-editor .cm-selectionBackground, .sql-editor ::selection { background: var(--editor-selection) !important; }
     .sql-editor .cm-cursor { border-left-width: 2px; }
     .sql-editor .cm-tooltip { z-index: var(--z-editor-tooltip); border: 1px solid var(--line-bright); border-radius: 9px; background: var(--panel-raised); color: var(--text); box-shadow: var(--shadow); }
+    .sql-editor .cm-completionInfo { pointer-events: none; }
     .sql-editor .cm-tooltip-lint { box-sizing: border-box; width: max-content; max-width: min(560px, calc(100vw - 32px)); max-height: min(184px, 34vh); overflow: auto; border-color: color-mix(in srgb, var(--red) 38%, var(--line-bright)); }
     .sql-editor .cm-tooltip-lint .cm-diagnostic { margin: 0; padding: 10px 12px; border-left: 3px solid var(--red); color: var(--text-soft); font-family: var(--font-sans); font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; white-space: pre-wrap; }
     .sql-editor .cm-tooltip-autocomplete ul li[aria-selected] { background: color-mix(in srgb, var(--accent) 16%, var(--panel)); color: var(--text); }
