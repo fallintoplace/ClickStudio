@@ -189,11 +189,12 @@
     .results-title h2 { font-size: 10px; }
     .results-title > .inline-flex { display: none; }
     .results-header .toolbar-small { display: none; }
-    .result-summary-row { flex-wrap: wrap; padding: 7px 9px; font-size: 8px; }
-    .result-filter { flex: 1; justify-content: flex-end; }
+    .result-filter { flex: 1; justify-content: flex-start; }
     .result-filter input { width: min(38vw, 160px); }
-    .table-pagination { flex-wrap: wrap; justify-content: center; font-size: 8px; }
-    .table-pagination > span { width: 100%; text-align: center; }
+    .table-pagination { flex-wrap: wrap; justify-content: flex-start; gap: 7px 10px; font-size: 8px; }
+    .table-pagination-summary { width: 100%; flex: 1 1 100%; justify-content: center; text-align: center; }
+    .table-pagination > .result-filter { flex: 1 1 220px; }
+    .table-pagination-controls { margin-left: auto; }
     .insight-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .insights-heading { flex-direction: column; }
     .run-analysis-columns { grid-template-columns: 1fr; }
