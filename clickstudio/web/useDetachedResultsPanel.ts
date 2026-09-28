@@ -63,10 +63,11 @@ export function useDetachedResultsPanel({
         dock();
         setNotice(copy.resultsWindowDocked);
     }, [copy.resultsWindowDocked, dock, setNotice]);
+    const closeResults = useCallback(() => dock(), [dock]);
 
     const focusResults = useCallback(() => {
         if (!focus()) dockResults();
     }, [dockResults, focus]);
 
-    return { detached, openResults, dockResults, focusResults };
+    return { detached, openResults, dockResults, closeResults, focusResults };
 }

@@ -36,6 +36,8 @@ export type WorkspaceQueryPanelState = Readonly<{
     inspector: Inspector;
     demoMode: boolean;
     view: ResultsView;
+    saveStatus: WorkspaceViewState['saveStatus'];
+    saveStatusLabel: string;
 }>;
 
 export type WorkspaceQueryPanelActions = Readonly<{
@@ -84,6 +86,8 @@ export function WorkspaceQueryPanel({
         inspector,
         demoMode,
         view,
+        saveStatus,
+        saveStatusLabel,
     } = state;
     const { statementCount, editorErrorContext, editorErrorRange } = viewState;
     const {
@@ -127,6 +131,7 @@ export function WorkspaceQueryPanel({
             </div>}
             <div className="editor-heading-actions">
                 {experience === 'beginner' && <>
+                    <span className="draft-status standard-draft-status" data-save-state={saveStatus.state} title={`${saveStatus.label}. ${saveStatus.detail}`} role="status"><span className={cx('status-light', saveStatus.state === 'saved' ? 'is-trusted' : ['changed', 'conflict', 'deleted', 'unavailable'].includes(saveStatus.state) ? 'is-warning' : '')}/>{saveStatusLabel}</span>
                     <Button variant="ghost" className="sql-ai-button" data-testid="open-ai" aria-label={copy.common.askAi} aria-pressed={inspector === 'assistant'} onClick={actions.onOpenAssistant}><Icon name="assistant"/>{copy.common.askAi}</Button>
                     <Button variant="ghost" className="toolbar-small standard-format-button" data-testid="format-sql" aria-label={copy.common.formatSql} title={copy.common.formatSql} onClick={() => void actions.onFormat(standardFormatter)}>{copy.common.format}</Button>
                     <Button variant="primary" className="run-query-button compact-run-button" data-testid="run-button" aria-label={copy.common.run} title={runTitle} onClick={() => void runSql()} disabled={runDisabled}><Icon name="play"/>{busy === 'run' || busy === 'script' ? copy.common.running : copy.common.run}</Button>

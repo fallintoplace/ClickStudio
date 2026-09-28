@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import type { WorkspaceState } from './workspace-state';
+import { newDraft, type Draft, type WorkspaceState } from './workspace-state';
 
 export function useWorkspaceTabs(workspace: WorkspaceState, setWorkspace: Dispatch<SetStateAction<WorkspaceState>>) {
-    const active = workspace.tabs.find(tab => tab.id === workspace.activeId) ?? workspace.tabs[0]!;
+    const emptyDraft = useRef<Draft | null>(null);
+    if (workspace.tabs.length) emptyDraft.current = null;
+    const active = workspace.tabs.find(tab => tab.id === workspace.activeId) ?? workspace.tabs[0] ?? (emptyDraft.current ??= newDraft());
     const tabScrollerRef = useRef<HTMLDivElement>(null);
     const [tabScrollState, setTabScrollState] = useState({ overflow: false, canScrollLeft: false, canScrollRight: false });
     const [renamingTabId, setRenamingTabId] = useState<string>();

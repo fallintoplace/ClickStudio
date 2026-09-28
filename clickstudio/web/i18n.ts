@@ -7,6 +7,7 @@ import {
     objectExplorerTranslations,
     referenceCatalogTranslations,
     referenceTranslations,
+    emptyWorkspaceTranslations,
     translations,
     workspaceCommonTranslations,
 } from './i18n-translations.js';
@@ -64,6 +65,8 @@ export interface Copy {
         restore: string;
         closedSqlTabs: string;
         startBlankSql: string;
+        noSqlTabsOpen: string;
+        noSqlTabsOpenDescription: string;
         help: string;
         closeHelp: string;
         helpCenterTitle: string;
@@ -577,7 +580,7 @@ export function getCopy(locale: Locale): Copy {
     return {
         app: { ...mergeSection(english.app, translated), ...chrome.app },
         auth: { ...mergeSection(english.auth, translated), ...chrome.auth },
-        common: { ...mergeSection(english.common, translated), ...exampleCommonTranslations[locale], ...workspaceCommonTranslations[locale], ...referenceTranslations[locale], ...referenceCatalogTranslations[locale], ...objectExplorerTranslations[locale], ...explainCommonTranslations[locale] },
+        common: { ...mergeSection(english.common, translated), ...exampleCommonTranslations[locale], ...workspaceCommonTranslations[locale], ...referenceTranslations[locale], ...referenceCatalogTranslations[locale], ...objectExplorerTranslations[locale], ...explainCommonTranslations[locale], ...emptyWorkspaceTranslations[locale] },
         chart: mergeSection(english.chart, translated),
     };
 }

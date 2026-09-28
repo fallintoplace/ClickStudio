@@ -25,6 +25,7 @@ function previewStarterDraft(starter: typeof DEMO_PREVIEW_INITIAL_STARTERS[numbe
 export function initialWorkspaceState(connectionId: string): WorkspaceState {
     const recovered = recover(workspaceStateKey(connectionId));
     if (!isFrontendDemoPreview) return recovered;
+    if (!recovered.tabs.length) return recovered;
     const activeId = recovered.tabs.find(tab => tab.id === recovered.activeId)?.id ?? recovered.tabs[0]!.id;
     const active = recovered.tabs.find(tab => tab.id === activeId)!;
     const isStarterDraft = active.name === 'Getting started.sql'

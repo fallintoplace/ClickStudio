@@ -67,6 +67,7 @@ export function useDetachedQueryEditor({
         dock();
         setNotice(copy.queryWindowDocked);
     }, [copy.queryWindowDocked, dock, setNotice]);
+    const closeEditor = useCallback(() => dock(), [dock]);
 
     const focusEditor = useCallback(() => {
         if (!focus()) {
@@ -76,5 +77,5 @@ export function useDetachedQueryEditor({
         window.requestAnimationFrame(() => editorRef.current?.focus());
     }, [dockEditor, editorRef, focus]);
 
-    return { detached, openEditor, dockEditor, focusEditor };
+    return { detached, openEditor, dockEditor, closeEditor, focusEditor };
 }

@@ -43,6 +43,8 @@ export const english: Copy = {
         restore: 'Restore',
         closedSqlTabs: 'Recently closed SQL tabs',
         startBlankSql: 'Blank SQL',
+        noSqlTabsOpen: 'No SQL tabs open',
+        noSqlTabsOpenDescription: 'Start a blank query or restore a recently closed tab.',
         help: 'Help',
         closeHelp: 'Close help',
         helpCenterTitle: 'Explore ClickStudio',

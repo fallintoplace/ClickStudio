@@ -138,6 +138,15 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         renamingTabId, tabRenameValue, setTabRenameValue,
         beginTabRename, finishTabRename, cancelTabRename,
     } = useWorkspaceTabs(workspace, setWorkspace);
+    const emptySqlActionRef = useRef<HTMLButtonElement>(null);
+    const previousTabCount = useRef(workspace.tabs.length);
+    useEffect(() => {
+        const closedLastTab = previousTabCount.current > 0 && workspace.tabs.length === 0;
+        previousTabCount.current = workspace.tabs.length;
+        if (!closedLastTab) return;
+        const frame = window.requestAnimationFrame(() => emptySqlActionRef.current?.focus());
+        return () => window.cancelAnimationFrame(frame);
+    }, [workspace.tabs.length]);
     const activeRunId = active.activeRunId;
     const activeRunIdRef = useRef(activeRunId);
     activeRunIdRef.current = activeRunId;
@@ -686,6 +695,11 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         }
         void executeSqlForDraft(draft, draft.sql, { expandResults: true, trackChartRun: true, preview: true });
     };
+    const startBlankSql = () => {
+        if (!openNewDraft(newDraft())) return false;
+        window.requestAnimationFrame(() => editor.current?.focus());
+        return true;
+    };
     const inspectorProps = {
         copy: copy.common,
         inspector,
@@ -768,7 +782,8 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
 
     const queryPanel = <WorkspaceQueryPanel
         state={{ active, connection, schema, copy, experience, dark, nativeParserEnabled, nativeParserStatus,
-            trusted, unsupportedParameters, parameters, busy, inspector, demoMode, view }}
+            trusted, unsupportedParameters, parameters, busy, inspector, demoMode, view,
+            saveStatus, saveStatusLabel }}
         actions={{
             onPatch: patch,
             onToggleSqlMap: () => {
@@ -855,7 +870,14 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
                     finishTabRename={finishTabRename}
                     cancelTabRename={cancelTabRename}
                     onActivate={draftId => setWorkspace(current => ({ ...current, activeId: draftId }))}
-                    onClose={draftId => { setWorkspace(current => closeDraft(current, draftId)); clearFailedQueryError(draftId); }}
+                    onClose={draftId => {
+                        if (workspace.tabs.length === 1) {
+                            detachedEditor.closeEditor();
+                            detachedResults.closeResults();
+                        }
+                        setWorkspace(current => closeDraft(current, draftId));
+                        clearFailedQueryError(draftId);
+                    }}
                     actions={<>
                     <button className={cx('new-tab-button', experience === 'expert' && 'new-tab-labeled')} data-testid="new-sql" type="button" aria-label={copy.common.newSql} title={copy.common.newSql} aria-haspopup="dialog" aria-expanded={helpPanelOpen} aria-controls="workspace-help-panel" onClick={event => openExamples(event.currentTarget)}><Icon name="plus"/>{experience === 'expert' && <span>{copy.common.newSql}</span>}</button>
                         <WorkspaceHelpPanel
@@ -914,24 +936,20 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
                                 return true;
                             }}
                             onRunExample={runExample}
-                            onStartBlankSql={() => {
-                                if (!openNewDraft(newDraft())) return false;
-                                window.requestAnimationFrame(() => editor.current?.focus());
-                                return true;
-                            }}
+                            onStartBlankSql={startBlankSql}
                         />
-                        {experience === 'expert' && !!workspace.closedTabs?.length && <RestoreSqlMenu closedTabs={workspace.closedTabs} copy={copy.common} onRestore={draftId => {
+                        {!!workspace.closedTabs?.length && <RestoreSqlMenu closedTabs={workspace.closedTabs} copy={copy.common} onRestore={draftId => {
                             if (workspaceRef.current.tabs.length >= MAX_TABS) { setError(`Close a tab before restoring one. This workspace supports ${MAX_TABS} open drafts.`); return false; }
                             setWorkspace(current => reopenDraft(current, draftId));
                             window.requestAnimationFrame(() => editor.current?.focus());
                             return true;
                         }}/>}
-                        {experience === 'expert' && <span className="draft-status" data-save-state={saveStatus.state} title={`${saveStatus.label}. ${saveStatus.detail}`}><span className={cx('status-light', saveStatus.state === 'saved' ? 'is-trusted' : ['changed', 'conflict', 'deleted', 'unavailable'].includes(saveStatus.state) ? 'is-warning' : '')}/>{saveStatusLabel}</span>}
+                        {experience === 'expert' && workspace.tabs.length > 0 && <span className="draft-status" data-save-state={saveStatus.state} title={`${saveStatus.label}. ${saveStatus.detail}`}><span className={cx('status-light', saveStatus.state === 'saved' ? 'is-trusted' : ['changed', 'conflict', 'deleted', 'unavailable'].includes(saveStatus.state) ? 'is-warning' : '')}/>{saveStatusLabel}</span>}
                         {experience === 'expert' && active.serverId && <Button variant="ghost" className="revision-history-trigger" aria-label={`Version history for ${active.name}`} aria-pressed={inspector === 'revisions'} title="View saved versions" onClick={() => showInspector('revisions')}><Icon name="history"/><span>Versions</span></Button>}
 
                     </>}
                 />
-                <div
+                {workspace.tabs.length > 0 ? <div
                     ref={panels.workspaceContentRef}
                     id="sql-document-panel"
                     role="tabpanel"
@@ -967,7 +985,12 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
                             onDock={detachedResults.dockResults}
                         />
                         : resultsPanel}
-                </div>
+                </div> : <section className="empty-sql-workspace" role="tabpanel" aria-label={copy.common.noSqlTabsOpen}>
+                    <Icon name="documents"/>
+                    <h2>{copy.common.noSqlTabsOpen}</h2>
+                    <p>{copy.common.noSqlTabsOpenDescription}</p>
+                    <button ref={emptySqlActionRef} type="button" className="button-base button-primary" onClick={startBlankSql}><Icon name="plus"/>{copy.common.startBlankSql}</button>
+                </section>}
             </main>
 
             {inspectorDocked && <InspectorPane {...inspectorProps} docked onClose={() => setDrawerOpen(false)}/>}

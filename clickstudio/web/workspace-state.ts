@@ -23,11 +23,11 @@ export interface Draft extends SaveableDraft {
 export interface WorkspaceState {
     version: 1;
     tabs: Draft[];
-    activeId: string;
+    activeId: string | undefined;
     closedTabs?: Draft[];
     recoveryWarning?: string;
 }
-export const newDraft = (name = 'Untitled.sql', sql = SAMPLE_SQL): Draft => ({ id: crypto.randomUUID(), name, sql, parameters: {}, chart: { kind: 'table', x: 0, ys: [], title: 'Query result' }, runIds: [], checkpoints: [], from: 0, to: 0, kind: 'query', dependencies: [] });
+export const newDraft = (name = 'Untitled.sql', sql = ''): Draft => ({ id: crypto.randomUUID(), name, sql, parameters: {}, chart: { kind: 'table', x: 0, ys: [], title: 'Query result' }, runIds: [], checkpoints: [], from: 0, to: 0, kind: 'query', dependencies: [] });
 export const MAX_TABS = 30;
 export const MAX_CLOSED_TABS = 10;
 export function draftFromDocument(document: QueryDocument): Draft {
@@ -140,16 +140,17 @@ export function recover(key: string, storage?: Pick<Storage, 'getItem'>): Worksp
             const incomplete = !Array.isArray(value.tabs) || tabs.length !== storedTabs.length ||
                 closedTabs.length !== storedClosed.length || (value.closedTabs !== undefined && !Array.isArray(value.closedTabs));
             // A damaged open-tab list must not erase an otherwise usable closed history.
-            if (!tabs.length) tabs.push(newDraft('Getting started.sql'));
+            if (!tabs.length && (!Array.isArray(value.tabs) || storedTabs.length > 0))
+                tabs.push(newDraft('Getting started.sql', SAMPLE_SQL));
             return {
                 version: 1, tabs, closedTabs,
-                activeId: tabs.find(t => t.id === value.activeId)?.id ?? tabs[0]!.id,
+                activeId: tabs.find(t => t.id === value.activeId)?.id ?? tabs[0]?.id,
                 recoveryWarning: incomplete ? 'Some stored tabs could not be recovered. Valid SQL drafts were kept.' : undefined,
             };
         }
     }
     catch { /* Corrupt or unavailable browser storage never prevents opening the editor. */ }
-    const draft = newDraft('Getting started.sql');
+    const draft = newDraft('Getting started.sql', SAMPLE_SQL);
     return { version: 1, tabs: [draft], activeId: draft.id, closedTabs: [] };
 }
 
@@ -159,9 +160,8 @@ export function closeDraft(state: WorkspaceState, draftId: string): WorkspaceSta
     if (i === -1) return state;
     const closed = state.tabs[i]!;
     const tabs = state.tabs.filter(d => d.id !== draftId);
-    if (!tabs.length) tabs.push(newDraft());
     return { ...state, tabs,
-        activeId: state.activeId === draftId ? tabs[Math.min(i, tabs.length - 1)]!.id : state.activeId,
+        activeId: state.activeId === draftId ? tabs[Math.min(i, tabs.length - 1)]?.id : state.activeId,
         closedTabs: [closed, ...(state.closedTabs ?? []).filter(d => d.id !== draftId)].slice(0, MAX_CLOSED_TABS),
     };
 }

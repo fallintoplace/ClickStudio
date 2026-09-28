@@ -1,5 +1,10 @@
 @layer components {
     .workspace-content { display: grid; min-height: 0; flex: 1; grid-template-rows: minmax(0, 1fr); gap: 10px; padding: 12px; overflow: auto; }
+    .empty-sql-workspace { display: flex; min-width: 0; min-height: 0; flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 11px; overflow: auto; padding: 24px; text-align: center; }
+    .empty-sql-workspace > svg { width: 32px; height: 32px; color: var(--signal-accent); }
+    .empty-sql-workspace h2 { margin: 0; color: var(--text); font-family: var(--font-display); font-size: 18px; font-weight: 680; letter-spacing: -.02em; }
+    .empty-sql-workspace p { max-width: 420px; margin: 0 0 3px; color: var(--muted); font-size: 10px; line-height: 1.55; }
+    .empty-sql-workspace > .button-base { min-height: 34px; }
     .workspace-content.has-run { grid-template-rows: minmax(205px, 1.08fr) minmax(185px, .92fr); }
     .workspace-content.has-run.is-query-collapsed { grid-template-rows: auto minmax(0, 1fr); }
     .workspace-content.has-run.is-results-collapsed { grid-template-rows: minmax(0, 1fr) auto; }

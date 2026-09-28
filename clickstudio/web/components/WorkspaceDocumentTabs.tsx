@@ -132,10 +132,10 @@ export function WorkspaceDocumentTabs({
                     const unsaved = ['local', 'changed', 'conflict', 'deleted', 'unavailable'].includes(status.state);
                     return unsaved ? <span className="tab-unsaved" title={status.label} aria-hidden="true"/> : null;
                 })()}
-                {!compactSingleTab && <button type="button" aria-label={`Close ${draft.name}`} onClick={event => {
+                <button type="button" aria-label={`Close ${draft.name}`} title={`Close ${draft.name}`} onClick={event => {
                     event.stopPropagation();
                     onClose(draft.id);
-                }}>×</button>}
+                }}>×</button>
             </div>)}
         </div>
         <div className="document-tab-actions">
