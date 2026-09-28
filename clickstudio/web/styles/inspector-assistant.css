@@ -303,6 +303,11 @@
     .proposal-heading { display: flex; align-items: center; gap: 9px; }
     .proposal-heading > div { display: grid; min-width: 0; gap: 4px; }
     .proposal-heading strong { font-size: 9px; line-height: 1.45; }
+    .assistant-proposal-summary { min-width: 0; color: var(--text); font-size: 9px; font-weight: 700; line-height: 1.45; overflow-wrap: anywhere; }
+    .assistant-proposal-summary > :first-child { margin-top: 0; }
+    .assistant-proposal-summary > :last-child { margin-bottom: 0; }
+    .assistant-proposal-summary p { margin: 0; }
+    .assistant-proposal-summary a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
     .assistant-answer-markdown { min-width: 0; color: var(--text-soft); font-size: 9px; line-height: 1.55; overflow-wrap: anywhere; }
     .assistant-answer-markdown > :first-child { margin-top: 0; }
     .assistant-answer-markdown > :last-child { margin-bottom: 0; }

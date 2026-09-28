@@ -165,7 +165,8 @@ test('Switching to Experimental keeps the AI chat, query and run evidence', asyn
         await route.fulfill({ json: {
             id: 'test-proposal', owner: 'local-owner', connectionId: 'demo', action: 'ask', createdAt: '2026-09-23T00:00:00.000Z',
             baseSql: proposalBaseSql, responseId: 'test-response', model: 'test-model', promptVersion: 'test', contextSummary: ['Fixture-backed mock'], decision: 'pending',
-            sql: generatedSql, summary: 'Show the sample event counts by day.', assumptions: [], tables: ['demo.events'], caveats: ['The demo fixture does not evaluate SQL.'], clarification: null, findings: [],
+            sql: generatedSql, summary: 'Show the sample event counts by day. ([nba.com](https://www.nba.com/news/history-nba-champions?lid=odtil4le7cgc))', assumptions: [], tables: ['demo.events'], caveats: ['The demo fixture does not evaluate SQL.'], clarification: null, findings: [],
+            sources: [{ title: 'NBA champions', url: 'https://www.nba.com/news/history-nba-champions?lid=odtil4le7cgc' }],
             quality: { evaluatorVersion: 'test', evaluatedAt: '2026-09-23T00:00:00.000Z', status: 'pass', score: 100, checks: [] },
         } });
     });
@@ -177,7 +178,8 @@ test('Switching to Experimental keeps the AI chat, query and run evidence', asyn
         await route.fulfill({ json: {
             id: 'test-proposal', owner: 'local-owner', connectionId: 'demo', action: 'ask', createdAt: '2026-09-23T00:00:00.000Z', decidedAt: '2026-09-23T00:00:01.000Z',
             baseSql: proposalBaseSql, responseId: 'test-response', model: 'test-model', promptVersion: 'test', contextSummary: ['Fixture-backed mock'], decision,
-            sql: generatedSql, summary: 'Show the sample event counts by day.', assumptions: [], tables: ['demo.events'], caveats: [], clarification: null, findings: [],
+            sql: generatedSql, summary: 'Show the sample event counts by day. ([nba.com](https://www.nba.com/news/history-nba-champions?lid=odtil4le7cgc))', assumptions: [], tables: ['demo.events'], caveats: [], clarification: null, findings: [],
+            sources: [{ title: 'NBA champions', url: 'https://www.nba.com/news/history-nba-champions?lid=odtil4le7cgc' }],
         } });
     });
 
@@ -189,7 +191,15 @@ test('Switching to Experimental keeps the AI chat, query and run evidence', asyn
     const prompt = page.getByRole('textbox', { name: 'Ask AI', exact: true });
     await prompt.fill('Show event counts by day');
     await page.locator('.assistant-panel').getByRole('button', { name: 'Send', exact: true }).click();
-    await expect(page.locator('.proposal-card').getByText('Show the sample event counts by day.', { exact: true })).toBeVisible();
+    const summary = page.getByTestId('assistant-proposal-summary');
+    await expect(summary).toContainText('Show the sample event counts by day.');
+    const citation = summary.getByRole('link', { name: 'nba.com', exact: true });
+    await expect(citation).toHaveAttribute('href', 'https://www.nba.com/news/history-nba-champions?lid=odtil4le7cgc');
+    await expect(citation).toHaveAttribute('target', '_blank');
+    await expect(citation).toHaveAttribute('rel', 'noreferrer');
+    await expect(summary).not.toContainText('[nba.com]');
+    const webSource = page.locator('.assistant-web-sources').getByRole('link', { name: 'NBA champions', exact: true });
+    await expect(webSource).toHaveAttribute('href', 'https://www.nba.com/news/history-nba-champions?lid=odtil4le7cgc');
     await expect(page.locator('.assistant-answer-markdown')).toHaveCount(0);
     await expect(page.locator('.proposal-card').getByTestId('sql-proposal-diff')).toBeVisible();
     expect(generations).toHaveLength(1);
