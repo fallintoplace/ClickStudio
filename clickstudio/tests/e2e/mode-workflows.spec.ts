@@ -318,12 +318,7 @@ test('Ask AI previews mixed writes and keeps UPDATE and DELETE alternatives sepa
     const combinedSql = 'SELECT id FROM demo.events WHERE id = 1; ALTER TABLE demo.events UPDATE status = \'reviewed\' WHERE id = 1; ALTER TABLE demo.events DELETE WHERE id = 1';
     const updateSql = 'SELECT id FROM demo.events WHERE id = 1; ALTER TABLE demo.events UPDATE status = \'reviewed\' WHERE id = 1';
     const deleteSql = 'SELECT id FROM demo.events WHERE id = 1; ALTER TABLE demo.events DELETE WHERE id = 1';
-    const runRequests: Record<string, unknown>[] = [];
     let proposalBaseSql = '';
-    page.on('request', request => {
-        if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/runs')
-            runRequests.push(jsonRecord(request.postDataJSON(), 'Run request'));
-    });
     await page.route('**/api/assistant/sql', async route => {
         const body = jsonRecord(route.request().postDataJSON(), 'Assistant request');
         proposalBaseSql = String(body.sql ?? '');
@@ -362,23 +357,31 @@ test('Ask AI previews mixed writes and keeps UPDATE and DELETE alternatives sepa
     await expect(recommended.locator('li').nth(0)).toHaveAttribute('data-operation', 'read');
     await expect(recommended.locator('li').nth(1)).toHaveAttribute('data-operation', 'update');
     await expect(recommended.locator('li').nth(2)).toHaveAttribute('data-operation', 'delete');
+    await expect(recommended.locator('li').nth(0).locator('pre')).toBeHidden();
+    await expect(recommended.locator('li').nth(1).locator('pre')).toBeHidden();
+    await expect(recommended.locator('li').nth(2).locator('pre')).toBeHidden();
     await expect(alternative).toContainText('Update matching row');
     await expect(deleteAlternative).toContainText('Delete matching row');
     await expect(alternative.locator('li').nth(1)).toHaveAttribute('data-operation', 'update');
     await expect(deleteAlternative.locator('li').nth(1)).toHaveAttribute('data-operation', 'delete');
-    expect(runRequests).toHaveLength(0);
 
     await page.getByRole('button', { name: 'Use this query', exact: true }).click();
-    await expect(recommended.getByRole('button', { name: 'Review run of 3 statements', exact: true })).toBeVisible();
+    await expect(recommended.getByText('UPDATE runs before DELETE, which may remove the changed rows.', { exact: false })).toBeVisible();
+    await expect(recommended.getByText(/ClickHouse mutations may finish asynchronously\./)).toBeVisible();
+    await expect(recommended.getByRole('button', { name: 'Run all 3 statements', exact: true })).toBeVisible();
+    await expect(recommended.getByRole('button', { name: /Review run|Confirm and run all/ })).toHaveCount(0);
     await expect(alternative.getByRole('button', { name: 'Run alternative: Update matching row', exact: true })).toBeVisible();
     await expect(deleteAlternative.getByRole('button', { name: 'Run alternative: Delete matching row', exact: true })).toBeVisible();
-    await recommended.getByRole('button', { name: 'Review run of 3 statements', exact: true }).click();
-    await expect(recommended.getByRole('alert')).toContainText('DELETE may remove rows changed by the UPDATE');
-    await expect(recommended.getByRole('alert')).toContainText('mutations can finish asynchronously');
-    await expect(recommended.getByRole('button', { name: 'Confirm and run all', exact: true })).toBeVisible();
     await expect(recommended.getByRole('button', { name: 'Run only statement 2: Update', exact: true })).toBeVisible();
     await expect(recommended.getByRole('button', { name: 'Run only statement 3: Delete', exact: true })).toBeVisible();
-    expect(runRequests).toHaveLength(0);
+    const readStep = recommended.locator('li').nth(0);
+    await expect(readStep.getByRole('button', { name: 'Run only statement 1: Read', exact: true })).toBeVisible();
+    await expect(readStep.getByRole('button', { name: 'Run only statement 1: Read', exact: true })).toBeEnabled();
+    await readStep.locator('summary').click();
+    await expect(readStep.locator('pre')).toBeVisible();
+
+    await recommended.getByRole('button', { name: 'Run all 3 statements', exact: true }).click();
+    await expect(page.getByTestId('query-failure')).toContainText('READ_ONLY_SQL');
 });
 
 test('Standard can run a script and open its statement results', async ({ page }) => {

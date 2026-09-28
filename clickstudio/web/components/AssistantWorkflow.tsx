@@ -153,37 +153,29 @@ function AssistantExecutionOption({ title, summary, sql, accepted, busy, runDisa
 }) {
     const outline = useMemo(() => statementOutline(sql), [sql]);
     const statements = outline.statements;
-    const needsConfirmation = statements.length > 1 && statements.some(statement => statement.operation !== 'read');
     const hasUpdateBeforeDelete = statements.some((statement, index) => statement.operation === 'update' && statements.slice(index + 1).some(next => next.operation === 'delete'));
     const firstOperation = statements[0]?.operation;
-    const [confirming, setConfirming] = useState(false);
     const runBlocked = !accepted || busy || runDisabled(sql) || Boolean(outline.error) || !statements.length || statements.length > 50;
-    const operations = [...new Set(statements.filter(statement => statement.operation !== 'read').map(statement => operationLabels[statement.operation].toUpperCase()))];
-    const confirmationText = hasUpdateBeforeDelete
-        ? `This submits all ${statements.length} statements in order. It submits UPDATE before DELETE, so the DELETE may remove rows changed by the UPDATE. ClickHouse mutations can finish asynchronously.`
-        : `This submits all ${statements.length} statements in order, including ${operations.join(', ') || 'unknown operations'} that may change data or schema.`;
+    const hasMutation = statements.some(statement => statement.operation === 'update' || statement.operation === 'delete');
 
     return <section className="assistant-execution-option" aria-label={`Execution plan: ${title}`} data-testid="assistant-execution-option">
         <header className="assistant-execution-heading">
-            <div><span className="eyebrow">{alternative ? 'ALTERNATIVE' : statements.length > 1 ? 'SCRIPT PLAN' : 'RECOMMENDED OPTION'}</span><strong>{title}</strong>{summary && <p>{summary}</p>}</div>
+            <div><span className="eyebrow">{alternative ? 'ALTERNATIVE' : statements.length > 1 ? 'SCRIPT PLAN' : 'RECOMMENDED OPTION'}</span><strong>{title}</strong>{summary && <p>{summary}</p>}{hasMutation && <p className="assistant-execution-warning" role="status">{hasUpdateBeforeDelete ? 'UPDATE runs before DELETE, which may remove the changed rows. ' : ''}ClickHouse mutations may finish asynchronously.</p>}</div>
             <span className="assistant-execution-count">{statements.length} {statements.length === 1 ? 'statement' : 'statements'}{statements.length > 1 ? ' · runs in order' : ''}</span>
         </header>
         {outline.error && <p className="assistant-execution-error" role="alert">Could not split this SQL safely: {outline.error}</p>}
         {!outline.error && !statements.length && <p className="assistant-execution-error" role="alert">There are no SQL statements to run.</p>}
         <ol className="assistant-execution-steps" aria-label="Statements in execution order">
             {statements.slice(0, 50).map((statement, index) => <li key={`${statement.from}-${index}`} data-operation={statement.operation}>
-                <div className="assistant-execution-step-heading"><span className="assistant-execution-number">{index + 1}</span><span className={cx('assistant-operation-badge', `is-${statement.operation}`)}>{operationLabels[statement.operation]}</span><span className="assistant-execution-label">{statement.label || 'SQL statement'}</span></div>
-                <pre><code>{statement.sql}</code></pre>
-                {accepted && statements.length > 1 && statement.operation !== 'read' && <Button variant="secondary" onClick={() => onRunQuery(statement.sql)} disabled={busy || runDisabled(statement.sql)} aria-label={`Run only statement ${index + 1}: ${operationLabels[statement.operation]}`}>Run only {operationLabels[statement.operation]}</Button>}
+                <details className="assistant-execution-step-details">
+                    <summary className="assistant-execution-step-heading"><span className="assistant-execution-number">{index + 1}</span><span className={cx('assistant-operation-badge', `is-${statement.operation}`)}>{operationLabels[statement.operation]}</span><span className="assistant-execution-label">{statement.label || 'SQL statement'}</span><span className="assistant-execution-step-chevron" aria-hidden="true">⌄</span></summary>
+                    <pre><code>{statement.sql}</code></pre>
+                </details>
+                {accepted && statements.length > 1 && <Button variant="secondary" onClick={() => onRunQuery(statement.sql)} disabled={busy || runDisabled(statement.sql)} aria-label={`Run only statement ${index + 1}: ${operationLabels[statement.operation]}`}>Run only {operationLabels[statement.operation]}</Button>}
             </li>)}
         </ol>
         {statements.length > 50 && <p className="assistant-execution-error" role="status">Showing the first 50 of {statements.length} statements. Scripts with more than 50 statements cannot run as one script.</p>}
-        {accepted && <footer className="assistant-execution-actions">
-            {confirming ? <div className="assistant-execution-confirmation" role="group" aria-label="Confirm running the full option">
-                <p role="alert">{confirmationText}</p>
-                <div><Button variant="secondary" onClick={() => setConfirming(false)}>Cancel</Button><Button variant="danger" onClick={() => { setConfirming(false); onRunQuery(sql); }} disabled={runBlocked}>Confirm and run all</Button></div>
-            </div> : <Button variant={needsConfirmation ? 'secondary' : 'primary'} onClick={() => needsConfirmation ? setConfirming(true) : onRunQuery(sql)} disabled={runBlocked} aria-label={alternative ? `Run alternative: ${title}` : statements.length > 1 ? `Run all ${statements.length} statements` : `Run recommended option: ${title}`}><Icon name="play"/>{needsConfirmation ? `Review run of ${statements.length} statements` : alternative ? `Run this alternative` : statements.length > 1 ? `Run all ${statements.length} statements` : firstOperation === 'read' ? 'Run query' : firstOperation ? `Run ${operationLabels[firstOperation]}` : 'Run SQL'}</Button>}
-        </footer>}
+        {accepted && <footer className="assistant-execution-actions"><Button variant="primary" onClick={() => onRunQuery(sql)} disabled={runBlocked} aria-label={alternative ? `Run alternative: ${title}` : statements.length > 1 ? `Run all ${statements.length} statements` : `Run recommended option: ${title}`}><Icon name="play"/>{alternative ? 'Run this alternative' : statements.length > 1 ? `Run all ${statements.length} statements` : firstOperation === 'read' ? 'Run query' : firstOperation ? `Run ${operationLabels[firstOperation]}` : 'Run SQL'}</Button></footer>}
     </section>;
 }
 
