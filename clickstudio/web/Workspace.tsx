@@ -848,7 +848,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         <div className="workspace-layout">
             <aside className="icon-rail" aria-label="Workspace tools">
                 <span className="rail-separator"/>
-                {PRIMARY_INSPECTOR_NAVIGATION.map(item => <RailButton key={item.id} icon={item.icon} label={copy.common[item.copyKey]} active={inspector === item.id && drawerOpen} accent={item.id === 'assistant'} onClick={() => showInspector(item.id)}/>)}
+                {PRIMARY_INSPECTOR_NAVIGATION.map(item => <RailButton key={item.id} icon={item.icon} label={copy.common[item.copyKey]} active={inspector === item.id && drawerOpen} accent={item.id === 'assistant'} testId={experience === 'expert' && item.id === 'assistant' ? 'open-ai' : undefined} onClick={() => showInspector(item.id)}/>)}
                 {experience === 'beginner' && <>
                     <span className="rail-spacer"/>
                     <span className="rail-separator"/>

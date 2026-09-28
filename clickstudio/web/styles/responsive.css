@@ -155,9 +155,6 @@
     .editor-heading .panel-collapse-button { top: 6px; right: 9px; translate: none; }
     .editor-file-heading { flex: 1 1 auto; }
     .editor-heading-tools { order: 3; flex: 1 0 100%; justify-content: flex-end; margin: 0; }
-    .formatter-control { gap: 2px; padding: 2px; }
-    .formatter-control-label { padding-inline: 3px; font-size: 6px; }
-    .formatter-control > .formatter-choice { min-height: 23px; padding-inline: 5px; font-size: 7px; }
     .file-type-icon { width: 27px; height: 27px; }
     .toolbar-small { min-height: 25px; padding: 0 5px; font-size: 7px; }
     .revision-history-trigger span { display: none; }

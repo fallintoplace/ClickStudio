@@ -1,7 +1,7 @@
 import { useRef, type RefObject } from 'react';
 import type { RunKind, Schema } from '../../shared/types';
 import type { NativeParseSnapshot, NativeParserStatus } from '../../shared/native-parser';
-import { hasSqlComments, type SqlParameter } from '../../shared/sql';
+import type { SqlParameter } from '../../shared/sql';
 import type { Copy, ExperienceLevel } from '../i18n';
 import type {
     BusyAction,
@@ -155,7 +155,6 @@ export function WorkspaceQueryPanel({
             /></label></div>
             {experience === 'expert' && <div className="editor-heading-tools">
                 <Button variant="ghost" className="sql-map-button" aria-label={copy.common.visualizeSqlStructure} aria-pressed={view === 'sqlmap'} title={copy.common.visualizeSqlStructure} onClick={actions.onToggleSqlMap}><Icon name="pipeline"/>{copy.common.sqlMap}</Button>
-                <Button variant="ghost" className="sql-ai-button" data-testid="open-ai" aria-label={copy.common.askAi} aria-pressed={inspector === 'assistant'} onClick={actions.onOpenAssistant}><Icon name="assistant"/>{copy.common.askAi}</Button>
                 {saveButton}
             </div>}
             <div className="editor-heading-actions">
@@ -170,30 +169,7 @@ export function WorkspaceQueryPanel({
                         <span className="toolbar-small" role="status" title="Formatting remains available while the native parser is unavailable.">{copy.common.parserUnavailable}</span>
                         <Button variant="ghost" className="toolbar-small" onClick={() => editorRef.current?.retryNativeParser()}>{copy.common.retryParser}</Button>
                     </>}
-                    <div className="formatter-control" role="group" aria-label={copy.common.formatSql}>
-                        <span className="formatter-control-label">{copy.common.format}</span>
-                        <Button
-                            variant="ghost"
-                            className="toolbar-small formatter-choice formatter-choice-wasm"
-                            disabled={!nativeParserEnabled || nativeParserStatus !== 'ready'}
-                            title={!nativeParserEnabled
-                                ? 'Select WASM in the parser switch to enable this formatter.'
-                                : nativeParserStatus === 'loading'
-                                    ? 'The WASM parser is loading.'
-                                    : nativeParserStatus === 'unavailable'
-                                        ? 'The WASM parser is unavailable. Retry the parser to enable this formatter.'
-                                        : hasSqlComments(active.sql)
-                                            ? 'Formats with WASM when supported; SQL with comments falls back to Built-in Format to preserve them.'
-                                            : 'Format SQL with the native ClickHouse WASM parser.'}
-                            onClick={() => void actions.onFormat('wasm')}
-                        >WASM</Button>
-                        <Button
-                            variant="ghost"
-                            className="toolbar-small formatter-choice formatter-choice-builtin"
-                            title="Format SQL with ClickStudio’s built-in formatter."
-                            onClick={() => void actions.onFormat('builtin')}
-                        >{copy.common.builtInFormatter}</Button>
-                    </div>
+                    <Button variant="ghost" className="toolbar-small standard-format-button" data-testid="format-sql" aria-label={copy.common.formatSql} title={copy.common.formatSql} onClick={() => void actions.onFormat(standardFormatter)}>{copy.common.format}</Button>
                 </>}
                 {detached
                     ? <Button variant="ghost" className="panel-window-button" aria-label={copy.common.dockQueryEditor} title={copy.common.dockQueryEditor} onClick={actions.onDockDetached}><Icon name="dock"/></Button>

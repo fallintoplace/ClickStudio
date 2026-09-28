@@ -787,12 +787,28 @@ test('Failed async formatting does not overwrite edits typed while it was pendin
     await replaceSql(page, 'select old_value from old_table');
     await openWorkspacePanel(page, 'parser');
     await expect(page.getByText('Ready · local WebAssembly', { exact: true })).toBeVisible();
-    await page.getByRole('group', { name: 'Format SQL' }).getByRole('button', { name: 'WASM', exact: true }).click();
+    await page.getByTestId('format-sql').click();
     await expect.poll(() => page.evaluate(() => Boolean(window.__pendingParserFormat))).toBe(true);
     await replaceSql(page, 'select new_value from new_table');
     await page.evaluate(() => window.__failParserWorker());
     await expect(page.locator('.cm-content')).toContainText('new_value');
     await expect(page.locator('.cm-content')).not.toContainText('old_value');
+});
+
+test('Experimental formatting preserves SQL comments when native formatting falls back', async ({ page }) => {
+    await page.addInitScript(parserWorkerStub('ready'));
+    await page.addInitScript(() => localStorage.setItem('clickstudio:experience', 'expert'));
+    await page.goto('/');
+    await replaceSql(page, '-- keep this comment\nselect 1 as value from numbers(1)');
+    await expect.poll(() => page.evaluate(() => Number(window.__parserParseCount ?? 0))).toBeGreaterThan(0);
+    await openWorkspacePanel(page, 'parser');
+    await expect(page.getByText('Ready · local WebAssembly', { exact: true })).toBeVisible();
+    await page.getByTestId('format-sql').click();
+    await expect(page.locator('.cm-content .cm-line')).toHaveText([
+        '-- keep this comment',
+        'select 1 as value',
+        'FROM numbers(1)',
+    ]);
 });
 
 test('Connection switches keep run evidence isolated and recover each connection workspace', async ({ page }) => {

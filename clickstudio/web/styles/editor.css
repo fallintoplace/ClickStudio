@@ -90,12 +90,6 @@
     .document-name input { width: min(30vw, 260px); padding: 0; border: 0; outline: none; background: transparent; color: var(--text); font-size: 13px; font-weight: 630; }
     .document-name input:focus { outline: 0; }
     .editor-heading-actions { gap: 6px; }
-    .formatter-control { display: inline-flex; align-items: center; gap: 3px; padding: 3px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--control-well); }
-    .formatter-control-label { padding: 0 5px; color: var(--muted); font-size: 8px; font-weight: 760; letter-spacing: .08em; text-transform: uppercase; }
-    .formatter-control > .formatter-choice { min-height: 25px; padding-inline: 8px; border: 1px solid transparent; border-radius: var(--radius-compact); font-size: 8px; letter-spacing: .01em; }
-    .formatter-control > .formatter-choice-wasm:not(:disabled) { border-color: color-mix(in srgb, var(--accent) 34%, var(--line)); background: color-mix(in srgb, var(--accent) 7%, var(--panel)); color: color-mix(in srgb, var(--accent) 82%, var(--text)); }
-    .formatter-control > .formatter-choice-wasm:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent) 56%, var(--line-bright)); background: color-mix(in srgb, var(--accent) 12%, var(--panel-hover)); }
-    .formatter-control > .formatter-choice-builtin:hover:not(:disabled) { border-color: var(--line-bright); background: var(--panel-hover); color: var(--text); }
     .panel-collapse-button { width: 29px; min-width: 29px; min-height: 29px; padding: 0; }
     .editor-mode-label { display: flex; align-items: center; gap: 9px; }
     .editor-mode-label { color: var(--text-soft); font-size: 10px; }

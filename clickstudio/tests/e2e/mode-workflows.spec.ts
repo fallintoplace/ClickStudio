@@ -99,6 +99,34 @@ test('Standard exposes assignment actions and can run a query without opening AI
     await expect(page.locator('.parser-switch')).toHaveCount(0);
 });
 
+test('Experimental keeps one format action and opens AI from the workspace rail', async ({ page }) => {
+    await beginInCompactMode(page);
+    await useAdvancedMode(page);
+
+    const queryHeader = page.locator('.editor-heading');
+    await expect(queryHeader.getByTestId('open-ai')).toHaveCount(0);
+    await expect(queryHeader.getByTestId('format-sql')).toHaveCount(1);
+    await expect(queryHeader.locator('.formatter-control, .formatter-choice')).toHaveCount(0);
+    await expect(queryHeader.getByRole('button', { name: 'WASM', exact: true })).toHaveCount(0);
+    await expect(queryHeader.getByRole('button', { name: 'Built-in', exact: true })).toHaveCount(0);
+
+    const assistantRailButton = page.locator('.icon-rail').getByTestId('open-ai');
+    await expect(assistantRailButton).toBeVisible();
+    await assistantRailButton.click();
+    await expect(page.locator('.assistant-panel')).toBeVisible();
+});
+
+test('Experimental Format uses the built-in formatter when WASM is not selected', async ({ page }) => {
+    await page.addInitScript(() => {
+        localStorage.setItem('clickstudio:experience', 'expert');
+        localStorage.setItem('clickstudio:parser-mode', 'basic');
+    });
+    await page.goto('/');
+    await replaceSql(page, 'select 1 as value from numbers(1)');
+    await page.getByTestId('format-sql').click();
+    await expect(page.locator('.cm-content .cm-line')).toHaveText(['select 1 as value', 'FROM numbers(1)']);
+});
+
 test('Standard keeps AI open after successful and failed query runs', async ({ page }) => {
     await beginInCompactMode(page);
     await page.getByTestId('open-ai').click();
