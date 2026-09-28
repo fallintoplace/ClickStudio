@@ -4,7 +4,7 @@ import type { ProfilePipeline, QueryDocument, QueryProfile, Run, Schema } from '
 import type { AssistantChat, AssistantChatTurn } from '../assistant-chat-state';
 import { AssistantWorkflow } from './AssistantWorkflow';
 import { Button, cx, formatBytes, Icon, inspectorLabel, Status } from './ui';
-import type { Connected, Inspector } from '../workspace-types';
+import type { Connected, ImportedTableTarget, Inspector } from '../workspace-types';
 import type { NativeParseSnapshot, NativeParserStatus } from '../../shared/native-parser';
 import { NativeParserInspector } from './NativeParserInspector';
 import { ObjectExplorer } from './ObjectExplorer';
@@ -37,6 +37,8 @@ export type InspectorPaneProps = {
     comparisonPipelines?: Readonly<Record<string, ProfilePipeline>>;
     pipeline?: ProfilePipeline;
     onRefreshSchema: () => void;
+    importedTableTarget?: ImportedTableTarget;
+    onImportedTableRevealed: (target: ImportedTableTarget) => void;
     onRefreshHistory: () => void;
     onInsert: (value: string) => void;
     onOpenSqlDraft: (name: string, sql: string, run: boolean) => void;
@@ -82,7 +84,7 @@ export type InspectorPaneProps = {
     onClose?: () => void;
 };
 
-export function InspectorPane({ comparisonProfiles, comparisonPipelines, copy, inspector, setInspector, connection, schema, schemaLoading, schemaError, search, setSearch, history, documents, revisions, revisionsDocumentId, revisionLoading, revisionError, currentRevision, unsavedDraft, canRestoreRevision, run, profile, pipeline, onRefreshSchema, onRefreshHistory, onInsert, onOpenSqlDraft, onOpenImport, onOpenExport, onOpenRun, onOpenDocument, onLoadProfile, onLoadPipeline, onOpenGraph, connectionId, sql, trusted, onRefreshDocuments, onRefreshRevisions, onRestoreRevision, assistantQuestion, onAssistantQuestion, assistantChats, activeAssistantChatId, assistantTurns, assistantChatStorageError, onNewAssistantChat, onSelectAssistantChat, onRenameAssistantChat, onDeleteAssistantChat, assistantBusy, assistantCancelable, assistantPhase, assistantError, assistantNotice, nativeParserEnabled, nativeParserStatus, nativeParseSnapshot, onRetryParser, onAskAI, onCancelAssistantRequest, onDecideProposal, onRunQuery, runDisabled, expert = false, docked = false, onClose }: InspectorPaneProps) {
+export function InspectorPane({ comparisonProfiles, comparisonPipelines, copy, inspector, setInspector, connection, schema, schemaLoading, schemaError, search, setSearch, history, documents, revisions, revisionsDocumentId, revisionLoading, revisionError, currentRevision, unsavedDraft, canRestoreRevision, run, profile, pipeline, onRefreshSchema, importedTableTarget, onImportedTableRevealed, onRefreshHistory, onInsert, onOpenSqlDraft, onOpenImport, onOpenExport, onOpenRun, onOpenDocument, onLoadProfile, onLoadPipeline, onOpenGraph, connectionId, sql, trusted, onRefreshDocuments, onRefreshRevisions, onRestoreRevision, assistantQuestion, onAssistantQuestion, assistantChats, activeAssistantChatId, assistantTurns, assistantChatStorageError, onNewAssistantChat, onSelectAssistantChat, onRenameAssistantChat, onDeleteAssistantChat, assistantBusy, assistantCancelable, assistantPhase, assistantError, assistantNotice, nativeParserEnabled, nativeParserStatus, nativeParseSnapshot, onRetryParser, onAskAI, onCancelAssistantRequest, onDecideProposal, onRunQuery, runDisabled, expert = false, docked = false, onClose }: InspectorPaneProps) {
     const visibleDocuments = documents.filter(document => document.connectionId === connectionId && !document.deletedAt);
     const [selectedRevisionNumber, setSelectedRevisionNumber] = useState<number>();
     const [referenceTarget, setReferenceTarget] = useState<{ name: string; type: string }>();
@@ -107,7 +109,7 @@ export function InspectorPane({ comparisonProfiles, comparisonPipelines, copy, i
             <InspectorMoreMenu copy={copy} inspector={inspector} onSelect={setInspector} items={moreItems} />
         </nav>
         <div className={cx('inspector-content', inspector === 'assistant' && 'is-assistant-content')}>
-            {inspector === 'schema' && <ObjectExplorer key={connection.id} copy={copy} connection={connection} schema={schema} schemaLoading={schemaLoading} schemaError={schemaError} search={search} setSearch={setSearch} trusted={trusted} onRefreshSchema={onRefreshSchema} onInsert={onInsert} compact={docked} onOpenSqlDraft={onOpenSqlDraft} onOpenReference={openReference}/>}
+            {inspector === 'schema' && <ObjectExplorer key={connection.id} copy={copy} connection={connection} schema={schema} schemaLoading={schemaLoading} schemaError={schemaError} search={search} setSearch={setSearch} trusted={trusted} onRefreshSchema={onRefreshSchema} importedTableTarget={importedTableTarget} onImportedTableRevealed={onImportedTableRevealed} onInsert={onInsert} compact={docked} onOpenSqlDraft={onOpenSqlDraft} onOpenReference={openReference}/>}
             {inspector === 'reference' && <ReferenceExplorer copy={copy} connection={connection} trusted={trusted} target={referenceTarget} onTargetHandled={clearReferenceTarget} onInsert={onInsert}/>}
             {inspector === 'history' && <section className="inspector-section"><div className="schema-heading"><span>RECENT RUNS</span><RunComparisonLauncher connectionId={connectionId} trusted={trusted} history={history} initialRun={run} profiles={comparisonProfiles} pipelines={comparisonPipelines} queryLogAvailable={connection.manifest?.queryLog.available === true}/><Button variant="ghost" className="toolbar-small" onClick={onRefreshHistory}>↻ Refresh</Button></div>{history.length ? history.slice(0, 30).map(item => <button type="button" className="history-card" key={item.id} onClick={() => onOpenRun(item)}><span className={cx('run-state-mark', `state-${item.status}`)}/><span className="history-card-copy"><strong>{item.sql.replace(/\s+/g, ' ').slice(0, 58)}</strong><small>{new Date(item.createdAt).toLocaleString()} <i>·</i> {Math.round(item.elapsedMs)} ms <i>·</i> {item.rowCount.toLocaleString()} rows</small></span><span className="history-open">↗</span></button>) : <div className="inspector-empty"><Icon name="history"/><strong>No runs yet</strong><p>Your recent ClickHouse executions appear here.</p></div>}</section>}
             {inspector === 'documents' && <section className="inspector-section"><div className="schema-heading"><span>SAVED DOCUMENTS</span><Button variant="ghost" className="toolbar-small" onClick={onRefreshDocuments}>↻ Refresh</Button></div>{visibleDocuments.length ? visibleDocuments.map(document => <button type="button" className="document-card" key={document.id} onClick={() => onOpenDocument(document)}><span className="file-type-icon small">SQL</span><span><strong>{document.name}</strong><small>revision {document.revision} · {new Date(document.updatedAt).toLocaleDateString()}</small></span><span className="history-open">↗</span></button>) : <div className="inspector-empty"><Icon name="documents"/><strong>Nothing saved yet</strong><p>Save the current query to keep a named revision on this connection.</p></div>}</section>}

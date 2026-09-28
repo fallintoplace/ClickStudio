@@ -16,7 +16,7 @@ import {
     type ExplorerRelation,
 } from '../../shared/object-explorer';
 import { quoteIdentifier } from '../../shared/sql';
-import type { Connected } from '../workspace-types';
+import type { Connected, ImportedTableTarget } from '../workspace-types';
 import type { Copy } from '../i18n';
 import { Button, cx, Icon } from './ui';
 import { canDropTableTarget, isSystemDatabaseName } from '../../shared/table-deletion';
@@ -38,6 +38,8 @@ type ObjectExplorerProps = {
     setSearch: (search: string) => void;
     trusted: boolean;
     onRefreshSchema: () => void;
+    importedTableTarget?: ImportedTableTarget;
+    onImportedTableRevealed: (target: ImportedTableTarget) => void;
     onInsert: (value: string) => void;
     onOpenSqlDraft: (name: string, sql: string, run: boolean) => void;
     onOpenReference: (name: string, type: string) => void;
@@ -63,7 +65,7 @@ function recoverUiState(key: string): ExplorerUiState {
     }
 }
 
-export function ObjectExplorer({ copy, connection, schema, schemaLoading, schemaError, search, setSearch, trusted, onRefreshSchema, onInsert, onOpenSqlDraft, onOpenReference, compact = false }: ObjectExplorerProps) {
+export function ObjectExplorer({ copy, connection, schema, schemaLoading, schemaError, search, setSearch, trusted, onRefreshSchema, importedTableTarget, onImportedTableRevealed, onInsert, onOpenSqlDraft, onOpenReference, compact = false }: ObjectExplorerProps) {
     const model = useMemo(() => buildObjectExplorer(schema, search, connection.database), [schema, search, connection.database]);
     const storageKey = uiStateKey(connection.id);
     const recovered = useMemo(() => recoverUiState(storageKey), [storageKey]);
@@ -77,8 +79,15 @@ export function ObjectExplorer({ copy, connection, schema, schemaLoading, schema
     const [deleteTableTarget, setDeleteTableTarget] = useState<SchemaTable>();
     const [createTableOpen, setCreateTableOpen] = useState(false);
     const [createdTableTarget, setCreatedTableTarget] = useState<{ database: string; table: string }>();
+    const handledImportedTargetRef = useRef<string | undefined>(undefined);
     const treeScroll = useRef<HTMLDivElement>(null);
     const copyTimer = useRef<number | undefined>(undefined);
+    const importedSchemaTable = useMemo(() => importedTableTarget
+        ? schema?.tables.find(table => `${table.database}.${table.name}` === importedTableTarget.table)
+        : undefined, [importedTableTarget, schema?.tables]);
+    const revealTarget = useMemo(() => createdTableTarget ?? (importedSchemaTable
+        ? { database: importedSchemaTable.database, table: importedSchemaTable.name }
+        : undefined), [createdTableTarget, importedSchemaTable]);
 
     useEffect(() => () => {
         if (copyTimer.current !== undefined) window.clearTimeout(copyTimer.current);
@@ -99,27 +108,31 @@ export function ObjectExplorer({ copy, connection, schema, schemaLoading, schema
     }, [model.selectionById, selectedId]);
 
     useEffect(() => {
-        if (!createdTableTarget) return;
-        const id = explorerRelationId(createdTableTarget.database, createdTableTarget.table);
+        if (!revealTarget) return;
+        const id = explorerRelationId(revealTarget.database, revealTarget.table);
         if (!model.selectionById.has(id)) return;
         setSelectedId(id);
         setDetailsOpen(true);
-        setExpandedIds(current => new Set([...current, explorerDatabaseId(createdTableTarget.database), explorerCategoryId(createdTableTarget.database, 'table')]));
-    }, [createdTableTarget, model.selectionById]);
+        setExpandedIds(current => new Set([...current, explorerDatabaseId(revealTarget.database), explorerCategoryId(revealTarget.database, 'table')]));
+    }, [revealTarget, model.selectionById]);
 
     useEffect(() => {
-        if (!createdTableTarget || search) return;
-        const id = explorerRelationId(createdTableTarget.database, createdTableTarget.table);
-        if (selectedId !== id || !expandedIds.has(explorerDatabaseId(createdTableTarget.database)) || !expandedIds.has(explorerCategoryId(createdTableTarget.database, 'table'))) return;
+        if (!revealTarget || search) return;
+        const id = explorerRelationId(revealTarget.database, revealTarget.table);
+        if (selectedId !== id || !expandedIds.has(explorerDatabaseId(revealTarget.database)) || !expandedIds.has(explorerCategoryId(revealTarget.database, 'table'))) return;
         const frame = window.requestAnimationFrame(() => {
             const rows = treeScroll.current?.querySelectorAll<HTMLElement>('[data-table-name]');
-            const row = rows && [...rows].find(item => item.dataset.database === createdTableTarget.database && item.dataset.tableName === createdTableTarget.table);
+            const row = rows && [...rows].find(item => item.dataset.database === revealTarget.database && item.dataset.tableName === revealTarget.table);
             if (!row) return;
             row.scrollIntoView({ block: 'nearest' });
-            setCreatedTableTarget(undefined);
+            if (createdTableTarget) setCreatedTableTarget(undefined);
+            if (importedSchemaTable && importedTableTarget && handledImportedTargetRef.current !== importedTableTarget.id) {
+                handledImportedTargetRef.current = importedTableTarget.id;
+                onImportedTableRevealed(importedTableTarget);
+            }
         });
         return () => window.cancelAnimationFrame(frame);
-    }, [compact, createdTableTarget, detailsOpen, expandedIds, schemaLoading, search, selectedId]);
+    }, [compact, createdTableTarget, detailsOpen, expandedIds, importedSchemaTable, importedTableTarget, onImportedTableRevealed, revealTarget, schemaLoading, search, selectedId]);
 
     useEffect(() => {
         if (search || expandedIds.size || !model.databases.length) return;

@@ -113,18 +113,22 @@ export function useWorkspaceData({
             setSchema(undefined);
             setSchemaError('');
             setSchemaLoading(false);
-            return;
+            return undefined;
         }
         setSchemaLoading(true);
         setSchemaError('');
         try {
             const next = await api<Schema>(`/connections/${encodeURIComponent(connectionId)}/schema${refresh ? '?refresh=true' : ''}`);
-            if (schemaRequestRef.current === requestId && trustedRef.current) setSchema(next);
+            if (schemaRequestRef.current === requestId && trustedRef.current) {
+                setSchema(next);
+                return next;
+            }
         } catch (caught) {
             if (schemaRequestRef.current === requestId && trustedRef.current) setSchemaError(message(caught));
         } finally {
             if (schemaRequestRef.current === requestId) setSchemaLoading(false);
         }
+        return undefined;
     }, [connectionId]);
 
     useEffect(() => {

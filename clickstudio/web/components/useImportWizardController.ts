@@ -269,7 +269,7 @@ export type ImportWizardControllerOptions = {
     trusted: boolean;
     demoMode: boolean;
     onClose: () => void;
-    onImported: () => void;
+    onImported: (job: ImportJob) => void;
 };
 
 function importUnavailableReason(connectionId: string) {
@@ -644,7 +644,7 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
                         setRecoverableJobs(recovered.status === 'succeeded' ? [] : [recovered]);
                         setStep('status');
                         try { localStorage.setItem(key, JSON.stringify(stored)); } catch { }
-                        if (recovered.status === 'succeeded') reportImported(recovered.id);
+                        if (recovered.status === 'succeeded') reportImported(recovered);
                         setRecoveryState('ready');
                         return;
                     }
@@ -725,10 +725,10 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
         cloudImport: browserCloudImport,
     });
 
-    function reportImported(id: string) {
-        if (reportedJobRef.current === id) return;
-        reportedJobRef.current = id;
-        onImportedRef.current();
+    function reportImported(job: ImportJob) {
+        if (reportedJobRef.current === job.id) return;
+        reportedJobRef.current = job.id;
+        onImportedRef.current(job);
     }
 
     function rememberJob(next: ImportJob) {
@@ -738,7 +738,7 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
             : current.some(item => item.id === next.id)
                 ? current.map(item => item.id === next.id ? next : item)
                 : [next, ...current]);
-        if (next.status === 'succeeded') reportImported(next.id);
+        if (next.status === 'succeeded') reportImported(next);
     }
 
     function savePendingImport(value: PendingImport) {

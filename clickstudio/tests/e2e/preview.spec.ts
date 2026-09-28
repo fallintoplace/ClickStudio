@@ -14,8 +14,10 @@ const previewCloudSchema = {
     truncated: false,
 };
 
-async function mockCloudEndpoint(page: Page, commitOutcome: 'success' | 'unknown' = 'success', cloudSchema = previewCloudSchema) {
+async function mockCloudEndpoint(page: Page, commitOutcome: 'success' | 'unknown' = 'success', cloudSchema = previewCloudSchema, onSchemaAfterImport?: () => void) {
     const imports: string[] = [];
+    let activeSchema = cloudSchema;
+    let importSucceeded = false;
     await page.route('**/api/cloud', async route => {
         const request = route.request();
         const contentType = request.headers()['content-type'] ?? '';
@@ -37,7 +39,16 @@ async function mockCloudEndpoint(page: Page, commitOutcome: 'success' | 'unknown
                 return;
             }
             const createValue = body.match(/name="createTable"\r\n\r\n([^\r\n]+)/)?.[1];
-            const targetValue = createValue ? `default.${JSON.parse(createValue).name}` : table;
+            const createTable = createValue ? JSON.parse(createValue) as { name: string; columns: { name: string; type: string }[]; generateId: boolean } : undefined;
+            const targetValue = createTable ? `default.${createTable.name}` : table;
+            if (createTable) {
+                activeSchema = {
+                    ...activeSchema,
+                    tables: [...activeSchema.tables.filter(item => item.name !== createTable.name), { database: 'default', name: createTable.name, engine: 'MergeTree' }],
+                    columns: [...activeSchema.columns.filter(item => item.table !== createTable.name), ...createTable.columns.map(column => ({ database: 'default', table: createTable.name, name: column.name, type: column.type, defaultKind: '', comment: '' })), ...(createTable.generateId ? [{ database: 'default', table: createTable.name, name: 'id', type: 'UInt64', defaultKind: 'DEFAULT', comment: '' }] : [])],
+                };
+            }
+            importSucceeded = true;
             await route.fulfill({ json: { id, connectionId: 'clickhouse-cloud', table: targetValue, queryId, rows, createdAt: '2026-09-28T00:00:00.000Z', status: 'succeeded' } });
             return;
         }
@@ -47,7 +58,8 @@ async function mockCloudEndpoint(page: Page, commitOutcome: 'success' | 'unknown
             return;
         }
         if (body.action === 'schema') {
-            await route.fulfill({ json: cloudSchema });
+            if (importSucceeded) onSchemaAfterImport?.();
+            await route.fulfill({ json: activeSchema });
             return;
         }
         if (body.action === 'import-status') {
@@ -302,6 +314,30 @@ test('ClickHouse Cloud import creates a table with editable inferred columns', a
     const createTable = imports[0]?.match(/name="createTable"\r\n\r\n([^\r\n]+)/)?.[1];
     expect(createTable).toBeTruthy();
     expect(JSON.parse(createTable!)).toMatchObject({ name: 'interview_events', generateId: true, columns: [{ source: 'day', name: 'event_day', type: 'Date' }, { source: 'events', name: 'events', type: 'UInt64' }] });
+});
+
+test('ClickHouse Cloud import refreshes and reveals the created table', async ({ page }) => {
+    let schemaRefreshesAfterImport = 0;
+    await mockCloudEndpoint(page, 'success', { ...previewCloudSchema, tables: [], columns: [] }, () => { schemaRefreshesAfterImport++; });
+    await connectPreviewCloud(page);
+    await page.getByRole('button', { name: 'Import', exact: true }).last().click();
+
+    const dialog = page.getByRole('dialog', { name: 'Import data', exact: true });
+    await dialog.getByLabel('Choose a CSV, JSON, or NDJSON file').setInputFiles({
+        name: 'interview events.csv',
+        mimeType: 'text/csv',
+        buffer: Buffer.from('day,events\n2026-09-27,10\n'),
+    });
+    await dialog.getByRole('button', { name: 'Preview file' }).click();
+    await dialog.getByRole('button', { name: 'Map columns' }).click();
+    await dialog.getByRole('button', { name: 'Review import' }).click();
+    await dialog.getByRole('button', { name: 'Create table and import' }).click();
+    await expect(dialog).toContainText('Inserted 1 row into default.interview_events');
+    await expect.poll(() => schemaRefreshesAfterImport).toBeGreaterThan(0);
+
+    await dialog.getByRole('button', { name: 'Done' }).click();
+    await expect(page.getByRole('region', { name: 'Selected object' })).toContainText('default.interview_events');
+    await expect(page.getByRole('button', { name: 'interview_events MergeTree', exact: true })).toBeVisible();
 });
 
 test('ClickHouse Cloud insert row leaves defaulted columns out and needs no typed confirmation', async ({ page }) => {

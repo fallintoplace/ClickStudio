@@ -21,7 +21,7 @@ export function useImportJobPolling({
     setRecoverableJobs: Dispatch<SetStateAction<ImportJob[]>>;
     setBusy: Dispatch<SetStateAction<BusyAction>>;
     setError: Dispatch<SetStateAction<string>>;
-    onSucceeded: (id: string) => void;
+    onSucceeded: (job: ImportJob) => void;
     cloudImport?: boolean;
 }) {
     const onSucceededRef = useRef(onSucceeded);
@@ -46,7 +46,7 @@ export function useImportJobPolling({
                     ? items.filter(item => item.id !== next.id)
                     : items.map(item => item.id === next.id ? next : item));
                 setBusy('');
-                if (next.status === 'succeeded') onSucceededRef.current(next.id);
+                if (next.status === 'succeeded') onSucceededRef.current(next);
             } catch (caught) {
                 if (current) setError(`Could not refresh import status: ${message(caught)}`);
             } finally {

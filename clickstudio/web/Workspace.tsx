@@ -33,6 +33,7 @@ import { useRunEvidence } from './useRunEvidence';
 import { useResultSnapshot } from './useResultSnapshot';
 import { useWorkspaceTabs } from './useWorkspaceTabs';
 import { useWorkspaceData } from './useWorkspaceData';
+import { useImportedTableReveal } from './useImportedTableReveal';
 import { useDefaultAssistantRunContext, useWorkspaceAssistant } from './useWorkspaceAssistant';
 import { useWorkspacePanels } from './useWorkspacePanels';
 import { useScriptExecution } from './useScriptExecution';
@@ -633,6 +634,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         if (next === 'profile') void perform(loadProfile, 'save');
         if (next === 'pipeline') void perform(loadPipeline, 'save');
     };
+    const { importedTableTarget, onImported, onImportedTableRevealed } = useImportedTableReveal({ connectionId: connection.id, demoMode, loadSchema, setSearch, showInspector, setNotice });
     const inspectorDocked = drawerOpen && (experience === 'beginner' || compactViewport);
 
     const trustConnection = () => perform(async () => {
@@ -741,6 +743,8 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         comparisonProfiles: profilesByRun,
         comparisonPipelines: pipelinesByRun,
         onRefreshSchema: () => void loadSchema(true),
+        importedTableTarget,
+        onImportedTableRevealed,
         onRefreshHistory: () => void loadHistory(),
         onInsert: (value: string) => editor.current?.insert(value),
         onOpenSqlDraft: openSqlDraft,
@@ -1014,14 +1018,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
             const opened = openNewDraft(newDraft(name, sql));
             if (opened) setNotice(`${name} opened in a new query tab. It has not been run.`);
             return opened;
-        }} onClose={() => setImportOpen(false)} onImported={() => {
-            if (demoMode && isFrontendDemoPreview) {
-                setNotice('Interview rows saved in this browser. Switch to Sample data and query demo.interview_imports.');
-                return;
-            }
-            void loadSchema(true);
-            setNotice('Import complete. The destination schema was refreshed.');
-        }}/>
+        }} onClose={() => setImportOpen(false)} onImported={onImported}/>
         <ExportDialog open={exportOpen} queryAvailable={Boolean(active.sql.trim())} rowsAvailable={run?.resultState === 'reopenable'} onClose={() => setExportOpen(false)} onExportQuery={() => { setExportOpen(false); exportCurrentQuery(); }} onExportRows={() => { setExportOpen(false); void exportCurrentCsv(); }}/>
         <ExecutionBar run={run} failedAttempt={Boolean(failedQueryError)} eventState={eventState} onCancel={() => void cancel()} cancelling={cancelling} scriptRunning={script?.status === 'running'} copy={copy.common} helpButton={<HelpButton copy={copy.common} open={helpPanelOpen} onOpen={openHelp}/>}/>
         {detachedEditor.detached && createPortal(queryPanel, detachedEditor.detached.container)}
