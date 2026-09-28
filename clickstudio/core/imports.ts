@@ -206,7 +206,7 @@ export class ImportService {
         this.store.put('mappings', mapping.id, mapping);
         return mapping;
     }
-    async commit(principal: Principal, mappingId: string, confirmation: string): Promise<ImportJob> {
+    async commit(principal: Principal, mappingId: string): Promise<ImportJob> {
         canWrite(principal);
         const mapping = this.store.get<Mapping>('mappings', mappingId);
         requireThat(mapping, 404, 'NOT_FOUND', 'Mapping not found');
@@ -220,7 +220,6 @@ export class ImportService {
         requireThat(!unresolved, 409, 'IMPORT_UNRESOLVED', 'Review or reconcile the previous import to this table before starting another write');
         this.get(principal, mapping.inputId);
         requireThat(this.trusted(principal, mapping.connectionId) && this.driver.allowed(mapping.connectionId, mapping.table), 403, 'IMPORT_NOT_ALLOWED', 'Destination trust or availability changed');
-        requireThat(confirmation === `INSERT ${mapping.rows.length} ROWS`, 400, 'IMPORT_CONFIRMATION', 'Confirm the exact row count before inserting');
         const schema = await this.driver.schema(mapping.connectionId);
         requireThat(hash(targetColumns(schema, mapping.table)) === mapping.schemaHash, 409, 'SCHEMA_CHANGED', 'The destination schema changed; review a new mapping');
         requireThat(this.trusted(principal, mapping.connectionId) && this.driver.allowed(mapping.connectionId, mapping.table), 403, 'IMPORT_NOT_ALLOWED', 'Destination trust or availability changed during schema validation');

@@ -55,6 +55,10 @@ export function isPendingImport(value: unknown): value is PendingImport {
 export const MAX_FILE_BYTES = 2_000_000;
 export const importStateKey = (connectionId: string) => `clickstudio:import:${connectionId}:v1`;
 
+export function formatImportRowCount(count: number): string {
+    return `${count.toLocaleString()} ${count === 1 ? 'row' : 'rows'}`;
+}
+
 export function fileFormat(file: File): ImportFormat | undefined {
     const name = file.name.toLowerCase();
     if (name.endsWith('.csv')) return 'csv';

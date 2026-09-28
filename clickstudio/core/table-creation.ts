@@ -21,9 +21,14 @@ export function createTableSql(table: string, columns: CreateTableColumn[], orde
     requireThat(columns.every(column => /^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(column.name)), 400, 'TABLE_COLUMN_NAME', 'Column names must use letters, numbers, and underscores');
     requireThat(new Set(columns.map(column => column.name)).size === columns.length, 400, 'TABLE_COLUMN_DUPLICATE', 'Column names must be unique');
     requireThat(columns.every(column => CREATE_TABLE_COLUMN_TYPES.includes(column.type)), 400, 'TABLE_COLUMN_TYPE', 'Choose a supported column type');
+    requireThat(columns.every(column => !column.generatedId || (column.name === 'id' && column.type === 'UInt64')), 400, 'TABLE_GENERATED_ID', 'Only an id UInt64 column can use generated IDs');
     requireThat(columns.some(column => column.name === orderBy), 400, 'TABLE_ORDER_BY', 'Choose an existing column for the sorting key');
     const [database, name] = parts;
-    return `CREATE TABLE ${quoteIdentifier(database!)}.${quoteIdentifier(name!)} (\n${columns.map(column => `    ${quoteIdentifier(column.name)} ${column.type}`).join(',\n')}\n) ENGINE = MergeTree ORDER BY ${quoteIdentifier(orderBy)}`;
+    const definitions = columns.map(column => {
+        const definition = `${quoteIdentifier(column.name)} ${column.type}`;
+        return column.generatedId ? `${definition} DEFAULT generateSerialID('${database}.${name}')` : definition;
+    });
+    return `CREATE TABLE ${quoteIdentifier(database!)}.${quoteIdentifier(name!)} (\n    ${definitions.join(',\n    ')}\n) ENGINE = MergeTree ORDER BY ${quoteIdentifier(orderBy)}`;
 }
 
 export class TableCreationService {

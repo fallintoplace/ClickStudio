@@ -4,4 +4,5 @@ export type CreateTableColumnType = (typeof CREATE_TABLE_COLUMN_TYPES)[number];
 export interface CreateTableColumn {
     name: string;
     type: CreateTableColumnType;
+    generatedId?: boolean;
 }

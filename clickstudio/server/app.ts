@@ -283,7 +283,12 @@ export function createApp(config: Config, overrides: {
         requireThat(Array.isArray(columnsValue) && columnsValue.length <= 50, 400, 'TABLE_COLUMNS', 'A table needs 1–50 columns');
         const columns: CreateTableColumn[] = columnsValue.map((value: unknown) => {
             const column = record(value, 'column');
-            return { name: text(column.name, 'column name', 128), type: choice(column.type, CREATE_TABLE_COLUMN_TYPES, 400, 'TABLE_COLUMN_TYPE', 'Choose a supported column type') };
+            requireThat(column.generatedId === undefined || typeof column.generatedId === 'boolean', 400, 'TABLE_COLUMNS', 'Check the generated ID option');
+            return {
+                name: text(column.name, 'column name', 128),
+                type: choice(column.type, CREATE_TABLE_COLUMN_TYPES, 400, 'TABLE_COLUMN_TYPE', 'Choose a supported column type'),
+                ...(column.generatedId === true ? { generatedId: true } : {}),
+            };
         });
         res.status(201).json(await tableCreation.create(principal(res), id(req), text(v.database, 'database', 128), text(v.table, 'table', 128), columns, text(v.orderBy, 'sorting key', 128)));
     });
@@ -447,7 +452,7 @@ export function createApp(config: Config, overrides: {
     });
     app.post('/api/imports/preview', (req, res) => { const v = body(req), format = choice(v.format, IMPORT_FORMATS, 400, 'IMPORT_FORMAT', 'Use CSV, JSON, or NDJSON'); const input = imports.preview(principal(res), text(v.name, 'filename', 128), text(v.source, 'input', 2000000), format); res.status(201).json({ ...input, rows: input.rows.slice(0, 20), rowCount: input.rows.length }); });
     app.post('/api/imports/:id/mapping', async (req, res) => { const v = body(req), mapping = await imports.map(principal(res), id(req), identifier(v.connectionId, 'connectionId'), text(v.table, 'table', 256), mappingFields(v.fields)); res.json({ ...mapping, rows: mapping.rows.slice(0, 20), rowCount: mapping.rows.length }); });
-    app.post('/api/imports/:id/commit', async (req, res) => res.json(await imports.commit(principal(res), id(req), text(body(req).confirmation, 'confirmation', 100))));
+    app.post('/api/imports/:id/commit', async (req, res) => res.json(await imports.commit(principal(res), id(req))));
     app.get('/api/imports/:id', (req, res) => res.json(imports.getJob(principal(res), id(req))));
     app.post('/api/imports/:id/reconcile', async (req, res) => res.json(await imports.reconcile(principal(res), id(req))));
     app.post('/api/imports/:id/review', async (req, res) => { const v = body(req); res.json(await imports.review(principal(res), id(req), boolean(v.inspected, 'inspected'), boolean(v.noActiveInsert, 'noActiveInsert'))); });

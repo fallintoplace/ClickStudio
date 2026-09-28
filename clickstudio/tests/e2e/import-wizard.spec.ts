@@ -37,11 +37,11 @@ async function previewCsv(page: Page) {
         buffer: Buffer.from('day,events\n2026-01-01,10\n2026-01-02,20\n'),
     });
     await dialog.getByRole('button', { name: 'Preview file', exact: true }).click();
-    await expect(dialog).toContainText(/\d+ rows · 2 columns · CSV/);
+    await expect(dialog).toContainText(/\d+ rows? · 2 columns · CSV/);
     return dialog;
 }
 
-test('File import previews, maps, confirms, and reports a successful insert', async ({ page }) => {
+test('File import previews, maps, and reports a successful insert without typed confirmation', async ({ page }) => {
     await mockWritableWorkspace(page);
     let mappingBody: Record<string, unknown> | undefined;
     let commitBody: Record<string, unknown> | undefined;
@@ -66,14 +66,12 @@ test('File import previews, maps, confirms, and reports a successful insert', as
     await expect(dialog).toContainText('2 rows into demo.events');
 
     const commit = dialog.getByRole('button', { name: 'Import rows', exact: true });
-    await expect(commit).toBeDisabled();
-    await dialog.getByLabel('Type INSERT 2 ROWS to confirm').fill('INSERT 2 ROWS');
     await expect(commit).toBeEnabled();
     await commit.click();
 
     await expect(dialog).toContainText('Inserted 2 rows into demo.events');
     expect(mappingBody).toMatchObject({ connectionId: 'live', table: 'demo.events', fields: { day: 'day', events: 'events' } });
-    expect(commitBody).toEqual({ confirmation: 'INSERT 2 ROWS' });
+    expect(commitBody).toEqual({});
 });
 
 test('File import rejects oversized files in the browser before upload', async ({ page }) => {
@@ -143,7 +141,6 @@ test('File import reports an unknown insert without retrying automatically', asy
     const dialog = await previewCsv(page);
     await dialog.getByRole('button', { name: 'Map columns', exact: true }).click();
     await dialog.getByRole('button', { name: 'Review import', exact: true }).click();
-    await dialog.getByLabel('Type INSERT 1 ROWS to confirm').fill('INSERT 1 ROWS');
     await dialog.getByRole('button', { name: 'Import rows', exact: true }).click();
 
     await expect(dialog).toContainText('We couldn’t confirm the import.');
@@ -168,7 +165,6 @@ test('File import reloads the destination mapping when the server detects a sche
     const dialog = await previewCsv(page);
     await dialog.getByRole('button', { name: 'Map columns', exact: true }).click();
     await dialog.getByRole('button', { name: 'Review import', exact: true }).click();
-    await dialog.getByLabel('Type INSERT 1 ROWS to confirm').fill('INSERT 1 ROWS');
     await dialog.getByRole('button', { name: 'Import rows', exact: true }).click();
 
     await expect(dialog).toContainText('The destination schema changed. Review the updated mapping');

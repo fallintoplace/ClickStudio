@@ -8,6 +8,7 @@ import { api, download, isFrontendDemoPreview, message, post } from './api';
 import { PLAYGROUND_CONNECTION_ID } from './playground';
 import type { EditorHandle } from './components/SqlEditor';
 import { ImportWizard } from './components/ImportWizard';
+import { ExportDialog } from './components/ExportDialog';
 import { WorkspaceHelpPanel, type HelpPanelSection } from './components/WorkspaceHelpPanel';
 import { HelpButton } from './components/HelpButton';
 import { RestoreSqlMenu } from './components/RestoreSqlMenu';
@@ -167,6 +168,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [compactViewport, setCompactViewport] = useState(() => window.matchMedia('(max-width: 850px)').matches);
     const [importOpen, setImportOpen] = useState(false);
+    const [exportOpen, setExportOpen] = useState(false);
     const [helpPanelOpen, setHelpPanelOpen] = useState(false);
     const [observabilityOpen, setObservabilityOpen] = useState(false);
     const [helpPanelSection, setHelpPanelSection] = useState<HelpPanelSection>('tour');
@@ -596,6 +598,11 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         }
     };
 
+    const exportCurrentQuery = () => {
+        const baseName = active.name.trim().replace(/\.sql$/i, '').replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').trim();
+        download(`${baseName || 'query'}.sql`, active.sql, 'application/sql;charset=utf-8');
+    };
+
     const loadProfile = async () => {
         if (!activeRunId) return;
         if (connection.manifest?.queryLog.available === false) return;
@@ -738,8 +745,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         onInsert: (value: string) => editor.current?.insert(value),
         onOpenSqlDraft: openSqlDraft,
         onOpenImport: () => setImportOpen(true),
-        onExportResult: () => void exportCurrentCsv(),
-        exportDisabled: run?.resultState !== 'reopenable',
+        onOpenExport: () => setExportOpen(true),
         onOpenRun: openRun,
         onOpenDocument: openDocument,
         onLoadProfile: () => void perform(loadProfile, 'save'),
@@ -842,7 +848,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
                     <span className="rail-spacer"/>
                     <span className="rail-separator"/>
                     <RailButton icon="importFile" label={copy.common.import} onClick={() => setImportOpen(true)}/>
-                    <RailButton icon="exportFile" label={copy.common.export} disabled={run?.resultState !== 'reopenable'} onClick={() => void exportCurrentCsv()}/>
+                    <RailButton icon="exportFile" label={copy.common.export} onClick={() => setExportOpen(true)}/>
                 </>}
                 {experience === 'expert' && <>
                     <span className="rail-separator"/>
@@ -1004,14 +1010,19 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
             {inspectorDocked && <InspectorPane {...inspectorProps} docked onClose={() => setDrawerOpen(false)}/>}
         </div>
         {observabilityOpen && <OverlayPortal><ObservabilityExplorer connectionId={connection.id} connectionLabel={connectionLabel} trusted={trusted} queryLog={connection.manifest?.queryLog} replication={connection.manifest?.replication} onClose={() => setObservabilityOpen(false)}/></OverlayPortal>}
-        <ImportWizard open={importOpen} connectionId={connection.id} trusted={trusted} demoMode={demoMode} onClose={() => setImportOpen(false)} onImported={() => {
+        <ImportWizard open={importOpen} connectionId={connection.id} trusted={trusted} demoMode={demoMode} onImportQuery={(name, sql) => {
+            const opened = openNewDraft(newDraft(name, sql));
+            if (opened) setNotice(`${name} opened in a new query tab. It has not been run.`);
+            return opened;
+        }} onClose={() => setImportOpen(false)} onImported={() => {
             if (demoMode && isFrontendDemoPreview) {
                 setNotice('Interview rows saved in this browser. Switch to Sample data and query demo.interview_imports.');
                 return;
             }
-            void loadSchema();
+            void loadSchema(true);
             setNotice('Import complete. The destination schema was refreshed.');
         }}/>
+        <ExportDialog open={exportOpen} queryAvailable={Boolean(active.sql.trim())} rowsAvailable={run?.resultState === 'reopenable'} onClose={() => setExportOpen(false)} onExportQuery={() => { setExportOpen(false); exportCurrentQuery(); }} onExportRows={() => { setExportOpen(false); void exportCurrentCsv(); }}/>
         <ExecutionBar run={run} failedAttempt={Boolean(failedQueryError)} eventState={eventState} onCancel={() => void cancel()} cancelling={cancelling} scriptRunning={script?.status === 'running'} copy={copy.common} helpButton={<HelpButton copy={copy.common} open={helpPanelOpen} onOpen={openHelp}/>}/>
         {detachedEditor.detached && createPortal(queryPanel, detachedEditor.detached.container)}
         {detachedResults.detached && createPortal(resultsPanel, detachedResults.detached.container)}

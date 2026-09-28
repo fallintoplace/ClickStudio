@@ -300,3 +300,7 @@
         .parts-inspector { align-items: flex-start; flex-direction: column; }
         .parts-inspector-stats { justify-content: flex-start; }
     }
+
+    .create-table-column-row.has-generated-id { border-color: color-mix(in srgb, var(--accent) 34%, var(--line)); background: color-mix(in srgb, var(--accent) 3%, var(--page)); }
+    .create-table-generated-id { display: inline-flex; width: fit-content; align-items: center; gap: 5px; color: var(--accent); font-size: 9px; font-weight: 600; line-height: 1.35; }
+    .create-table-generated-id::before { width: 5px; height: 5px; flex: none; border-radius: 50%; background: currentColor; content: ""; }

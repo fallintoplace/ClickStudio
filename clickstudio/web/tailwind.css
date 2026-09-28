@@ -8,6 +8,7 @@
 @import "./styles/inspector-assistant.css";
 @import "./styles/responsive.css";
 @import "./styles/object-explorer.css";
+@import "./styles/import-wizard.css";
 @import "./styles/panel-chrome.css";
 @import "./styles/observability.css";
 @import "./styles/help.css";

@@ -47,7 +47,12 @@ test('Standard exposes assignment actions and can run a query without opening AI
     await expect(page.getByTestId('run-button')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Import', exact: true })).toBeVisible();
     const exportButton = page.getByRole('button', { name: 'Export', exact: true });
-    await expect(exportButton).toBeDisabled();
+    await expect(exportButton).toBeEnabled();
+    await exportButton.click();
+    const exportDialog = page.getByRole('dialog', { name: 'Export' });
+    await expect(exportDialog.getByRole('button', { name: /Export query/ })).toBeEnabled();
+    await expect(exportDialog.getByRole('button', { name: /Export rows/ })).toBeDisabled();
+    await exportDialog.getByRole('button', { name: 'Close export options' }).click();
     await expect(page.locator('.editor-control-rail')).toHaveCount(0);
     await expect(page.getByRole('textbox', { name: 'Describe your data question', exact: true })).toHaveCount(0);
 
@@ -65,7 +70,11 @@ test('Standard exposes assignment actions and can run a query without opening AI
     await expect(results.locator('.chart-workspace, .chart-table-fallback')).toBeVisible();
     await results.getByRole('tab', { name: 'Results', exact: true }).click();
     await expect(exportButton).toBeEnabled();
-    const [download] = await Promise.all([page.waitForEvent('download'), exportButton.click()]);
+    await exportButton.click();
+    const [download] = await Promise.all([
+        page.waitForEvent('download'),
+        page.getByRole('dialog', { name: 'Export' }).getByRole('button', { name: /Export rows/ }).click(),
+    ]);
     expect(download.suggestedFilename()).toMatch(/\.csv$/);
     await expect(page.getByRole('status').filter({ hasText: 'Sample results were generated. Query SQL was not sent to ClickHouse.' })).toBeVisible();
     expect(contextRequests).toBe(0);

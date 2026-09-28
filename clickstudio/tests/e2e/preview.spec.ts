@@ -14,7 +14,7 @@ const previewCloudSchema = {
     truncated: false,
 };
 
-async function mockCloudEndpoint(page: Page, commitOutcome: 'success' | 'unknown' = 'success') {
+async function mockCloudEndpoint(page: Page, commitOutcome: 'success' | 'unknown' = 'success', cloudSchema = previewCloudSchema) {
     const imports: string[] = [];
     await page.route('**/api/cloud', async route => {
         const request = route.request();
@@ -24,6 +24,13 @@ async function mockCloudEndpoint(page: Page, commitOutcome: 'success' | 'unknown
             imports.push(body);
             const queryId = body.match(/name="queryId"\r\n\r\n([^\r\n]+)/)?.[1] ?? 'clickstudio-import-00000000-0000-4000-8000-000000000000';
             const table = body.match(/name="target"\r\n\r\n([^\r\n]+)/)?.[1] ?? 'default.events';
+            const format = body.match(/name="format"\r\n\r\n([^\r\n]+)/)?.[1];
+            const fileContents = body.match(/name="file"; filename="[^\"]+"\r\nContent-Type: [^\r\n]+\r\n\r\n([\s\S]*?)\r\n--/)?.[1] ?? '';
+            const rows = format === 'json'
+                ? (JSON.parse(fileContents) as unknown[]).length
+                : format === 'ndjson'
+                    ? fileContents.split(/\r?\n/).filter(Boolean).length
+                    : Math.max(0, fileContents.trim().split(/\r?\n/).length - 1);
             const id = queryId.replace('clickstudio-import-', '');
             if (commitOutcome === 'unknown') {
                 await route.fulfill({ status: 502, json: { error: { code: 'CLICKHOUSE_ERROR', message: 'The request ended before the insert response arrived.' } } });
@@ -31,7 +38,7 @@ async function mockCloudEndpoint(page: Page, commitOutcome: 'success' | 'unknown
             }
             const createValue = body.match(/name="createTable"\r\n\r\n([^\r\n]+)/)?.[1];
             const targetValue = createValue ? `default.${JSON.parse(createValue).name}` : table;
-            await route.fulfill({ json: { id, connectionId: 'clickhouse-cloud', table: targetValue, queryId, rows: 2, createdAt: '2026-09-28T00:00:00.000Z', status: 'succeeded' } });
+            await route.fulfill({ json: { id, connectionId: 'clickhouse-cloud', table: targetValue, queryId, rows, createdAt: '2026-09-28T00:00:00.000Z', status: 'succeeded' } });
             return;
         }
         const body = request.postDataJSON() as { action?: string; queryId?: string; table?: string; rows?: number };
@@ -40,7 +47,7 @@ async function mockCloudEndpoint(page: Page, commitOutcome: 'success' | 'unknown
             return;
         }
         if (body.action === 'schema') {
-            await route.fulfill({ json: previewCloudSchema });
+            await route.fulfill({ json: cloudSchema });
             return;
         }
         if (body.action === 'import-status') {
@@ -106,13 +113,22 @@ test('Static production preview loads the native parser and exports retained sam
     await expect(table).toBeVisible();
     await table.click();
 
+    await page.locator('.inspector-footer').getByRole('button', { name: 'Export', exact: true }).click();
+    const exportDialog = page.getByRole('dialog', { name: 'Export' });
     const [download] = await Promise.all([
         page.waitForEvent('download'),
-        page.locator('.inspector-footer').getByRole('button', { name: 'Export', exact: true }).click(),
+        exportDialog.getByRole('button', { name: /Export rows/ }).click(),
     ]);
     const csv = await readFile(await download.path(), 'utf8');
     expect(csv.split('\r\n')[0]).toContain('day');
     expect(csv).toContain('events');
+    await page.locator('.inspector-footer').getByRole('button', { name: 'Export', exact: true }).click();
+    const [queryDownload] = await Promise.all([
+        page.waitForEvent('download'),
+        page.getByRole('dialog', { name: 'Export' }).getByRole('button', { name: /Export query/ }).click(),
+    ]);
+    expect(queryDownload.suggestedFilename()).toMatch(/\.sql$/);
+    expect(await readFile(await queryDownload.path(), 'utf8')).toContain('SELECT');
 });
 
 test('Static production preview searches native Playground docs with bound query parameters', async ({ page }) => {
@@ -231,7 +247,7 @@ test('Geo Help demo runs native Point values and renders twenty cities', async (
     await expect(page.getByText('No returned rows contain valid longitude/latitude geometry for this selection.', { exact: true })).toHaveCount(0);
 });
 
-test('ClickHouse Cloud import maps and confirms an existing table with the connected user', async ({ page }) => {
+test('ClickHouse Cloud import maps and inserts into an existing table without typed confirmation', async ({ page }) => {
     const imports = await mockCloudEndpoint(page);
     await connectPreviewCloud(page);
     await page.getByRole('button', { name: 'Import', exact: true }).last().click();
@@ -245,15 +261,15 @@ test('ClickHouse Cloud import maps and confirms an existing table with the conne
     await dialog.getByRole('button', { name: 'Preview file' }).click();
     await expect(dialog).toContainText('2 rows · 2 columns · CSV');
     await dialog.getByRole('button', { name: 'Map columns' }).click();
+    await expect(dialog.getByRole('radio', { name: /Use an existing table/ })).toBeChecked();
     await expect(dialog.getByLabel('Map day to destination')).toHaveValue('day');
     await dialog.getByRole('button', { name: 'Review import' }).click();
-    await dialog.getByLabel('Type INSERT 2 ROWS to confirm').fill('INSERT 2 ROWS');
     await dialog.getByRole('button', { name: 'Import rows' }).click();
 
     await expect(dialog).toContainText('Inserted 2 rows into default.events');
     expect(imports).toHaveLength(1);
     expect(imports[0]).toContain('name="file"; filename="events.csv"');
-    expect(imports[0]).toContain('name="confirmation"\r\n\r\nINSERT 2 ROWS');
+    expect(imports[0]).not.toContain('name="confirmation"');
     expect(imports[0]).toContain('name="fields"\r\n\r\n{"day":"day","events":"events"}');
 });
 
@@ -270,21 +286,76 @@ test('ClickHouse Cloud import creates a table with editable inferred columns', a
     });
     await dialog.getByRole('button', { name: 'Preview file' }).click();
     await dialog.getByRole('button', { name: 'Map columns' }).click();
-    await dialog.getByLabel('Import target table').selectOption('__create_table_from_file__');
+    await dialog.getByRole('radio', { name: /Create a new table from this file/ }).check();
     await expect(dialog.getByLabel('New table name')).toHaveValue('interview_events');
     await expect(dialog.getByLabel('Type for day')).toHaveValue('Date');
     await expect(dialog.getByLabel('Type for events')).toHaveValue('UInt64');
+    await expect(dialog.getByRole('checkbox', { name: /Add a generated id/ })).toBeChecked();
     await dialog.getByLabel('New table name').fill('interview_events');
     await dialog.getByLabel('New column name for day').fill('event_day');
     await dialog.getByRole('button', { name: 'Review import' }).click();
     await expect(dialog).toContainText('2 rows into default.interview_events');
-    await dialog.getByLabel('Type INSERT 2 ROWS to confirm').fill('INSERT 2 ROWS');
-    await dialog.getByRole('button', { name: 'Import rows' }).click();
+    await expect(dialog).toContainText('Generated by ClickHouse');
+    await dialog.getByRole('button', { name: 'Create table and import' }).click();
 
     await expect(dialog).toContainText('Inserted 2 rows into default.interview_events');
     const createTable = imports[0]?.match(/name="createTable"\r\n\r\n([^\r\n]+)/)?.[1];
     expect(createTable).toBeTruthy();
-    expect(JSON.parse(createTable!)).toMatchObject({ name: 'interview_events', columns: [{ source: 'day', name: 'event_day', type: 'Date' }, { source: 'events', name: 'events', type: 'UInt64' }] });
+    expect(JSON.parse(createTable!)).toMatchObject({ name: 'interview_events', generateId: true, columns: [{ source: 'day', name: 'event_day', type: 'Date' }, { source: 'events', name: 'events', type: 'UInt64' }] });
+});
+
+test('ClickHouse Cloud insert row leaves defaulted columns out and needs no typed confirmation', async ({ page }) => {
+    const cloudSchema = {
+        ...previewCloudSchema,
+        columns: [...previewCloudSchema.columns, { database: 'default', table: 'events', name: 'created_at', type: 'DateTime', defaultKind: 'DEFAULT', comment: '' }],
+    };
+    const imports = await mockCloudEndpoint(page, 'success', cloudSchema);
+    await connectPreviewCloud(page);
+    await page.getByRole('button', { name: 'Objects', exact: true }).click();
+    await page.getByRole('button', { name: 'events MergeTree', exact: true }).click();
+    await page.getByRole('button', { name: 'Insert row', exact: true }).click();
+
+    const dialog = page.getByRole('dialog', { name: 'Insert row', exact: true });
+    await dialog.getByLabel('day').fill('2026-09-28');
+    await dialog.getByLabel('events').fill('12');
+    await dialog.getByRole('button', { name: 'Review row' }).click();
+    await expect(dialog.locator('pre')).toContainText('"day": "2026-09-28"');
+    await expect(dialog.locator('pre')).not.toContainText('created_at');
+    await dialog.getByRole('button', { name: 'Insert row', exact: true }).click();
+
+    await expect(dialog).toContainText('Inserted one row into default.events.');
+    expect(imports).toHaveLength(1);
+    expect(imports[0]).not.toContain('name="confirmation"');
+    expect(imports[0]).toContain('name="fields"\r\n\r\n{"day":"day","events":"events"}');
+    const row = imports[0]!.match(/name="file"; filename="insert-row\.json"\r\nContent-Type: [^\r\n]+\r\n\r\n([\s\S]*?)\r\n--/)?.[1];
+    expect(JSON.parse(row!)).toEqual([{ day: '2026-09-28', events: '12' }]);
+});
+
+test('ClickHouse Cloud can create a table from a file when no tables exist', async ({ page }) => {
+    const imports = await mockCloudEndpoint(page, 'success', { ...previewCloudSchema, tables: [], columns: [] });
+    await connectPreviewCloud(page);
+    await page.getByRole('button', { name: 'Import', exact: true }).last().click();
+
+    const dialog = page.getByRole('dialog', { name: 'Import data', exact: true });
+    await dialog.getByLabel('Choose a CSV, JSON, or NDJSON file').setInputFiles({
+        name: 'events.csv',
+        mimeType: 'text/csv',
+        buffer: Buffer.from('event,count\npurchase,2\n'),
+    });
+    await expect(dialog.getByRole('button', { name: 'Preview file' })).toBeEnabled();
+    await dialog.getByRole('button', { name: 'Preview file' }).click();
+    await dialog.getByRole('button', { name: 'Map columns' }).click();
+
+    await expect(dialog.getByRole('radio', { name: /Use an existing table/ })).toBeDisabled();
+    await expect(dialog.getByRole('radio', { name: /Create a new table from this file/ })).toBeChecked();
+    await expect(dialog.getByRole('checkbox', { name: /Add a generated id/ })).toBeChecked();
+    await dialog.getByRole('button', { name: 'Review import' }).click();
+    await dialog.getByRole('button', { name: 'Create table and import' }).click();
+
+    await expect(dialog).toContainText('Inserted 1 row into default.events');
+    expect(imports).toHaveLength(1);
+    const createTable = imports[0]?.match(/name="createTable"\r\n\r\n([^\r\n]+)/)?.[1];
+    expect(JSON.parse(createTable!)).toMatchObject({ name: 'events', generateId: true });
 });
 
 test('ClickHouse Cloud import shows clear choices after an interrupted write', async ({ page }) => {
@@ -301,7 +372,6 @@ test('ClickHouse Cloud import shows clear choices after an interrupted write', a
     await dialog.getByRole('button', { name: 'Preview file' }).click();
     await dialog.getByRole('button', { name: 'Map columns' }).click();
     await dialog.getByRole('button', { name: 'Review import' }).click();
-    await dialog.getByLabel('Type INSERT 1 ROWS to confirm').fill('INSERT 1 ROWS');
     await dialog.getByRole('button', { name: 'Import rows' }).click();
 
     await expect(dialog).toContainText('We couldn’t confirm the import.');

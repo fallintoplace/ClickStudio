@@ -15,8 +15,6 @@ type Preview = { id: string; rowCount: number };
 type Mapping = { id: string; table: string; rowCount: number; fields: Record<string, string> };
 type ImportJob = { id: string; table: string; rows: number; status: 'running' | 'succeeded' | 'unknown'; error?: string; reconciliationRequired?: boolean; reviewedAt?: string; queryId?: string; connectionId?: string };
 type Step = 'edit' | 'review' | 'status';
-const INSERT_ROW_CONFIRMATION = 'INSERT 1 ROWS';
-
 function optionalColumn(column: SchemaColumn) {
     return Boolean(column.defaultKind) || /^Nullable\(/.test(column.type);
 }
@@ -130,7 +128,7 @@ export function InsertRowDialog({ connectionId, table, columns, onClose, onInser
         try {
             const next = cloudConnection && queryId
                 ? await insertClickHouseCloudRow({ table: name, columns, row, queryId })
-                : await post<ImportJob>(`/imports/${encodeURIComponent(mapping.id)}/commit`, { confirmation: INSERT_ROW_CONFIRMATION });
+                : await post<ImportJob>(`/imports/${encodeURIComponent(mapping.id)}/commit`);
             setJob(next);
             if (next.status === 'succeeded') reportSuccess();
         } catch (caught) {
@@ -247,7 +245,7 @@ export function InsertRowDialog({ connectionId, table, columns, onClose, onInser
             writeStarted = true;
             const next = retryQueryId
                 ? await insertClickHouseCloudRow({ table: name, columns, row, queryId: retryQueryId })
-                : await post<ImportJob>(`/imports/${encodeURIComponent(retryMapping.id)}/commit`, { confirmation: INSERT_ROW_CONFIRMATION });
+                : await post<ImportJob>(`/imports/${encodeURIComponent(retryMapping.id)}/commit`);
             setJob(next);
             if (next.status === 'succeeded') reportSuccess();
         } catch (caught) {

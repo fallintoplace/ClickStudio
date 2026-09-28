@@ -205,7 +205,9 @@ async function createCloudTable(credentials: CloudCredentials, url: string, body
         if (!isRecord(value) || !isImportIdentifier(value.name) || typeof value.type !== 'string' ||
             !(CREATE_TABLE_COLUMN_TYPES as readonly string[]).includes(value.type))
             throw new AppError(400, 'TABLE_COLUMNS', 'Check the table column names and types.');
-        return { name: value.name, type: value.type as CreateTableColumnType };
+        if (value.generatedId !== undefined && typeof value.generatedId !== 'boolean')
+            throw new AppError(400, 'TABLE_COLUMNS', 'Check the generated ID option.');
+        return { name: value.name, type: value.type as CreateTableColumnType, ...(value.generatedId === true ? { generatedId: true } : {}) };
     });
     const orderBy = typeof body.orderBy === 'string' ? body.orderBy : '';
     const table = `${body.database}.${body.name}`;
@@ -410,16 +412,13 @@ async function commitCloudImport(form: FormData, credentials: CloudCredentials, 
     const queryIdValue = form.get('queryId');
     if (!validImportQueryId(queryIdValue)) throw new AppError(400, 'IMPORT_QUERY_ID', 'The import request id is invalid.');
     const queryId = queryIdValue;
-    const confirmation = form.get('confirmation');
     const target = form.get('target');
     const fields = parseFormJson<Record<string, unknown>>(form, 'fields');
     if (!fields || typeof fields !== 'object' || Array.isArray(fields)) throw new AppError(400, 'IMPORT_MAPPING', 'Choose at least one destination column.');
     const source = await file.text();
     const parsed = parseInput(source, format);
     if (!parsed.rows.length) throw new AppError(400, 'IMPORT_EMPTY', 'The input contains no data rows.');
-    if (confirmation !== `INSERT ${parsed.rows.length} ROWS`) throw new AppError(400, 'IMPORT_CONFIRMATION', 'Confirm the exact row count before inserting.');
-
-    const createTable = parseFormJson<{ name?: unknown; columns?: unknown }>(form, 'createTable');
+    const createTable = parseFormJson<{ name?: unknown; columns?: unknown; generateId?: unknown }>(form, 'createTable');
     const creating = createTable !== undefined;
     let tableName: string;
     let tableDatabase = credentials.database;
@@ -428,7 +427,8 @@ async function commitCloudImport(form: FormData, credentials: CloudCredentials, 
     let expectedColumns: { name: string; type: string; defaultKind: string }[] | undefined;
 
     if (creating) {
-        if (!createTable || !isImportIdentifier(createTable.name) || !Array.isArray(createTable.columns) || createTable.columns.length === 0 || createTable.columns.length > 200)
+        if (!createTable || !isImportIdentifier(createTable.name) || !Array.isArray(createTable.columns) || createTable.columns.length === 0 || createTable.columns.length > 200 ||
+            (createTable.generateId !== undefined && typeof createTable.generateId !== 'boolean'))
             throw new AppError(400, 'IMPORT_CREATE_TABLE', 'Enter a table name and at least one column.');
         tableName = createTable.name;
         createColumns = createTable.columns.map(value => {
@@ -439,6 +439,8 @@ async function commitCloudImport(form: FormData, credentials: CloudCredentials, 
         });
         if (new Set(createColumns.map(column => column.source)).size !== createColumns.length || new Set(createColumns.map(column => column.name)).size !== createColumns.length)
             throw new AppError(400, 'IMPORT_CREATE_TABLE', 'New table column names must be unique.');
+        if (createTable.generateId === true && createColumns.some(column => column.name.toLowerCase() === 'id'))
+            throw new AppError(400, 'IMPORT_CREATE_TABLE', 'The file already has an id column. Map that column or rename it before adding a generated id.');
         const schema = await readSchema(credentials, url);
         if (schema.tables.some(table => table.database === credentials.database && table.name === tableName)) throw new AppError(409, 'TABLE_EXISTS', 'A table with this name already exists. Choose an existing table or a different name.');
         destinationColumns = createColumns.map(column => ({ database: credentials.database, table: tableName, name: column.name, type: column.type, defaultKind: '', comment: '' }));
@@ -485,7 +487,10 @@ async function commitCloudImport(form: FormData, credentials: CloudCredentials, 
     const client = makeClient(credentials, url);
     try {
         if (creating) {
-            const definitions = createColumns.map(column => `${quoteIdentifier(column.name)} Nullable(${column.type})`).join(', ');
+            const definitions = [
+                ...createColumns.map(column => `${quoteIdentifier(column.name)} Nullable(${column.type})`),
+                ...(createTable?.generateId === true ? [`\`id\` UInt64 DEFAULT generateSerialID('${tableDatabase}.${tableName}')`] : []),
+            ].join(', ');
             await client.command({
                 query: `CREATE TABLE ${quoteIdentifier(tableDatabase)}.${quoteIdentifier(tableName)} (${definitions}) ENGINE = MergeTree ORDER BY tuple()`,
                 query_id: `clickstudio-create-${queryId.slice('clickstudio-import-'.length)}`,

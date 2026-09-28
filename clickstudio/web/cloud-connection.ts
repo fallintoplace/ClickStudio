@@ -15,10 +15,9 @@ export type CloudImportInput = {
     format: 'csv' | 'json' | 'ndjson';
     target: string;
     fields: Record<string, string>;
-    confirmation: string;
     queryId: string;
     expectedColumns?: Pick<SchemaColumn, 'name' | 'type' | 'defaultKind'>[];
-    createTable?: { name: string; columns: CloudImportColumn[] };
+    createTable?: { name: string; columns: CloudImportColumn[]; generateId?: boolean };
 };
 type CloudConnectionState = { credentials: CloudCredentials; connection: Connection & { trusted: boolean } };
 
@@ -184,7 +183,6 @@ export async function importClickHouseCloudFile(input: CloudImportInput): Promis
     form.set('format', input.format);
     form.set('target', input.target);
     form.set('fields', JSON.stringify(input.fields));
-    form.set('confirmation', input.confirmation);
     form.set('queryId', input.queryId);
     if (input.expectedColumns) form.set('expectedColumns', JSON.stringify(input.expectedColumns));
     if (input.createTable) form.set('createTable', JSON.stringify(input.createTable));
@@ -203,7 +201,6 @@ export async function insertClickHouseCloudRow(input: {
         format: 'json',
         target: input.table,
         fields: Object.fromEntries(Object.keys(input.row).map(column => [column, column])),
-        confirmation: 'INSERT 1 ROWS',
         queryId: input.queryId,
         expectedColumns: input.columns.map(({ name, type, defaultKind }) => ({ name, type, defaultKind })),
     });

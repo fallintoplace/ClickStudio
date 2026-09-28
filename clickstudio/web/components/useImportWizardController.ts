@@ -49,8 +49,6 @@ type ImportActionSetters = {
 
 async function runCommitImport(context: ImportActionSetters & {
     mapping?: ImportMapping;
-    confirmation: string;
-    confirmationPhrase: string;
     busy: BusyAction;
     browserDemoImport: boolean;
     browserCloudImport: boolean;
@@ -60,15 +58,16 @@ async function runCommitImport(context: ImportActionSetters & {
     schema?: Schema;
     createTableName: string;
     createColumns: CloudImportColumn[];
+    generateId: boolean;
     importConnectionId: string;
     preview?: ImportPreview;
     savePendingImport: (value: PendingImport) => void;
     clearPendingImport: () => void;
     rememberJob: (job: ImportJob) => void;
 }) {
-    const { mapping, confirmation, confirmationPhrase, busy, browserDemoImport, browserCloudImport, file, format, creatingTable, schema, createTableName, createColumns, importConnectionId, preview,
+    const { mapping, busy, browserDemoImport, browserCloudImport, file, format, creatingTable, schema, createTableName, createColumns, generateId, importConnectionId, preview,
         setJob, setStep, setBusy, setError, setMapping, setTargets, setSchema, setTarget, setFields, setRecoveryState, setRecoverableJobs, setPendingImport, savePendingImport, clearPendingImport, rememberJob } = context;
-    if (!mapping || (!browserDemoImport && confirmation !== confirmationPhrase) || busy) return;
+    if (!mapping || busy) return;
     const queryId = browserCloudImport ? `clickstudio-import-${mapping.id}` : undefined;
     const record: PendingImport = { id: mapping.id, table: mapping.table, rows: mapping.rowCount, name: preview?.name ?? 'Selected file', ...(queryId ? { queryId } : {}) };
     savePendingImport(record);
@@ -88,13 +87,12 @@ async function runCommitImport(context: ImportActionSetters & {
                 format,
                 target: mapping.table,
                 fields: mapping.fields,
-                confirmation,
                 queryId,
                 ...(expectedColumns ? { expectedColumns } : {}),
-                ...(creatingTable ? { createTable: { name: createTableName, columns: createColumns } } : {}),
+                ...(creatingTable ? { createTable: { name: createTableName, columns: createColumns, generateId } } : {}),
             });
         } else {
-            next = await post<ImportJob>(`/imports/${encodeURIComponent(mapping.id)}/commit`, { confirmation });
+            next = await post<ImportJob>(`/imports/${encodeURIComponent(mapping.id)}/commit`);
         }
         rememberJob(next);
     } catch (caught) {
@@ -296,7 +294,7 @@ type ImportWizardFileActionContext = {
     setCreateTableName: Dispatch<SetStateAction<string>>;
     setJob: Dispatch<SetStateAction<ImportJob | undefined>>;
     setError: Dispatch<SetStateAction<string>>;
-    setConfirmation: Dispatch<SetStateAction<string>>;
+    setGenerateId: Dispatch<SetStateAction<boolean>>;
     setStep: Dispatch<SetStateAction<Step>>;
     setBusy: Dispatch<SetStateAction<BusyAction>>;
 };
@@ -304,7 +302,7 @@ type ImportWizardFileActionContext = {
 function createImportWizardFileActions(context: ImportWizardFileActionContext) {
     const { browserDemoImport, browserCloudImport, target, file, format, busy,
         setFile, setFormat, setPreview, setMapping, setCloudRows, setCreateColumns, setCreateTableName,
-        setJob, setError, setConfirmation, setStep, setBusy } = context;
+        setJob, setError, setGenerateId, setStep, setBusy } = context;
 
     function chooseFile(next?: File) {
         setFile(next);
@@ -315,7 +313,7 @@ function createImportWizardFileActions(context: ImportWizardFileActionContext) {
         if (browserCloudImport && target === CREATE_CLOUD_TABLE_TARGET) setCreateTableName('');
         setJob(undefined);
         setError('');
-        setConfirmation('');
+        setGenerateId(true);
         if (!next) { setFormat(undefined); return; }
         const nextFormat = fileFormat(next);
         setFormat(nextFormat);
@@ -414,10 +412,10 @@ type RetryUnknownImportContext = ImportActionSetters & {
     cloudRows: Record<string, Json>[];
     createTableName: string;
     createColumns: CloudImportColumn[];
+    generateId: boolean;
     setCreateTableName: Dispatch<SetStateAction<string>>;
     setCreateColumns: Dispatch<SetStateAction<CloudImportColumn[]>>;
     importConnectionId: string;
-    confirmation: string;
     browserDemoImport: boolean;
     setRetryAttemptedFor: Dispatch<SetStateAction<string | undefined>>;
     savePendingImport: (value: PendingImport) => void;
@@ -427,7 +425,7 @@ type RetryUnknownImportContext = ImportActionSetters & {
 
 async function runRetryUnknownImport(context: RetryUnknownImportContext) {
     const { job, busy, preview, mapping, browserCloudImport, file, format, reviewUnknownImport, schema, target, creatingTable,
-        cloudRows, createTableName, createColumns, setCreateTableName, setCreateColumns, importConnectionId, confirmation,
+        cloudRows, createTableName, createColumns, generateId, setCreateTableName, setCreateColumns, importConnectionId,
         browserDemoImport, setRetryAttemptedFor,
         savePendingImport, clearPendingImport, rememberJob,
         setJob, setStep, setBusy, setError, setMapping, setTargets, setSchema, setTarget, setFields, setRecoveryState,
@@ -517,9 +515,9 @@ async function runRetryUnknownImport(context: RetryUnknownImportContext) {
         setRecoverableJobs(current => current.filter(item => item.id !== job.id));
         clearPendingImport();
         await runCommitImport({
-            mapping: retryMapping, confirmation, confirmationPhrase: `INSERT ${retryMapping.rowCount} ROWS`, busy: '',
+            mapping: retryMapping, busy: '',
             browserDemoImport, browserCloudImport, file, format, creatingTable: retryCreatingTable, schema: retrySchema,
-            createTableName, createColumns, importConnectionId, preview,
+            createTableName, createColumns, generateId, importConnectionId, preview,
             setJob, setStep, setBusy, setError, setMapping, setTargets, setSchema, setTarget, setFields,
             setRecoveryState, setRecoverableJobs, setPendingImport, setImportUnavailable,
             savePendingImport, clearPendingImport, rememberJob,
@@ -547,6 +545,7 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
     const [schema, setSchema] = useState<Schema>();
     const [targets, setTargets] = useState<string[]>([]);
     const [target, setTarget] = useState('');
+    const [lastExistingTarget, setLastExistingTarget] = useState('');
     const [createTableName, setCreateTableName] = useState('');
     const [createColumns, setCreateColumns] = useState<CloudImportColumn[]>([]);
     const [fields, setFields] = useState<Record<string, string>>({});
@@ -559,7 +558,7 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
     const [busy, setBusy] = useState<BusyAction>('');
     const [error, setError] = useState('');
     const [retryAttemptedFor, setRetryAttemptedFor] = useState<string>();
-    const [confirmation, setConfirmation] = useState('');
+    const [generateId, setGenerateId] = useState(true);
     const [importUnavailable, setImportUnavailable] = useState('');
 
     const availableTargets = useMemo(() => targets.filter(table => schema?.tables.some(item => `${item.database}.${item.name}` === table)), [schema, targets]);
@@ -570,12 +569,11 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
     const selectedFields = useMemo(() => Object.fromEntries(Object.entries(fields).filter(([, destination]) => Boolean(destination))), [fields]);
     const destinationNames = Object.values(selectedFields);
     const duplicateDestinations = new Set(destinationNames).size !== destinationNames.length;
-    const confirmationPhrase = mapping && !browserDemoImport ? `INSERT ${mapping.rowCount} ROWS` : '';
     const sampleColumns = preview?.columns.slice(0, 6) ?? [];
     const { chooseFile, previewFile, previewSampleFile } = createImportWizardFileActions({
         browserDemoImport, browserCloudImport, target, file, format, busy,
         setFile, setFormat, setPreview, setMapping, setCloudRows, setCreateColumns, setCreateTableName,
-        setJob, setError, setConfirmation, setStep, setBusy,
+        setJob, setError, setGenerateId, setStep, setBusy,
     });
 
     useEffect(() => {
@@ -597,6 +595,7 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
         setSchema(undefined);
         setTargets([]);
         setTarget('');
+        setLastExistingTarget('');
         setCreateTableName('');
         setCreateColumns([]);
         setFields({});
@@ -607,7 +606,7 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
         setBusy('');
         setError('');
         setRetryAttemptedFor(undefined);
-        setConfirmation('');
+        setGenerateId(true);
         setImportUnavailable('');
         setRecoveryState('checking');
         reportedJobRef.current = undefined;
@@ -659,6 +658,7 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
                     if (!current) return;
                     setTargets(nextTargets);
                     setSchema(nextSchema);
+                    setLastExistingTarget(nextTargets[0] ?? '');
                     setTarget(nextTargets[0] ?? CREATE_CLOUD_TABLE_TARGET);
                     setRecoveryState('ready');
                 } catch (caught) {
@@ -697,6 +697,7 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
                 setTargets(nextTargets);
                 setSchema(nextSchema);
                 const first = nextTargets.find(table => nextSchema.tables.some(item => `${item.database}.${item.name}` === table)) ?? '';
+                setLastExistingTarget(first);
                 setTarget(first);
                 if (!first) setImportUnavailable('No import targets are configured for this connection. Ask the workspace owner to allow a destination table.');
             } catch (caught) {
@@ -771,6 +772,7 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
             setCreateColumns(columns);
             setCreateTableName(createTableName || suggestCloudTableName(preview.name));
             setFields(Object.fromEntries(columns.map(column => [column.source, column.name])));
+            setGenerateId(!columns.some(column => column.name.toLowerCase() === 'id'));
         } else {
             setFields(initialFields(preview.columns, writableColumns(schema, target)));
         }
@@ -780,22 +782,31 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
     }
 
     function changeTarget(next: string) {
+        if (next !== CREATE_CLOUD_TABLE_TARGET) setLastExistingTarget(next);
         setTarget(next);
         if (browserCloudImport && next === CREATE_CLOUD_TABLE_TARGET && preview) {
             const columns = inferCloudImportColumns(cloudRows.length ? cloudRows : preview.rows, preview.columns);
             setCreateColumns(columns);
             setCreateTableName(suggestCloudTableName(preview.name));
             setFields(Object.fromEntries(columns.map(column => [column.source, column.name])));
+            setGenerateId(!columns.some(column => column.name.toLowerCase() === 'id'));
         } else {
             setFields(initialFields(preview?.columns ?? [], writableColumns(schema, next)));
         }
         setMapping(undefined);
-        setConfirmation('');
         setError('');
     }
 
     function updateCreateColumn(source: string, key: 'name' | 'type', value: string) {
-        setCreateColumns(current => current.map(column => column.source === source ? { ...column, [key]: value } as CloudImportColumn : column));
+        setCreateColumns(current => {
+            const next = current.map(column => column.source === source ? { ...column, [key]: value } as CloudImportColumn : column);
+            if (key === 'name') {
+                const hadId = current.some(column => column.name.toLowerCase() === 'id');
+                const hasId = next.some(column => column.name.toLowerCase() === 'id');
+                if (hadId !== hasId) setGenerateId(!hasId);
+            }
+            return next;
+        });
         if (key === 'name') setFields(current => ({ ...current, [source]: value }));
         setMapping(undefined);
         setError('');
@@ -821,7 +832,6 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
                 });
             }
             setMapping(next);
-            setConfirmation('');
             setStep('review');
         } catch (caught) {
             setError(message(caught));
@@ -830,8 +840,8 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
 
     async function commitImport() {
         await runCommitImport({
-            mapping, confirmation, confirmationPhrase, busy, browserDemoImport, browserCloudImport, file, format,
-            creatingTable, schema, createTableName, createColumns, importConnectionId, preview,
+            mapping, busy, browserDemoImport, browserCloudImport, file, format,
+            creatingTable, schema, createTableName, createColumns, generateId, importConnectionId, preview,
             ...actionSetters,
             savePendingImport, clearPendingImport, rememberJob,
         });
@@ -865,8 +875,8 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
     async function retryUnknownImport() {
         await runRetryUnknownImport({
             job, busy, preview, mapping, browserCloudImport, file, format, reviewUnknownImport,
-            schema, target, creatingTable, cloudRows, createTableName, createColumns, importConnectionId,
-            setCreateTableName, setCreateColumns, confirmation, browserDemoImport, setRetryAttemptedFor, ...actionSetters,
+            schema, target, creatingTable, cloudRows, createTableName, createColumns, generateId, importConnectionId,
+            setCreateTableName, setCreateColumns, browserDemoImport, setRetryAttemptedFor, ...actionSetters,
             savePendingImport, clearPendingImport, rememberJob,
         });
     }
@@ -880,6 +890,7 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
         preview,
         setPreview,
         target,
+        lastExistingTarget,
         fields,
         setFields,
         mapping,
@@ -892,8 +903,8 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
         busy,
         error,
         setError,
-        confirmation,
-        setConfirmation,
+        generateId,
+        setGenerateId,
         importUnavailable,
         browserDemoImport,
         availableTargets,
@@ -901,7 +912,6 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
         selectedFields,
         destinationNames,
         duplicateDestinations,
-        confirmationPhrase,
         sampleColumns,
         browserCloudImport,
         creatingTable,

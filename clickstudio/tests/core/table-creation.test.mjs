@@ -10,6 +10,15 @@ test('CREATE TABLE SQL quotes identifiers and uses a fixed MergeTree engine', ()
     assert.equal(createTableSql('default.events', columns, 'id'), 'CREATE TABLE `default`.`events` (\n    `id` UInt64,\n    `event_name` String\n) ENGINE = MergeTree ORDER BY `id`');
 });
 
+test('CREATE TABLE SQL gives an omitted UInt64 id a generated default', () => {
+    assert.equal(
+        createTableSql('default.events', [{ name: 'id', type: 'UInt64', generatedId: true }], 'id'),
+        'CREATE TABLE `default`.`events` (\n    `id` UInt64 DEFAULT generateSerialID(\'default.events\')\n) ENGINE = MergeTree ORDER BY `id`',
+    );
+    assert.throws(() => createTableSql('default.events', [{ name: 'event_id', type: 'UInt64', generatedId: true }], 'event_id'), { code: 'TABLE_GENERATED_ID' });
+    assert.throws(() => createTableSql('default.events', [{ name: 'id', type: 'String', generatedId: true }], 'id'), { code: 'TABLE_GENERATED_ID' });
+});
+
 test('CREATE TABLE SQL accepts only bounded safe definitions', () => {
     assert.throws(() => createTableSql('default.events; DROP TABLE x', columns, 'id'), { code: 'TABLE_NAME' });
     assert.throws(() => createTableSql('default.events', [], 'id'), { code: 'TABLE_COLUMNS' });

@@ -1,0 +1,69 @@
+.import-wizard-dialog { scrollbar-color: var(--scrollbar-thumb) transparent; }
+.import-wizard-dialog :is(button, input, select):focus-visible { outline: 2px solid var(--focus-color); outline-offset: 2px; }
+.import-wizard-shell { width: 100%; }
+.import-wizard-main { overscroll-behavior: contain; scrollbar-color: var(--scrollbar-thumb) transparent; }
+.import-wizard-footer { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+
+.import-kind-choice { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 10px 20px; border-bottom: 1px solid var(--line); background: var(--page); }
+.import-kind-button { display: grid; min-width: 0; gap: 3px; padding: 9px 12px; border: 1px solid transparent; border-radius: 9px; background: transparent; color: var(--text-soft); text-align: left; cursor: pointer; transition: border-color .16s ease, background .16s ease, color .16s ease; }
+.import-kind-button:hover { border-color: var(--line); background: var(--panel-hover); color: var(--text); }
+.import-kind-button.is-selected { border-color: color-mix(in srgb, var(--accent) 42%, var(--line)); background: color-mix(in srgb, var(--accent) 8%, var(--panel)); color: var(--text); }
+.import-kind-button:disabled { cursor: not-allowed; opacity: .55; }
+.import-kind-button:focus-visible, .import-query-picker :is(input):focus-visible { outline: 2px solid var(--focus-color); outline-offset: 2px; }
+.export-option:focus-visible { outline: 2px solid var(--focus-color); outline-offset: 2px; }
+.import-kind-button > strong { font-size: 12px; font-weight: 650; }
+.import-kind-button > small { color: var(--muted); font-size: 10px; line-height: 1.4; }
+
+.import-destination-choice { display: grid; min-width: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0; padding: 0; border: 0; }
+.import-destination-choice legend { grid-column: 1 / -1; margin-bottom: 2px; color: var(--text-soft); font-size: 12px; font-weight: 600; }
+.import-destination-option { display: flex; min-width: 0; min-height: 76px; align-items: flex-start; gap: 10px; padding: 13px; border: 1px solid var(--line); border-radius: 10px; background: color-mix(in srgb, var(--page) 74%, var(--panel)); color: var(--text-soft); cursor: pointer; transition: border-color .16s ease, background .16s ease, box-shadow .16s ease, transform .16s ease; }
+.import-destination-option:hover:not(.is-disabled) { border-color: var(--line-bright); background: var(--panel-hover); }
+.import-destination-option.is-selected { border-color: color-mix(in srgb, var(--accent) 58%, var(--line)); background: color-mix(in srgb, var(--accent) 8%, var(--page)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent); color: var(--text); }
+.import-destination-option:focus-within { outline: 2px solid var(--focus-color); outline-offset: 2px; }
+.import-destination-option.is-disabled { cursor: not-allowed; opacity: .48; }
+.import-destination-option > input { width: 15px; height: 15px; flex: none; margin: 1px 0 0; accent-color: var(--accent); }
+.import-destination-option-copy { display: grid; min-width: 0; gap: 4px; }
+.import-destination-option-title { color: inherit; font-size: 12px; font-weight: 650; line-height: 1.35; }
+.import-destination-option-description { color: var(--muted); font-size: 10px; font-weight: 450; line-height: 1.45; }
+
+.import-map-overview { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); align-items: end; gap: 10px; }
+.import-map-overview.is-create { grid-template-columns: minmax(0, 1fr); }
+.import-destination-select { min-width: 0; }
+.import-source-summary { display: grid; min-width: 0; min-height: 58px; align-content: center; gap: 3px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--page); }
+.import-source-summary-label { color: var(--muted); font-size: 9px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.import-source-summary > strong { color: var(--text); font-size: 11px; font-weight: 600; }
+.import-source-summary > span:last-child { overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+
+.import-new-table-card { border-color: color-mix(in srgb, var(--accent) 23%, var(--line)); }
+.import-generated-id-option { display: flex; max-width: 540px; align-items: flex-start; gap: 10px; padding: 11px 12px; border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--line)); border-radius: 9px; background: color-mix(in srgb, var(--accent) 5%, var(--page)); color: var(--text-soft); cursor: pointer; }
+.import-generated-id-option > input { width: 15px; height: 15px; flex: none; margin: 1px 0 0; accent-color: var(--accent); }
+.import-generated-id-option > span { display: grid; gap: 3px; }
+.import-generated-id-option strong { color: var(--text); font-size: 11px; font-weight: 600; }
+.import-generated-id-option small, .import-id-source-note { color: var(--muted); font-size: 10px; line-height: 1.45; }
+.import-id-source-note code { color: var(--text-soft); font-family: var(--font-mono); }
+.import-column-map { max-height: min(38vh, 340px); scrollbar-color: var(--scrollbar-thumb) transparent; }
+.import-column-map thead { position: sticky; z-index: 1; top: 0; }
+.import-column-map tbody tr:hover { background: color-mix(in srgb, var(--panel-hover) 65%, transparent); }
+.import-review-mapping-list { max-height: 180px; overflow: auto; scrollbar-color: var(--scrollbar-thumb) transparent; }
+.import-column-chip { max-width: 100%; overflow-wrap: anywhere; line-height: 1.45; }
+.import-column-chip.is-generated { border-color: color-mix(in srgb, var(--accent) 38%, var(--line)); color: var(--text-soft); }
+.import-column-chip.is-generated code { color: var(--accent); font-family: var(--font-mono); font-weight: 650; }
+
+@media (max-width: 640px) {
+    .import-wizard-dialog { width: calc(100vw - 1rem); max-height: calc(100dvh - 1rem); border-radius: 14px; }
+    .import-wizard-shell { max-height: calc(100dvh - 1rem); }
+    .import-wizard-steps { gap: 0; padding-inline: 8px; }
+    .import-wizard-steps > div { justify-content: center; gap: 5px; padding-inline: 2px; font-size: 9px; }
+    .import-kind-choice { padding-inline: 10px; }
+    .import-kind-button { padding: 8px; }
+    .import-destination-choice, .import-map-overview { grid-template-columns: minmax(0, 1fr); }
+    .import-destination-option { min-height: 64px; }
+    .import-column-map { max-height: 42vh; }
+    .import-wizard-footer { align-items: stretch; }
+    .import-wizard-footer > span { flex-basis: 100%; }
+    .import-wizard-footer > div { justify-content: flex-end; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .import-kind-button, .import-destination-option { transition: none; }
+}
