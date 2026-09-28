@@ -149,7 +149,7 @@ export function WorkspaceResultsPanel({
         ? failedAttempt && run
             ? { description: 'The latest attempt failed. Showing the previous result.' }
             : !failedAttempt && staleResult
-                ? { description: 'SQL text, selection, or bound parameters changed since this run. Rerun to refresh the result.' }
+                ? { description: 'SQL text, selection, or bound parameters changed since this run.' }
                 : undefined
         : undefined;
 
