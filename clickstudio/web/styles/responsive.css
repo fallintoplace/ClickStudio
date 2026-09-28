@@ -24,7 +24,7 @@
 @media (max-width: 1120px) {
     .topbar { gap: 12px; padding: 0 14px; }
     .topbar-preferences .select-control > span { display: none; }
-    .workspace-root.is-expert .workspace-layout { grid-template-columns: minmax(250px, 280px) minmax(0, 1fr); }
+    .workspace-root.is-expert .workspace-layout { grid-template-columns: 58px minmax(250px, 280px) minmax(0, 1fr); }
     .editor-heading-tools > .button-base { width: 32px; min-width: 32px; padding-inline: 0; font-size: 0; }
     .editor-heading-tools > .button-base svg { width: 15px; height: 15px; }
     .execution-bar { gap: 9px; }
@@ -86,6 +86,8 @@
     .rail-icon-button { width: 35px; height: 35px; }
     .workspace-root.is-expert .icon-rail { display: flex; }
     .workspace-root.is-expert .inspector-pane { display: none; }
+    .workspace-root.is-expert .expert-rail-secondary { display: contents; }
+    .workspace-root.is-expert .workspace-main { grid-column: 2; }
     .workspace-content { padding: 7px; gap: 7px; }
     .workspace-content.has-run { grid-template-rows: minmax(260px, 1fr) minmax(225px, .9fr); }
     .beginner-workspace-content { grid-template-rows: minmax(320px, 1fr) minmax(170px, .7fr); }

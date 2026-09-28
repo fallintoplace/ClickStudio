@@ -853,13 +853,13 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
                     <RailButton icon="importFile" label={copy.common.import} onClick={() => setImportOpen(true)}/>
                     <RailButton icon="exportFile" label={copy.common.export} onClick={() => setExportOpen(true)}/>
                 </>}
-                {experience === 'expert' && <>
+                {experience === 'expert' && <div className="expert-rail-secondary">
                     <span className="rail-separator"/>
                     {EXPERT_BROWSE_NAVIGATION.map(item => <RailButton key={item.id} icon={item.icon} label={item.copyKey ? copy.common[item.copyKey] : inspectorLabel(item.id)} active={inspector === item.id && (experience === 'expert' || drawerOpen)} onClick={() => showInspector(item.id)}/>)}
                     <span className="rail-spacer"/>
                     {EXPERT_EXECUTION_NAVIGATION.map(item => <RailButton key={item.id} icon={item.icon} label={inspectorLabel(item.id)} active={inspector === item.id && (experience === 'expert' || drawerOpen)} onClick={() => showInspector(item.id)}/>)}
-                </>}
-                {experience === 'expert' && <><span className="rail-separator"/><button className="rail-icon-button rail-icon-muted" type="button" title="Export local drafts" onClick={() => download('clickstudio-local-drafts.json', workspace)}><Icon name="settings"/></button></>}
+                    <span className="rail-separator"/><button className="rail-icon-button rail-icon-muted" type="button" title="Export local drafts" onClick={() => download('clickstudio-local-drafts.json', workspace)}><Icon name="settings"/></button>
+                </div>}
             </aside>
 
             {experience === 'expert' && !inspectorDocked && <InspectorPane {...inspectorProps}/>}

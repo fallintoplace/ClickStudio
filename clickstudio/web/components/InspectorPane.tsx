@@ -101,15 +101,21 @@ export function InspectorPane({ comparisonProfiles, comparisonPipelines, copy, i
     const clearReferenceTarget = useCallback(() => setReferenceTarget(undefined), []);
     const moreItems = inspectorMoreNavigation(expert, Boolean(run));
 
-    return <aside className={cx('inspector-pane', expert && 'is-expert-browser', expert && (inspector === 'schema' || inspector === 'reference') && 'is-browser-tab-selected', docked && 'is-docked-inspector')}>
-        <header className="inspector-header"><div><span className="eyebrow">{expert ? copy.browse : copy.workspaceInspector}</span><h2>{title}</h2></div>{closeButton}</header>
-        <nav className="inspector-tabs is-browser-tabs" aria-label={copy.workspaceBrowser}>
+    return <aside className={cx('inspector-pane', expert && 'is-expert-browser', expert && !docked && 'is-expanded-browser', expert && (inspector === 'schema' || inspector === 'reference') && 'is-browser-tab-selected', docked && 'is-docked-inspector')}>
+        <header className="inspector-header">
+            <div><span className="eyebrow">{expert ? copy.browse : copy.workspaceInspector}</span><h2>{title}</h2></div>
+            {(expert && !docked || closeButton) && <div className="inspector-header-tools">
+                {expert && !docked && <InspectorMoreMenu copy={copy} inspector={inspector} onSelect={setInspector} items={moreItems}/>}
+                {closeButton}
+            </div>}
+        </header>
+        {(!expert || docked) && <nav className="inspector-tabs is-browser-tabs" aria-label={copy.workspaceBrowser}>
             {PRIMARY_INSPECTOR_NAVIGATION.map(item => <button key={item.id} type="button" className={item.id === 'assistant' ? 'is-assistant-tab' : undefined} aria-label={copy[item.copyKey]} aria-pressed={inspector === item.id} onClick={() => {
                 if (item.id === 'reference') setReferenceTarget(undefined);
                 setInspector(item.id);
             }}><Icon name={item.icon}/><span>{copy[item.copyKey]}</span></button>)}
             <InspectorMoreMenu copy={copy} inspector={inspector} onSelect={setInspector} items={moreItems} />
-        </nav>
+        </nav>}
         <div className={cx('inspector-content', inspector === 'assistant' && 'is-assistant-content')}>
             {inspector === 'schema' && <ObjectExplorer key={connection.id} copy={copy} connection={connection} schema={schema} schemaLoading={schemaLoading} schemaLoadingMore={schemaLoadingMore} schemaError={schemaError} search={search} setSearch={setSearch} trusted={trusted} onRefreshSchema={onRefreshSchema} onLoadMoreSchema={onLoadMoreSchema} importedTableTarget={importedTableTarget} onImportedTableRevealed={onImportedTableRevealed} onInsert={onInsert} compact={docked} onOpenSqlDraft={onOpenSqlDraft} onOpenReference={openReference}/>}
             {inspector === 'reference' && <ReferenceExplorer copy={copy} connection={connection} trusted={trusted} target={referenceTarget} onTargetHandled={clearReferenceTarget} onInsert={onInsert}/>}

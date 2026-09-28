@@ -1,8 +1,13 @@
 @layer components {
     .inspector-pane { display: flex; min-width: 0; min-height: 0; flex-direction: column; overflow: hidden; border-left: 1px solid var(--line); background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 90%, var(--page)), var(--page-raised)); animation: inspectorReveal .35s cubic-bezier(.2,.7,.2,1) both; }
     .inspector-pane.is-expert-browser.is-browser-tab-selected > .inspector-header { display: none; }
+    .inspector-pane.is-expanded-browser.is-browser-tab-selected > .inspector-header { display: flex; }
     .inspector-header { display: flex; min-height: 66px; flex: none; align-items: center; justify-content: space-between; gap: 8px; padding: 11px 16px; border-bottom: 1px solid var(--line); background: var(--panel-header); }
     .inspector-header h2 { margin: 3px 0 0; font-family: var(--font-display); font-size: 15px; font-weight: 680; letter-spacing: -.025em; }
+    .inspector-header-tools { display: flex; flex: none; align-items: center; gap: 7px; }
+    .inspector-header-tools .inspector-more-trigger { display: flex; min-height: 32px; align-items: center; justify-content: center; gap: 4px; padding: 0 8px; border: 1px solid var(--line); border-radius: 7px; background: transparent; color: var(--text-soft); font-size: 9px; cursor: pointer; }
+    .inspector-header-tools .inspector-more-trigger:hover, .inspector-header-tools .inspector-more-trigger[aria-expanded="true"] { border-color: var(--active-border); background: var(--control-hover); color: var(--text); }
+    .inspector-header-tools .inspector-more-trigger.is-active { color: var(--accent); }
     .inspector-tabs { display: flex; flex: none; gap: 5px; padding: 8px 13px; border-bottom: 1px solid var(--line); background: var(--control-well); }
     .inspector-tabs button { display: grid; width: 34px; height: 32px; place-items: center; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; transition: .18s ease; }
     .inspector-tabs button svg { width: 15px; height: 15px; }

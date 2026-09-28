@@ -8,13 +8,38 @@ test('Experimental mode gives the editor the full work area before the first run
     await expect(content).not.toHaveClass(/has-run/);
     await expect(page.getByRole('region', { name: 'Query results', exact: true })).toHaveCount(0);
     await expect(page.locator('.empty-workspace')).toHaveCount(0);
-    await expect(page.locator('.icon-rail')).toBeHidden();
+    const rail = page.locator('.icon-rail');
+    const inspector = page.locator('.inspector-pane.is-expanded-browser');
+    const workspace = page.locator('.workspace-main');
+    await expect(rail).toBeVisible();
+    await expect(rail.getByRole('button', { name: 'Objects', exact: true })).toBeVisible();
+    await expect(rail.getByRole('button', { name: 'Reference', exact: true })).toBeVisible();
+    await expect(rail.getByRole('button', { name: 'AI', exact: true })).toBeVisible();
+    await expect(inspector.locator('.inspector-tabs')).toHaveCount(0);
+    await expect(inspector.getByRole('heading', { name: 'Objects', exact: true })).toBeVisible();
+
+    for (const width of [1280, 1120, 851]) {
+        await page.setViewportSize({ width, height: 900 });
+        const railBounds = await rail.evaluate(element => element.getBoundingClientRect().toJSON());
+        const inspectorBounds = await inspector.evaluate(element => element.getBoundingClientRect().toJSON());
+        const workspaceBounds = await workspace.evaluate(element => element.getBoundingClientRect().toJSON());
+        expect(railBounds.right).toBeLessThanOrEqual(inspectorBounds.left + 1);
+        expect(inspectorBounds.right).toBeLessThanOrEqual(workspaceBounds.left + 1);
+        expect(inspectorBounds.width).toBeGreaterThanOrEqual(width <= 1120 ? 250 : 280);
+    }
+
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await rail.getByRole('button', { name: 'Reference', exact: true }).click();
+    await expect(inspector.getByRole('heading', { name: 'Reference', exact: true })).toBeVisible();
+    await rail.getByRole('button', { name: 'AI', exact: true }).click();
+    await expect(inspector.getByRole('heading', { name: 'AI', exact: true })).toBeVisible();
+    await expect(page.locator('.assistant-panel')).toBeVisible();
 
     const browser = page.getByRole('navigation', { name: 'Workspace browser', exact: true });
-    await expect(browser.getByRole('button', { name: 'Objects', exact: true })).toBeVisible();
-    await expect(browser.getByRole('button', { name: 'Reference', exact: true })).toBeVisible();
-    await browser.getByRole('button', { name: 'More workspace panels', exact: true }).click();
+    await expect(browser).toHaveCount(0);
+    await page.getByRole('button', { name: 'More workspace panels', exact: true }).click();
     await page.getByRole('menuitem', { name: 'Queries', exact: true }).click();
+    await expect(inspector.getByRole('heading', { name: 'Queries', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Ask AI', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Run', exact: true })).toBeVisible();
