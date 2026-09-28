@@ -34,6 +34,21 @@ test('Cloud schema inference handles dates, integer bounds, decimals, UUIDs, and
     assert.equal(inferCloudImportType([{ value: { nested: true } }], 'value'), 'String');
 });
 
+test('Cloud schema inference recognizes JSON booleans, including nullable values', () => {
+    assert.equal(inferCloudImportType([{ enabled: true }, { enabled: false }], 'enabled'), 'Bool');
+    assert.equal(inferCloudImportType([{ enabled: true }, { enabled: null }, { enabled: false }], 'enabled'), 'Bool');
+    assert.deepEqual(inferCloudImportColumns([{ enabled: true }, { enabled: false }], ['enabled']), [
+        { source: 'enabled', name: 'enabled', type: 'Bool' },
+    ]);
+});
+
+test('Cloud schema inference keeps Boolean-looking strings and mixed types as String', () => {
+    assert.equal(inferCloudImportType([{ enabled: 'true' }, { enabled: 'false' }], 'enabled'), 'String');
+    assert.equal(inferCloudImportType([{ enabled: true }, { enabled: 'false' }], 'enabled'), 'String');
+    assert.equal(inferCloudImportType([{ enabled: true }, { enabled: 1 }], 'enabled'), 'String');
+    assert.equal(inferCloudImportType([{ enabled: null }, { enabled: null }], 'enabled'), 'String');
+});
+
 test('Cloud table suggestion creates a safe name from a file name', () => {
     assert.equal(suggestCloudTableName('Daily events 2026.csv'), 'Daily_events_2026');
     assert.equal(suggestCloudTableName('2026-report.json'), 'import_2026_report');

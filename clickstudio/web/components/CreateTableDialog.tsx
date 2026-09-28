@@ -256,7 +256,7 @@ export function CreateTableDialog({ connection, databases, onClose, onCreated }:
                         <span className="create-table-select-wrap"><select aria-label="Sorting key" aria-describedby="create-table-sorting-help" value={orderBy} onChange={event => setOrderBy(event.target.value)} className="create-table-control create-table-select">{columns.map((column, index) => <option key={`${column.name}-${index}`} value={column.name}>{column.name || `Column ${index + 1}`}</option>)}</select><Icon name="chevron"/></span>
                         <span id="create-table-sorting-help" className="create-table-help">Used to organize data for queries. The first column is selected by default.</span>
                     </label>
-                    <p className="create-table-supported-types">Available types: String, UInt64, Int64, Float64, Decimal(18, 2), Date, DateTime, UUID.</p>
+                    <p className="create-table-supported-types">Available types: String, Bool, UInt64, Int64, Float64, Decimal(18, 2), Date, DateTime, UUID.</p>
                 </>}
                 {created && <p role="status" className="rounded-xl border border-[var(--green)]/30 bg-[var(--green)]/5 p-4 text-sm">Created <code>{targetTable}</code>.</p>}
                 {error && <p role="alert" className="rounded-lg border border-[var(--red)]/30 bg-[var(--red)]/5 px-3 py-2.5 text-xs text-[var(--red)]">{error}</p>}

@@ -19,6 +19,11 @@ test('CREATE TABLE SQL gives an omitted UInt64 id a generated default', () => {
     assert.throws(() => createTableSql('default.events', [{ name: 'id', type: 'String', generatedId: true }], 'id'), { code: 'TABLE_GENERATED_ID' });
 });
 
+test('CREATE TABLE SQL accepts Bool columns', () => {
+    assert.equal(createTableSql('default.flags', [{ name: 'enabled', type: 'Bool' }], 'enabled'),
+        'CREATE TABLE `default`.`flags` (\n    `enabled` Bool\n) ENGINE = MergeTree ORDER BY `enabled`');
+});
+
 test('CREATE TABLE SQL accepts only bounded safe definitions', () => {
     assert.throws(() => createTableSql('default.events; DROP TABLE x', columns, 'id'), { code: 'TABLE_NAME' });
     assert.throws(() => createTableSql('default.events', [], 'id'), { code: 'TABLE_COLUMNS' });
@@ -26,7 +31,7 @@ test('CREATE TABLE SQL accepts only bounded safe definitions', () => {
     assert.throws(() => createTableSql('default.events', [{ name: 'x', type: 'String' }, { name: 'x', type: 'String' }], 'x'), { code: 'TABLE_COLUMN_DUPLICATE' });
     assert.throws(() => createTableSql('default.events', [{ name: 'x`); DROP TABLE events; --', type: 'String' }], 'x`); DROP TABLE events; --'), { code: 'TABLE_COLUMN_NAME' });
     assert.throws(() => createTableSql('default.events', [{ name: 'x', type: 'String' }], 'missing'), { code: 'TABLE_ORDER_BY' });
-    assert.deepEqual(CREATE_TABLE_COLUMN_TYPES, ['String', 'UInt64', 'Int64', 'Float64', 'Decimal(18, 2)', 'Date', 'DateTime', 'UUID']);
+    assert.deepEqual(CREATE_TABLE_COLUMN_TYPES, ['String', 'Bool', 'UInt64', 'Int64', 'Float64', 'Decimal(18, 2)', 'Date', 'DateTime', 'UUID']);
 });
 
 test('Table creation requires owner, trust, and valid database and table names', async () => {

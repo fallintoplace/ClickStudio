@@ -17,7 +17,7 @@ import { appendSqlSnippet, clickhouseSnippetCompletions, sqlEditorTools, sqlStat
 import { clickHouseNativeParser } from '../clickhouse-native-parser';
 import { ScrollEdgeFrame } from './ScrollEdgeShadows';
 const keywordCompletions = [...new Set(CLICKHOUSE_KEYWORDS.split(' '))].map(label => ({ label, type: 'keyword' }));
-const clickhouse = SQLDialect.define({ keywords: CLICKHOUSE_KEYWORDS, types: 'String UInt8 UInt16 UInt32 UInt64 UInt128 UInt256 Int8 Int16 Int32 Int64 Int128 Int256 Float32 Float64 Date Date32 DateTime DateTime64 Nullable Array Tuple Map Decimal LowCardinality UUID JSON', builtin: 'count sum avg min max uniq uniqExact quantile median toDate toDateTime toStartOfDay toStartOfHour now today numbers arrayJoin arrayMap arrayFilter multiIf ifNull coalesce', doubleQuotedStrings: false, hashComments: true });
+const clickhouse = SQLDialect.define({ keywords: CLICKHOUSE_KEYWORDS, types: 'String Bool UInt8 UInt16 UInt32 UInt64 UInt128 UInt256 Int8 Int16 Int32 Int64 Int128 Int256 Float32 Float64 Date Date32 DateTime DateTime64 Nullable Array Tuple Map Decimal LowCardinality UUID JSON', builtin: 'count sum avg min max uniq uniqExact quantile median toDate toDateTime toStartOfDay toStartOfHour now today numbers arrayJoin arrayMap arrayFilter multiIf ifNull coalesce', doubleQuotedStrings: false, hashComments: true });
 const clickhouseFunctions = [
     ['count', 'Aggregate count of rows'], ['sum', 'Aggregate numeric values'], ['avg', 'Average numeric values'], ['uniqExact', 'Exact distinct count'],
     ['quantile', 'Approximate quantile aggregate'], ['median', 'Median aggregate'], ['toDate', 'Convert a value to Date'], ['toDateTime', 'Convert a value to DateTime'],

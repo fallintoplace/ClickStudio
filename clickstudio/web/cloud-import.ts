@@ -39,8 +39,9 @@ function isDateTime(value: string) {
 }
 
 export function inferCloudImportType(rows: Record<string, Json>[], column: string): CreateTableColumnType {
-    const values = rows.map(row => row[column]).filter((value): value is Json => value !== null && value !== undefined)
-        .map(textValue);
+    const rawValues = rows.map(row => row[column]).filter((value): value is Json => value !== null && value !== undefined);
+    if (rawValues.length > 0 && rawValues.every(value => typeof value === 'boolean')) return 'Bool';
+    const values = rawValues.map(textValue);
     if (values.some(value => value === undefined || value === '')) return 'String';
     const nonEmpty = values.filter((value): value is string => Boolean(value));
     if (!nonEmpty.length) return 'String';
