@@ -77,16 +77,6 @@ export function useWorkspaceViewState({
         ? sqlErrorRangeInDraft(active.sql, editorErrorContext.statementSql, editorErrorContext.sourceFrom, editorErrorContext.error)
         : undefined;
     const staleResult = Boolean(run && (!runSourceSql || run.connectionId !== connection.id || !matchesDraft(run, runSourceSql, active.parameters)));
-    const saveStatusLabel = saveStatus.state === 'local' ? copy.common.localDraft : ({
-        local: 'Local draft',
-        checking: 'Checking save…',
-        saving: 'Saving…',
-        saved: `Saved r${active.baseRevision}`,
-        changed: 'Unsaved changes',
-        conflict: 'Newer revision available',
-        deleted: 'Saved file in trash',
-        unavailable: 'Save status unavailable',
-    } as const)[saveStatus.state];
     const requestedResultsView = experience === 'beginner' && view === 'insights' ? 'results' : view;
     const sqlMapStatement = safeSelectedStatement(active.sql, active.from, active.from);
     const queryTreeCapability = connection.manifest?.queryTree ?? connection.manifest?.explain;
@@ -122,7 +112,6 @@ export function useWorkspaceViewState({
         sortedHistory,
         savedDocument,
         saveStatus,
-        saveStatusLabel,
         statementCount,
         editorErrorContext,
         editorErrorRange,

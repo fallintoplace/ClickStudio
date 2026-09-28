@@ -666,7 +666,6 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         sortedHistory,
         savedDocument,
         saveStatus,
-        saveStatusLabel,
         requestedResultsView,
         sqlMapStatement,
         queryTreeAvailable,
@@ -954,7 +953,6 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
                             window.requestAnimationFrame(() => editor.current?.focus());
                             return true;
                         }}/>}
-                        {experience === 'expert' && workspace.tabs.length > 0 && <span className="draft-status" data-save-state={saveStatus.state} title={`${saveStatus.label}. ${saveStatus.detail}`}><span className={cx('status-light', saveStatus.state === 'saved' ? 'is-trusted' : ['changed', 'conflict', 'deleted', 'unavailable'].includes(saveStatus.state) ? 'is-warning' : '')}/>{saveStatusLabel}</span>}
                         {experience === 'expert' && active.serverId && <Button variant="ghost" className="revision-history-trigger" aria-label={`Version history for ${active.name}`} aria-pressed={inspector === 'revisions'} title="View saved versions" onClick={() => showInspector('revisions')}><Icon name="history"/><span>Versions</span></Button>}
 
                     </>}
