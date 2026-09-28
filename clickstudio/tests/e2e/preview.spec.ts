@@ -44,7 +44,7 @@ async function mockCloudEndpoint(page: Page, commitOutcome: 'success' | 'unknown
             return;
         }
         if (body.action === 'import-status') {
-            await route.fulfill({ json: { id: (body.queryId ?? '').replace('clickstudio-import-', ''), connectionId: 'clickhouse-cloud', table: body.table, queryId: body.queryId, rows: body.rows, createdAt: '2026-09-28T00:00:00.000Z', status: 'unknown', error: 'ClickHouse has no conclusive success record. Inspect the destination before deciding what to do; automatic retry is disabled.' } });
+            await route.fulfill({ json: { id: (body.queryId ?? '').replace('clickstudio-import-', ''), connectionId: 'clickhouse-cloud', table: body.table, queryId: body.queryId, rows: body.rows, createdAt: '2026-09-28T00:00:00.000Z', status: 'unknown', error: 'ClickHouse could not confirm the insert. The rows may already be there.' } });
             return;
         }
         await route.fulfill({ status: 409, json: { error: { code: 'UNEXPECTED_ACTION', message: 'Unexpected Cloud action in this import test.' } } });
@@ -287,7 +287,7 @@ test('ClickHouse Cloud import creates a table with editable inferred columns', a
     expect(JSON.parse(createTable!)).toMatchObject({ name: 'interview_events', columns: [{ source: 'day', name: 'event_day', type: 'Date' }, { source: 'events', name: 'events', type: 'UInt64' }] });
 });
 
-test('ClickHouse Cloud import keeps an interrupted write blocked and does not retry it', async ({ page }) => {
+test('ClickHouse Cloud import shows clear choices after an interrupted write', async ({ page }) => {
     const imports = await mockCloudEndpoint(page, 'unknown');
     await connectPreviewCloud(page);
     await page.getByRole('button', { name: 'Import', exact: true }).last().click();
@@ -304,10 +304,11 @@ test('ClickHouse Cloud import keeps an interrupted write blocked and does not re
     await dialog.getByLabel('Type INSERT 1 ROWS to confirm').fill('INSERT 1 ROWS');
     await dialog.getByRole('button', { name: 'Import rows' }).click();
 
-    await expect(dialog).toContainText('We couldn’t confirm whether the import finished.');
-    await expect(dialog).toContainText('another import could add duplicate rows');
-    await dialog.getByRole('button', { name: 'Check ClickHouse status' }).click();
-    await expect(dialog).toContainText('We couldn’t confirm whether the import finished.');
-    await expect(dialog.getByRole('button', { name: 'Continue anyway' })).toBeVisible();
+    await expect(dialog).toContainText('We couldn’t confirm the import.');
+    await expect(dialog).toContainText('A late first import may add duplicate rows.');
+    await dialog.getByRole('button', { name: 'Check status' }).click();
+    await expect(dialog).toContainText('We couldn’t confirm the import.');
+    await expect(dialog.getByRole('button', { name: 'I see all rows' })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'No rows; retry import' })).toBeVisible();
     expect(imports).toHaveLength(1);
 });

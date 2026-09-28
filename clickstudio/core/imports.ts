@@ -242,7 +242,7 @@ export class ImportService {
         catch (error) {
             job.status = 'unknown';
             job.reconciliationRequired = true;
-            job.error = `${asError(error).message} The insert may have partially completed. Inspect the destination; automatic retry is disabled.`;
+            job.error = `${asError(error).message} The insert may have partially completed. Check the table before retrying.`;
         }
         this.store.put('imports', job.id, job);
         return job;
@@ -261,12 +261,12 @@ export class ImportService {
         }
         else if (evidence === 'running') {
             job.status = 'running';
-            job.error = 'ClickHouse still reports this insert as active. Status checks will continue; a second insert will remain blocked.';
+            job.error = 'ClickHouse still reports this insert as active.';
             job.reconciliationRequired = true;
         }
         else {
             job.status = 'unknown';
-            job.error = 'ClickHouse has no conclusive success record. Inspect the destination before deciding what to do; automatic retry is disabled.';
+            job.error = 'ClickHouse could not confirm the insert. The rows may already be there.';
             job.reconciliationRequired = false;
         }
         const changed = job.status !== previous.status || job.error !== previous.error || job.reconciliationRequired !== previous.reconciliationRequired;
@@ -293,7 +293,7 @@ export class ImportService {
         }
         else if (evidence === 'running') {
             job.status = 'running';
-            job.error = 'ClickHouse still reports this insert as active. Status checks will continue; a second insert will remain blocked.';
+            job.error = 'ClickHouse still reports this insert as active.';
             job.reconciliationRequired = true;
         }
         else {

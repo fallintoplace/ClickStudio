@@ -136,7 +136,7 @@ test('File import reports an unknown insert without retrying automatically', asy
     await page.route('**/api/imports/input-1/mapping', route => route.fulfill({ json: { id: 'mapping-1', inputId: 'input-1', connectionId: 'live', table: 'demo.events', fields: { day: 'day', events: 'events' }, rows: [{ day: '2026-01-01', events: '10' }], rowCount: 1 } }));
     await page.route('**/api/imports/mapping-1/commit', async route => {
         commitRequests++;
-        await route.fulfill({ json: { id: 'mapping-1', table: 'demo.events', rows: 1, status: 'unknown', error: 'The insert may have partially completed. Inspect the destination; automatic retry is disabled.' } });
+        await route.fulfill({ json: { id: 'mapping-1', table: 'demo.events', rows: 1, status: 'unknown', error: 'The insert may have partially completed. Check the table before retrying.' } });
     });
 
     await page.getByRole('button', { name: 'Import', exact: true }).click();
@@ -146,8 +146,10 @@ test('File import reports an unknown insert without retrying automatically', asy
     await dialog.getByLabel('Type INSERT 1 ROWS to confirm').fill('INSERT 1 ROWS');
     await dialog.getByRole('button', { name: 'Import rows', exact: true }).click();
 
-    await expect(dialog).toContainText('We couldn’t confirm whether the import finished.');
-    await expect(dialog).toContainText('They may already be there. Check the table before retrying; another import could add duplicate rows.');
+    await expect(dialog).toContainText('We couldn’t confirm the import.');
+    await expect(dialog).toContainText('The rows may already be in demo.events. Check the table before choosing. A late first import may add duplicate rows.');
+    await expect(dialog.getByRole('button', { name: 'I see all rows' })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'No rows; retry import' })).toBeVisible();
     expect(commitRequests).toBe(1);
 });
 
@@ -182,7 +184,7 @@ test('File import recovers ambiguous writes without local storage and records a 
     await page.route(url => url.pathname === '/api/imports' && url.searchParams.get('recoverable') === 'true', route => route.fulfill({ json: recoverable }));
     await page.route('**/api/imports/saved-import/reconcile', async route => {
         reconcileRequests++;
-        await route.fulfill({ json: { ...recoverable[0], status: 'unknown', reconciliationRequired: false, error: 'ClickHouse has no conclusive success record.' } });
+        await route.fulfill({ json: { ...recoverable[0], status: 'unknown', reconciliationRequired: false, error: 'ClickHouse could not confirm the import.' } });
     });
     await page.route('**/api/imports/saved-import/review', async route => {
         reviewBody = route.request().postDataJSON() as Record<string, unknown>;
@@ -194,12 +196,12 @@ test('File import recovers ambiguous writes without local storage and records a 
 
     await page.getByRole('button', { name: 'Import', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Import data', exact: true });
-    await expect(dialog.getByRole('region', { name: 'Import status' })).toContainText('We couldn’t confirm whether the import finished.');
+    await expect(dialog.getByRole('region', { name: 'Import status' })).toContainText('We couldn’t confirm the import.');
     await expect(dialog.getByLabel('Choose a CSV, JSON, or NDJSON file')).toHaveCount(0);
-    await dialog.getByRole('button', { name: 'Check ClickHouse status' }).click();
-    await expect(dialog).toContainText('They may already be there. Check the table before retrying; another import could add duplicate rows.');
+    await dialog.getByRole('button', { name: 'Check status' }).click();
+    await expect(dialog).toContainText('The rows may already be in demo.events. Check the table before choosing. A late first import may add duplicate rows.');
     expect(reconcileRequests).toBe(1);
-    await dialog.getByRole('button', { name: 'Continue anyway' }).click();
+    await dialog.getByRole('button', { name: 'No rows; choose file again' }).click();
     await expect(dialog.getByLabel('Choose a CSV, JSON, or NDJSON file')).toBeVisible();
     expect(reviewBody).toEqual({ inspected: true, noActiveInsert: true });
     expect(previewRequests).toBe(0);

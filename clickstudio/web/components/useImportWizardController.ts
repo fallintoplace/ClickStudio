@@ -121,7 +121,7 @@ async function runCommitImport(context: ImportActionSetters & {
                 const status = await checkClickHouseCloudImport(queryId, mapping.table, mapping.rowCount);
                 rememberJob(status);
             } catch {
-                rememberJob({ id: mapping.id, connectionId: importConnectionId, table: mapping.table, rows: mapping.rowCount, queryId, status: 'unknown', error: 'The insert response was interrupted. Check ClickHouse status and inspect the destination before starting another write.' });
+                rememberJob({ id: mapping.id, connectionId: importConnectionId, table: mapping.table, rows: mapping.rowCount, queryId, status: 'unknown', error: 'ClickHouse could not confirm the import. The rows may already be there.' });
             }
             return;
         }
@@ -225,7 +225,7 @@ async function runReviewUnknownImport(context: ImportActionSetters & {
                 const [nextTargets, nextSchema] = await loadConnectionImportSetup(importConnectionId, true);
                 setTargets(nextTargets);
                 setSchema(nextSchema);
-                setTarget(nextTargets[0] ?? CREATE_CLOUD_TABLE_TARGET);
+                setTarget(nextTargets.includes(job.table) ? job.table : nextTargets[0] ?? CREATE_CLOUD_TABLE_TARGET);
                 setError('');
             } catch (caught) { setError(message(caught)); }
             finally { setBusy(''); }
@@ -253,7 +253,9 @@ async function runReviewUnknownImport(context: ImportActionSetters & {
                 const [nextTargets, nextSchema] = await loadConnectionImportSetup(importConnectionId, false);
                 setTargets(nextTargets);
                 setSchema(nextSchema);
-                const first = nextTargets.find(table => nextSchema.tables.some(item => `${item.database}.${item.name}` === table)) ?? '';
+                const first = nextTargets.includes(job.table) && nextSchema.tables.some(item => `${item.database}.${item.name}` === job.table)
+                    ? job.table
+                    : nextTargets.find(table => nextSchema.tables.some(item => `${item.database}.${item.name}` === table)) ?? '';
                 setTarget(first);
                 setImportUnavailable(first ? '' : 'No import targets are configured for this connection. Ask the workspace owner to allow a destination table.');
             } catch (caught) { setError(message(caught)); }
@@ -306,6 +308,7 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
     const [recoveryAttempt, setRecoveryAttempt] = useState(0);
     const [busy, setBusy] = useState<BusyAction>('');
     const [error, setError] = useState('');
+    const [retryAttemptedFor, setRetryAttemptedFor] = useState<string>();
     const [confirmation, setConfirmation] = useState('');
     const [importUnavailable, setImportUnavailable] = useState('');
 
@@ -348,6 +351,7 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
         setPendingImport(undefined);
         setBusy('');
         setError('');
+        setRetryAttemptedFor(undefined);
         setConfirmation('');
         setImportUnavailable('');
         setRecoveryState('checking');
@@ -651,6 +655,131 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
         });
     }
 
+    async function confirmUnknownImport() {
+        if (!job || job.status !== 'unknown' || busy) return;
+        setBusy('review');
+        setError('');
+        try {
+            let checked = job;
+            if (!browserCloudImport) {
+                checked = job.reviewedAt
+                    ? await post<ImportJob>(`/imports/${encodeURIComponent(job.id)}/reconcile`)
+                    : await post<ImportJob>(`/imports/${encodeURIComponent(job.id)}/review`, { inspected: true, noActiveInsert: true });
+                if (checked.status !== 'unknown') {
+                    rememberJob(checked);
+                    return;
+                }
+                if (!checked.reviewedAt) {
+                    rememberJob(checked);
+                    return;
+                }
+            }
+            clearPendingImport();
+            rememberJob({ ...checked, status: 'succeeded', error: undefined, reviewedAt: checked.reviewedAt ?? new Date().toISOString() });
+        } catch (caught) {
+            setError(`Could not confirm the imported rows: ${message(caught)}`);
+        } finally { setBusy(''); }
+    }
+
+    async function retryUnknownImport() {
+        if (!job || job.status !== 'unknown' || busy) return;
+        if (!preview || !mapping || (browserCloudImport && (!file || !format))) {
+            await reviewUnknownImport();
+            return;
+        }
+        setBusy('review');
+        setError('');
+        try {
+            let checked: ImportJob;
+            if (browserCloudImport) {
+                if (!job.queryId) throw new Error('This Cloud import has no status id. Choose the file again before retrying.');
+                checked = await checkClickHouseCloudImport(job.queryId, job.table, job.rows);
+            } else {
+                checked = await post<ImportJob>(`/imports/${encodeURIComponent(job.id)}/reconcile`);
+            }
+            if (checked.status !== 'unknown') {
+                rememberJob(checked);
+                return;
+            }
+            if (!browserCloudImport && !checked.reviewedAt) {
+                checked = await post<ImportJob>(`/imports/${encodeURIComponent(job.id)}/review`, { inspected: true, noActiveInsert: true });
+                if (checked.status !== 'unknown') {
+                    rememberJob(checked);
+                    return;
+                }
+                if (!checked.reviewedAt) {
+                    rememberJob(checked);
+                    return;
+                }
+            }
+
+            let retrySchema = schema;
+            let retryTarget = target;
+            let retryCreatingTable = creatingTable;
+            let retryMapping: ImportMapping;
+            if (browserCloudImport) {
+                retrySchema = await loadClickHouseCloudSchema();
+                const tableExists = retrySchema.tables.some(table => `${table.database}.${table.name}` === job.table);
+                if (retryCreatingTable && tableExists) {
+                    retryCreatingTable = false;
+                    retryTarget = job.table;
+                    const writableNames = new Set(writableColumns(retrySchema, job.table).map(column => column.name));
+                    if (Object.values(mapping.fields).some(column => !writableNames.has(column))) {
+                        setSchema(retrySchema);
+                        setTarget(job.table);
+                        setFields(initialFields(preview.columns, writableColumns(retrySchema, job.table)));
+                        setMapping(undefined);
+                        setJob(checked);
+                        setStep('mapping');
+                        setError('The table is already there. Check the column mapping before retrying.');
+                        return;
+                    }
+                } else if (!retryCreatingTable && !tableExists) {
+                    setSchema(retrySchema);
+                    setTarget(CREATE_CLOUD_TABLE_TARGET);
+                    const columns = inferCloudImportColumns(cloudRows.length ? cloudRows : preview.rows, preview.columns);
+                    setCreateColumns(columns);
+                    setCreateTableName(job.table.split('.').at(-1) ?? createTableName);
+                    setFields(Object.fromEntries(columns.map(column => [column.source, column.name])));
+                    setMapping(undefined);
+                    setJob(checked);
+                    setStep('mapping');
+                    setError('The destination table is not available now. Choose a table before retrying.');
+                    return;
+                } else {
+                    retryTarget = retryCreatingTable ? CREATE_CLOUD_TABLE_TARGET : job.table;
+                }
+                retryMapping = { ...mapping, id: crypto.randomUUID(), table: job.table };
+                setSchema(retrySchema);
+                setTarget(retryTarget);
+            } else {
+                retryMapping = await post<ImportMapping>(`/imports/${encodeURIComponent(preview.id)}/mapping`, {
+                    connectionId: importConnectionId,
+                    table: mapping.table,
+                    fields: mapping.fields,
+                });
+            }
+
+            setRetryAttemptedFor(retryMapping.id);
+            setMapping(retryMapping);
+            setFields(retryMapping.fields);
+            setJob(checked);
+            setRecoverableJobs(current => current.filter(item => item.id !== job.id));
+            clearPendingImport();
+            await runCommitImport({
+                mapping: retryMapping, confirmation, confirmationPhrase: `INSERT ${retryMapping.rowCount} ROWS`, busy: '',
+                browserDemoImport, browserCloudImport, file, format, creatingTable: retryCreatingTable, schema: retrySchema,
+                createTableName, createColumns, importConnectionId, preview,
+                setJob, setStep, setBusy, setError, setMapping, setTargets, setSchema, setTarget, setFields,
+                setRecoveryState, setRecoverableJobs, setPendingImport, setImportUnavailable,
+                savePendingImport, clearPendingImport, rememberJob,
+            });
+        } catch (caught) {
+            setJob(job);
+            setError(`Could not prepare the retry: ${message(caught)}`);
+        } finally { setBusy(''); }
+    }
+
     return {
         dialogRef,
         step,
@@ -700,5 +829,8 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
         commitImport,
         reconcileJob,
         reviewUnknownImport,
+        confirmUnknownImport,
+        retryUnknownImport,
+        retryAttemptedFor,
     };
 }

@@ -348,21 +348,21 @@ function isImportTableName(value: string) {
 }
 
 async function inspectCloudImport(credentials: CloudCredentials, url: string, queryId: string, table: string, rows: number): Promise<CloudImportJob> {
-    const job: CloudImportJob = { id: queryId.slice('clickstudio-import-'.length), connectionId: 'clickhouse-cloud', table, queryId, rows, createdAt: new Date().toISOString(), status: 'unknown', error: 'ClickHouse has no conclusive success record. Inspect the destination before deciding what to do; automatic retry is disabled.' };
+    const job: CloudImportJob = { id: queryId.slice('clickstudio-import-'.length), connectionId: 'clickhouse-cloud', table, queryId, rows, createdAt: new Date().toISOString(), status: 'unknown', error: 'ClickHouse could not confirm the insert. The rows may already be there.' };
     const client = makeClient(credentials, url);
     try {
         try {
             const running = await queryRows<{ query_id: string }>(client,
                 'SELECT query_id FROM system.processes WHERE query_id = {queryId:String} LIMIT 1', { queryId }, 8_000, 6);
-            if (running.length) return { ...job, status: 'running', reconciliationRequired: true, error: 'ClickHouse still reports this insert as active. Status checks will continue; a second insert will remain blocked.' };
+            if (running.length) return { ...job, status: 'running', reconciliationRequired: true, error: 'ClickHouse still reports this insert as active.' };
         } catch { }
         for (const source of ['user_query_log', 'query_log'] as const) {
             try {
                 const entries = await queryRows<{ type: string; event_time: string }>(client,
                     `SELECT type, event_time FROM system.${source} WHERE query_id = {queryId:String} ORDER BY event_time DESC LIMIT 10`, { queryId }, 8_000, 6);
                 if (entries.some(entry => entry.type === 'QueryFinish')) return { ...job, status: 'succeeded', error: undefined };
-                if (entries.some(entry => entry.type.startsWith('Exception'))) return { ...job, error: 'ClickHouse recorded an insert error. Inspect the destination before deciding what to do; automatic retry is disabled.' };
-                if (entries.some(entry => entry.type === 'QueryStart')) return { ...job, status: 'running', reconciliationRequired: true, error: 'ClickHouse still reports this insert as active. Status checks will continue; a second insert will remain blocked.' };
+                if (entries.some(entry => entry.type.startsWith('Exception'))) return { ...job, error: 'ClickHouse recorded an insert error. Check the destination before retrying.' };
+                if (entries.some(entry => entry.type === 'QueryStart')) return { ...job, status: 'running', reconciliationRequired: true, error: 'ClickHouse still reports this insert as active.' };
             } catch { }
         }
         return job;
