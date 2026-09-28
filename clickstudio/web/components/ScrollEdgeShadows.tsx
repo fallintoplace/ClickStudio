@@ -65,7 +65,7 @@ export function ScrollEdgeFrame<T extends HTMLElement>({ className, hidden, onVi
     className?: string;
     hidden?: boolean;
     onViewport?: RefCallback<T>;
-    children: (ref: RefCallback<T>) => ReactNode;
+    children: (ref: RefCallback<T>, edges: ScrollEdges) => ReactNode;
 }) {
     const { ref, edges } = useScrollEdges<T>();
     const setViewport = useCallback((element: T | null) => {
@@ -74,7 +74,7 @@ export function ScrollEdgeFrame<T extends HTMLElement>({ className, hidden, onVi
     }, [onViewport, ref]);
 
     return <div className={['scroll-edge-frame', className].filter(Boolean).join(' ')} hidden={hidden}>
-        {children(setViewport)}
+        {children(setViewport, edges)}
         <ScrollEdgeShadows edges={edges}/>
     </div>;
 }

@@ -66,6 +66,25 @@ test('Result export downloads the complete retained CSV from the server', async 
     expect(runs()).toBe(1);
 });
 
+test('Wide retained results show a horizontal scroll cue and can be keyboard scrolled', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await resultPage(page, result => ({ ...result,
+        columns: Array.from({ length: 10 }, (_, index) => ({ name: `column_${index + 1}`, type: 'String' })),
+        rows: [Array.from({ length: 10 }, (_, index) => `value ${index + 1}`)],
+    }));
+    await trust(page);
+
+    const results = await run(page);
+    const scroll = results.locator('.data-table-scroll');
+    await expect(results.getByText('Scroll horizontally to view all 10 columns')).toBeVisible();
+    await expect(scroll).toHaveAttribute('tabindex', '0');
+    expect(await scroll.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true);
+
+    await scroll.focus();
+    await scroll.press('ArrowRight');
+    await expect.poll(() => scroll.evaluate(element => element.scrollLeft)).toBeGreaterThan(0);
+});
+
 for (const theme of ['light', 'dark']) test(`Retained results stay within a 390px ${theme} viewport`, async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/');
