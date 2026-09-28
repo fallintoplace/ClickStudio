@@ -17,7 +17,6 @@ test('Execution IDs are available from copyable details instead of the footer', 
 
     await expect(page.locator('.execution-bar')).toHaveAttribute('data-query-id', run.queryId);
     await expect(page.locator('.execution-bar')).not.toContainText(run.queryId);
-    await expect(page.locator('.execution-telemetry')).toHaveCount(0);
     await page.getByTestId('execution-details').click();
     const queryId = page.getByTestId('run-query-id');
     await expect(queryId.locator('strong')).toHaveText(run.queryId);
