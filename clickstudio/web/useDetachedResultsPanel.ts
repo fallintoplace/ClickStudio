@@ -4,6 +4,7 @@ import type { WorkspacePanelController } from './useWorkspacePanels';
 import { useDetachedResultsWindow } from './useDetachedWorkspaceWindow';
 
 export function useDetachedResultsPanel({
+    activeDraftId,
     activeName,
     resultsTitle,
     experience,
@@ -12,6 +13,7 @@ export function useDetachedResultsPanel({
     setError,
     setNotice,
 }: {
+    activeDraftId: string;
     activeName: string;
     resultsTitle: string;
     experience: ExperienceLevel;
@@ -23,12 +25,13 @@ export function useDetachedResultsPanel({
     const { detached, open, focus, dock, setTitle } = useDetachedResultsWindow();
     const previousResultsMode = useRef(panels.panelLayout.results.mode);
     const detachedWasOpen = useRef(false);
-    const { panelLayout, setPanelLayout, setResultsCollapsed } = panels;
+    const { panelLayout, setPanelLayout, revealPanelTemporarily, clearTemporaryPanelReveal } = panels;
 
     useEffect(() => {
         if (!detached) {
             if (detachedWasOpen.current) {
                 detachedWasOpen.current = false;
+                clearTemporaryPanelReveal('results');
                 setPanelLayout(current => ({
                     ...current,
                     results: { ...current.results, mode: previousResultsMode.current },
@@ -46,7 +49,7 @@ export function useDetachedResultsPanel({
         detached.container.classList.toggle('is-beginner', experience === 'beginner');
         detached.container.classList.toggle('is-expert', experience === 'expert');
         setTitle(`${activeName} · ${resultsTitle}`);
-    }, [activeName, detached, experience, resultsTitle, setPanelLayout, setTitle]);
+    }, [activeName, clearTemporaryPanelReveal, detached, experience, resultsTitle, setPanelLayout, setTitle]);
 
     const openResults = useCallback(() => {
         previousResultsMode.current = panelLayout.results.mode;
@@ -54,10 +57,10 @@ export function useDetachedResultsPanel({
             setError(copy.resultsWindowBlocked);
             return;
         }
-        setResultsCollapsed(false);
+        revealPanelTemporarily('results', activeDraftId);
         setPanelLayout(current => ({ ...current, results: { ...current.results, mode: 'docked' } }));
         setNotice(copy.resultsWindowOpened);
-    }, [activeName, copy.resultsWindowBlocked, copy.resultsWindowOpened, experience, open, panelLayout.results.mode, resultsTitle, setError, setNotice, setPanelLayout, setResultsCollapsed]);
+    }, [activeDraftId, activeName, copy.resultsWindowBlocked, copy.resultsWindowOpened, experience, open, panelLayout.results.mode, resultsTitle, revealPanelTemporarily, setError, setNotice, setPanelLayout]);
 
     const dockResults = useCallback(() => {
         dock();

@@ -5,6 +5,7 @@ import type { WorkspacePanelController } from './useWorkspacePanels';
 import { useDetachedEditorWindow } from './useDetachedWorkspaceWindow';
 
 export function useDetachedQueryEditor({
+    activeDraftId,
     activeName,
     experience,
     panels,
@@ -13,6 +14,7 @@ export function useDetachedQueryEditor({
     setError,
     setNotice,
 }: {
+    activeDraftId: string;
     activeName: string;
     experience: ExperienceLevel;
     panels: WorkspacePanelController;
@@ -24,12 +26,13 @@ export function useDetachedQueryEditor({
     const { detached, open, focus, dock, setTitle } = useDetachedEditorWindow();
     const previousQueryMode = useRef(panels.panelLayout.query.mode);
     const detachedWasOpen = useRef(false);
-    const { panelLayout, setPanelLayout, setQueryCollapsed } = panels;
+    const { panelLayout, setPanelLayout, revealPanelTemporarily, clearTemporaryPanelReveal } = panels;
 
     useEffect(() => {
         if (!detached) {
             if (detachedWasOpen.current) {
                 detachedWasOpen.current = false;
+                clearTemporaryPanelReveal('query');
                 setPanelLayout(current => ({
                     ...current,
                     query: { ...current.query, mode: previousQueryMode.current },
@@ -50,7 +53,7 @@ export function useDetachedQueryEditor({
         detached.container.classList.toggle('is-beginner', experience === 'beginner');
         detached.container.classList.toggle('is-expert', experience === 'expert');
         setTitle(activeName);
-    }, [activeName, detached, editorRef, experience, setPanelLayout, setTitle]);
+    }, [activeName, clearTemporaryPanelReveal, detached, editorRef, experience, setPanelLayout, setTitle]);
 
     const openEditor = useCallback(() => {
         previousQueryMode.current = panelLayout.query.mode;
@@ -58,10 +61,10 @@ export function useDetachedQueryEditor({
             setError(copy.queryWindowBlocked);
             return;
         }
-        setQueryCollapsed(false);
+        revealPanelTemporarily('query', activeDraftId);
         setPanelLayout(current => ({ ...current, query: { ...current.query, mode: 'docked' } }));
         setNotice(copy.queryWindowOpened);
-    }, [activeName, copy.queryWindowBlocked, copy.queryWindowOpened, experience, open, panelLayout.query.mode, setError, setNotice, setPanelLayout, setQueryCollapsed]);
+    }, [activeDraftId, activeName, copy.queryWindowBlocked, copy.queryWindowOpened, experience, open, panelLayout.query.mode, revealPanelTemporarily, setError, setNotice, setPanelLayout]);
 
     const dockEditor = useCallback(() => {
         dock();

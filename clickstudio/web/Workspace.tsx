@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { createPortal } from 'react-dom';
 import type { ProfilePipeline, QueryDocument, QueryProfile, Result, Run, RunKind, Schema, Script } from '../shared/types';
 import { DEFAULT_LIMITS } from '../shared/types';
@@ -36,6 +36,7 @@ import { useWorkspaceData } from './useWorkspaceData';
 import { isSchemaChangingSql, useImportedTableReveal } from './useImportedTableReveal';
 import { useDefaultAssistantRunContext, useWorkspaceAssistant } from './useWorkspaceAssistant';
 import { useWorkspacePanels } from './useWorkspacePanels';
+import { useScopedValue } from './useScopedValue';
 import { useScriptExecution } from './useScriptExecution';
 import { usePendingExecution } from './usePendingExecution';
 import { useFailedQueryErrors } from './useFailedQueryErrors';
@@ -157,10 +158,12 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
     const [savingDraftIds, setSavingDraftIds] = useState<Record<string, boolean>>({});
     const [scripts, setScripts] = useState<Record<string, Script>>({});
     const script = active.scriptId ? scripts[active.scriptId] : undefined;
-    const [view, setView] = useState<ResultsView>('results');
+    const [draftView, setViewForDraft] = useScopedValue<ResultsView>(active.id);
+    const view = draftView ?? 'results';
+    const setView = useCallback<Dispatch<SetStateAction<ResultsView>>>(next => {
+        setViewForDraft(active.id, current => typeof next === 'function' ? next(current ?? 'results') : next, true);
+    }, [active.id, setViewForDraft]);
     const [exampleChartRunId, setExampleChartRunId] = useState<string>();
-    const [queryCollapsed, setQueryCollapsed] = useState(false);
-    const [resultsCollapsed, setResultsCollapsed] = useState(false);
     const [inspector, setInspector] = useState<Inspector>('schema');
     const inspectorRef = useRef(inspector);
     inspectorRef.current = inspector;
@@ -309,16 +312,17 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         setWorkspace(current => ({ ...current, tabs: [...current.tabs, draft], activeId: draft.id }));
         return true;
     };
-    const openNewDraft = (draft: Draft) => {
+    const openNewDraft = (draft: Draft, revealQuery = false) => {
         if (!addDraft(draft)) return false;
-        setQueryCollapsed(false);
+        if (revealQuery) panels.revealPanelTemporarily('query', draft.id);
         return true;
     };
     const recordFailedQueryError = (failure: FailedQueryError) => {
         executionFailureRef.current = true;
         storeFailedQueryError(failure);
         if (workspaceRef.current.activeId !== failure.draftId) return;
-        setView('results'); setResultsCollapsed(false);
+        setViewForDraft(failure.draftId, 'results', true);
+        panels.revealPanelTemporarily('results', failure.draftId);
     };
 
     const createExampleDraft = (example: SqlExample) => {
@@ -404,8 +408,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
                 update(draft.id, current => first?.runId
                     ? { ...current, activeRunId: first.runId, scriptId: created.id, runIds: rememberRunIds(current.runIds, [first.runId]) }
                     : { ...current, scriptId: created.id });
-                setPage(0);
-                setView('results');
+                setViewForDraft(draft.id, 'results', true);
                 if (options.trackChartRun) setExampleChartRunId(undefined);
             } else {
                 pendingExecution.start(payload.clientRequestId, draft.id, payload.sql, previousResult);
@@ -421,13 +424,12 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
                 setRunForRun(created.id, created, true);
                 if (created.status === 'succeeded' && connection.dataSource === 'clickhouse' && connection.readonly === false && isSchemaChangingSql(statement!.sql))
                     importedReveal.refreshAfterImportedSqlRun(draft.id, created.id, importedSqlBaseline);
-                setPage(0);
-                setView(kind === 'explain' ? 'indexes' : kind === 'plan' ? 'plan' : kind === 'pipeline' ? 'pipeline' : kind === 'analyze' ? 'runtime' : options.view ?? 'results');
+                setViewForDraft(draft.id, kind === 'explain' ? 'indexes' : kind === 'plan' ? 'plan' : kind === 'pipeline' ? 'pipeline' : kind === 'analyze' ? 'runtime' : options.view ?? 'results', true);
                 update(draft.id, current => ({ ...current, activeRunId: created.id, scriptId: undefined, runIds: rememberRunIds(current.runIds, [created.id]) }));
                 if (draft.id === active.id) editor.current?.focus();
                 if (options.trackChartRun) setExampleChartRunId(options.view === 'chart' ? created.id : undefined);
             }
-            if (options.expandResults) setResultsCollapsed(false);
+            if (options.expandResults) panels.revealPanelTemporarily('results', draft.id);
             if (!isFrontendDemoPreview)
                 setNotice(demoMode
                     ? isScript ? 'Sample results were generated. Script SQL was not sent to ClickHouse.' : options.preview ? 'Sample preview generated. SQL was not sent to ClickHouse.' : 'Sample results were generated. Query SQL was not sent to ClickHouse.'
@@ -440,7 +442,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         if (busy || executionInFlightRef.current) { setError(copy.common.runActionWait); return true; }
         if (!trusted) { setError(copy.common.runActionTrustRequired); return true; }
         const draft = createExampleDraft(example);
-        if (!openNewDraft(draft)) return true;
+        if (!openNewDraft(draft, true)) return true;
         void executeSqlForDraft(draft, draft.sql, { view: output, expandResults: true, trackChartRun: true });
         return true;
     };
@@ -485,7 +487,9 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         draft.activeRunId = selected.id;
         draft.runIds = [selected.id];
         if (!addDraft(draft)) return;
-        setView(selected.kind === 'plan' ? 'plan' : selected.kind === 'pipeline' ? 'pipeline' : selected.kind === 'analyze' ? 'runtime' : 'results'); setNotice(`Opened retained run ${selected.queryId}. No query was rerun.`);
+        setViewForDraft(draft.id, selected.kind === 'plan' ? 'plan' : selected.kind === 'pipeline' ? 'pipeline' : selected.kind === 'analyze' ? 'runtime' : 'results', true);
+        panels.revealPanelTemporarily('results', draft.id);
+        setNotice(`Opened retained run ${selected.queryId}. No query was rerun.`);
     };
 
     const saveDraft = useWorkspaceDocumentSave({
@@ -683,15 +687,12 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
 
 
     const panels = useWorkspacePanels({
+        activeDraftId: active.id,
         compactViewport,
-        queryCollapsed,
-        setQueryCollapsed,
-        resultsCollapsed,
-        setResultsCollapsed,
         hasOutput: Boolean(run || requestedResultsView === 'sqlmap'),
     });
-    const detachedEditor = useDetachedQueryEditor({ activeName: active.name, experience, panels, editorRef: editor, copy: copy.common, setError, setNotice });
-    const detachedResults = useDetachedResultsPanel({ activeName: active.name, resultsTitle: viewState.resultsTitle, experience, panels, copy: copy.common, setError, setNotice });
+    const detachedEditor = useDetachedQueryEditor({ activeDraftId: active.id, activeName: active.name, experience, panels, editorRef: editor, copy: copy.common, setError, setNotice });
+    const detachedResults = useDetachedResultsPanel({ activeDraftId: active.id, activeName: active.name, resultsTitle: viewState.resultsTitle, experience, panels, copy: copy.common, setError, setNotice });
 
 
     const openDocument = (document: QueryDocument) => {
@@ -701,7 +702,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         if (run && (busy || executionInFlightRef.current)) { setError(copy.common.runActionWait); return; }
         if (run && !trusted) { setError(copy.common.runActionTrustRequired); return; }
         const draft = newDraft(name, sql);
-        if (!openNewDraft(draft)) return;
+        if (!openNewDraft(draft, !run)) return;
         if (!run) {
             window.requestAnimationFrame(() => editor.current?.focus());
             return;
@@ -709,7 +710,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         void executeSqlForDraft(draft, draft.sql, { expandResults: true, trackChartRun: true, preview: true });
     };
     const startBlankSql = () => {
-        if (!openNewDraft(newDraft())) return false;
+        if (!openNewDraft(newDraft(), true)) return false;
         window.requestAnimationFrame(() => editor.current?.focus());
         return true;
     };
@@ -803,7 +804,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
             onPatch: patch,
             onToggleSqlMap: () => {
                 setView(current => current === 'sqlmap' ? 'results' : 'sqlmap');
-                setResultsCollapsed(false);
+                panels.revealPanelTemporarily('results');
             },
             onOpenAssistant: () => showInspector('assistant'),
             onSave: saveDraft,
@@ -828,7 +829,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         state={{ active, connection, copy, locale, run, failedAttempt: failedQueryError, script, history, page, resultPage, profile, pipeline, flamegraph, profilesByRun, pipelinesByRun, nativeParserEnabled, nativeParserStatus, nativeParseSnapshot, trusted, busy, execution: pendingExecution.execution, retainedExecutionResult: pendingExecution.retainedExecutionResult, cancelling, experience }}
         actions={{
             onSelectView: nextView => { setView(nextView); if (nextView === 'insights') void perform(loadProfile, 'save'); },
-            onSelectScriptRun: runId => { if (active.scriptId) scriptFollowRef.current = { scriptId: active.scriptId, enabled: false }; update(active.id, draft => ({ ...draft, activeRunId: runId })); setPage(0); setView('results'); },
+            onSelectScriptRun: runId => { if (active.scriptId) scriptFollowRef.current = { scriptId: active.scriptId, enabled: false }; update(active.id, draft => ({ ...draft, activeRunId: runId })); setView('results'); },
             onOpenDetached: detachedResults.openResults, onDockDetached: detachedResults.dockResults, onCancel: () => void cancel(), onPage: setPage, onPatch: patch,
             onLoadProfile: () => void perform(loadProfile, 'save'), onLoadPipeline: () => void perform(loadPipeline, 'save'), onLoadFlamegraph: () => void perform(loadFlamegraph, 'save'),
             onRevealRange: (from, to) => editor.current?.revealRange(from, to),
@@ -950,7 +951,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
                             }}
                             onOpenExample={example => {
                                 const draft = createExampleDraft(example);
-                                if (!openNewDraft(draft)) return false;
+                                if (!openNewDraft(draft, true)) return false;
                                 window.requestAnimationFrame(() => editor.current?.focus());
                                 return true;
                             }}
@@ -959,7 +960,9 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
                         />
                         {!!workspace.closedTabs?.length && <RestoreSqlMenu closedTabs={workspace.closedTabs} copy={copy.common} onRestore={draftId => {
                             if (workspaceRef.current.tabs.length >= MAX_TABS) { setError(`Close a tab before restoring one. This workspace supports ${MAX_TABS} open drafts.`); return false; }
-                            setWorkspace(current => reopenDraft(current, draftId));
+                            const restored = reopenDraft(workspaceRef.current, draftId);
+                            setWorkspace(restored);
+                            if (restored.activeId) panels.revealPanelTemporarily('query', restored.activeId);
                             window.requestAnimationFrame(() => editor.current?.focus());
                             return true;
                         }}/>}
@@ -979,15 +982,15 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
                         experience === 'beginner' && 'beginner-workspace-content',
                         run && 'has-run',
                         visibleResultsView === 'sqlmap' && 'has-sql-map',
-                        queryCollapsed && 'is-query-collapsed',
-                        (run || visibleResultsView === 'sqlmap') && resultsCollapsed && 'is-results-collapsed',
+                        panels.queryCollapsed && 'is-query-collapsed',
+                        (run || visibleResultsView === 'sqlmap') && panels.resultsCollapsed && 'is-results-collapsed',
                         panels.queryFloating && 'has-floating-query',
                         panels.resultsFloating && 'has-floating-results',
                         panels.canSplitPanels && 'has-panel-split',
                     )}
                 >
                     {detachedEditor.detached
-                        ? <DetachedQueryPlaceholder name={active.name} copy={copy.common} collapsed={queryCollapsed} onFocus={detachedEditor.focusEditor} onDock={detachedEditor.dockEditor}/>
+                        ? <DetachedQueryPlaceholder name={active.name} copy={copy.common} collapsed={panels.queryCollapsed} onFocus={detachedEditor.focusEditor} onDock={detachedEditor.dockEditor}/>
                         : queryPanel}
 
                     <WorkspacePanelSplitter panels={panels}/>
@@ -998,7 +1001,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
                             eyebrow={viewState.resultsEyebrow}
                             queryName={active.name}
                             copy={copy.common}
-                            collapsed={resultsCollapsed}
+                            collapsed={panels.resultsCollapsed}
                             onFocus={detachedResults.focusResults}
                             onDock={detachedResults.dockResults}
                         />

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import type { ProfilePipeline, QueryProfile, Result, ResultPage, Run } from '../shared/types';
 import type { FlamegraphSnapshot } from '../shared/flamegraph';
 import { parseRunEvent } from '../shared/run-wire';
@@ -20,7 +20,12 @@ export function useRunEvidence({ activeRunId, connectionId, loadHistory, setErro
     const [profile, setProfileForRun, profilesByRun] = useScopedValue<QueryProfile>(activeRunId);
     const [pipeline, setPipelineForRun, pipelinesByRun] = useScopedValue<ProfilePipeline>(activeRunId);
     const [flamegraph, setFlamegraphForRun, flamegraphsByRun] = useScopedValue<FlamegraphSnapshot>(activeRunId);
-    const [page, setPage] = useState(0);
+    const [storedPage, setPageForRun] = useScopedValue<number>(activeRunId);
+    const page = storedPage ?? 0;
+    const setPage = useCallback<Dispatch<SetStateAction<number>>>(next => {
+        if (!activeRunId) return;
+        setPageForRun(activeRunId, current => typeof next === 'function' ? next(current ?? 0) : next, true);
+    }, [activeRunId, setPageForRun]);
     const [eventState, setEventState] = useState<RunEventState>('idle');
     const resultPage = resultPageState?.page === page ? resultPageState.value : undefined;
     const running = Boolean(run && !terminal(run));
@@ -31,7 +36,6 @@ export function useRunEvidence({ activeRunId, connectionId, loadHistory, setErro
         void api<Run>(`/runs/${encodeURIComponent(activeRunId)}`).then(next => {
             if (cancelled || next.connectionId !== connectionId) return;
             setRunForRun(activeRunId, next);
-            setPage(0);
             if (terminal(next)) void loadHistory().catch(() => undefined);
         }).catch(caught => { if (!cancelled) setError(message(caught)); });
         return () => { cancelled = true; };

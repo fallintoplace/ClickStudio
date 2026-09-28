@@ -74,8 +74,11 @@ test('Run evidence stays with its draft through tab and mode switches', async ({
     });
     await trust(page);
     await useAdvancedMode(page);
-    const results = await runQuery(page);
+    await runQuery(page);
     const firstQueryId = await page.locator('.execution-bar code').innerText();
+    const firstResultsPanel = page.locator('.results-surface');
+    await firstResultsPanel.getByRole('tab', { name: 'Chart', exact: true }).click();
+    await expect(firstResultsPanel.getByRole('tab', { name: 'Chart', exact: true })).toHaveAttribute('aria-selected', 'true');
 
     await openBlankSql(page);
     await replaceSql(page, 'SELECT 2 AS second_query');
@@ -89,15 +92,92 @@ test('Run evidence stays with its draft through tab and mode switches', async ({
     expect(secondQueryId).not.toBe(firstQueryId);
 
     await page.getByRole('tab').filter({ hasText: 'Getting started.sql' }).click();
-    await expect(results.getByRole('table', { name: 'Retained query rows' })).toBeVisible();
+    await expect(firstResultsPanel.getByRole('tab', { name: 'Chart', exact: true })).toHaveAttribute('aria-selected', 'true');
+    await expect(firstResultsPanel.locator('.chart-canvas svg[role="img"]')).toBeVisible();
     await expect(page.locator('.execution-bar code')).toHaveText(firstQueryId);
     await page.getByText('Standard', { exact: true }).click();
     await expect(page.locator('.execution-bar code')).toHaveText(firstQueryId);
+    await expect(firstResultsPanel.getByRole('tab', { name: 'Chart', exact: true })).toHaveAttribute('aria-selected', 'true');
     await page.getByText('Experimental', { exact: true }).click();
     await expect(page.locator('.execution-bar code')).toHaveText(firstQueryId);
     await expect(page.getByRole('group', { name: 'Workspace layouts' })).toHaveCount(0);
     await expect(page.getByRole('navigation', { name: 'Workspace browser' })).toBeVisible();
     expect(runRequests).toBe(2);
+});
+
+test('Result view and page stay with their draft run', async ({ page }) => {
+    const retainedRuns: { run: Record<string, unknown>; result: Record<string, unknown>; rows: unknown[][] }[] = [];
+    await page.route('**/api/runs**', async route => {
+        const request = route.request();
+        const url = new URL(request.url());
+        if (request.method() === 'POST' && url.pathname === '/api/runs') {
+            const input = request.postDataJSON() as { connectionId: string; sql: string; parameters?: Record<string, string>; limits?: Record<string, number>; tags?: Record<string, string> };
+            const runNumber = retainedRuns.length + 1;
+            const id = `state-run-${runNumber}`;
+            const queryId = `state-query-${runNumber}`;
+            const createdAt = new Date(Date.UTC(2026, 0, runNumber)).toISOString();
+            const columns = [{ name: 'label', type: 'String' }, { name: 'value', type: 'UInt64' }];
+            const rows = Array.from({ length: 250 }, (_, index) => [`${runNumber}-${index}`, index]);
+            const run = {
+                dataSource: 'fixture', id, queryId, owner: 'local-owner', connectionId: input.connectionId, sql: input.sql,
+                kind: 'query', parameters: input.parameters ?? {}, limits: input.limits ?? { rows: 5000, bytes: 2000000, seconds: 30, memory: 536870912, threads: 4 },
+                tags: input.tags ?? {}, status: 'succeeded', createdAt, startedAt: createdAt, finishedAt: createdAt,
+                elapsedMs: 1, rowCount: rows.length, bytes: rows.length * 8, columns, warnings: [], sequence: runNumber,
+                resultExpiresAt: '2027-01-01T00:00:00.000Z', resultState: 'reopenable', requestedBy: 'local-owner',
+                executedAs: 'fixture-reader', permissionSnapshot: { readonly: true, role: 'viewer' }, retryPolicy: 'never',
+            };
+            const result = { runId: id, queryId, columns, rows, completeness: 'complete', createdAt, expiresAt: '2027-01-01T00:00:00.000Z' };
+            retainedRuns.push({ run, result, rows });
+            await route.fulfill({ json: run });
+            return;
+        }
+        if (url.pathname === '/api/runs') {
+            await route.fulfill({ json: retainedRuns.map(entry => entry.run) });
+            return;
+        }
+        const match = url.pathname.match(/^\/api\/runs\/(state-run-\d+)(?:\/(snapshot|result))?$/);
+        const retained = match && retainedRuns.find(entry => entry.run.id === match[1]);
+        if (!retained || !match) {
+            await route.fulfill({ status: 404, json: { error: { code: 'RUN_NOT_FOUND', message: 'The mocked run was not found.' } } });
+            return;
+        }
+        if (match[2] === 'snapshot') {
+            await route.fulfill({ json: retained.result });
+            return;
+        }
+        if (match[2] === 'result') {
+            const offset = Number(url.searchParams.get('offset') ?? 0);
+            const count = Number(url.searchParams.get('count') ?? 200);
+            const rows = retained.rows.slice(offset, offset + count);
+            await route.fulfill({ json: {
+                ...retained.result, rows, offset, totalRows: retained.rows.length,
+                nextOffset: offset + count < retained.rows.length ? offset + count : null,
+            } });
+            return;
+        }
+        await route.fulfill({ json: retained.run });
+    });
+
+    await trust(page);
+    await useAdvancedMode(page);
+    await runQuery(page);
+    const firstTab = page.getByRole('tablist', { name: 'SQL documents', exact: true }).getByRole('tab').first();
+    const firstTabName = await firstTab.getAttribute('aria-label');
+    const firstResults = page.locator('.results-surface');
+    await expect(firstResults.getByText('Page 1 of 2')).toBeVisible();
+    await firstResults.getByRole('button', { name: 'Last', exact: true }).click();
+    await expect(firstResults.getByText('Page 2 of 2')).toBeVisible();
+    await firstResults.getByRole('tab', { name: 'Chart', exact: true }).click();
+    await expect(firstResults.locator('.chart-canvas svg[role="img"]')).toBeVisible();
+
+    await openBlankSql(page);
+    await replaceSql(page, 'SELECT 2 AS second_query');
+    await runQuery(page);
+    await page.getByRole('tab', { name: firstTabName!, exact: true }).click();
+    await expect(firstResults.getByRole('tab', { name: 'Chart', exact: true })).toHaveAttribute('aria-selected', 'true');
+    await expect(firstResults.locator('.chart-canvas svg[role="img"]')).toBeVisible();
+    await firstResults.getByRole('tab', { name: 'Results', exact: true }).click();
+    await expect(firstResults.getByText('Page 2 of 2')).toBeVisible();
 });
 
 test('Run button submits the live CodeMirror document before React catches up', async ({ page }) => {
@@ -441,6 +521,14 @@ test('Query and result panels collapse to their headings', async ({ page }) => {
     await expect(page.locator('#query-results-content')).toBeHidden();
     await expect.poll(async () => (await resultsPanel.boundingBox())?.height ?? 0).toBeLessThan(80);
 
+    await expect.poll(() => page.evaluate(() => {
+        const layout = JSON.parse(localStorage.getItem('clickstudio:workspace-layout:v1') ?? 'null') as { query?: { collapsed?: boolean }; results?: { collapsed?: boolean } } | null;
+        return layout?.query?.collapsed === true && layout.results?.collapsed === true;
+    })).toBe(true);
+    await page.reload();
+    await expect(page.locator('#sql-editor-content')).toBeHidden();
+    await expect(page.locator('#query-results-content')).toBeHidden();
+
     await page.locator('button[aria-controls="sql-editor-content"]').click();
     await expect(page.locator('#sql-editor-content')).toBeVisible();
     await page.locator('button[aria-controls="query-results-content"]').click();
@@ -454,6 +542,9 @@ test('Desktop workspace panels float, resize, maximize, and dock without losing 
     const results = await runQuery(page);
     const queryPanel = page.locator('.editor-surface');
     const editor = page.locator('#sql-editor-content .cm-content');
+
+    await page.locator('button[aria-controls="sql-editor-content"]').click();
+    await expect(page.locator('#sql-editor-content')).toBeHidden();
 
     const queryFloat = page.getByRole('button', { name: 'Float query panel', exact: true });
     const queryFloatBox = await queryFloat.boundingBox();
@@ -497,13 +588,20 @@ test('Desktop workspace panels float, resize, maximize, and dock without losing 
     await page.getByRole('button', { name: 'Restore query panel', exact: true }).click();
     await page.getByRole('button', { name: 'Dock query panel', exact: true }).click();
     await expect(queryPanel).not.toHaveClass(/is-floating/);
-    await expect(editor).toContainText('SELECT');
+    await expect(page.locator('#sql-editor-content')).toBeHidden();
 
     await page.getByRole('button', { name: 'Float output panel', exact: true }).click();
     await expect(results).toHaveClass(/is-floating/);
     await expect(results.getByRole('table', { name: 'Retained query rows' })).toBeVisible();
     await page.getByRole('button', { name: 'Dock output panel', exact: true }).click();
     await expect(results).not.toHaveClass(/is-floating/);
+
+    await page.locator('button[aria-controls="query-results-content"]').click();
+    await expect(page.locator('#query-results-content')).toBeHidden();
+    await page.getByRole('button', { name: 'Float output panel', exact: true }).click();
+    await expect(page.locator('#query-results-content')).toBeVisible();
+    await page.getByRole('button', { name: 'Dock output panel', exact: true }).click();
+    await expect(page.locator('#query-results-content')).toBeHidden();
 });
 
 test('Desktop docked query and output panels resize with the splitter', async ({ page }) => {

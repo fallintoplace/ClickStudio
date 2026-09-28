@@ -104,10 +104,17 @@ test('Object explorer shows ClickHouse metadata, searchable children, and genera
     await expect(page.getByLabel('Selected object')).toContainText('1.5 GiB');
     await expect(page.getByLabel('Selected object')).toContainText('18 active');
 
+    const sqlTabs = page.getByRole('tablist', { name: 'SQL documents', exact: true });
+    const originalTabName = await sqlTabs.getByRole('tab').first().getAttribute('aria-label');
+    await page.locator('button[aria-controls="sql-editor-content"]').click();
+    await expect(page.locator('#sql-editor-content')).toBeHidden();
     await page.getByRole('button', { name: 'Generate SELECT', exact: true }).click();
+    await expect(page.locator('#sql-editor-content')).toBeVisible();
     await expect(page.locator('.cm-content')).toContainText('SELECT');
     await expect(page.locator('.cm-content')).toContainText('`day`');
     await expect(page.locator('.cm-content')).toContainText('FROM `analytics`.`events`');
+    await sqlTabs.getByRole('tab', { name: originalTabName!, exact: true }).click();
+    await expect(page.locator('#sql-editor-content')).toBeHidden();
 
     const search = page.getByTestId('schema-search');
     await search.fill('tenant_bloom');
@@ -117,6 +124,29 @@ test('Object explorer shows ClickHouse metadata, searchable children, and genera
     await expect(page.getByText('campaign_lookup', { exact: true })).toBeVisible();
     await page.getByText('campaign_lookup', { exact: true }).click();
     await expect(page.getByLabel('Selected object')).toContainText('18.2K');
+});
+
+test('Preview Rows keeps the saved query panel preference on the previous tab', async ({ page }) => {
+    await mockLiveWorkspace(page, route => route.fulfill({ json: schema }));
+    await page.route('**/api/runs**', async route => {
+        if (route.request().method() === 'POST') {
+            await route.fulfill({ status: 503, json: { error: { code: 'MOCK_RUN_FAILURE', message: 'The preview request is mocked.' } } });
+            return;
+        }
+        await route.fallback();
+    });
+
+    const sqlTabs = page.getByRole('tablist', { name: 'SQL documents', exact: true });
+    const originalTabName = await sqlTabs.getByRole('tab').first().getAttribute('aria-label');
+    await page.locator('button[aria-controls="sql-editor-content"]').click();
+    await expect(page.locator('#sql-editor-content')).toBeHidden();
+    await page.getByText('events', { exact: true }).first().click();
+    await page.getByRole('button', { name: 'Preview rows', exact: true }).click();
+    await expect(sqlTabs.getByRole('tab').last()).toHaveAttribute('aria-label', 'Preview events.sql');
+    await expect(page.locator('#sql-editor-content')).toBeHidden();
+
+    await sqlTabs.getByRole('tab', { name: originalTabName!, exact: true }).click();
+    await expect(page.locator('#sql-editor-content')).toBeHidden();
 });
 
 test('MergeTree storage opens a selectable, metric-switchable D3 parts explorer', async ({ page }) => {
