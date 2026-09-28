@@ -276,7 +276,7 @@ export function ObjectExplorer({ copy, connection, expert, schema, schemaLoading
                         </div>;
                     })}
                 </div>
-            </div> : <div className="object-empty-search"><strong>{copy.noObjectsMatch}</strong><span>{search ? 'Try a different name, type, engine, index, or column.' : copy.metadataUnavailable}</span></div>}
+            </div> : <div className="object-empty-search"><strong>{model.query ? copy.noObjectsMatch : copy.noObjectsAvailable}</strong><span>{model.query ? copy.noObjectsMatchHint : copy.noObjectsAvailableHint}</span></div>}
             {schema.truncated && schema.pagination && <div className="schema-partial-state" role="status"><span>Showing part of this schema. Load the next page to see more tables and columns.</span><Button variant="secondary" className="toolbar-small" disabled={schemaLoadingMore || !onLoadMoreSchema} onClick={onLoadMoreSchema}>{schemaLoadingMore ? 'Loading…' : 'Load more metadata'}</Button></div>}
             {!compact && detailsOpen && selected && <ObjectDetails copy={copy} selection={selected} trusted={trusted} expert={expert} copiedId={copiedId} onClose={browseObjects} onInsert={onInsert} onCopy={copyText} onOpenSqlDraft={onOpenSqlDraft} onOpenReference={onOpenReference} onOpenParts={setPartsTable}/>}
         </>}

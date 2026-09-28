@@ -127,6 +127,43 @@ test('Object explorer shows ClickHouse metadata, searchable children, and genera
     await expect(page.getByLabel('Selected object')).toContainText('18.2K');
 });
 
+test('Object explorer explains when the loaded schema has no visible objects', async ({ page }) => {
+    await mockLiveWorkspace(page, route => route.fulfill({ json: { ...schema, tables: [], columns: [], dictionaries: [] } }));
+
+    await expect(page.getByText('No objects found.', { exact: true })).toBeVisible();
+    await expect(page.getByText('No tables, views, or dictionaries are visible for this connection.', { exact: true })).toBeVisible();
+    await expect(page.getByText('ClickHouse metadata unavailable', { exact: true })).toHaveCount(0);
+
+    const search = page.getByTestId('schema-search');
+    await search.fill('events');
+    await expect(page.getByText('No objects match this search.', { exact: true })).toBeVisible();
+    await expect(page.getByText('Try a different name, type, engine, index, or column.', { exact: true })).toBeVisible();
+
+    await search.fill('   ');
+    await expect(page.getByText('No objects found.', { exact: true })).toBeVisible();
+});
+
+test('Object explorer keeps metadata failures separate from an empty schema', async ({ page }) => {
+    await mockLiveWorkspace(page, route => route.fulfill({
+        status: 403,
+        json: { error: { code: 'CLICKHOUSE_PERMISSION', message: 'Not enough privileges to read system.tables' } },
+    }));
+
+    await expect(page.locator('.callout-error')).toContainText('Not enough privileges to read system.tables');
+    await expect(page.getByText('No objects found.', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('ClickHouse metadata unavailable', { exact: true })).toHaveCount(0);
+});
+
+test('Object explorer keeps the partial-schema notice beside an empty loaded page', async ({ page }) => {
+    await mockLiveWorkspace(page, route => route.fulfill({
+        json: { ...schema, tables: [], columns: [], dictionaries: [], truncated: true, pagination: { tables: 0 } },
+    }));
+
+    await expect(page.getByText('No objects found.', { exact: true })).toBeVisible();
+    await expect(page.getByText(/Showing part of this schema/)).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Load more metadata', exact: true })).toBeVisible();
+});
+
 test('Standard hides advanced object actions and keeps the object header balanced', async ({ page }) => {
     await page.addInitScript(() => localStorage.setItem('clickstudio:experience', 'beginner'));
     await mockLiveWorkspace(page, route => route.fulfill({ json: schema }));

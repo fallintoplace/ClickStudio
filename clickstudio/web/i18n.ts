@@ -341,6 +341,9 @@ export interface Copy {
         objectSearch: string;
         objectCount: string;
         noObjectsMatch: string;
+        noObjectsMatchHint: string;
+        noObjectsAvailable: string;
+        noObjectsAvailableHint: string;
         views: string;
         dictionaries: string;
         columns: string;
