@@ -90,9 +90,6 @@ export function ScriptResults({ script, runs, activeRunId, onSelectRun, onCancel
         const details = run?.error ? `${run.error.code}: ${run.error.message}` : statement.error ? `${statement.error.code}: ${statement.error.message}` : run ? `${statementOutcome(run)} · ${Math.round(run.elapsedMs)} ms` : statement.status === 'pending' ? 'Waiting to run' : statement.status === 'running' ? 'Running' : statement.status === 'skipped' ? 'Skipped' : 'Not executed';
         return { statement, index, details };
     });
-    const selectedStatement = statements.find(({ statement }) => statement.runId === activeRunId)
-        ?? [...statements].reverse().find(({ statement }) => statement.runId)
-        ?? statements[0];
     return <section className="script-results" aria-label="Script statement results">
         <div className="script-results-heading"><span><span className="eyebrow">SCRIPT EXECUTION</span><strong>{script.statements.length} statements <i>·</i> {script.status}</strong></span>{script.status === 'running' && (script.cancelled
             ? <span role="status">Finishing current statement…</span>
@@ -100,16 +97,9 @@ export function ScriptResults({ script, runs, activeRunId, onSelectRun, onCancel
         <div className="script-statement-list" role="group" aria-label="Select a statement result">{statements.map(({ statement, index, details }) => {
             const active = statement.runId === activeRunId;
             return <button key={`${script.id}-${index}`} type="button" className={cx('script-statement', active && 'is-active')} aria-label={`Statement ${index + 1}: ${statement.status}`} aria-pressed={active} title={`${statement.sql.replace(/\s+/g, ' ').slice(0, 160)} · ${details}`} disabled={!statement.runId} onClick={() => statement.runId && onSelectRun(statement.runId)}>
-                <span className="script-statement-index">{String(index + 1).padStart(2, '0')}</span><strong>Statement {index + 1}</strong><span className={cx('script-status', `status-${statement.status}`)}>{statement.status}</span>
+                <span className="script-statement-index">{String(index + 1).padStart(2, '0')}</span><span className="script-statement-copy"><strong>Statement {index + 1}</strong><code>{statement.sql.replace(/\s+/g, ' ').slice(0, 72)}</code><small>{details}</small></span><span className={cx('script-status', `status-${statement.status}`)}>{statement.status}</span>
             </button>;
         })}</div>
-        {selectedStatement && <details className="script-statement-details">
-            <summary>Statement {selectedStatement.index + 1} details</summary>
-            <div className="script-statement-detail">
-                <pre className="script-statement-sql"><code>{selectedStatement.statement.sql}</code></pre>
-                <span>{selectedStatement.details}</span>
-            </div>
-        </details>}
     </section>;
 }
 
