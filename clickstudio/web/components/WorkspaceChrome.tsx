@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react';
 import type { Run, Script } from '../../shared/types';
-import { lexSql } from '../../shared/sql';
 import { Button, cx, formatBytes, formatCount, Icon, Status, terminal } from './ui';
 import type { IconName } from './ui';
 import type { RunEventState } from '../workspace-types';
 import type { Copy } from '../i18n';
+import { statementOutcome } from '../statement-outcome';
 
 export type RunAction = {
     id: string;
@@ -55,24 +55,6 @@ export function RailButton({ icon, label, active, accent, disabled, testId, onCl
 
 export function EmptyWorkspace({ onRun, beginner }: { onRun: () => void; beginner: boolean }) {
     return <div className="empty-workspace"><div className="empty-graphic"><span className="empty-orbit orbit-one"/><span className="empty-orbit orbit-two"/><span className="empty-core"><Icon name="bolt"/></span><span className="empty-spark spark-one"/><span className="empty-spark spark-two"/></div><span className="eyebrow">YOUR NEXT INSIGHT STARTS HERE</span><h3>Make the data<br/><em>say something.</em></h3><p>{beginner ? 'Run SQL to see your data. Select text to run only that selection.' : 'Run all SQL in the editor, or select SQL to run only that selection. Your query, run, and evidence stay linked.'}</p><Button variant="primary" onClick={onRun}><Icon name="play"/>Focus SQL editor</Button></div>;
-}
-
-function statementRowOutcome(count: number, action: 'returned' | 'written') {
-    return `${formatCount(count)} ${count === 1 ? 'row' : 'rows'} ${action}`;
-}
-
-function statementOutcome(run: Run) {
-    if (run.columns.length > 0 || run.rowCount > 0)
-        return statementRowOutcome(run.rowCount, 'returned');
-
-    const command = lexSql(run.sql).find(token => token.kind === 'word')?.text.toUpperCase();
-    if (command === 'INSERT')
-        return run.writtenRows === undefined ? 'INSERT completed · row count unavailable' : statementRowOutcome(run.writtenRows, 'written');
-    if (command === 'CREATE')
-        return run.writtenRows !== undefined && run.writtenRows > 0
-            ? `CREATE completed · ${statementRowOutcome(run.writtenRows, 'written')}`
-            : 'CREATE completed';
-    return `${command ?? 'Statement'} completed`;
 }
 
 export function ScriptResults({ script, runs, activeRunId, onSelectRun, onCancel, cancelDisabled, cancelAfterCurrentStatement = false }: {

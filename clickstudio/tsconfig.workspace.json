@@ -23,6 +23,7 @@
     "web/assistant-chat-state.ts",
     "web/workspace-layout.ts",
     "web/workspace-persistence.ts",
+    "web/statement-outcome.ts",
     "web/visible-polling.ts",
     "web/demo-preview.ts",
     "web/cloud-import.ts",

@@ -3,12 +3,15 @@ import { displayValue, filterRows } from '../../shared/results';
 import type { ResultPage, Run } from '../../shared/types';
 import { ScrollEdgeFrame } from './ScrollEdgeShadows';
 import { Button, cx, terminal } from './ui';
+import { statementOutcome } from '../statement-outcome';
 
 export function ResultGrid({ run, page, pageIndex, loading, onPage, showPagination = true, obscured = false }: { run: Run; page?: ResultPage; pageIndex: number; loading: boolean; onPage: (page: number) => void; showPagination?: boolean; obscured?: boolean }) {
     const [filter, setFilter] = useState('');
     if (run.resultState === 'expired') return <div className="result-empty-state"><span className="empty-result-icon">⌛</span><strong>Result retention expired</strong><p>The SQL and query ID are still available. Run it again to fetch fresh data.</p></div>;
     if (run.resultState !== 'reopenable') return <div className="result-empty-state">{terminal(run) ? <span className="empty-result-icon">!</span> : <span className="loading-orbit"/>}<strong>{terminal(run) ? 'No retained result' : 'Query is running'}</strong><p>{terminal(run) ? 'This run did not produce result rows.' : 'The live execution status appears in the bottom bar.'}</p></div>;
     if (loading || !page) return <div className="result-loading"><span className="loading-orbit"/><span>Loading retained rows…</span></div>;
+    if (page.columns.length === 0 && page.rows.length === 0 && page.totalRows === 0 && page.completeness !== 'truncated')
+        return <div className="result-empty-state" role="status"><strong>{statementOutcome(run)}</strong><p>No result set was returned.</p></div>;
     const searchableRows = page.rows.map(row => row.map(value => displayValue(value).toLocaleLowerCase()).join('\u0001'));
     const matchingRows = new Set(filterRows(page.rows, filter, searchableRows));
     const visibleRows = page.rows.flatMap((row, index) => matchingRows.has(row) ? [{ row, index }] : []);
