@@ -38,18 +38,12 @@ export function PanelResizeHandles({ onResize }: { onResize: (edge: PanelResizeE
 }
 
 export function useWorkspacePanels({
+    activeDraftId,
     compactViewport,
-    queryCollapsed,
-    setQueryCollapsed,
-    resultsCollapsed,
-    setResultsCollapsed,
     hasOutput,
 }: {
+    activeDraftId: string;
     compactViewport: boolean;
-    queryCollapsed: boolean;
-    setQueryCollapsed: Dispatch<SetStateAction<boolean>>;
-    resultsCollapsed: boolean;
-    setResultsCollapsed: Dispatch<SetStateAction<boolean>>;
     hasOutput: boolean;
 }) {
     const [panelLayout, setPanelLayout] = useState(() => {
@@ -58,6 +52,7 @@ export function useWorkspacePanels({
         return recoverWorkspacePanelLayout(stored, panelViewport());
     });
     const [activeFloatingPanel, setActiveFloatingPanel] = useState<WorkspacePanelId>('query');
+    const [temporaryReveals, setTemporaryReveals] = useState<Partial<Record<WorkspacePanelId, string>>>({});
     const queryPanelRef = useRef<HTMLElement>(null);
     const resultsPanelRef = useRef<HTMLElement>(null);
     const workspaceContentRef = useRef<HTMLDivElement>(null);
@@ -67,6 +62,20 @@ export function useWorkspacePanels({
     }, [panelLayout]);
 
     useEffect(() => {
+        setTemporaryReveals(current => {
+            const next = { ...current };
+            let changed = false;
+            for (const panel of ['query', 'results'] as const) {
+                if (next[panel] && next[panel] !== activeDraftId) {
+                    delete next[panel];
+                    changed = true;
+                }
+            }
+            return changed ? next : current;
+        });
+    }, [activeDraftId]);
+
+    useEffect(() => {
         const normalize = () => setPanelLayout(current => normalizeWorkspacePanelLayout(current, panelViewport()));
         window.addEventListener('resize', normalize);
         return () => window.removeEventListener('resize', normalize);
@@ -74,6 +83,8 @@ export function useWorkspacePanels({
 
     const queryMode = compactViewport ? 'docked' : panelLayout.query.mode;
     const resultsMode = compactViewport ? 'docked' : panelLayout.results.mode;
+    const queryCollapsed = panelLayout.query.collapsed && temporaryReveals.query !== activeDraftId;
+    const resultsCollapsed = panelLayout.results.collapsed && temporaryReveals.results !== activeDraftId;
     const queryFloating = queryMode !== 'docked';
     const resultsFloating = resultsMode !== 'docked';
     const panelElement = (panel: WorkspacePanelId) => panel === 'query' ? queryPanelRef.current : resultsPanelRef.current;
@@ -91,13 +102,24 @@ export function useWorkspacePanels({
         const geometry = panelLayout[panel].geometry;
         return { left: geometry.x, top: geometry.y, width: geometry.width, height: geometry.height, zIndex };
     };
-    const setPanelExpanded = (panel: WorkspacePanelId) => {
-        if (panel === 'query') setQueryCollapsed(false);
-        else setResultsCollapsed(false);
+    const revealPanelTemporarily = (panel: WorkspacePanelId, draftId = activeDraftId) => {
+        setTemporaryReveals(current => ({ ...current, [panel]: draftId }));
     };
+    const clearTemporaryPanelReveal = (panel: WorkspacePanelId) => {
+        setTemporaryReveals(current => current[panel] === undefined ? current : { ...current, [panel]: undefined });
+    };
+    const setPanelCollapsed = (panel: WorkspacePanelId, next: SetStateAction<boolean>) => {
+        const current = panel === 'query' ? queryCollapsed : resultsCollapsed;
+        const collapsed = typeof next === 'function' ? next(current) : next;
+        setPanelLayout(layout => ({ ...layout, [panel]: { ...layout[panel], collapsed } }));
+        clearTemporaryPanelReveal(panel);
+    };
+    const setQueryCollapsed: Dispatch<SetStateAction<boolean>> = next => setPanelCollapsed('query', next);
+    const setResultsCollapsed: Dispatch<SetStateAction<boolean>> = next => setPanelCollapsed('results', next);
     const togglePanelFloating = (panel: WorkspacePanelId) => {
         if (compactViewport) return;
-        setPanelExpanded(panel);
+        if (panelLayout[panel].mode === 'docked') revealPanelTemporarily(panel);
+        else clearTemporaryPanelReveal(panel);
         setActiveFloatingPanel(panel);
         setPanelLayout(current => ({
             ...current,
@@ -106,7 +128,7 @@ export function useWorkspacePanels({
     };
     const togglePanelMaximized = (panel: WorkspacePanelId) => {
         if (compactViewport) return;
-        setPanelExpanded(panel);
+        revealPanelTemporarily(panel);
         setActiveFloatingPanel(panel);
         setPanelLayout(current => ({
             ...current,
@@ -191,6 +213,8 @@ export function useWorkspacePanels({
         setQueryCollapsed,
         resultsCollapsed,
         setResultsCollapsed,
+        revealPanelTemporarily,
+        clearTemporaryPanelReveal,
         panelLayout,
         setPanelLayout,
         activeFloatingPanel,

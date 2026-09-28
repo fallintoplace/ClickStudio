@@ -4,7 +4,7 @@ export type PanelResizeEdge = 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw';
 
 export type ViewportSize = { width: number; height: number };
 export type PanelGeometry = { x: number; y: number; width: number; height: number };
-export type WorkspacePanelState = { mode: WorkspacePanelMode; geometry: PanelGeometry };
+export type WorkspacePanelState = { mode: WorkspacePanelMode; geometry: PanelGeometry; collapsed: boolean };
 export type WorkspacePanelLayout = {
     version: 1;
     splitRatio: number;
@@ -87,7 +87,7 @@ export function clampPanelSplitRatio(value: number): number {
 
 function panelState(value: unknown, panel: WorkspacePanelId, viewport: ViewportSize): WorkspacePanelState {
     const fallback = defaultPanelGeometry(panel, viewport);
-    if (!value || typeof value !== 'object') return { mode: 'docked', geometry: fallback };
+    if (!value || typeof value !== 'object') return { mode: 'docked', geometry: fallback, collapsed: false };
     const candidate = value as Partial<WorkspacePanelState>;
     const mode = candidate.mode === 'floating' || candidate.mode === 'maximized' || candidate.mode === 'docked'
         ? candidate.mode
@@ -96,15 +96,15 @@ function panelState(value: unknown, panel: WorkspacePanelId, viewport: ViewportS
     const geometry = raw && finite(raw.x) && finite(raw.y) && finite(raw.width) && finite(raw.height)
         ? normalizePanelGeometry(raw, viewport)
         : fallback;
-    return { mode, geometry };
+    return { mode, geometry, collapsed: candidate.collapsed === true };
 }
 
 export function defaultWorkspacePanelLayout(viewport: ViewportSize): WorkspacePanelLayout {
     return {
         version: 1,
         splitRatio: 0.54,
-        query: { mode: 'docked', geometry: defaultPanelGeometry('query', viewport) },
-        results: { mode: 'docked', geometry: defaultPanelGeometry('results', viewport) },
+        query: { mode: 'docked', geometry: defaultPanelGeometry('query', viewport), collapsed: false },
+        results: { mode: 'docked', geometry: defaultPanelGeometry('results', viewport), collapsed: false },
     };
 }
 

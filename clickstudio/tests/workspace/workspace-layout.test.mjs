@@ -49,10 +49,21 @@ test('saved layouts are validated and normalized on recovery', () => {
     }), viewport);
     assert.equal(recovered.splitRatio, 0.75);
     assert.equal(recovered.query.mode, 'floating');
+    assert.equal(recovered.query.collapsed, false);
     assert.equal(recovered.query.geometry.x + recovered.query.geometry.width, viewport.width - PANEL_MARGIN);
     assert.equal(recovered.results.mode, 'docked');
+    assert.equal(recovered.results.collapsed, false);
     assert.equal(recovered.results.geometry.width, PANEL_MIN_WIDTH);
     assert.equal(recovered.results.geometry.height, PANEL_MIN_HEIGHT);
+});
+
+test('saved collapsed panel preferences survive recovery', () => {
+    const recovered = recoverWorkspacePanelLayout(JSON.stringify({
+        query: { mode: 'docked', collapsed: true },
+        results: { mode: 'floating', collapsed: false },
+    }), viewport);
+    assert.equal(recovered.query.collapsed, true);
+    assert.equal(recovered.results.collapsed, false);
 });
 
 test('bad storage falls back to a stable docked layout', () => {

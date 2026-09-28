@@ -11,7 +11,7 @@ test('SQL examples open in a new tab without changing or running the current que
     const tabs = page.getByRole('tablist', { name: 'SQL documents', exact: true }).getByRole('tab');
     const originalTab = tabs.first();
     const originalName = await originalTab.getAttribute('aria-label');
-    const originalSql = await page.locator('.cm-content').innerText();
+    const originalSql = await page.locator('.cm-content').textContent();
     const collapseButton = page.getByRole('button', { name: 'Collapse SQL query', exact: true });
     const collapseButtonRight = await collapseButton.evaluate(element => element.getBoundingClientRect().right);
     expect(collapseButtonRight).toBeLessThanOrEqual(page.viewportSize()!.width);
@@ -37,7 +37,8 @@ test('SQL examples open in a new tab without changing or running the current que
     await expect(page.locator('.execution-bar code')).toHaveCount(0);
     expect(originalName).not.toBeNull();
     await page.getByRole('tab', { name: originalName!, exact: true }).click();
-    await expect.poll(() => page.locator('.cm-content').evaluate(element => (element as HTMLElement).innerText)).toBe(originalSql);
+    await expect.poll(() => page.locator('.cm-content').textContent()).toBe(originalSql);
+    await expect(page.locator('#sql-editor-content')).toBeHidden();
     expect(runRequests).toBe(0);
     await expect(dialog).toHaveCount(0);
 });
