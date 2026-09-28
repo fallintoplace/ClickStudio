@@ -145,7 +145,7 @@
     .topbar-preferences { order: 3; }
     .select-control select { max-width: 91px; }
     .connection-wrap { min-width: 0; width: 150px; max-width: 150px; }
-    .connection-menu { position: fixed; top: 64px; right: 9px; left: 9px; width: auto; max-height: min(72dvh, calc(100dvh - 84px)); padding: 7px; border-radius: 12px; }
+    .connection-menu { position: fixed; top: 64px; right: 8px; left: 8px; width: auto; max-height: calc(100dvh - 80px); padding: 7px; border-radius: 12px; }
     .connection-env, .connection-quick-status { font-size: 6px; letter-spacing: .04em; }
     .workspace-content.has-run { grid-template-rows: minmax(285px, 1fr) minmax(250px, .94fr); }
     .beginner-workspace-content { grid-template-rows: minmax(310px, 1fr) minmax(165px, .65fr); }

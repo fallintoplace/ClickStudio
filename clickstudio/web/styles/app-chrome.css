@@ -20,23 +20,27 @@
     .connection-quick-status.is-ready { color: var(--green); }
     .connection-database { display: inline-flex; grid-column: 2; grid-row: 2; align-items: center; gap: 4px; color: var(--text-soft); font-family: var(--font-mono); font-size: 10px; }
     .connection-database svg { width: 13px; height: 13px; color: var(--muted); }
-    .connection-menu { position: absolute; z-index: var(--z-popover); top: calc(100% + 8px); left: 0; width: min(360px, calc(100vw - 28px)); max-height: min(72dvh, 560px); overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; padding: 8px; border: 1px solid var(--line-bright); border-radius: 13px; background: var(--panel-raised); box-shadow: var(--shadow); }
-    .connection-menu-current { display: grid; gap: 4px; padding: 4px 8px 8px; }
+    .connection-menu { position: absolute; z-index: var(--z-popover); top: calc(100% + 8px); left: 0; display: flex; width: min(380px, calc(100vw - 24px)); max-height: min(78dvh, 600px); flex-direction: column; overflow: hidden; padding: 8px; border: 1px solid var(--line-bright); border-radius: 13px; background: var(--panel-raised); box-shadow: var(--shadow); }
+    .connection-menu-content { display: grid; min-height: 0; gap: 5px; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+    .connection-menu-current { display: grid; gap: 4px; padding: 4px 8px 3px; }
     .connection-menu-heading { color: var(--muted); font-size: 8px; font-weight: 760; letter-spacing: .13em; line-height: 1.35; text-transform: uppercase; }
-    .connection-menu-current strong, .connection-switch-list strong { overflow: hidden; color: var(--text); font-size: 12px; font-weight: 680; text-overflow: ellipsis; white-space: nowrap; }
-    .connection-menu-current small, .connection-switch-list small { overflow: hidden; color: var(--muted); font-size: 10px; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
-    .connection-menu-note { margin: 0 0 3px; padding: 8px 10px; border-radius: 9px; background: color-mix(in srgb, var(--amber) 8%, var(--panel)); color: var(--text-soft); font-size: 10px; line-height: 1.45; }
+    .connection-menu-current strong, .connection-switch-list strong { overflow: hidden; color: var(--text); font-size: 12px; font-weight: 680; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+    .connection-menu-current small, .connection-switch-list small { overflow: hidden; color: var(--muted); font-size: 10px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+    .connection-menu-current small { display: -webkit-box; white-space: normal; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+    .connection-menu-note { margin: 0; padding: 7px 9px; border-radius: 8px; background: color-mix(in srgb, var(--amber) 8%, var(--panel)); color: var(--text-soft); font-size: 9px; line-height: 1.45; }
     .connection-menu-note.is-ready { background: color-mix(in srgb, var(--green) 7%, var(--panel)); }
     .connection-menu-note.is-sample { background: color-mix(in srgb, var(--accent) 7%, var(--panel)); }
     .connection-menu-action { width: 100%; min-height: 32px; font-size: 10px; }
-    .connection-switch-list { display: grid; gap: 2px; margin-top: 4px; padding-top: 8px; border-top: 1px solid var(--line); }
-    .connection-switch-list > .connection-menu-heading { padding: 0 8px 3px; }
-    .connection-switch-list > button { display: flex; width: 100%; min-width: 0; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 8px; border: 1px solid transparent; border-radius: 9px; background: transparent; text-align: left; cursor: pointer; transition: background .16s ease, border-color .16s ease; }
+    .connection-menu-disconnect { justify-self: start; width: auto; min-height: 28px; padding-inline: 8px; }
+    .connection-switch-list { display: grid; gap: 2px; margin-top: 3px; padding-top: 7px; border-top: 1px solid var(--line); }
+    .connection-switch-list > .connection-menu-heading { padding: 0 8px 2px; }
+    .connection-switch-list > button { display: flex; width: 100%; min-width: 0; min-height: 46px; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 8px; border: 1px solid transparent; border-radius: 8px; background: transparent; text-align: left; cursor: pointer; transition: background .16s ease, border-color .16s ease; }
     .connection-switch-list > button:hover { background: var(--control-hover); }
     .connection-switch-list > button:focus-visible { outline: 2px solid var(--focus-color); outline-offset: 1px; }
     .connection-switch-list > button > span:first-child { display: grid; min-width: 0; gap: 2px; }
-    .connection-switch-list + .connection-menu-action { margin-top: 4px; }
     .connection-choice-arrow { flex: none; color: var(--muted); font-size: 18px; line-height: 1; }
+    .connection-menu-footer { flex: none; margin-top: 7px; padding-top: 7px; border-top: 1px solid var(--line); background: var(--panel-raised); }
+    .connection-menu-footer .connection-menu-action { min-height: 36px; }
     .cloud-connect-layer { position: fixed; z-index: var(--z-dialog); inset: 0; display: grid; place-items: center; padding: 18px; }
     .cloud-connect-scrim { position: absolute; inset: 0; border: 0; background: color-mix(in srgb, var(--canvas) 72%, transparent); backdrop-filter: blur(7px); }
     .cloud-connect-dialog { position: relative; display: grid; width: min(500px, calc(100vw - 32px)); max-height: min(760px, calc(100dvh - 32px)); gap: 15px; overflow: auto; padding: 20px; border: 1px solid var(--line-bright); border-radius: 15px; outline: none; background: var(--panel-raised); box-shadow: 0 22px 74px #0009, inset 0 1px #ffffff12; }

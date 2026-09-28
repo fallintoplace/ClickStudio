@@ -151,27 +151,29 @@ function App() {
                     <span className="connection-database">{connection?.database ?? '—'} <Icon name="chevron"/></span>
                 </button>
                 {connectionPicker && connection && <div className="connection-menu animate-enter" id="connection-menu" role="dialog" aria-label={hasPreviewSourceSwitcher ? 'Data source options' : 'Connection details'}>
-                    <div className="connection-menu-current">
-                        <span className="connection-menu-heading">{hasPreviewSourceSwitcher ? 'Current data source' : 'Current connection'}</span>
-                        <strong>{connectionLabel(connection, session.demo)}</strong>
-                        <small>{isSampleData ? 'Generated sample data · SQL stays in this browser' : isPlayground ? `${connection.host} · public read-only access` : isCloudConnection ? `${connection.host} · ${connection.database} · password held in this tab` : session.demo ? 'Local sample data' : `Database: ${connection.database} · Server: ${connection.host}`}</small>
+                    <div className="connection-menu-content">
+                        <div className="connection-menu-current">
+                            <span className="connection-menu-heading">{hasPreviewSourceSwitcher ? 'Current data source' : 'Current connection'}</span>
+                            <strong>{connectionLabel(connection, session.demo)}</strong>
+                            <small>{isSampleData ? 'Generated sample data · SQL stays in this browser' : isPlayground ? `${connection.host} · public read-only access` : isCloudConnection ? `${connection.host} · ${connection.database} · password held in this tab` : session.demo ? 'Local sample data' : `Database: ${connection.database} · Server: ${connection.host}`}</small>
+                        </div>
+                        <p className={cx('connection-menu-note', isSampleData ? 'is-sample' : isPlayground || connection.trusted && !connectionNeedsTest ? 'is-ready' : 'is-review')} role="status">
+                            {isSampleData ? 'Sample rows are generated for the preview. SQL is not sent to a database.' : isPlayground ? 'Queries run against the public ClickHouse SQL Playground directly from your browser. Access is read only.' : isCloudConnection ? 'Queries pass through this site to your Cloud service over HTTPS. Your Cloud user controls which reads and writes are allowed.' : session.demo ? 'This demo uses sample data. Your SQL is not sent to a real database.' : connectionNeedsTest ? connection.trusted ? 'Read-only access is on, but this server needs a fresh capability check.' : 'Test this connection to discover its ClickHouse features.' : connection.trusted ? 'Read-only access is on. Queries can read data but cannot change it.' : 'Connection tested. Turn on read-only access when you are ready to query.'}
+                        </p>
+                        {isCloudConnection
+                            ? <Button variant="ghost" className="connection-menu-action connection-menu-disconnect" onClick={disconnectCloud}>Disconnect ClickHouse Cloud</Button>
+                            : (!session.demo || !connection.trusted) && <Button variant={!session.demo && connection.trusted ? 'ghost' : 'primary'} className="connection-menu-action" disabled={connectionActionBusy} onClick={() => void runConnectionAction(connectionNeedsTest)}>
+                                {connectionActionBusy ? connectionNeedsTest ? 'Testing…' : 'Saving…' : session.demo ? 'Start exploring' : connectionNeedsTest ? connection.trusted ? 'Retest connection' : 'Test connection' : connection.trusted ? 'Turn off read-only access' : 'Trust connection'}
+                            </Button>}
+                        {sourceChoices.length > 0 && <div className="connection-switch-list">
+                            <span className="connection-menu-heading">{hasPreviewSourceSwitcher ? 'Choose data source' : 'Switch connection'}</span>
+                            {sourceChoices.map(item => <button key={item.id} type="button" aria-pressed={item.id === connection.id} onClick={() => { selectConnection(item.id); setConnectionPicker(false); }}>
+                                <span><strong>{connectionLabel(item, session.demo)}</strong><small>{item.id === 'playground' ? 'Real ClickHouse · public read only' : item.dataSource === 'fixture' ? 'Generated sample rows · no database request' : `${item.database} · ${item.host}`}</small></span>
+                                <span className="connection-choice-arrow" aria-hidden="true">{item.id === connection.id ? '✓' : '›'}</span>
+                            </button>)}
+                        </div>}
                     </div>
-                    <p className={cx('connection-menu-note', isSampleData ? 'is-sample' : isPlayground || connection.trusted && !connectionNeedsTest ? 'is-ready' : 'is-review')} role="status">
-                        {isSampleData ? 'Sample rows are generated for the preview. SQL is not sent to a database.' : isPlayground ? 'Queries run against the public ClickHouse SQL Playground directly from your browser. Access is read only.' : isCloudConnection ? 'SQL runs on your ClickHouse Cloud service through this site over HTTPS. Your Cloud user decides which read and write operations are allowed.' : session.demo ? 'This demo uses sample data. Your SQL is not sent to a real database.' : connectionNeedsTest ? connection.trusted ? 'Read-only access is on, but this server needs a fresh capability check.' : 'Test this connection to discover its ClickHouse features.' : connection.trusted ? 'Read-only access is on. Queries can read data but cannot change it.' : 'Connection tested. Turn on read-only access when you are ready to query.'}
-                    </p>
-                    {isCloudConnection
-                        ? <Button variant="ghost" className="connection-menu-action" onClick={disconnectCloud}>Disconnect ClickHouse Cloud</Button>
-                        : (!session.demo || !connection.trusted) && <Button variant={!session.demo && connection.trusted ? 'ghost' : 'primary'} className="connection-menu-action" disabled={connectionActionBusy} onClick={() => void runConnectionAction(connectionNeedsTest)}>
-                            {connectionActionBusy ? connectionNeedsTest ? 'Testing…' : 'Saving…' : session.demo ? 'Start exploring' : connectionNeedsTest ? connection.trusted ? 'Retest connection' : 'Test connection' : connection.trusted ? 'Turn off read-only access' : 'Trust connection'}
-                        </Button>}
-                    {sourceChoices.length > 0 && <div className="connection-switch-list">
-                        <span className="connection-menu-heading">{hasPreviewSourceSwitcher ? 'Choose data source' : 'Switch connection'}</span>
-                        {sourceChoices.map(item => <button key={item.id} type="button" aria-pressed={item.id === connection.id} onClick={() => { selectConnection(item.id); setConnectionPicker(false); }}>
-                            <span><strong>{connectionLabel(item, session.demo)}</strong><small>{item.id === 'playground' ? 'Real ClickHouse · public read only' : item.dataSource === 'fixture' ? 'Generated sample rows · no database request' : `${item.database} · ${item.host}`}</small></span>
-                            <span className="connection-choice-arrow" aria-hidden="true">{item.id === connection.id ? '✓' : '›'}</span>
-                        </button>)}
-                    </div>}
-                    {hasPreviewSourceSwitcher && <Button variant="secondary" className="connection-menu-action cloud-connect-trigger" onClick={() => { setConnectionPicker(false); setCloudDialogOpen(true); }}>{isCloudConnection ? 'Change Cloud service' : 'Connect ClickHouse Cloud'}</Button>}
+                    {hasPreviewSourceSwitcher && <div className="connection-menu-footer"><Button variant="secondary" className="connection-menu-action cloud-connect-trigger" onClick={() => { setConnectionPicker(false); setCloudDialogOpen(true); }}>{isCloudConnection ? 'Change Cloud service' : 'Connect ClickHouse Cloud'}</Button></div>}
                 </div>}
             </div>
             <div className="topbar-spacer"/>
