@@ -99,7 +99,7 @@ export function PartsExplorer({ connection, table, copy, onClose, embedded = fal
     }, [connection.id, requestKey, table.database, table.name]);
 
     const snapshot = state?.key === requestKey ? state.snapshot : undefined;
-    const filteredParts = useMemo(() => snapshot?.parts.filter(part => partState === 'all' || part.active === (partState === 'active')) ?? [], [partState, snapshot]);
+    const filteredParts = useMemo(() => snapshot?.parts?.filter(part => partState === 'all' || part.active === (partState === 'active')) ?? [], [partState, snapshot]);
     const tree = useMemo(() => snapshot ? makeTree(snapshot, metric, filteredParts) : undefined, [filteredParts, metric, snapshot]);
     const layout = useMemo(() => {
         if (!tree || layoutMode === 'map') return undefined;
