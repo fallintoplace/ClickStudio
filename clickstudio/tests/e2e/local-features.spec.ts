@@ -66,7 +66,7 @@ test('Result export downloads the complete retained CSV from the server', async 
     expect(runs()).toBe(1);
 });
 
-test('Wide retained results show a horizontal scroll cue and can be keyboard scrolled', async ({ page }) => {
+test('Wide retained results remain horizontally scrollable and keyboard accessible', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await resultPage(page, result => ({ ...result,
         columns: Array.from({ length: 10 }, (_, index) => ({ name: `column_${index + 1}`, type: 'String' })),
@@ -76,7 +76,7 @@ test('Wide retained results show a horizontal scroll cue and can be keyboard scr
 
     const results = await run(page);
     const scroll = results.locator('.data-table-scroll');
-    await expect(results.getByText('Scroll horizontally to view all 10 columns')).toBeVisible();
+    await expect(results.getByText('Scroll horizontally to view all 10 columns')).toHaveCount(0);
     await expect(scroll).toHaveAttribute('tabindex', '0');
     expect(await scroll.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true);
 

@@ -22,16 +22,13 @@ export function ResultGrid({ run, page, pageIndex, loading, onPage, showPaginati
             ? 'No rows fit in the retained result. The query may still have matched rows; the result limits left none to keep.'
             : 'This query returned zero rows.';
     return <div className={cx('result-grid-wrap animate-enter', obscured && 'is-pending-previous-result')} aria-busy={obscured || undefined} inert={obscured || undefined}>
-        <ScrollEdgeFrame<HTMLDivElement> className="data-table-scroll-frame">{(ref, edges) => <>
-            {(edges.left || edges.right) && <div className="result-scroll-hint" aria-hidden="true"><span>↔</span>Scroll horizontally to view all {page.columns.length} columns</div>}
-            <div ref={ref} className="data-table-scroll" role="region" aria-label={edges.left || edges.right ? 'Retained query rows. Scroll horizontally to view all columns.' : 'Retained query rows'} tabIndex={edges.left || edges.right ? 0 : undefined}>
+        <ScrollEdgeFrame<HTMLDivElement> className="data-table-scroll-frame">{(ref, edges) => <div ref={ref} className="data-table-scroll" role="region" aria-label={edges.left || edges.right ? 'Retained query rows. Scroll horizontally to view all columns.' : 'Retained query rows'} tabIndex={edges.left || edges.right ? 0 : undefined}>
                 <table className="data-table" aria-label="Retained query rows">
                     <thead><tr><th className="row-number">#</th>{page.columns.map((column, index) => <th key={`${column.name}-${index}`}><span>{column.name}</span><small>{column.type}</small></th>)}</tr></thead>
                     <tbody>{visibleRows.map(({ row, index: rowIndex }) => <tr key={`${page.offset}-${rowIndex}`} style={{ animationDelay: `${Math.min(rowIndex, 12) * 16}ms` }}><td className="row-number">{page.offset + rowIndex + 1}</td>{row.map((value, index) => <td key={index} title={displayValue(value)} className={value === null ? 'cell-null' : ''}>{displayValue(value)}</td>)}</tr>)}</tbody>
                 </table>
                 {page.rows.length === 0 ? <div className="no-rows" role="status">{emptyRowsMessage}</div> : visibleRows.length === 0 && <div className="no-rows">No rows match on this page.</div>}
-            </div>
-        </>}</ScrollEdgeFrame>
+            </div>}</ScrollEdgeFrame>
         {(showPagination || page.completeness === 'truncated') && <div className="table-pagination">
             <div className="table-pagination-summary">
                 {showPagination && <span>Showing {page.rows.length.toLocaleString()} of {page.totalRows.toLocaleString()} retained rows <i>·</i> filter applies to this page only</span>}
