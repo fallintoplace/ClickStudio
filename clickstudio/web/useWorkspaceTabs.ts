@@ -69,18 +69,24 @@ export function useWorkspaceTabs(workspace: WorkspaceState, setWorkspace: Dispat
         setTabRenameValue(draft.name);
         setRenamingTabId(draft.id);
     };
-    const finishTabRename = (draftId: string, value: string, restoreFocus = false) => {
+    const finishTabRename = (draftId: string, value: string, restoreFocus = false): Draft | undefined => {
+        let renamedDraft: Draft | undefined;
         if (cancelTabRenameOnBlur.current) {
             cancelTabRenameOnBlur.current = false;
         } else {
             const name = value.trim();
-            if (name) setWorkspace(current => ({
-                ...current,
-                tabs: current.tabs.map(draft => draft.id === draftId && draft.name !== name ? { ...draft, name } : draft),
-            }));
+            const draft = workspace.tabs.find(item => item.id === draftId);
+            if (name && draft && draft.name !== name) {
+                renamedDraft = { ...draft, name };
+                setWorkspace(current => ({
+                    ...current,
+                    tabs: current.tabs.map(item => item.id === draftId ? { ...item, name } : item),
+                }));
+            }
         }
         setRenamingTabId(current => current === draftId ? undefined : current);
         if (restoreFocus) window.requestAnimationFrame(() => document.getElementById(`document-tab-${draftId}`)?.focus());
+        return renamedDraft;
     };
     const cancelTabRename = (draftId: string) => {
         cancelTabRenameOnBlur.current = true;

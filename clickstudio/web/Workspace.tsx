@@ -69,6 +69,7 @@ import { useWorkspaceViewState } from './useWorkspaceViewState';
 import { useDetachedQueryEditor } from './useDetachedQueryEditor';
 import { useDetachedResultsPanel } from './useDetachedResultsPanel';
 import { useWorkspaceSqlFormatter } from './useWorkspaceSqlFormatter';
+import { useWorkspaceDocumentSave } from './useWorkspaceDocumentSave';
 
 type WorkspaceProps = Readonly<{
     connection: Connected;
@@ -136,7 +137,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
     const {
         active, tabScrollerRef, tabScrollState, updateTabScrollState, scrollTabs,
         renamingTabId, tabRenameValue, setTabRenameValue,
-        beginTabRename, finishTabRename, cancelTabRename,
+        beginTabRename, finishTabRename: updateTabRename, cancelTabRename,
     } = useWorkspaceTabs(workspace, setWorkspace);
     const emptySqlActionRef = useRef<HTMLButtonElement>(null);
     const previousTabCount = useRef(workspace.tabs.length);
@@ -485,17 +486,24 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         setView(selected.kind === 'plan' ? 'plan' : selected.kind === 'pipeline' ? 'pipeline' : selected.kind === 'analyze' ? 'runtime' : 'results'); setDrawerOpen(false); setNotice(`Opened retained run ${selected.queryId}. No query was rerun.`);
     };
 
-    const saveDraft = async () => perform(async () => {
-        setSavingDraftIds(current => ({ ...current, [active.id]: true }));
-        try {
-            const payload = { name: active.name, sql: active.sql, connectionId: connection.id, baseRevision: active.baseRevision, parameters: active.parameters, chart: active.chart, runId: active.activeRunId, parentDocumentId: active.parentDocumentId, kind: active.kind, metric: active.metric, dependencies: active.dependencies };
-            const saved = await api<QueryDocument>(active.serverId ? `/documents/${encodeURIComponent(active.serverId)}` : '/documents', { method: active.serverId ? 'PUT' : 'POST', body: payload });
-            patch({ serverId: saved.id, baseRevision: saved.revision });
-            setDocuments(current => [saved, ...current.filter(document => document.id !== saved.id)]);
-            setNotice(`Saved ${saved.name} · revision ${saved.revision}`);
-            if (active.serverId && inspector === 'revisions') void loadDocumentRevisions(saved.id);
-        } finally { setSavingDraftIds(current => ({ ...current, [active.id]: false })); }
-    }, 'save');
+    const saveDraft = useWorkspaceDocumentSave({
+        active,
+        busy,
+        connectionId: connection.id,
+        workspaceRef,
+        inspectorRef,
+        perform,
+        updateDraft: update,
+        setSavingDraftIds,
+        setDocuments,
+        setNotice,
+        loadDocumentRevisions,
+    });
+
+    const finishTabRename = (id: string, value: string, restoreFocus = false, saveAfterRename = true) => {
+        const renamedDraft = updateTabRename(id, value, restoreFocus);
+        if (saveAfterRename && renamedDraft) void saveDraft(renamedDraft);
+    };
 
     const restoreDocumentRevision = (revision: QueryDocument) => void perform(async () => {
         const draft = workspaceRef.current.tabs.find(item => item.id === workspaceRef.current.activeId);

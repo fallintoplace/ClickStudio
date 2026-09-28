@@ -1,4 +1,4 @@
-import type { RefObject } from 'react';
+import { useRef, type RefObject } from 'react';
 import type { RunKind, Schema } from '../../shared/types';
 import type { NativeParseSnapshot, NativeParserStatus } from '../../shared/native-parser';
 import { hasSqlComments, type SqlParameter } from '../../shared/sql';
@@ -44,7 +44,7 @@ export type WorkspaceQueryPanelActions = Readonly<{
     onPatch: (values: Partial<Draft>) => void;
     onToggleSqlMap: () => void;
     onOpenAssistant: () => void;
-    onSave: () => Promise<void>;
+    onSave: (draft?: Draft) => Promise<void>;
     onFormat: (formatter: WorkspaceFormatter) => Promise<void>;
     onRun: (kind?: RunKind, sqlOverride?: string) => Promise<void>;
     runActionTitle: (capability: WorkspaceRunCapability | undefined, action: WorkspaceRunCapabilityAction) => string | undefined;
@@ -103,6 +103,7 @@ export function WorkspaceQueryPanel({
         startPanelResize,
     } = panels;
     const selectedSql = active.to > active.from ? active.sql.slice(active.from, active.to) : undefined;
+    const queryNameAtFocus = useRef(active.name);
     const sqlToRun = selectedSql ?? active.sql;
     const statementsToRun = safeStatementCount(sqlToRun);
     const runRequiresScript = statementsToRun !== undefined && statementsToRun > 1;
@@ -110,6 +111,16 @@ export function WorkspaceQueryPanel({
     const runTitle = runRequiresScript ? actions.runActionTitle(connection.manifest?.scripts, 'script') : undefined;
     const standardFormatter = nativeParserEnabled && nativeParserStatus === 'ready' ? 'wasm' : 'builtin';
     const runSql = () => actions.onRun('query');
+    const saveButton = <Button
+        variant="secondary"
+        className="save-revision-button standard-save-button"
+        data-testid="save-query"
+        aria-label={copy.common.save}
+        aria-keyshortcuts="Control+S Meta+S"
+        title={`${copy.common.save} (Ctrl/Cmd+S)`}
+        onClick={() => void actions.onSave(active)}
+        disabled={Boolean(busy) || !active.name.trim()}
+    ><Icon name="documents"/>{copy.common.save}</Button>;
     return <section
         ref={queryPanelRef}
         className={cx('editor-surface', panels.queryCollapsed && 'is-collapsed', queryFloating && 'is-floating', queryMode === 'maximized' && 'is-maximized', activeFloatingPanel === 'query' && queryFloating && 'is-front')}
@@ -123,17 +134,38 @@ export function WorkspaceQueryPanel({
                 if (queryFloating && !panelTargetIsInteractive(event.target)) togglePanelMaximized('query');
             }}
         >
-            <div className="editor-file-heading"><span className="file-type-icon">SQL</span><label className="document-name"><span className="eyebrow">{copy.common.query}</span><input aria-label="SQL document name" value={active.name} onChange={event => actions.onPatch({ name: event.target.value })}/></label></div>
+            <div className="editor-file-heading"><span className="file-type-icon">SQL</span><label className="document-name"><span className="eyebrow">{copy.common.query}</span><input
+                aria-label="SQL document name"
+                value={active.name}
+                onFocus={() => { queryNameAtFocus.current = active.name; }}
+                onChange={event => actions.onPatch({ name: event.target.value })}
+                onBlur={event => {
+                    const name = event.currentTarget.value.trim();
+                    const savingButtonFocused = event.relatedTarget instanceof HTMLElement
+                        && event.relatedTarget.closest('[data-testid="save-query"]');
+                    if (name && name !== queryNameAtFocus.current) {
+                        actions.onPatch({ name });
+                        if (!savingButtonFocused) void actions.onSave({ ...active, name });
+                    }
+                }}
+                onKeyDown={event => {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        event.currentTarget.blur();
+                    }
+                }}
+            /></label></div>
             {experience === 'expert' && <div className="editor-heading-tools">
                 <Button variant="ghost" className="sql-map-button" aria-label={copy.common.visualizeSqlStructure} aria-pressed={view === 'sqlmap'} title={copy.common.visualizeSqlStructure} onClick={actions.onToggleSqlMap}><Icon name="pipeline"/>{copy.common.sqlMap}</Button>
                 <Button variant="ghost" className="sql-ai-button" data-testid="open-ai" aria-label={copy.common.askAi} aria-pressed={inspector === 'assistant'} onClick={actions.onOpenAssistant}><Icon name="assistant"/>{copy.common.askAi}</Button>
-                <Button variant="secondary" className="save-revision-button" data-testid="save-query" aria-label={copy.common.saveRevision} onClick={() => void actions.onSave()} disabled={Boolean(busy)}><Icon name="documents"/>{copy.common.save}</Button>
+                {saveButton}
             </div>}
             <div className="editor-heading-actions">
                 {experience === 'beginner' && <>
                     <span className="draft-status standard-draft-status" data-save-state={saveStatus.state} title={`${saveStatus.label}. ${saveStatus.detail}`} role="status"><span className={cx('status-light', saveStatus.state === 'saved' ? 'is-trusted' : ['changed', 'conflict', 'deleted', 'unavailable'].includes(saveStatus.state) ? 'is-warning' : '')}/>{saveStatusLabel}</span>
                     <Button variant="ghost" className="sql-ai-button" data-testid="open-ai" aria-label={copy.common.askAi} aria-pressed={inspector === 'assistant'} onClick={actions.onOpenAssistant}><Icon name="assistant"/>{copy.common.askAi}</Button>
                     <Button variant="ghost" className="toolbar-small standard-format-button" data-testid="format-sql" aria-label={copy.common.formatSql} title={copy.common.formatSql} onClick={() => void actions.onFormat(standardFormatter)}>{copy.common.format}</Button>
+                    {saveButton}
                     <Button variant="primary" className="run-query-button compact-run-button" data-testid="run-button" aria-label={copy.common.run} title={runTitle} onClick={() => void runSql()} disabled={runDisabled}><Icon name="play"/>{busy === 'run' || busy === 'script' ? copy.common.running : copy.common.run}</Button>
                 </>}
                 {experience === 'expert' && <>

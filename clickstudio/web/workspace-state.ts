@@ -27,7 +27,7 @@ export interface WorkspaceState {
     closedTabs?: Draft[];
     recoveryWarning?: string;
 }
-export const newDraft = (name = 'Untitled.sql', sql = ''): Draft => ({ id: crypto.randomUUID(), name, sql, parameters: {}, chart: { kind: 'table', x: 0, ys: [], title: 'Query result' }, runIds: [], checkpoints: [], from: 0, to: 0, kind: 'query', dependencies: [] });
+export const newDraft = (name = 'Untitled Query', sql = ''): Draft => ({ id: crypto.randomUUID(), name, sql, parameters: {}, chart: { kind: 'table', x: 0, ys: [], title: 'Query result' }, runIds: [], checkpoints: [], from: 0, to: 0, kind: 'query', dependencies: [] });
 export const MAX_TABS = 30;
 export const MAX_CLOSED_TABS = 10;
 export function draftFromDocument(document: QueryDocument): Draft {

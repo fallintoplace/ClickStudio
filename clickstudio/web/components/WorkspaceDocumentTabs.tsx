@@ -2,7 +2,7 @@ import type { QueryDocument } from '../../shared/types';
 import { draftSaveStatus } from '../../shared/workspace-view';
 import type { Draft, WorkspaceState } from '../workspace-state';
 import { cx, Icon } from './ui';
-import type { ReactNode, RefObject } from 'react';
+import { useRef, type ReactNode, type RefObject } from 'react';
 
 type TabScrollState = {
     overflow: boolean;
@@ -27,7 +27,7 @@ type WorkspaceDocumentTabsProps = {
     tabRenameValue: string;
     setTabRenameValue: (value: string) => void;
     beginTabRename: (draft: Draft) => void;
-    finishTabRename: (draftId: string, value: string, restoreFocus?: boolean) => void;
+    finishTabRename: (draftId: string, value: string, restoreFocus?: boolean, saveAfterRename?: boolean) => void;
     cancelTabRename: (draftId: string) => void;
     onActivate: (draftId: string) => void;
     onClose: (draftId: string) => void;
@@ -57,6 +57,7 @@ export function WorkspaceDocumentTabs({
     onClose,
     actions,
 }: WorkspaceDocumentTabsProps) {
+    const restoreFocusAfterRenameRef = useRef<string | undefined>(undefined);
     const compactSingleTab = experience === 'beginner' && workspace.tabs.length === 1;
     return <div className={cx('document-tabs', tabScrollState.overflow && 'has-tab-overflow', compactSingleTab && 'is-compact-single')}>
         <div
@@ -104,11 +105,19 @@ export function WorkspaceDocumentTabs({
                         onFocus={event => event.currentTarget.select()}
                         onClick={event => event.stopPropagation()}
                         onChange={event => setTabRenameValue(event.target.value)}
-                        onBlur={event => finishTabRename(draft.id, event.currentTarget.value)}
+                        onBlur={event => {
+                            const restoreFocus = restoreFocusAfterRenameRef.current === draft.id;
+                            restoreFocusAfterRenameRef.current = undefined;
+                            const saveButtonFocused = draft.id === activeId
+                                && event.relatedTarget instanceof HTMLElement
+                                && event.relatedTarget.closest('[data-testid="save-query"]');
+                            finishTabRename(draft.id, event.currentTarget.value, restoreFocus, !saveButtonFocused);
+                        }}
                         onKeyDown={event => {
                             if (event.key === 'Enter') {
                                 event.preventDefault();
-                                finishTabRename(draft.id, event.currentTarget.value, true);
+                                restoreFocusAfterRenameRef.current = draft.id;
+                                event.currentTarget.blur();
                             } else if (event.key === 'Escape') {
                                 event.preventDefault();
                                 cancelTabRename(draft.id);

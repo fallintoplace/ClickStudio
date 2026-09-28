@@ -54,7 +54,7 @@ export function sameSavedContent(draft: SaveableDraft, saved: QueryDocument): bo
 export function draftSaveStatus(draft: SaveableDraft, connectionId: string, saved?: QueryDocument,
     options: { saving?: boolean; pending?: boolean; readError?: boolean } = {}): SaveStatus {
     if (options.saving) return { state: 'saving', label: 'Saving revision…', detail: 'Edits made while saving will remain in your local draft.' };
-    if (!draft.serverId) return { state: 'local', label: 'Private local draft', detail: 'No named server revision yet. Save a revision to keep this file on the server.' };
+    if (!draft.serverId) return { state: 'local', label: 'Private local draft', detail: 'This query is only in this browser. Save it to keep a server copy.' };
     if (options.readError) return { state: 'unavailable', label: 'Saved revision could not be checked', detail: 'Your draft is unchanged. Retry reading saved files before assuming this draft is saved.' };
     if (!saved && options.pending) return { state: 'checking', label: 'Checking saved revision…', detail: 'Your local draft is available while saved files load.' };
     if (!Number.isSafeInteger(draft.baseRevision) || !draft.baseRevision || draft.baseRevision < 1 || !saved || saved.id !== draft.serverId || saved.connectionId !== connectionId || saved.revision < draft.baseRevision)
