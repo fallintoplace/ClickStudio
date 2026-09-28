@@ -293,6 +293,33 @@
     .beginner-run-ready > span { display: inline-flex; align-items: center; gap: 8px; color: var(--green); font-size: 9px; }
     .beginner-run-ready .button-base { min-height: 33px; padding: 0 11px; font-size: 9px; }
     .beginner-run-ready .button-base svg { width: 13px; height: 13px; margin-right: 6px; }
+    .assistant-execution-options { display: grid; min-width: 0; gap: 7px; }
+    .assistant-execution-option { display: grid; min-width: 0; gap: 6px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: color-mix(in srgb, var(--page-raised) 68%, var(--panel)); }
+    .assistant-execution-heading { display: flex; min-width: 0; align-items: flex-start; justify-content: space-between; gap: 8px; }
+    .assistant-execution-heading > div { display: grid; min-width: 0; gap: 3px; }
+    .assistant-execution-heading strong { color: var(--text-soft); font-size: 9px; line-height: 1.4; }
+    .assistant-execution-heading p { margin: 0; color: var(--muted); font-size: 8px; line-height: 1.45; }
+    .assistant-execution-count { flex: none; color: var(--muted); font-family: var(--font-mono); font-size: 7px; white-space: nowrap; }
+    .assistant-execution-steps { display: grid; min-width: 0; gap: 5px; margin: 0; padding: 0; list-style: none; counter-reset: assistant-step; }
+    .assistant-execution-steps > li { display: grid; min-width: 0; gap: 4px; padding: 5px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); counter-increment: assistant-step; }
+    .assistant-execution-step-heading { display: flex; min-width: 0; align-items: center; gap: 5px; }
+    .assistant-execution-number { display: grid; width: 17px; height: 17px; flex: none; place-items: center; border: 1px solid var(--line); border-radius: 5px; color: var(--muted); font-family: var(--font-mono); font-size: 7px; }
+    .assistant-operation-badge { flex: none; padding: 2px 5px; border: 1px solid var(--line); border-radius: 999px; background: var(--page-raised); color: var(--text-soft); font-size: 7px; font-weight: 700; text-transform: uppercase; }
+    .assistant-operation-badge.is-read { border-color: color-mix(in srgb, var(--accent) 32%, var(--line)); color: var(--accent); }
+    .assistant-operation-badge.is-insert, .assistant-operation-badge.is-update { border-color: color-mix(in srgb, var(--amber) 36%, var(--line)); color: var(--amber); }
+    .assistant-operation-badge.is-delete { border-color: color-mix(in srgb, var(--red) 36%, var(--line)); color: var(--red); }
+    .assistant-operation-badge.is-schema { border-color: color-mix(in srgb, var(--violet) 36%, var(--line)); color: var(--violet); }
+    .assistant-operation-badge.is-unknown { border-color: color-mix(in srgb, var(--amber) 36%, var(--line)); color: var(--amber); }
+    .assistant-execution-label { min-width: 0; overflow: hidden; color: var(--text-soft); font-family: var(--font-mono); font-size: 7px; text-overflow: ellipsis; white-space: nowrap; }
+    .assistant-execution-steps pre { max-height: 130px; overflow: auto; margin: 0; padding: 5px 6px; border-radius: 4px; background: var(--page); color: var(--text-soft); font-family: var(--font-mono); font-size: 7px; line-height: 1.5; white-space: pre; }
+    .assistant-execution-steps pre code { display: block; min-width: max-content; }
+    .assistant-execution-steps .button-base { min-height: 25px; justify-self: start; padding-inline: 7px; font-size: 7px; }
+    .assistant-execution-actions { display: flex; min-width: 0; flex-wrap: wrap; justify-content: flex-end; gap: 5px; }
+    .assistant-execution-actions > .button-base { min-height: 29px; padding-inline: 9px; font-size: 8px; }
+    .assistant-execution-confirmation { display: grid; min-width: 0; flex: 1; gap: 5px; }
+    .assistant-execution-confirmation > p, .assistant-execution-error { margin: 0; color: var(--amber); font-size: 8px; line-height: 1.5; }
+    .assistant-execution-confirmation > div { display: flex; justify-content: flex-end; gap: 5px; }
+    .assistant-execution-confirmation .button-base { min-height: 28px; padding-inline: 8px; font-size: 8px; }
     .beginner-workspace-content:not(.has-run) { display: flex; flex-direction: column; }
     .beginner-workspace-content:not(.has-run) > .editor-surface { min-height: 0; flex: 1; }
     .beginner-workspace-content:not(.has-run).is-query-collapsed > .editor-surface { flex: none; }

@@ -5,7 +5,7 @@ import { canWrite, mustOwn } from './guards.js';
 import { audit, hash, type Store } from './store.js';
 import { choice, record, text } from './validation.js';
 import { buildEvaluationReport, evaluateProposal, referencedTables } from './assistant-evaluation.js';
-export const PROMPT_VERSION = 'clickstudio-assistant-v11';
+export const PROMPT_VERSION = 'clickstudio-assistant-v12';
 export const MAX_ASSISTANT_CONVERSATION_MESSAGES = 40;
 export const MAX_ASSISTANT_CONVERSATION_BYTES = 80_000;
 export const ASSISTANT_REQUEST_TIMEOUT_MS = 45_000;
@@ -253,6 +253,7 @@ export function buildContext(input: ContextInput): {
         'Use web search when current or external information can improve the answer, and cite any web sources used. Keep claims about this ClickHouse connection grounded in the supplied workspace data. ' +
         'For web citations in summary, assumptions, caveats, clarification, findings, and evidence, use standard Markdown links such as [source](https://example.com). Do not nest or escape links. Do not repeat interface labels such as ASSUMPTION or NOTE in field text. ' +
         'When the summary contains a plain-language answer, format it as concise Markdown: separate paragraphs and put each ordered or bulleted list item on its own line. For SQL proposals, keep the summary to one short sentence. ' +
+        'When you offer mutually exclusive SQL choices, put the recommended complete script in sql and each other choice in alternatives with a short title and summary. Never combine mutually exclusive actions, such as UPDATE versus DELETE, in the same script. Each alternative must be independently runnable and include any needed checks. A script inside one option is an intentional ordered sequence. Return an empty alternatives array when there are no separate choices. Offer at most three alternatives. ' +
         'For explain, result, performance analysis without a concrete fix, and review, sql may be null. ' +
         'For review and explain actions sql MUST be null. Return the requested structured object.';
     return { payload: { instructions, question: input.question, context: encoded(), ...(conversation.length ? { conversation } : {}), image }, summary };
@@ -331,8 +332,10 @@ export class AssistantService {
             const response = await this.driver.propose(context, signal);
             signal.throwIfAborted();
             const content = validateProposal(response.content);
-            if (context.action === 'review' || context.action === 'explain')
+            if (context.action === 'review' || context.action === 'explain') {
                 content.sql = null;
+                content.alternatives = [];
+            }
             const proposal: Proposal = { ...content, id: randomUUID(), owner: p.id, connectionId: context.connectionId,
                 action: context.action, createdAt: new Date().toISOString(), baseSql: context.baseSql, responseId: response.responseId,
                 model: this.driver.model, promptVersion: PROMPT_VERSION, contextSummary: context.summary, decision: 'pending',
@@ -401,6 +404,15 @@ export class AssistantService {
 export function validateProposal(value: unknown): ProposalContent {
     const v = record(value, 'model proposal');
     const strings = (x: unknown, name: string) => { requireThat(Array.isArray(x) && x.length <= 50, 502, 'AI_OUTPUT', `Invalid ${name}`); return x.map(s => text(s, name, 4000, true)); };
+    const alternatives = v.alternatives === undefined ? [] : (() => {
+        requireThat(Array.isArray(v.alternatives) && v.alternatives.length <= 4, 502, 'AI_OUTPUT', 'Invalid alternatives');
+        const parsed = v.alternatives.map((raw, index) => {
+            const option = record(raw, `alternative ${index + 1}`);
+            return { title: text(option.title, 'alternative title', 120), summary: text(option.summary, 'alternative summary', 1_000, true), sql: text(option.sql, 'alternative SQL', 100_000) };
+        });
+        requireThat(v.sql !== null || parsed.length === 0, 502, 'AI_OUTPUT', 'An alternative requires a recommended SQL proposal');
+        return parsed;
+    })();
     const sources = v.sources === undefined ? undefined : (() => {
         requireThat(Array.isArray(v.sources) && v.sources.length <= 20, 502, 'AI_OUTPUT', 'Invalid web sources');
         return v.sources.map((raw, index) => {
@@ -414,7 +426,7 @@ export function validateProposal(value: unknown): ProposalContent {
         });
     })();
     requireThat(Array.isArray(v.findings) && v.findings.length <= 30, 502, 'AI_OUTPUT', 'Invalid review findings');
-    return { sql: v.sql === null ? null : text(v.sql, 'proposed SQL', 100000), summary: text(v.summary, 'summary', 20000, true),
+    return { sql: v.sql === null ? null : text(v.sql, 'proposed SQL', 100000), alternatives, summary: text(v.summary, 'summary', 20000, true),
         assumptions: strings(v.assumptions, 'assumptions'), tables: strings(v.tables, 'tables'), caveats: strings(v.caveats, 'caveats'),
         clarification: v.clarification === null ? null : text(v.clarification, 'clarification', 4000),
         ...(sources ? { sources } : {}),

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { activeStatementIndex, appendQuerySeparator, CLICKHOUSE_SNIPPETS, completionTarget, matchingNames, statementOutline, tableAliases } from '../../.core-build/shared/editor-tools.js';
+import { activeStatementIndex, appendQuerySeparator, classifySqlOperation, CLICKHOUSE_SNIPPETS, completionTarget, matchingNames, statementOutline, tableAliases } from '../../.core-build/shared/editor-tools.js';
 import { selectedStatement, splitSql } from '../../.core-build/shared/sql.js';
 
 for (const [name, sql, count] of [
@@ -37,6 +37,33 @@ test('outline labels omit leading comments but retain exact source ranges', () =
     assert.equal(statements[0].label, 'SELECT 1');
     assert.equal(sql.slice(statements[0].from, statements[0].to), statements[0].sql);
     assert.equal(statementOutline('SELECT ' + 'x'.repeat(100)).statements[0].label.length, 62);
+});
+
+for (const [name, sql, operation] of [
+    ['SELECT', "SELECT 'DELETE FROM events' AS note", 'read'],
+    ['SELECT outfile', "SELECT 1 INTO OUTFILE '/tmp/export.tsv'", 'unknown'],
+    ['WITH SELECT', 'WITH recent AS (SELECT 1 AS id) SELECT id FROM recent', 'read'],
+    ['INSERT', 'INSERT INTO events SELECT 1', 'insert'],
+    ['native UPDATE mutation', 'ALTER TABLE events UPDATE value = 2 WHERE id = 1', 'update'],
+    ['quoted table UPDATE mutation', 'ALTER TABLE `events` UPDATE value = 2 WHERE id = 1', 'update'],
+    ['native DELETE mutation', 'ALTER TABLE events DELETE WHERE id = 1', 'delete'],
+    ['drop partition mutation', "ALTER TABLE events DROP PARTITION '202401'", 'delete'],
+    ['reserved table name is not an update', 'ALTER TABLE update MODIFY COLUMN status String', 'schema'],
+    ['DELETE statement', 'DELETE FROM events WHERE id = 1', 'delete'],
+    ['truncate', 'TRUNCATE TABLE events', 'delete'],
+    ['drop', 'DROP TABLE events', 'delete'],
+    ['schema alter', 'ALTER TABLE events ADD COLUMN status String', 'schema'],
+    ['comment keywords', '-- UPDATE and DELETE are examples\nSELECT 1', 'read'],
+    ['unknown operation', 'SYSTEM FLUSH LOGS', 'unknown'],
+    ['empty statement', '', 'unknown'],
+]) test(`operation preview classifies ${name}`, () => {
+    assert.equal(classifySqlOperation(sql), operation);
+});
+
+test('script preview keeps order and labels an UPDATE followed by DELETE', () => {
+    const outline = statementOutline('SELECT id FROM events; ALTER TABLE events UPDATE value = 2 WHERE id = 1; ALTER TABLE events DELETE WHERE id = 1');
+    assert.deepEqual(outline.statements.map(statement => statement.operation), ['read', 'update', 'delete']);
+    assert.deepEqual(outline.statements.map(statement => statement.from < statement.to), [true, true, true]);
 });
 
 for (const sql of ['', '  ', '-- a comment', '# a comment', '/* a comment */', 'SELECT 1', 'SELECT 1  ', 'SELECT 1;', 'SELECT 1; -- end', 'SELECT 1 -- end', 'SELECT 1 # end', 'SELECT 1 /* end */', "SELECT ';'"]) {

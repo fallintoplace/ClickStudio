@@ -314,6 +314,73 @@ test('An older accepted proposal says which SQL will run', async ({ page }) => {
     expect(runRequests[0]).toMatchObject({ sql: generatedSql, connectionId: 'demo' });
 });
 
+test('Ask AI previews mixed writes and keeps UPDATE and DELETE alternatives separate', async ({ page }) => {
+    const combinedSql = 'SELECT id FROM demo.events WHERE id = 1; ALTER TABLE demo.events UPDATE status = \'reviewed\' WHERE id = 1; ALTER TABLE demo.events DELETE WHERE id = 1';
+    const updateSql = 'SELECT id FROM demo.events WHERE id = 1; ALTER TABLE demo.events UPDATE status = \'reviewed\' WHERE id = 1';
+    const deleteSql = 'SELECT id FROM demo.events WHERE id = 1; ALTER TABLE demo.events DELETE WHERE id = 1';
+    const runRequests: Record<string, unknown>[] = [];
+    let proposalBaseSql = '';
+    page.on('request', request => {
+        if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/runs')
+            runRequests.push(jsonRecord(request.postDataJSON(), 'Run request'));
+    });
+    await page.route('**/api/assistant/sql', async route => {
+        const body = jsonRecord(route.request().postDataJSON(), 'Assistant request');
+        proposalBaseSql = String(body.sql ?? '');
+        await route.fulfill({ json: {
+            id: 'script-options-proposal', owner: 'local-owner', connectionId: 'demo', action: 'ask', createdAt: '2026-09-29T00:00:00.000Z',
+            baseSql: proposalBaseSql, responseId: 'test-response', model: 'test-model', promptVersion: 'test', contextSummary: [], decision: 'pending',
+            sql: combinedSql, alternatives: [
+                { title: 'Update matching row', summary: 'Change the status and keep the event.', sql: updateSql },
+                { title: 'Delete matching row', summary: 'Remove the matching event.', sql: deleteSql },
+            ],
+            summary: 'Choose whether to update or delete the matching event.', assumptions: [], tables: ['demo.events'], caveats: [], clarification: null, findings: [],
+        } });
+    });
+    await page.route('**/api/assistant/proposals/script-options-proposal/decision', async route => {
+        const body = jsonRecord(route.request().postDataJSON(), 'Assistant decision');
+        await route.fulfill({ json: {
+            id: 'script-options-proposal', owner: 'local-owner', connectionId: 'demo', action: 'ask', createdAt: '2026-09-29T00:00:00.000Z',
+            decidedAt: '2026-09-29T00:00:01.000Z', baseSql: proposalBaseSql, responseId: 'test-response', model: 'test-model', promptVersion: 'test', contextSummary: [], decision: body.decision,
+            sql: combinedSql, alternatives: [
+                { title: 'Update matching row', summary: 'Change the status and keep the event.', sql: updateSql },
+                { title: 'Delete matching row', summary: 'Remove the matching event.', sql: deleteSql },
+            ],
+            summary: 'Choose whether to update or delete the matching event.', assumptions: [], tables: ['demo.events'], caveats: [], clarification: null, findings: [],
+        } });
+    });
+
+    await beginInCompactMode(page);
+    await page.getByTestId('open-ai').click();
+    await page.getByRole('textbox', { name: 'Ask AI', exact: true }).fill('Give me separate update and delete options for this row');
+    await page.locator('.assistant-panel').getByRole('button', { name: 'Send', exact: true }).click();
+    await expect(page.getByTestId('assistant-execution-option')).toHaveCount(3);
+    const recommended = page.getByTestId('assistant-execution-option').nth(0);
+    const alternative = page.getByTestId('assistant-execution-option').nth(1);
+    const deleteAlternative = page.getByTestId('assistant-execution-option').nth(2);
+    await expect(recommended.getByRole('list', { name: 'Statements in execution order' }).locator('li')).toHaveCount(3);
+    await expect(recommended.locator('li').nth(0)).toHaveAttribute('data-operation', 'read');
+    await expect(recommended.locator('li').nth(1)).toHaveAttribute('data-operation', 'update');
+    await expect(recommended.locator('li').nth(2)).toHaveAttribute('data-operation', 'delete');
+    await expect(alternative).toContainText('Update matching row');
+    await expect(deleteAlternative).toContainText('Delete matching row');
+    await expect(alternative.locator('li').nth(1)).toHaveAttribute('data-operation', 'update');
+    await expect(deleteAlternative.locator('li').nth(1)).toHaveAttribute('data-operation', 'delete');
+    expect(runRequests).toHaveLength(0);
+
+    await page.getByRole('button', { name: 'Use this query', exact: true }).click();
+    await expect(recommended.getByRole('button', { name: 'Review run of 3 statements', exact: true })).toBeVisible();
+    await expect(alternative.getByRole('button', { name: 'Run alternative: Update matching row', exact: true })).toBeVisible();
+    await expect(deleteAlternative.getByRole('button', { name: 'Run alternative: Delete matching row', exact: true })).toBeVisible();
+    await recommended.getByRole('button', { name: 'Review run of 3 statements', exact: true }).click();
+    await expect(recommended.getByRole('alert')).toContainText('DELETE may remove rows changed by the UPDATE');
+    await expect(recommended.getByRole('alert')).toContainText('mutations can finish asynchronously');
+    await expect(recommended.getByRole('button', { name: 'Confirm and run all', exact: true })).toBeVisible();
+    await expect(recommended.getByRole('button', { name: 'Run only statement 2: Update', exact: true })).toBeVisible();
+    await expect(recommended.getByRole('button', { name: 'Run only statement 3: Delete', exact: true })).toBeVisible();
+    expect(runRequests).toHaveLength(0);
+});
+
 test('Standard can run a script and open its statement results', async ({ page }) => {
     await beginInCompactMode(page);
     await replaceSql(page, 'SELECT 1; SELECT 2;');

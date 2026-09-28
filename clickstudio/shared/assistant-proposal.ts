@@ -3,6 +3,7 @@ import type {
     AssistantSource,
     EvaluationStatus,
     Proposal,
+    ProposalAlternative,
     ProposalContent,
     ProposalQuality,
     ProposalQualityCheck,
@@ -74,6 +75,18 @@ function parseFindings(value: unknown): ProposalContent['findings'] | undefined 
     return findings;
 }
 
+function parseAlternatives(value: unknown): ProposalAlternative[] | undefined {
+    if (!Array.isArray(value) || value.length > 4) return undefined;
+    const alternatives: ProposalAlternative[] = [];
+    for (const option of value) {
+        if (!isRecord(option) || typeof option.title !== 'string' || !option.title.trim() || option.title.length > 120 ||
+            typeof option.summary !== 'string' || option.summary.length > 1_000 ||
+            typeof option.sql !== 'string' || !option.sql.trim() || option.sql.length > 100_000) return undefined;
+        alternatives.push({ title: option.title, summary: option.summary, sql: option.sql });
+    }
+    return alternatives;
+}
+
 function parseQuality(value: unknown): ProposalQuality | undefined {
     if (!isRecord(value) || typeof value.evaluatorVersion !== 'string' || typeof value.evaluatedAt !== 'string' ||
         !isEvaluationStatus(value.status) || typeof value.score !== 'number' || !Number.isFinite(value.score) ||
@@ -106,6 +119,8 @@ export function parseAssistantProposal(value: unknown): Proposal | undefined {
 
     const findings = parseFindings(value.findings);
     if (!findings) return undefined;
+    const alternatives = value.alternatives === undefined ? [] : parseAlternatives(value.alternatives);
+    if (!alternatives || (alternatives.length > 0 && value.sql === null)) return undefined;
     const sources = value.sources === undefined ? undefined : parseSources(value.sources);
     if (value.sources !== undefined && !sources) return undefined;
     const quality = value.quality === undefined ? undefined : parseQuality(value.quality);
@@ -124,6 +139,7 @@ export function parseAssistantProposal(value: unknown): Proposal | undefined {
         promptVersion: value.promptVersion,
         contextSummary: value.contextSummary,
         sql: value.sql,
+        alternatives,
         summary: value.summary,
         assumptions: value.assumptions,
         tables: value.tables,

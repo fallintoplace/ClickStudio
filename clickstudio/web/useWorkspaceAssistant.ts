@@ -50,8 +50,8 @@ function detailedConversationTurn(turn: AssistantChatTurn): AssistantConversatio
         ...(turn.runContext ? { runContext: turn.runContext } : {}),
     }) }];
     if (turn.proposal) {
-        const { summary, clarification, sql, assumptions, tables, caveats, sources, findings, decision, quality } = turn.proposal;
-        messages.push({ role: 'assistant', content: JSON.stringify({ summary, clarification, sql, assumptions, tables, caveats, sources, findings, decision, quality }) });
+        const { summary, clarification, sql, alternatives, assumptions, tables, caveats, sources, findings, decision, quality } = turn.proposal;
+        messages.push({ role: 'assistant', content: JSON.stringify({ summary, clarification, sql, alternatives, assumptions, tables, caveats, sources, findings, decision, quality }) });
     } else if (turn.error) {
         messages.push({ role: 'assistant', content: turn.error });
     }

@@ -2,19 +2,59 @@ import { lexSql, splitSql, SqlSyntaxError, type Statement, type Token } from './
 
 export interface OutlinedStatement extends Statement {
     label: string;
+    operation: SqlOperation;
 }
 export interface StatementOutline {
     statements: OutlinedStatement[];
     error?: string;
 }
 
+export type SqlOperation = 'read' | 'insert' | 'update' | 'delete' | 'schema' | 'unknown';
+
+function classifyTokens(tokens: readonly Token[]): SqlOperation {
+    const words = tokens.filter(token => token.kind === 'word').map(token => token.text.toUpperCase());
+    const first = words[0];
+    if (!first) return 'unknown';
+    if (['SELECT', 'SHOW', 'DESCRIBE', 'DESC', 'EXPLAIN', 'EXISTS', 'CHECK'].includes(first)) {
+        if (first === 'SELECT' && words.some((word, index) => word === 'INTO' && words[index + 1] === 'OUTFILE')) return 'unknown';
+        return 'read';
+    }
+    if (first === 'WITH') return words.includes('SELECT') && !words.some(word => ['INSERT', 'UPDATE', 'DELETE'].includes(word)) ? 'read' : 'unknown';
+    if (first === 'INSERT') return 'insert';
+    if (first === 'UPDATE') return 'update';
+    if (first === 'DELETE' || first === 'TRUNCATE' || first === 'DROP') return 'delete';
+    if (first === 'ALTER') {
+        let index = tokens.findIndex(token => token.kind === 'word' && token.text.toUpperCase() === 'TABLE') + 1;
+        if (index === 0) return 'schema';
+        const isIdentifier = (token: Token | undefined) => token?.kind === 'word' || token?.kind === 'quoted';
+        if (tokens[index]?.kind === 'word' && tokens[index]?.text.toUpperCase() === 'IF' && tokens[index + 1]?.text.toUpperCase() === 'EXISTS') index += 2;
+        if (isIdentifier(tokens[index])) index++;
+        while (tokens[index]?.text === '.' && isIdentifier(tokens[index + 1])) index += 2;
+        if (tokens[index]?.kind === 'word' && tokens[index]?.text.toUpperCase() === 'ON' && tokens[index + 1]?.kind === 'word' && tokens[index + 1]?.text.toUpperCase() === 'CLUSTER') {
+            index += 2;
+            if (isIdentifier(tokens[index])) index++;
+        }
+        const action = tokens[index]?.kind === 'word' ? tokens[index]?.text.toUpperCase() : undefined;
+        if (action === 'UPDATE') return 'update';
+        if (action === 'DELETE' || action === 'DROP' && tokens[index + 1]?.kind === 'word' && tokens[index + 1]?.text.toUpperCase() === 'PARTITION') return 'delete';
+        return 'schema';
+    }
+    if (['CREATE', 'RENAME', 'ATTACH', 'DETACH', 'EXCHANGE'].includes(first)) return 'schema';
+    return 'unknown';
+}
+
+export function classifySqlOperation(sql: string): SqlOperation {
+    return classifyTokens(lexSql(sql));
+}
+
 /** Uses the execution boundary lexer, so quoted semicolons never create fake queries. */
 export function statementOutline(text: string): StatementOutline {
     try {
         return { statements: splitSql(text).map(statement => {
-            const first = lexSql(statement.sql)[0];
+            const tokens = lexSql(statement.sql);
+            const first = tokens[0];
             const preview = statement.sql.slice(first?.from ?? 0).replace(/\s+/g, ' ').trim();
-            return { ...statement, label: preview.length > 64 ? `${preview.slice(0, 61)}…` : preview };
+            return { ...statement, label: preview.length > 64 ? `${preview.slice(0, 61)}…` : preview, operation: classifyTokens(tokens) };
         }) };
     } catch (error) {
         if (!(error instanceof SqlSyntaxError)) throw error;

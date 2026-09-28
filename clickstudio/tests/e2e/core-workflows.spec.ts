@@ -1150,7 +1150,7 @@ test('Ask AI keeps chat history when SQL changes and sends prior messages with f
     });
     expect(requests[1]?.conversation).toMatchObject([
         { role: 'user' },
-        { role: 'assistant', content: JSON.stringify({ summary: 'Answer to Show the old question', clarification: null, sql: null, assumptions: [], tables: [], caveats: [], findings: [], decision: 'pending' }) },
+        { role: 'assistant', content: JSON.stringify({ summary: 'Answer to Show the old question', clarification: null, sql: null, alternatives: [], assumptions: [], tables: [], caveats: [], findings: [], decision: 'pending' }) },
     ]);
 
     await page.getByRole('button', { name: 'New chat', exact: true }).click();
