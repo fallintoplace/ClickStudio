@@ -60,6 +60,19 @@ for (const locale of supportedLocales) {
             assert.equal(categoryLabel(category, copy, locale), copy[key], `${locale}: ${category}`);
         }
     });
+
+    test(`Untranslated non-schema examples retain their original text: ${locale}`, () => {
+        const example = {
+            id: 'help-model-test-untranslated',
+            category: 'basics',
+            name: 'Inspect recent events',
+            description: 'Read the newest events without changing data.',
+        };
+        assert.deepEqual(exampleText(example, locale, getCopy(locale).common), {
+            name: example.name,
+            description: example.description,
+        });
+    });
 }
 
 test('Schema preview labels preserve literal table names and repeated placeholders', () => {
@@ -71,6 +84,15 @@ test('Schema preview labels preserve literal table names and repeated placeholde
     const example = { category: 'schema', name: `Preview ${tableName}` };
     assert.deepEqual(exampleText(example, 'en', copy), {
         name: `${tableName}: preview ${tableName}`,
+        description: copy.exampleReadRows,
+    });
+});
+
+test('Schema examples without a Preview prefix preserve the complete name', () => {
+    const tableName = 'events_Preview_$&';
+    const copy = { ...getCopy('en').common, examplePreviewTable: 'Inspect {table}' };
+    assert.deepEqual(exampleText({ category: 'schema', name: tableName }, 'en', copy), {
+        name: `Inspect ${tableName}`,
         description: copy.exampleReadRows,
     });
 });
