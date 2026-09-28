@@ -310,6 +310,8 @@ export const english: Copy = {
         columns: 'Columns',
         previewRows: 'Preview rows',
         generateSelect: 'Generate SELECT',
+        newTable: 'New table',
+        insertRow: 'Insert row',
         insertName: 'Insert name',
         copyName: 'Copy name',
         copied: 'Copied',

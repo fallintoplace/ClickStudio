@@ -8,6 +8,7 @@ import { demoFlamegraph, demoReplication, demoWorkload } from '../shared/observa
 import type { WorkloadWindow } from '../shared/workload.js';
 import { DEMO_EXPLAIN_ANALYZE, demoMergeTreePartRows } from '../shared/demo-fixtures.js';
 import { AppError } from '../core/errors.js';
+import type { CreateTableColumn } from '../core/table-creation.js';
 
 const demoIndexAnalysis = [
     'ReadFromMergeTree (demo.events)',
@@ -95,6 +96,8 @@ export class DemoDriver {
     async close() { }
     targets(_id: string) { return []; }
     allowed(_id: string, _table: string) { return false; }
+    createTargets(_id: string) { return []; }
+    async createTable(_id: string, _table: string, _columns: CreateTableColumn[], _orderBy: string, _queryId: string) { throw new AppError(403, 'DEMO_READ_ONLY', 'Fixture mode never creates tables'); }
     async insert() { throw new AppError(403, 'DEMO_READ_ONLY', 'Fixture mode never inserts'); }
     async inspectInsert() { return 'unknown' as const; }
     async queryTree(id: string) {

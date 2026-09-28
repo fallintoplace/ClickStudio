@@ -28,6 +28,19 @@ test('Import targets must belong to their connection profile database', () => {
     assert.deepEqual(config.profiles[0].writer.tables, ['analytics.events', 'analytics.sessions']);
     assert.throws(() => loadConfig({ CLICKHOUSE_DATABASE: 'analytics', CLICKHOUSE_WRITER_USER: 'writer', CLICKHOUSE_IMPORT_TABLES: 'analytics.events,default.archive' }), { code: 'IMPORT_TABLES' });
 });
+test('Table creation targets are opt-in, exact, unique, and scoped to the profile database', () => {
+    const config = loadConfig({ CLICKHOUSE_WRITER_USER: 'writer', CLICKHOUSE_IMPORT_TABLES: 'default.events', CLICKHOUSE_CREATE_TABLES: 'default.new_events' });
+    assert.deepEqual(config.profiles[0].writer.createTables, ['default.new_events']);
+    assert.deepEqual(loadConfig({ CLICKHOUSE_WRITER_USER: 'writer', CLICKHOUSE_IMPORT_TABLES: 'default.events' }).profiles[0].writer.createTables, []);
+    assert.throws(() => loadConfig({ CLICKHOUSE_WRITER_USER: 'writer', CLICKHOUSE_CREATE_TABLES: 'default.*' }), { code: 'CREATE_TABLES' });
+    assert.throws(() => loadConfig({ CLICKHOUSE_DATABASE: 'analytics', CLICKHOUSE_WRITER_USER: 'writer', CLICKHOUSE_CREATE_TABLES: 'default.events' }), { code: 'CREATE_TABLES' });
+    assert.throws(() => loadConfig({ CLICKHOUSE_WRITER_USER: 'writer', CLICKHOUSE_CREATE_TABLES: 'default.events,default.events' }), { code: 'CREATE_TABLES' });
+});
+test('A writer can be configured only for table creation', () => {
+    const config = loadConfig({ CLICKHOUSE_WRITER_USER: 'writer', CLICKHOUSE_CREATE_TABLES: 'default.new_events' });
+    assert.deepEqual(config.profiles[0].writer.tables, []);
+    assert.deepEqual(config.profiles[0].writer.createTables, ['default.new_events']);
+});
 test('Null child filters use IS NULL semantics rather than a printable value', () => { const child = insertChildFilter('SELECT NULL AS value', 'value', null); assert.ok(child.sql.includes('isNull(`value`)')); assert.deepEqual(child.parameters, {}); });
 test('Child filters do not overwrite an existing query parameter', () => { const child = insertChildFilter('SELECT {wb_filter:String} AS value', 'value', 'next'); assert.deepEqual(child.parameters, { wb_filter_child: 'next' }); assert.ok(child.sql.includes('{wb_filter_child:String}')); });
 test('Demo publications remain labeled fixtures outside the workspace', async () => {

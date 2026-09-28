@@ -346,6 +346,8 @@ export interface Copy {
         columns: string;
         previewRows: string;
         generateSelect: string;
+        newTable: string;
+        insertRow: string;
         insertName: string;
         copyName: string;
         copied: string;

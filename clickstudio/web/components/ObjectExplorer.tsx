@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { Schema, SchemaDictionary, SchemaTable } from '../../shared/types';
+import type { Schema, SchemaColumn, SchemaDictionary, SchemaTable } from '../../shared/types';
 import {
     buildObjectExplorer,
     explorerCategoryId,
@@ -21,6 +21,8 @@ import { ObjectDetails } from './ObjectExplorerDetails';
 import { OverlayPortal } from './OverlayPortal';
 import { StorageExplorer } from './StorageExplorer';
 import { MaterializedViewExplorer } from './MaterializedViewExplorer';
+import { CreateTableDialog } from './CreateTableDialog';
+import { InsertRowDialog } from './InsertRowDialog';
 
 type ObjectExplorerProps = {
     copy: Copy['common'];
@@ -67,6 +69,8 @@ export function ObjectExplorer({ copy, connection, schema, schemaLoading, schema
     const [copiedId, setCopiedId] = useState<string>();
     const [lineageOpen, setLineageOpen] = useState(false);
     const [partsTable, setPartsTable] = useState<SchemaTable>();
+    const [insertRowTarget, setInsertRowTarget] = useState<{ table: SchemaTable; columns: readonly SchemaColumn[] }>();
+    const [createTableOpen, setCreateTableOpen] = useState(false);
     const copyTimer = useRef<number | undefined>(undefined);
 
     useEffect(() => () => {
@@ -180,8 +184,9 @@ export function ObjectExplorer({ copy, connection, schema, schemaLoading, schema
     return <section className={cx('inspector-section object-explorer-section', compact && 'is-compact', showCompactDetails && 'is-detail-mode')}>
         {showCompactDetails ? <div className="object-compact-details">
             <button type="button" className="object-back-button" onClick={browseObjects}><span>‹</span>{copy.objects}</button>
-            <ObjectDetails copy={copy} selection={selected} trusted={trusted} copiedId={copiedId} onInsert={onInsert} onCopy={copyText} onOpenSqlDraft={onOpenSqlDraft} onOpenReference={onOpenReference} onOpenParts={setPartsTable}/>
+            <ObjectDetails copy={copy} selection={selected} trusted={trusted} allowRowInsert={connection.dataSource !== 'fixture'} copiedId={copiedId} onInsert={onInsert} onInsertRow={(table, columns) => setInsertRowTarget({ table, columns })} onCopy={copyText} onOpenSqlDraft={onOpenSqlDraft} onOpenReference={onOpenReference} onOpenParts={setPartsTable}/>
         </div> : <>
+        {connection.dataSource !== 'fixture' && <Button variant="secondary" className="w-full justify-center" disabled={!trusted} title={!trusted ? copy.runActionTrustRequired : undefined} onClick={() => setCreateTableOpen(true)}><Icon name="table"/>{copy.newTable}</Button>}
         <div className="inspector-search object-search"><Icon name="search"/><input data-testid="schema-search" value={search} onChange={event => changeSearch(event.target.value)} placeholder={copy.objectSearch} aria-label={copy.objectSearch}/>{search && <button type="button" className="object-search-clear" aria-label="Clear object search" onClick={() => changeSearch('')}>×</button>}</div>
         <div className="schema-heading object-heading"><Button variant="ghost" className="toolbar-small" disabled={!trusted} onClick={() => setLineageOpen(true)}>View dependencies</Button><span>{copy.objectCount.replace('{count}', (model.query ? model.visibleObjects : model.totalObjects).toLocaleString())}</span><Button variant="ghost" className="toolbar-small" onClick={onRefreshSchema} disabled={schemaLoading || !trusted}>{schemaLoading ? copy.loading : copy.refresh}</Button></div>
         {schemaError && <div className="callout callout-error">{schemaError}</div>}
@@ -204,11 +209,13 @@ export function ObjectExplorer({ copy, connection, schema, schemaLoading, schema
                     })}
                 </div>
             </div> : <div className="object-empty-search"><strong>{copy.noObjectsMatch}</strong><span>{search ? 'Try a different name, type, engine, index, or column.' : copy.metadataUnavailable}</span></div>}
-            {!compact && detailsOpen && selected && <ObjectDetails copy={copy} selection={selected} trusted={trusted} copiedId={copiedId} onClose={browseObjects} onInsert={onInsert} onCopy={copyText} onOpenSqlDraft={onOpenSqlDraft} onOpenReference={onOpenReference} onOpenParts={setPartsTable}/>}
+            {!compact && detailsOpen && selected && <ObjectDetails copy={copy} selection={selected} trusted={trusted} allowRowInsert={connection.dataSource !== 'fixture'} copiedId={copiedId} onClose={browseObjects} onInsert={onInsert} onInsertRow={(table, columns) => setInsertRowTarget({ table, columns })} onCopy={copyText} onOpenSqlDraft={onOpenSqlDraft} onOpenReference={onOpenReference} onOpenParts={setPartsTable}/>}
         </>}
         </>}
         {trusted && partsTable && <OverlayPortal><StorageExplorer connection={connection} table={partsTable} copy={copy} onClose={() => setPartsTable(undefined)}/></OverlayPortal>}
         {trusted && lineageOpen && <OverlayPortal><MaterializedViewExplorer connection={connection} database={connection.database} onClose={() => setLineageOpen(false)}/></OverlayPortal>}
+        {trusted && createTableOpen && <OverlayPortal><CreateTableDialog connection={connection} onClose={() => setCreateTableOpen(false)} onCreated={onRefreshSchema}/></OverlayPortal>}
+        {trusted && insertRowTarget && <OverlayPortal><InsertRowDialog key={`${insertRowTarget.table.database}.${insertRowTarget.table.name}`} connectionId={connection.id} table={insertRowTarget.table} columns={insertRowTarget.columns} onClose={() => setInsertRowTarget(undefined)} onInserted={onRefreshSchema}/></OverlayPortal>}
     </section>;
 }
 

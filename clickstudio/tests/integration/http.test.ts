@@ -8,6 +8,7 @@ import { MemoryStore } from '../../core/store.js';
 import { DemoDriver } from '../../server/demo.js';
 import type { VoiceService } from '../../server/voice.js';
 import type { ImportJob } from '../../core/imports.js';
+import type { CreateTableColumn } from '../../core/table-creation.js';
 import type { ClickHouseDocumentationEntry, ClickHouseDocumentationSummary, QueryDocument, ReferenceCategory, Run, Published } from '../../shared/types.js';
 async function start(token?: string, voice?: VoiceService, parserWasm?: () => Promise<Uint8Array>, driver = new DemoDriver()) {
     const config = loadConfig({ DEMO_MODE: 'true', CLICKSTUDIO_TOKEN: token });
@@ -53,6 +54,31 @@ class ReferenceDocsDemoDriver extends DemoDriver {
         return { name, type, source: 'system.documentation', description: '# Native docs', serverVersion: '24.6-test', origin: 'native' };
     }
 }
+
+class TableCreationDemoDriver extends DemoDriver {
+    readonly createdTables: Array<{ id: string; table: string; columns: CreateTableColumn[]; orderBy: string; queryId: string }> = [];
+    override createTargets(_id: string) { return ['demo.new_events']; }
+    override async createTable(id: string, table: string, columns: CreateTableColumn[], orderBy: string, queryId: string) {
+        this.createdTables.push({ id, table, columns, orderBy, queryId });
+    }
+}
+
+test('Table creation needs trust, an exact target, and an exact confirmation', async (t) => {
+    const driver = new TableCreationDemoDriver(), s = await start(undefined, undefined, undefined, driver);
+    t.after(() => s.stop());
+    assert.deepEqual(await (await s.call('/connections/demo/create-table-targets')).json(), ['demo.new_events']);
+    const request = { table: 'demo.new_events', columns: [{ name: 'id', type: 'UInt64' }], orderBy: 'id', confirmation: 'CREATE TABLE demo.new_events' };
+    assert.equal((await s.call('/connections/demo/tables', request)).status, 403);
+    await s.call('/connections/demo/trust', { trusted: true, confirmation: 'demo' });
+    assert.equal((await s.call('/connections/demo/tables', { ...request, confirmation: 'yes' })).status, 400);
+    assert.equal((await s.call('/connections/demo/tables', { ...request, columns: [{ name: 'id); DROP TABLE x', type: 'UInt64' }] })).status, 400);
+    assert.equal((await s.call('/connections/demo/tables', { ...request, columns: [{ name: 'id', type: 'String); DROP TABLE x' }] })).status, 400);
+    const response = await s.call('/connections/demo/tables', request);
+    assert.equal(response.status, 201);
+    assert.equal(driver.createdTables.length, 1);
+    assert.deepEqual(driver.createdTables[0], { id: 'demo', table: 'demo.new_events', columns: request.columns, orderBy: 'id', queryId: driver.createdTables[0].queryId });
+    assert.match(driver.createdTables[0].queryId, /^clickstudio-create-table-/);
+});
 
 test('Reference routes require trust, validate bounded filters, and preserve entry type identity', async (t) => {
     const driver = new ReferenceDocsDemoDriver(), s = await start(undefined, undefined, undefined, driver);

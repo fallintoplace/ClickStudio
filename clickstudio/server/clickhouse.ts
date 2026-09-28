@@ -12,13 +12,14 @@ import { AppError, requireThat } from '../core/errors.js';
 import { collectCompactStream } from '../core/compact-stream.js';
 import type { QueryDriver } from '../core/runs.js';
 import type { ImportDriver } from '../core/imports.js';
+import { createTableSql, type CreateTableColumn, type CreateTableDriver } from '../core/table-creation.js';
 import { splitSql } from '../shared/sql.js';
 import { explainPrefixLength, sqlForRunKind } from '../shared/explain-plan.js';
 import { sourcePositionFromUtf8ByteOffset } from '../shared/native-parser.js';
 import { quotedTable } from '../core/imports.js';
 import { publicProfile, redactor, type Config, type Profile } from './config.js';
 /** All database addresses and credentials are operator-owned; the API accepts only profile IDs. */
-export class ClickHouseDriver implements QueryDriver, ImportDriver {
+export class ClickHouseDriver implements QueryDriver, ImportDriver, CreateTableDriver {
     private readers = new Map<string, ClickHouseClient>();
     private writers = new Map<string, ClickHouseClient>();
     private manifests = new Map<string, Manifest>();
@@ -397,8 +398,19 @@ export class ClickHouseDriver implements QueryDriver, ImportDriver {
         const rows = await this.rows<Record<string, unknown>>(run.connectionId, `EXPLAIN PIPELINE graph = 1, compact = 0\n${statement}`, run.parameters);
         return rows.map(row => String(Object.values(row)[0] ?? '')).filter(Boolean);
     }
-    targets(id: string) { return this.profile(id).writer?.tables ?? []; }
+    targets(id: string) { const writer = this.profile(id).writer; return [...new Set([...(writer?.tables ?? []), ...(writer?.createTables ?? [])])]; }
     allowed(id: string, table: string) { return this.targets(id).includes(table); }
+    createTargets(id: string) { return this.profile(id).writer?.createTables ?? []; }
+    async createTable(id: string, table: string, columns: CreateTableColumn[], orderBy: string, queryId: string) {
+        requireThat(this.createTargets(id).includes(table), 403, 'TABLE_CREATE_NOT_ALLOWED', 'Table creation target is not allowlisted');
+        try {
+            await this.client(id, true).command({ query: createTableSql(table, columns, orderBy), query_id: queryId, abort_signal: AbortSignal.timeout(60000),
+                clickhouse_settings: { max_execution_time: 55, max_memory_usage: '536870912' } });
+        }
+        catch (error) {
+            throw this.safeError(error);
+        }
+    }
     async insert(id: string, table: string, rows: Record<string, Json>[], queryId: string) {
         requireThat(this.allowed(id, table), 403, 'IMPORT_NOT_ALLOWED', 'Import target is not allowlisted');
         try {

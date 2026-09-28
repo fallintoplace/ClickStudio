@@ -14,6 +14,8 @@ CLICKHOUSE_PASSWORD=${secret()}
 CLICKHOUSE_WRITER_USER=clickstudio_writer
 CLICKHOUSE_WRITER_PASSWORD=${secret()}
 CLICKHOUSE_IMPORT_TABLES=default.import_events
+# Optional: exact targets. Grant CREATE TABLE and INSERT to the writer.
+# CLICKHOUSE_CREATE_TABLES=default.new_events
 CLICKHOUSE_ADMIN_USER=clickstudio_admin
 CLICKHOUSE_ADMIN_PASSWORD=${secret()}
 DEMO_MODE=false

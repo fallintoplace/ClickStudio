@@ -23,6 +23,7 @@ export interface Profile {
         username: string;
         password: string;
         tables: string[];
+        createTables: string[];
     };
 }
 export interface Config {
@@ -52,7 +53,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     const raw: unknown = env.CONNECTIONS_FILE ? JSON.parse(readFileSync(resolve(env.CONNECTIONS_FILE), 'utf8')) : [{
             id: 'local', name: 'Local ClickHouse', url: env.CLICKHOUSE_URL ?? 'http://127.0.0.1:8123', database: env.CLICKHOUSE_DATABASE ?? 'default',
             username: env.CLICKHOUSE_USER ?? 'default', passwordEnv: 'CLICKHOUSE_PASSWORD',
-            ...(env.CLICKHOUSE_IMPORT_TABLES ? { writer: { username: env.CLICKHOUSE_WRITER_USER, passwordEnv: 'CLICKHOUSE_WRITER_PASSWORD', tables: env.CLICKHOUSE_IMPORT_TABLES.split(',').map(t => t.trim()).filter(Boolean) } } : {}),
+            ...(env.CLICKHOUSE_IMPORT_TABLES || env.CLICKHOUSE_CREATE_TABLES ? { writer: {
+                username: env.CLICKHOUSE_WRITER_USER,
+                passwordEnv: 'CLICKHOUSE_WRITER_PASSWORD',
+                tables: (env.CLICKHOUSE_IMPORT_TABLES ?? '').split(',').map(t => t.trim()).filter(Boolean),
+                createTables: (env.CLICKHOUSE_CREATE_TABLES ?? '').split(',').map(t => t.trim()).filter(Boolean),
+            } } : {}),
         }];
     requireThat(Array.isArray(raw) && raw.length > 0 && raw.length <= 20, 400, 'CONNECTIONS_CONFIG', 'Configure 1–20 connection profiles');
     const profiles = raw.map(value => {
@@ -63,10 +69,18 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
         const profile: Profile = { id: identifier(v.id, 'profile id'), name: text(v.name, 'profile name', 128), url: url.toString(), database: text(v.database, 'database', 128), username, password: getSecret(v.passwordEnv), limits: limits(v.limits) };
         if (v.writer !== undefined) {
             const w = record(v.writer);
-            requireThat(Array.isArray(w.tables) && w.tables.length > 0 && w.tables.length <= 50 && w.tables.every(t => typeof t === 'string' && /^[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*$/.test(t)), 400, 'IMPORT_TABLES', 'Import targets must be explicit database.table names');
-            const tables = w.tables as string[];
-            requireThat(tables.every(table => table.slice(0, table.indexOf('.')) === profile.database), 400, 'IMPORT_TABLES', 'Import targets must use the connection profile database');
-            profile.writer = { username: text(w.username, 'writer username', 128), password: getSecret(w.passwordEnv), tables };
+            const targets = (value: unknown, key: 'tables' | 'createTables', code: string) => {
+                if (value === undefined)
+                    return [];
+                requireThat(Array.isArray(value) && value.length <= 50 && value.every(t => typeof t === 'string' && /^[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*$/.test(t)), 400, code, `${key === 'tables' ? 'Import' : 'Create table'} targets must be explicit database.table names`);
+                const list = value as string[];
+                requireThat(new Set(list).size === list.length, 400, code, `${key === 'tables' ? 'Import' : 'Create table'} targets must be unique`);
+                requireThat(list.every(table => table.slice(0, table.indexOf('.')) === profile.database), 400, code, `${key === 'tables' ? 'Import' : 'Create table'} targets must use the connection profile database`);
+                return list;
+            };
+            const tables = targets(w.tables, 'tables', 'IMPORT_TABLES'), createTables = targets(w.createTables, 'createTables', 'CREATE_TABLES');
+            requireThat(tables.length + createTables.length > 0, 400, 'WRITER_TARGETS', 'Configure at least one import or table creation target');
+            profile.writer = { username: text(w.username, 'writer username', 128), password: getSecret(w.passwordEnv), tables, createTables };
         }
         return profile;
     });
