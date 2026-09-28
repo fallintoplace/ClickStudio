@@ -39,6 +39,13 @@ test('Every Help category has an explicit label contract', () => {
     assert.equal(new Set(helpCategories).size, helpCategories.length);
 });
 
+test('Unknown Help categories fail instead of displaying an unrelated label', () => {
+    assert.throws(
+        () => categoryLabel('unsupported', getCopy('en').common, 'en'),
+        /Unsupported Help category: unsupported/,
+    );
+});
+
 for (const locale of supportedLocales) {
     test(`Help categories use the selected locale: ${locale}`, () => {
         const copy = getCopy(locale).common;

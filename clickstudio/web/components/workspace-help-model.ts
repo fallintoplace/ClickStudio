@@ -33,6 +33,10 @@ export function categoryLabel(category: CategoryFilter, copy: Copy['common'], lo
         case 'charts': return copy.exampleCharts;
         case 'clickhouse': return copy.exampleClickHouse;
         case 'schema': return copy.exampleSchema;
+        default: {
+            const unsupported: never = category;
+            throw new Error(`Unsupported Help category: ${unsupported}`);
+        }
     }
 }
 
