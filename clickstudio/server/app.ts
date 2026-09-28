@@ -10,6 +10,7 @@ import { ArtifactService } from '../core/artifacts.js';
 import { AssistantService, type AssistantDriver, validateAssistantConversation } from '../core/assistant.js';
 import { ImportService, type ImportDriver } from '../core/imports.js';
 import { CREATE_TABLE_COLUMN_TYPES, TableCreationService, type CreateTableColumn } from '../core/table-creation.js';
+import { TableDeletionService } from '../core/table-deletion.js';
 import { MonitorService } from '../core/monitors.js';
 import { SessionService } from '../core/sessions.js';
 import { FileStore, type Store } from '../core/store.js';
@@ -27,7 +28,7 @@ import { DemoDriver } from './demo.js';
 import { OpenAIDriver } from './openai.js';
 import { OpenAIVoiceService, safetyIdentifier, type VoiceService } from './voice.js';
 import { telemetry, recordRun } from './telemetry.js';
-type Driver = QueryDriver & ImportDriver & Pick<ClickHouseDriver, 'connection' | 'connections' | 'test' | 'targets' | 'database' | 'createTable' | 'profileEvidence' | 'profilePipeline' | 'profileFlamegraph' | 'workload' | 'replication' | 'queryTree' | 'tableParts' | 'nativeExplorer' | 'searchDocumentation' | 'documentationEntry' | 'close'>;
+type Driver = QueryDriver & ImportDriver & Pick<ClickHouseDriver, 'connection' | 'connections' | 'test' | 'targets' | 'database' | 'createTable' | 'dropTable' | 'profileEvidence' | 'profilePipeline' | 'profileFlamegraph' | 'workload' | 'replication' | 'queryTree' | 'tableParts' | 'nativeExplorer' | 'searchDocumentation' | 'documentationEntry' | 'close'>;
 const MAX_WASM_PARSER_BYTES = 64 * 1024 * 1024;
 const ASSISTANT_ACTIONS = ['ask', 'generate', 'explain', 'repair', 'result', 'performance', 'review'] as const satisfies readonly AssistantAction[];
 const IMPORT_FORMATS = ['csv', 'json', 'ndjson'] as const;
@@ -191,7 +192,7 @@ export function createApp(config: Config, overrides: {
     const authorized = (p: Principal, c: string) => { driver.connection(p, c); return runs.isTrusted(p, c); };
     const ai = new AssistantService(store, overrides.assistant ?? new OpenAIDriver(config.demo ? undefined : config.openaiKey, config.openaiModel), authorized);
     const voice = overrides.voice ?? new OpenAIVoiceService(config.demo ? undefined : config.openaiKey, config.openaiRealtimeModel);
-    const imports = new ImportService(store, driver, authorized), tableCreation = new TableCreationService(store, driver, authorized), monitors = new MonitorService(store, runs, artifacts), sessions = new SessionService(config.token), redact = redactor(config), parserWasm = overrides.parserWasm ?? cachedClickHouseParserWasm;
+    const imports = new ImportService(store, driver, authorized), tableCreation = new TableCreationService(store, driver, authorized), tableDeletion = new TableDeletionService(store, driver, authorized), monitors = new MonitorService(store, runs, artifacts), sessions = new SessionService(config.token), redact = redactor(config), parserWasm = overrides.parserWasm ?? cachedClickHouseParserWasm;
     const secretFree = (value: unknown) => !configuredSecrets(config).some(secret => JSON.stringify(value).includes(secret));
     const safeExport = (value: unknown) => requireThat(secretFree(value), 400, 'SECRET_IN_EXPORT', 'This data contains a configured secret and cannot be exported or shared');
     configureHttp(app, config, runs, artifacts, sessions, parserWasm);
@@ -285,6 +286,10 @@ export function createApp(config: Config, overrides: {
             return { name: text(column.name, 'column name', 128), type: choice(column.type, CREATE_TABLE_COLUMN_TYPES, 400, 'TABLE_COLUMN_TYPE', 'Choose a supported column type') };
         });
         res.status(201).json(await tableCreation.create(principal(res), id(req), text(v.table, 'table', 128), columns, text(v.orderBy, 'sorting key', 128), text(v.confirmation, 'confirmation', 300)));
+    });
+    app.delete('/api/connections/:id/tables', async (req, res) => {
+        const v = body(req);
+        res.json(await tableDeletion.drop(principal(res), id(req), text(v.database, 'database', 128), text(v.table, 'table', 128)));
     });
     app.get('/api/connections/:id/import-targets', async (req, res) => { driver.connection(principal(res), id(req)); res.json(await driver.targets(id(req))); });
     app.get('/api/runs', (req, res) => res.json(runs.list(principal(res), typeof req.query.connectionId === 'string' ? req.query.connectionId : undefined, typeof req.query.documentId === 'string' ? req.query.documentId : undefined)));

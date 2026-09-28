@@ -11,6 +11,7 @@ const iconPaths = {
     schema: <><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></>,
     database: <><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></>,
     table: <><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10m6-10v10"/></>,
+    trash: <><path d="M3 6h18M8 6V4h8v2m3 0-.8 14H5.8L5 6"/><path d="M10 10v6m4-6v6"/></>,
     view: <><path d="M3 12s3.3-5 9-5 9 5 9 5-3.3 5-9 5-9-5-9-5Z"/><circle cx="12" cy="12" r="2.2"/></>,
     column: <><rect x="6" y="3" width="12" height="18" rx="2"/><path d="M10 7h4m-4 5h4m-4 5h4"/></>,
     projection: <><rect x="4" y="7" width="13" height="13" rx="2"/><path d="M8 4h12v12"/></>,

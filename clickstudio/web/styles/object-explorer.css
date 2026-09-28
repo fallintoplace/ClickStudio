@@ -5,6 +5,7 @@
     .object-explorer-action-bar .toolbar-small { min-width: 0; justify-content: center; gap: 6px; }
     .object-explorer-action-bar .object-create-table-action { grid-column: 1 / -1; }
     .object-explorer-action-bar .object-refresh-action.is-alone { grid-column: 1 / -1; }
+    .object-explorer-action-bar .object-refresh-action:not(.is-alone) { grid-column: 1 / -1; }
     .object-explorer-section::before { position: absolute; z-index: 0; inset: 0; pointer-events: none; background-image: linear-gradient(color-mix(in srgb, var(--explorer-signal) 5%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--explorer-signal) 5%, transparent) 1px, transparent 1px); background-size: 24px 24px; mask-image: linear-gradient(to bottom, #000 0, transparent 72%); content: ""; }
     .object-explorer-section::after { position: absolute; z-index: 0; top: 0; left: 12px; width: 88px; height: 1px; pointer-events: none; background: linear-gradient(90deg, transparent, var(--explorer-signal), transparent); box-shadow: 0 0 10px color-mix(in srgb, var(--explorer-signal) 52%, transparent); content: ""; }
     .object-explorer-section > * { position: relative; z-index: 1; }

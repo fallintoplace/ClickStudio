@@ -6,6 +6,7 @@ import type { Column, Json, Row, Schema, SchemaColumn, SchemaTable } from '../sh
 import { lexSql, quoteIdentifier, splitSql } from '../shared/sql.js';
 import { CREATE_TABLE_COLUMN_TYPES, type CreateTableColumn, type CreateTableColumnType } from '../shared/table-creation.js';
 import { createTableSql } from '../core/table-creation.js';
+import { canDropTableTarget, dropTableSql, isViewEngine } from '../shared/table-deletion.js';
 import { parseReplicationSnapshot, replicationQueueQuery, replicationReplicasQuery, type ReplicationCapabilities } from '../shared/replication.js';
 import { parseWorkloadSnapshot, WORKLOAD_WINDOWS, workloadFamiliesQuery, workloadPointsQuery, type QueryLogSource, type WorkloadWindow } from '../shared/workload.js';
 
@@ -217,6 +218,26 @@ async function createCloudTable(credentials: CloudCredentials, url: string, body
         await client.close();
     }
     return { database: credentials.database, table: body.name, columns, orderBy, queryId };
+}
+
+async function dropCloudTable(credentials: CloudCredentials, url: string, body: Record<string, unknown>) {
+    const database = typeof body.database === 'string' ? body.database : '';
+    const table = typeof body.table === 'string' ? body.table : '';
+    if (!canDropTableTarget(database, table)) throw new AppError(400, 'TABLE_DROP_TARGET', 'Choose a regular table outside a system database.');
+    if (database !== credentials.database) throw new AppError(403, 'TABLE_DROP_NOT_ALLOWED', 'Table deletion is limited to the connection database.');
+    const queryId = `clickstudio-drop-table-${randomUUID()}`;
+    const client = makeClient(credentials, url);
+    try {
+        const target = (await queryRows<{ engine: string }>(client,
+            'SELECT engine FROM system.tables WHERE database = {database:String} AND name = {table:String} LIMIT 1', { database, table }))[0];
+        if (target) {
+            if (isViewEngine(target.engine)) throw new AppError(400, 'TABLE_DROP_KIND', 'Select a table, not a view.');
+            await client.command({ query: dropTableSql(database, table), query_id: queryId, abort_signal: AbortSignal.timeout(48_000), clickhouse_settings: clickhouseSettings });
+        }
+        return { database, table, queryId };
+    } finally {
+        await client.close();
+    }
 }
 
 function isReadQuery(sql: string) {
@@ -549,6 +570,8 @@ async function post(request: Request): Promise<Response> {
             return json(await readReplication(credentials, url));
         if (body.action === 'create-table')
             return json(await createCloudTable(credentials, url, body));
+        if (body.action === 'drop-table')
+            return json(await dropCloudTable(credentials, url, body));
         if (body.action === 'import-status') {
             const tablePrefix = `${credentials.database}.`;
             const targetTable = typeof body.table === 'string' ? body.table : '';
@@ -558,7 +581,7 @@ async function post(request: Request): Promise<Response> {
                 return fail('IMPORT_STATUS', 'The saved import details are invalid.');
             return json(await inspectCloudImport(credentials, url, body.queryId, targetTable, body.rows));
         }
-        return fail('CLOUD_ACTION', 'Choose test, schema, run, workload, replication, or import status.');
+        return fail('CLOUD_ACTION', 'Choose test, schema, run, workload, replication, table creation, table deletion, or import status.');
     } catch (error) {
         if (error instanceof AppError) return fail(error.code, error.message, error.status);
         return safeError(error, credentials.password);

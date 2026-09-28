@@ -98,6 +98,7 @@ export class DemoDriver {
     allowed(_id: string, _table: string) { return false; }
     database(id: string) { this.connection({ id: 'local-owner', role: 'owner' }, id); return 'demo'; }
     async createTable(_id: string, _table: string, _columns: CreateTableColumn[], _orderBy: string, _queryId: string) { throw new AppError(403, 'DEMO_READ_ONLY', 'Fixture mode never creates tables'); }
+    async dropTable(_id: string, _database: string, _table: string, _queryId: string) { throw new AppError(403, 'DEMO_READ_ONLY', 'Fixture mode never deletes tables'); }
     async insert() { throw new AppError(403, 'DEMO_READ_ONLY', 'Fixture mode never inserts'); }
     async inspectInsert() { return 'unknown' as const; }
     async queryTree(id: string) {

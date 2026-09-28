@@ -17,12 +17,14 @@ import { quoteIdentifier } from '../../shared/sql';
 import type { Connected } from '../workspace-types';
 import type { Copy } from '../i18n';
 import { Button, cx, Icon } from './ui';
+import { canDropTableTarget } from '../../shared/table-deletion';
 import { ObjectDetails } from './ObjectExplorerDetails';
 import { OverlayPortal } from './OverlayPortal';
 import { StorageExplorer } from './StorageExplorer';
 import { MaterializedViewExplorer } from './MaterializedViewExplorer';
 import { CreateTableDialog } from './CreateTableDialog';
 import { InsertRowDialog } from './InsertRowDialog';
+import { DeleteTableDialog } from './DeleteTableDialog';
 
 type ObjectExplorerProps = {
     copy: Copy['common'];
@@ -70,6 +72,7 @@ export function ObjectExplorer({ copy, connection, schema, schemaLoading, schema
     const [lineageOpen, setLineageOpen] = useState(false);
     const [partsTable, setPartsTable] = useState<SchemaTable>();
     const [insertRowTarget, setInsertRowTarget] = useState<{ table: SchemaTable; columns: readonly SchemaColumn[] }>();
+    const [deleteTableTarget, setDeleteTableTarget] = useState<SchemaTable>();
     const [createTableOpen, setCreateTableOpen] = useState(false);
     const copyTimer = useRef<number | undefined>(undefined);
 
@@ -108,6 +111,7 @@ export function ObjectExplorer({ copy, connection, schema, schemaLoading, schema
     const expanded = (id: string, forced = false) => forced || expandedIds.has(id);
     const selected = selectedId ? model.selectionById.get(selectedId) : undefined;
     const selectedTable = selected?.kind === 'relation' && selected.relationKind === 'table' ? selected : undefined;
+    const deletableTable = selectedTable && selectedTable.table.database === connection.database && canDropTableTarget(selectedTable.table.database, selectedTable.table.name) ? selectedTable.table : undefined;
     const selectObject = (id: string) => {
         setSelectedId(id);
         setDetailsOpen(true);
@@ -186,7 +190,8 @@ export function ObjectExplorer({ copy, connection, schema, schemaLoading, schema
         <div className="object-explorer-action-bar" role="group" aria-label="Table actions">
             {connection.dataSource !== 'fixture' && <Button variant="secondary" className="toolbar-small object-create-table-action" disabled={!trusted} title={!trusted ? copy.runActionTrustRequired : undefined} onClick={() => setCreateTableOpen(true)}><Icon name="table"/>{copy.newTable}</Button>}
             {connection.dataSource !== 'fixture' && selectedTable && <Button variant="secondary" className="toolbar-small" disabled={!trusted} title={!trusted ? copy.runActionTrustRequired : undefined} onClick={() => setInsertRowTarget({ table: selectedTable.table, columns: selectedTable.columns })}><Icon name="plus"/>{copy.insertRow}</Button>}
-            <Button variant="ghost" className={cx('toolbar-small', 'object-refresh-action', !(connection.dataSource !== 'fixture' && selectedTable) && 'is-alone')} onClick={onRefreshSchema} disabled={schemaLoading || !trusted}>{schemaLoading ? copy.loading : copy.refresh}</Button>
+            {connection.dataSource !== 'fixture' && deletableTable && <Button variant="danger" className="toolbar-small object-delete-table-action" disabled={!trusted} title={!trusted ? copy.runActionTrustRequired : undefined} onClick={() => setDeleteTableTarget(deletableTable)}><Icon name="trash"/>{copy.deleteTable}</Button>}
+            <Button variant="ghost" className={cx('toolbar-small', 'object-refresh-action', !(connection.dataSource !== 'fixture' && deletableTable) && 'is-alone')} onClick={onRefreshSchema} disabled={schemaLoading || !trusted}>{schemaLoading ? copy.loading : copy.refresh}</Button>
         </div>
         {showCompactDetails ? <div className="object-compact-details">
             <button type="button" className="object-back-button" onClick={browseObjects}><span>‹</span>{copy.objects}</button>
@@ -221,6 +226,7 @@ export function ObjectExplorer({ copy, connection, schema, schemaLoading, schema
         {trusted && lineageOpen && <OverlayPortal><MaterializedViewExplorer connection={connection} database={connection.database} onClose={() => setLineageOpen(false)}/></OverlayPortal>}
         {trusted && createTableOpen && <OverlayPortal><CreateTableDialog connection={connection} onClose={() => setCreateTableOpen(false)} onCreated={onRefreshSchema}/></OverlayPortal>}
         {trusted && insertRowTarget && <OverlayPortal><InsertRowDialog key={`${insertRowTarget.table.database}.${insertRowTarget.table.name}`} connectionId={connection.id} table={insertRowTarget.table} columns={insertRowTarget.columns} onClose={() => setInsertRowTarget(undefined)} onInserted={onRefreshSchema}/></OverlayPortal>}
+        {trusted && deleteTableTarget && <OverlayPortal><DeleteTableDialog connectionId={connection.id} table={deleteTableTarget} onClose={() => setDeleteTableTarget(undefined)} onDeleted={() => { setSelectedId(undefined); setDetailsOpen(false); onRefreshSchema(); }}/></OverlayPortal>}
     </section>;
 }
 

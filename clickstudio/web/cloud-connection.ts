@@ -168,6 +168,13 @@ export async function createClickHouseCloudTable(input: { name: string; columns:
     });
 }
 
+export async function dropClickHouseCloudTable(database: string, table: string) {
+    if (!activeCloud) throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before deleting a table.', 401);
+    return await requestCloud<{ database: string; table: string; queryId: string }>({
+        action: 'drop-table', credentials: activeCloud.credentials, database, table,
+    });
+}
+
 export async function importClickHouseCloudFile(input: CloudImportInput): Promise<CloudImportJob> {
     if (!activeCloud) throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before importing data.', 401);
     const form = new FormData();

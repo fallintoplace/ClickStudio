@@ -13,6 +13,7 @@ import { collectCompactStream } from '../core/compact-stream.js';
 import type { QueryDriver } from '../core/runs.js';
 import type { ImportDriver } from '../core/imports.js';
 import { createTableSql, type CreateTableColumn, type CreateTableDriver } from '../core/table-creation.js';
+import { canDropTableTarget, dropTableSql, isViewEngine } from '../shared/table-deletion.js';
 import { splitSql } from '../shared/sql.js';
 import { explainPrefixLength, sqlForRunKind } from '../shared/explain-plan.js';
 import { sourcePositionFromUtf8ByteOffset } from '../shared/native-parser.js';
@@ -412,6 +413,21 @@ export class ClickHouseDriver implements QueryDriver, ImportDriver, CreateTableD
         requireThat(this.allowed(id, table), 403, 'TABLE_CREATE_NOT_ALLOWED', 'Table creation is limited to the connection database');
         try {
             await this.client(id, true).command({ query: createTableSql(table, columns, orderBy), query_id: queryId, abort_signal: AbortSignal.timeout(60000),
+                clickhouse_settings: { max_execution_time: 55, max_memory_usage: '536870912' } });
+        }
+        catch (error) {
+            throw this.safeError(error);
+        }
+    }
+    async dropTable(id: string, database: string, table: string, queryId: string) {
+        requireThat(canDropTableTarget(database, table) && database === this.profile(id).database, 403, 'TABLE_DROP_NOT_ALLOWED', 'Table deletion is limited to the connection database');
+        const target = (await this.rows<{ engine: string }>(id,
+            'SELECT engine FROM system.tables WHERE database = {database:String} AND name = {table:String} LIMIT 1', { database, table }))[0];
+        if (!target)
+            return;
+        requireThat(!isViewEngine(target.engine), 400, 'TABLE_DROP_KIND', 'Select a table, not a view');
+        try {
+            await this.client(id, true).command({ query: dropTableSql(database, table), query_id: queryId, abort_signal: AbortSignal.timeout(60000),
                 clickhouse_settings: { max_execution_time: 55, max_memory_usage: '536870912' } });
         }
         catch (error) {

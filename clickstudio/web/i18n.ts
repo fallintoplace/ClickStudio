@@ -348,6 +348,7 @@ export interface Copy {
         generateSelect: string;
         newTable: string;
         insertRow: string;
+        deleteTable: string;
         insertName: string;
         copyName: string;
         copied: string;

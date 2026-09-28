@@ -312,6 +312,7 @@ export const english: Copy = {
         generateSelect: 'Generate SELECT',
         newTable: 'New table',
         insertRow: 'Insert row',
+        deleteTable: 'Delete table',
         insertName: 'Insert name',
         copyName: 'Copy name',
         copied: 'Copied',
