@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { trust } from './helpers.js';
 
-test('Experimental mode gives the editor the full work area before the first run', async ({ page }) => {
+test('Experimental mode uses the Standard right inspector layout', async ({ page }) => {
     await trust(page);
 
     const content = page.locator('.workspace-content');
@@ -9,35 +9,51 @@ test('Experimental mode gives the editor the full work area before the first run
     await expect(page.getByRole('region', { name: 'Query results', exact: true })).toHaveCount(0);
     await expect(page.locator('.empty-workspace')).toHaveCount(0);
     const rail = page.locator('.icon-rail');
-    const inspector = page.locator('.inspector-pane.is-expanded-browser');
+    const inspector = page.locator('.inspector-pane.is-docked-inspector');
     const workspace = page.locator('.workspace-main');
     await expect(rail).toBeVisible();
     await expect(rail.getByRole('button', { name: 'Objects', exact: true })).toBeVisible();
     await expect(rail.getByRole('button', { name: 'Reference', exact: true })).toBeVisible();
     await expect(rail.getByRole('button', { name: 'AI', exact: true })).toBeVisible();
-    await expect(inspector.locator('.inspector-tabs')).toHaveCount(0);
+    await expect(inspector).toBeVisible();
+    await expect(inspector.locator('.inspector-tabs')).toBeVisible();
     await expect(inspector.getByRole('heading', { name: 'Objects', exact: true })).toBeVisible();
+    await expect(inspector.getByRole('button', { name: 'Objects', exact: true })).toBeVisible();
+    await expect(inspector.getByRole('button', { name: 'Reference', exact: true })).toBeVisible();
+    await expect(inspector.getByRole('button', { name: 'AI', exact: true })).toBeVisible();
+    await expect(inspector.getByRole('button', { name: 'Close inspector', exact: true })).toBeVisible();
 
     for (const width of [1280, 1120, 851]) {
         await page.setViewportSize({ width, height: 900 });
         const railBounds = await rail.evaluate(element => element.getBoundingClientRect().toJSON());
-        const inspectorBounds = await inspector.evaluate(element => element.getBoundingClientRect().toJSON());
         const workspaceBounds = await workspace.evaluate(element => element.getBoundingClientRect().toJSON());
-        expect(railBounds.right).toBeLessThanOrEqual(inspectorBounds.left + 1);
-        expect(inspectorBounds.right).toBeLessThanOrEqual(workspaceBounds.left + 1);
-        expect(inspectorBounds.width).toBeGreaterThanOrEqual(width <= 1120 ? 250 : 280);
+        const inspectorBounds = await inspector.evaluate(element => element.getBoundingClientRect().toJSON());
+        expect(railBounds.right).toBeLessThanOrEqual(workspaceBounds.left + 1);
+        expect(workspaceBounds.right).toBeLessThanOrEqual(inspectorBounds.left + 1);
+        expect(inspectorBounds.width).toBeGreaterThanOrEqual(320);
     }
 
+    await page.setViewportSize({ width: 850, height: 900 });
+    await expect(inspector).toHaveCount(0);
+    await page.setViewportSize({ width: 851, height: 900 });
+    await expect(inspector).toBeVisible();
+
     await page.setViewportSize({ width: 1280, height: 720 });
-    await rail.getByRole('button', { name: 'Reference', exact: true }).click();
+    const browser = inspector.getByRole('navigation', { name: 'Workspace browser', exact: true });
+    await browser.getByRole('button', { name: 'Reference', exact: true }).click();
     await expect(inspector.getByRole('heading', { name: 'Reference', exact: true })).toBeVisible();
     await rail.getByRole('button', { name: 'AI', exact: true }).click();
     await expect(inspector.getByRole('heading', { name: 'AI', exact: true })).toBeVisible();
     await expect(page.locator('.assistant-panel')).toBeVisible();
 
-    const browser = page.getByRole('navigation', { name: 'Workspace browser', exact: true });
-    await expect(browser).toHaveCount(0);
-    await page.getByRole('button', { name: 'More workspace panels', exact: true }).click();
+    await inspector.getByRole('button', { name: 'Close inspector', exact: true }).click();
+    await expect(inspector).toHaveCount(0);
+    await expect(rail.getByRole('button', { name: 'AI', exact: true })).toHaveAttribute('aria-pressed', 'false');
+    await rail.getByRole('button', { name: 'AI', exact: true }).click();
+    await expect(inspector).toBeVisible();
+    await expect(inspector.getByRole('heading', { name: 'AI', exact: true })).toBeVisible();
+
+    await inspector.getByRole('button', { name: 'More workspace panels', exact: true }).click();
     await page.getByRole('menuitem', { name: 'Queries', exact: true }).click();
     await expect(inspector.getByRole('heading', { name: 'Queries', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Ask AI', exact: true })).toBeVisible();

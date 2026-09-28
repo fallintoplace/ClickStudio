@@ -167,8 +167,8 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
     const [inspector, setInspector] = useState<Inspector>('schema');
     const inspectorRef = useRef(inspector);
     inspectorRef.current = inspector;
-    const [drawerOpen, setDrawerOpen] = useState(false);
     const [compactViewport, setCompactViewport] = useState(() => window.matchMedia('(max-width: 850px)').matches);
+    const [drawerOpen, setDrawerOpen] = useState(() => experience === 'expert' && !window.matchMedia('(max-width: 850px)').matches);
     const [importOpen, setImportOpen] = useState(false);
     const [exportOpen, setExportOpen] = useState(false);
     const [helpPanelOpen, setHelpPanelOpen] = useState(false);
@@ -243,7 +243,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         connectionId: connection.id, demoMode,
         canRevealSqlTables: connection.dataSource === 'clickhouse' && connection.readonly === false,
         loadSchema, setSearch, setInspector, setDrawerOpen,
-        openInspectorDrawer: experience === 'beginner' || compactViewport, setNotice,
+        openInspectorDrawer: true, setNotice,
     });
     const sqlExamples = useMemo(() => sqlExamplesFor(connection, schema), [connection, schema]);
     useEffect(() => {
@@ -254,14 +254,15 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         const media = window.matchMedia('(max-width: 850px)');
         const update = () => {
             setCompactViewport(media.matches);
-            if (!media.matches) setDrawerOpen(false);
+            if (experience === 'expert') setDrawerOpen(!media.matches);
+            else if (!media.matches) setDrawerOpen(false);
         };
         media.addEventListener('change', update);
         return () => media.removeEventListener('change', update);
-    }, []);
+    }, [experience]);
     const cancellingRef = useRef(false);
 
-    useEffect(() => { setDrawerOpen(false); }, [experience]);
+    useEffect(() => { setDrawerOpen(experience === 'expert' && !window.matchMedia('(max-width: 850px)').matches); }, [experience]);
 
     const update = useCallback((id: string, change: (draft: Draft) => Draft) => {
         setWorkspace(current => ({ ...current, tabs: current.tabs.map(draft => draft.id === id ? change(draft) : draft) }));
@@ -633,11 +634,11 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
 
     const showInspector = (next: Inspector) => {
         setInspector(next);
-        if (experience === 'beginner' || compactViewport) setDrawerOpen(true);
+        setDrawerOpen(true);
         if (next === 'profile') void perform(loadProfile, 'save');
         if (next === 'pipeline') void perform(loadPipeline, 'save');
     };
-    const inspectorDocked = drawerOpen && (experience === 'beginner' || compactViewport);
+    const inspectorDocked = drawerOpen;
 
     const trustConnection = () => perform(async () => {
         if (!trusted && !demoMode && !window.confirm(`Check these connection details before continuing:\n\nConnection: ${connectionLabel}\nServer: ${connection.host}\nDatabase: ${connection.database}\nUser: ${connection.username}\nAccess: read-only\n\nAllow read-only access so you can run queries?`)) return;
@@ -847,7 +848,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         <div className="workspace-layout">
             <aside className="icon-rail" aria-label="Workspace tools">
                 <span className="rail-separator"/>
-                {PRIMARY_INSPECTOR_NAVIGATION.map(item => <RailButton key={item.id} icon={item.icon} label={copy.common[item.copyKey]} active={inspector === item.id && (experience === 'expert' || drawerOpen)} accent={item.id === 'assistant'} onClick={() => showInspector(item.id)}/>)}
+                {PRIMARY_INSPECTOR_NAVIGATION.map(item => <RailButton key={item.id} icon={item.icon} label={copy.common[item.copyKey]} active={inspector === item.id && drawerOpen} accent={item.id === 'assistant'} onClick={() => showInspector(item.id)}/>)}
                 {experience === 'beginner' && <>
                     <span className="rail-spacer"/>
                     <span className="rail-separator"/>
@@ -856,14 +857,12 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
                 </>}
                 {experience === 'expert' && <div className="expert-rail-secondary">
                     <span className="rail-separator"/>
-                    {EXPERT_BROWSE_NAVIGATION.map(item => <RailButton key={item.id} icon={item.icon} label={item.copyKey ? copy.common[item.copyKey] : inspectorLabel(item.id)} active={inspector === item.id && (experience === 'expert' || drawerOpen)} onClick={() => showInspector(item.id)}/>)}
+                    {EXPERT_BROWSE_NAVIGATION.map(item => <RailButton key={item.id} icon={item.icon} label={item.copyKey ? copy.common[item.copyKey] : inspectorLabel(item.id)} active={inspector === item.id && drawerOpen} onClick={() => showInspector(item.id)}/>)}
                     <span className="rail-spacer"/>
-                    {EXPERT_EXECUTION_NAVIGATION.map(item => <RailButton key={item.id} icon={item.icon} label={inspectorLabel(item.id)} active={inspector === item.id && (experience === 'expert' || drawerOpen)} onClick={() => showInspector(item.id)}/>)}
+                    {EXPERT_EXECUTION_NAVIGATION.map(item => <RailButton key={item.id} icon={item.icon} label={inspectorLabel(item.id)} active={inspector === item.id && drawerOpen} onClick={() => showInspector(item.id)}/>)}
                     <span className="rail-separator"/><button className="rail-icon-button rail-icon-muted" type="button" title="Export local drafts" onClick={() => download('clickstudio-local-drafts.json', workspace)}><Icon name="settings"/></button>
                 </div>}
             </aside>
-
-            {experience === 'expert' && !inspectorDocked && <InspectorPane {...inspectorProps}/>}
 
             <main className="workspace-main">
                 <WorkspaceDocumentTabs

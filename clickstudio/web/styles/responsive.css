@@ -24,7 +24,6 @@
 @media (max-width: 1120px) {
     .topbar { gap: 12px; padding: 0 14px; }
     .topbar-preferences .select-control > span { display: none; }
-    .workspace-root.is-expert .workspace-layout { grid-template-columns: 58px minmax(250px, 280px) minmax(0, 1fr); }
     .editor-heading-tools > .button-base { width: 32px; min-width: 32px; padding-inline: 0; font-size: 0; }
     .editor-heading-tools > .button-base svg { width: 15px; height: 15px; }
     .execution-bar { gap: 9px; }
