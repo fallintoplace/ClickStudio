@@ -36,6 +36,9 @@ const playgroundClient = createClient({
     request_timeout: REQUEST_TIMEOUT_MS,
 });
 
+let playgroundServerVersion: string | undefined;
+let playgroundServerVersionRequest: Promise<string | undefined> | undefined;
+
 const capability = (available: boolean, reason?: string) => ({ available, ...(reason ? { reason } : {}) });
 
 export const PLAYGROUND_CONNECTION: Connection & { trusted: boolean } = {
@@ -184,6 +187,22 @@ async function executePlaygroundQuery(sql: string, signal: AbortSignal | undefin
 
 export function queryPlayground(sql: string, signal?: AbortSignal) {
     return executePlaygroundQuery(sql, signal, MAX_RESULT_ROWS, MAX_RESPONSE_BYTES);
+}
+
+export function loadPlaygroundServerVersion(): Promise<string | undefined> {
+    if (playgroundServerVersion) return Promise.resolve(playgroundServerVersion);
+    if (playgroundServerVersionRequest) return playgroundServerVersionRequest;
+    const request = queryPlayground('SELECT version() AS version').then(result => {
+        const version = result.rows[0]?.[0];
+        if (typeof version !== 'string' || !version.trim()) return undefined;
+        playgroundServerVersion = version.trim();
+        return playgroundServerVersion;
+    }).catch(() => undefined).finally(() => {
+        if (!playgroundServerVersion && playgroundServerVersionRequest === request)
+            playgroundServerVersionRequest = undefined;
+    });
+    playgroundServerVersionRequest = request;
+    return request;
 }
 
 export async function queryPlaygroundQueryTree(sql: string, signal?: AbortSignal) {

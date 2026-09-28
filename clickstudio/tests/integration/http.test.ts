@@ -8,13 +8,14 @@ import { loadConfig } from '../../server/config.js';
 import { ClickHouseDriver } from '../../server/clickhouse.js';
 import { MemoryStore } from '../../core/store.js';
 import { DemoDriver } from '../../server/demo.js';
+import type { AssistantDriver } from '../../core/assistant.js';
 import type { VoiceService } from '../../server/voice.js';
 import type { ImportJob } from '../../core/imports.js';
 import type { CreateTableColumn } from '../../core/table-creation.js';
 import type { ClickHouseDocumentationEntry, ClickHouseDocumentationSummary, QueryDocument, ReferenceCategory, Run, Published } from '../../shared/types.js';
-async function start(token?: string, voice?: VoiceService, parserWasm?: () => Promise<Uint8Array>, driver = new DemoDriver()) {
+async function start(token?: string, voice?: VoiceService, parserWasm?: () => Promise<Uint8Array>, driver = new DemoDriver(), assistant?: AssistantDriver) {
     const config = loadConfig({ DEMO_MODE: 'true', CLICKSTUDIO_TOKEN: token });
-    const service = createApp(config, { store: new MemoryStore(), driver, voice, parserWasm });
+    const service = createApp(config, { store: new MemoryStore(), driver, voice, parserWasm, ...(assistant ? { assistant } : {}) });
     const server = service.app.listen(0, '127.0.0.1');
     await new Promise<void>((resolve, reject) => { server.once('listening', resolve); server.once('error', reject); });
     config.port = (server.address() as AddressInfo).port;
@@ -54,6 +55,13 @@ class ReferenceDocsDemoDriver extends DemoDriver {
     override async documentationEntry(id: string, name: string, type: string): Promise<ClickHouseDocumentationEntry | undefined> {
         this.entries.push({ id, name, type });
         return { name, type, source: 'system.documentation', description: '# Native docs', serverVersion: '24.6-test', origin: 'native' };
+    }
+}
+
+class PlaygroundVersionDemoDriver extends DemoDriver {
+    override connection(principal: Parameters<DemoDriver['connection']>[0], id: string) {
+        const connection = super.connection(principal, id);
+        return { ...connection, manifest: { ...connection.manifest!, serverVersion: 'ClickHouse SQL Playground' } };
     }
 }
 
@@ -202,6 +210,33 @@ test('Assistant context falls back to the bundled ClickHouse documentation', asy
     assert.equal(context.referenceDocs[0]?.name, 'quantileExact');
     assert.equal(context.referenceDocs[0]?.origin, 'bundled');
     assert.match(context.referenceDocs[0]?.serverVersion ?? '', /^(?:Offline docs |Demo catalog)/);
+});
+
+test('Ask AI uses a validated Playground server version supplied by the browser', async (t) => {
+    let sentVersion: string | undefined;
+    const assistant: AssistantDriver = {
+        available: true,
+        model: 'fixture',
+        propose: async context => {
+            sentVersion = (JSON.parse(context.payload.context) as { serverVersion: string }).serverVersion;
+            return { content: { sql: null, summary: 'Answer', assumptions: [], tables: [], caveats: [], clarification: null, findings: [] }, completeness: 'complete', columns: [], rows: [] };
+        },
+    };
+    const s = await start(undefined, undefined, undefined, new PlaygroundVersionDemoDriver(), assistant);
+    t.after(() => s.stop());
+    await s.call('/connections/demo/trust', { trusted: true, confirmation: 'demo' });
+
+    const response = await s.call('/assistant/sql', {
+        connectionId: 'demo', question: 'Explain SELECT 1', sql: 'SELECT 1', serverVersion: '26.10.1.39301',
+    });
+    assert.equal(response.status, 201);
+    assert.equal(sentVersion, '26.10.1.39301');
+
+    const invalid = await s.call('/assistant/sql', {
+        connectionId: 'demo', question: 'Explain SELECT 1', sql: 'SELECT 1', serverVersion: 'not a version',
+    });
+    assert.equal(invalid.status, 201);
+    assert.equal(sentVersion, 'unknown');
 });
 
 test('Voice sessions require trust and keep the provider behind the server', async (t) => {

@@ -85,13 +85,15 @@ export function ScriptResults({ script, runs, activeRunId, onSelectRun, onCancel
     </section>;
 }
 
-export function ExecutionBar({ run, failedAttempt, eventState, onCancel, cancelling, scriptRunning, helpButton, copy }: { run?: Run; failedAttempt?: boolean; eventState: RunEventState; onCancel: () => void; cancelling: boolean; scriptRunning: boolean; helpButton: ReactNode; copy: Copy['common'] }) {
+export function ExecutionBar({ run, failedAttempt, eventState, onCancel, onOpenDetails, cancelling, scriptRunning, helpButton, copy }: { run?: Run; failedAttempt?: boolean; eventState: RunEventState; onCancel: () => void; onOpenDetails: () => void; cancelling: boolean; scriptRunning: boolean; helpButton: ReactNode; copy: Copy['common'] }) {
     const currentRun = failedAttempt ? undefined : run;
     const progress = currentRun?.progress;
     const executionInProgress = Boolean(currentRun && (!terminal(currentRun) || scriptRunning));
     const elapsedMs = currentRun ? terminal(currentRun) ? Math.round(currentRun.elapsedMs) : Math.max(0, Math.round(progress?.elapsedMs ?? currentRun.elapsedMs)) : undefined;
 
-    return <footer className={cx('execution-bar', executionInProgress && 'is-running')} data-run-status={failedAttempt ? 'failed' : currentRun?.status ?? 'ready'}>
+    const hasTelemetry = Boolean(progress && (progress.readRows !== '' || progress.readBytes !== '' || progress.memory !== undefined));
+
+    return <footer className={cx('execution-bar', executionInProgress && 'is-running')} data-run-status={failedAttempt ? 'failed' : currentRun?.status ?? 'ready'} data-query-id={currentRun?.queryId}>
         <div className="execution-state">
             {failedAttempt
                 ? <span className="execution-ready-state" role="status"><span className="status-light is-error"/>{copy.statusFailed}</span>
@@ -108,14 +110,14 @@ export function ExecutionBar({ run, failedAttempt, eventState, onCancel, cancell
                 </span>
             </>}
         </div>
-        {currentRun && <div className="execution-telemetry">
-            <span><strong>{progress?.readRows ? formatCount(progress.readRows) : '—'}</strong> {copy.rowsRead}</span>
-            <span><strong>{progress?.readBytes ? formatBytes(progress.readBytes) : '—'}</strong> {copy.bytesRead}</span>
-            <span><strong>{progress?.memory ? formatBytes(progress.memory) : '—'}</strong> {copy.memory}</span>
+        {currentRun && (hasTelemetry || currentRun.kind !== 'query') && <div className="execution-telemetry">
+            {progress?.readRows !== undefined && progress.readRows !== '' && <span><strong>{formatCount(progress.readRows)}</strong> {copy.rowsRead}</span>}
+            {progress?.readBytes !== undefined && progress.readBytes !== '' && <span><strong>{formatBytes(progress.readBytes)}</strong> {copy.bytesRead}</span>}
+            {progress?.memory !== undefined && progress.memory !== '' && <span><strong>{formatBytes(progress.memory)}</strong> {copy.memory}</span>}
             {currentRun.kind !== 'query' && <span className="execution-kind">{currentRun.kind.toUpperCase()}</span>}
         </div>}
         <div className="execution-right">
-            {currentRun && <code title={currentRun.queryId}>{currentRun.queryId}</code>}
+            {currentRun && <Button variant="ghost" className="execution-details-button" data-testid="execution-details" aria-label="Execution details" title="Open execution details" onClick={onOpenDetails}>Details</Button>}
             {currentRun && (scriptRunning || !terminal(currentRun)) && <Button variant="danger" className="cancel-execution" onClick={onCancel} disabled={cancelling}>{cancelling ? 'Cancelling…' : scriptRunning ? `${copy.cancel} ${copy.runScript.toLowerCase()}` : copy.cancel}</Button>}
             {helpButton}
         </div>

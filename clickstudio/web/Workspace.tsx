@@ -130,6 +130,21 @@ function workspaceRunActionTitle(
     return undefined;
 }
 
+function useSchemaRefreshAfterDdl(run: Run | undefined, connectionId: string, refreshAfterRun: (draftId: string, runId: string, baseline?: ReadonlySet<string>) => void) {
+    const pending = useRef(new Map<string, { draftId: string; baseline?: ReadonlySet<string> }>());
+    const track = useCallback((runId: string, draftId: string, baseline?: ReadonlySet<string>) => {
+        pending.current.set(runId, { draftId, baseline });
+    }, []);
+    useEffect(() => {
+        if (!run || run.connectionId !== connectionId || !terminal(run)) return;
+        const refresh = pending.current.get(run.id);
+        if (!refresh) return;
+        pending.current.delete(run.id);
+        if (run.status === 'succeeded' && isSchemaChangingSql(run.sql)) refreshAfterRun(refresh.draftId, run.id, refresh.baseline);
+    }, [connectionId, refreshAfterRun, run]);
+    return track;
+}
+
 export function Workspace({ connection, connectionLabel, connections, onSelectConnection, onRefreshConnections, trustActionRef, testConnectionActionRef, demoMode, experience, nativeParserEnabled, dark, copy, locale }: WorkspaceProps) {
     const key = workspaceStateKey(connection.id);
     const [workspace, setWorkspace] = useState(() => initialWorkspaceState(connection.id));
@@ -227,7 +242,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         setWorkspace,
     });
     const {
-        schema, schemaLoading, schemaError,
+        schema, schemaLoading, schemaError, serverVersion: playgroundServerVersion, serverVersionLoading: playgroundServerVersionLoading,
         documents, setDocuments, documentsLoaded, documentsReadError,
         documentRevisions, revisionsDocumentId, revisionLoading, revisionError,
         history, loadHistory, loadDocuments, loadDocumentRevisions, loadSchema, schemaLoadingMore, loadMoreSchema,
@@ -276,6 +291,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         loadHistory,
         setError,
     });
+    const trackSchemaRefresh = useSchemaRefreshAfterDdl(run, connection.id, importedReveal.refreshAfterImportedSqlRun);
     const selectableRunId = run && terminal(run) ? run.id : undefined;
     useDefaultAssistantRunContext(selectableRunId, includeRun, assistantBusy, setIncludeRun);
     const pendingExecution = usePendingExecution({ activeDraftId: active.id, busy, run, script });
@@ -422,9 +438,9 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
                     throw caught;
                 }
                 pendingExecution.acceptRun(payload.clientRequestId, created.id);
+                if (connection.dataSource === 'clickhouse' && connection.readonly === false && statement && isSchemaChangingSql(statement.sql))
+                    trackSchemaRefresh(created.id, draft.id, importedSqlBaseline);
                 setRunForRun(created.id, created, true);
-                if (created.status === 'succeeded' && connection.dataSource === 'clickhouse' && connection.readonly === false && isSchemaChangingSql(statement!.sql))
-                    importedReveal.refreshAfterImportedSqlRun(draft.id, created.id, importedSqlBaseline);
                 setViewForDraft(draft.id, kind === 'explain' ? 'indexes' : kind === 'plan' ? 'plan' : kind === 'pipeline' ? 'pipeline' : kind === 'analyze' ? 'runtime' : options.view ?? 'results', true);
                 update(draft.id, current => ({ ...current, activeRunId: created.id, scriptId: undefined, runIds: rememberRunIds(current.runIds, [created.id]) }));
                 if (draft.id === active.id) editor.current?.focus();
@@ -720,6 +736,8 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         inspector,
         setInspector: showInspector,
         connection,
+        serverVersion: connection.id === PLAYGROUND_CONNECTION_ID ? playgroundServerVersion : connection.manifest?.serverVersion,
+        serverVersionLoading: connection.id === PLAYGROUND_CONNECTION_ID && playgroundServerVersionLoading,
         schema,
         schemaLoading,
         schemaLoadingMore,
@@ -1018,7 +1036,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         {observabilityOpen && <OverlayPortal><ObservabilityExplorer connectionId={connection.id} connectionLabel={connectionLabel} trusted={trusted} queryLog={connection.manifest?.queryLog} replication={connection.manifest?.replication} onClose={() => setObservabilityOpen(false)}/></OverlayPortal>}
         <ImportWizard open={importOpen} connectionId={connection.id} trusted={trusted} demoMode={demoMode} onImportQuery={(name, sql) => openImportedSqlQuery(name, sql, openNewDraft, importedReveal.markImportedSqlDraft, setNotice)} onClose={() => setImportOpen(false)} onImported={importedReveal.onImported} onTableNeedsInspection={importedReveal.onUnconfirmedDestination}/>
         <ExportDialog open={exportOpen} queryAvailable={Boolean(active.sql.trim())} rowsAvailable={run?.resultState === 'reopenable'} onClose={() => setExportOpen(false)} onExportQuery={() => { setExportOpen(false); exportCurrentQuery(); }} onExportRows={() => { setExportOpen(false); void exportCurrentCsv(); }}/>
-        <ExecutionBar run={run} failedAttempt={Boolean(failedQueryError)} eventState={eventState} onCancel={() => void cancel()} cancelling={cancelling} scriptRunning={script?.status === 'running'} copy={copy.common} helpButton={<HelpButton copy={copy.common} open={helpPanelOpen} onOpen={openHelp}/>}/>
+        <ExecutionBar run={run} failedAttempt={Boolean(failedQueryError)} eventState={eventState} onCancel={() => void cancel()} onOpenDetails={() => showInspector('details')} cancelling={cancelling} scriptRunning={script?.status === 'running'} copy={copy.common} helpButton={<HelpButton copy={copy.common} open={helpPanelOpen} onOpen={openHelp}/>}/>
         {detachedEditor.detached && createPortal(queryPanel, detachedEditor.detached.container)}
         {detachedResults.detached && createPortal(resultsPanel, detachedResults.detached.container)}
     </div>;

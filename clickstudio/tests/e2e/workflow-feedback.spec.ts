@@ -39,7 +39,7 @@ test('Reopening and saving a metric keeps its saved contract and dependency', as
     await page.getByRole('menuitem', { name: 'Queries', exact: true }).click();
     await page.getByRole('button', { name: /Daily revenue/ }).click();
     await expect(page.locator('.cm-content')).toContainText(savedDocument.sql);
-    await expect(page.locator('.execution-bar code')).toHaveText(savedRun.queryId);
+    await expect(page.locator('.execution-bar')).toHaveAttribute('data-query-id', savedRun.queryId);
     await page.getByTestId('save-query').click();
     await expect.poll(() => savePayload).toBeDefined();
     expect(savePayload).toMatchObject({

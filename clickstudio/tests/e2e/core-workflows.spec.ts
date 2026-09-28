@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { openBlankSql, openWorkspacePanel, runIdentity, runScript, runButton, trust, trustCurrentConnection, useAdvancedMode } from './helpers.js';
+import { currentQueryId, openBlankSql, openWorkspacePanel, runIdentity, runScript, runButton, trust, trustCurrentConnection, useAdvancedMode } from './helpers.js';
 
 declare global {
     interface Window {
@@ -28,7 +28,7 @@ async function runQuery(page: Page) {
     });
     await runButton(page).click();
     const run = runIdentity(await (await runResponse).json());
-    await expect(page.locator('.execution-bar code')).toHaveText(run.queryId);
+    await expect(page.locator('.execution-bar')).toHaveAttribute('data-query-id', run.queryId);
     const results = page.getByRole('region', { name: 'Query results', exact: true });
     await expect(results.getByRole('table', { name: 'Retained query rows' })).toBeVisible();
     return results;
@@ -75,7 +75,7 @@ test('Run evidence stays with its draft through tab and mode switches', async ({
     await trust(page);
     await useAdvancedMode(page);
     await runQuery(page);
-    const firstQueryId = await page.locator('.execution-bar code').innerText();
+    const firstQueryId = await currentQueryId(page);
     const firstResultsPanel = page.locator('.results-surface');
     await firstResultsPanel.getByRole('tab', { name: 'Chart', exact: true }).click();
     await expect(firstResultsPanel.getByRole('tab', { name: 'Chart', exact: true })).toHaveAttribute('aria-selected', 'true');
@@ -85,21 +85,21 @@ test('Run evidence stays with its draft through tab and mode switches', async ({
     const secondResults = page.getByRole('region', { name: 'Query results', exact: true });
     await expect(secondResults.getByRole('table', { name: 'Retained query rows' })).toHaveCount(0);
     await expect(page.locator('.execution-bar')).toHaveAttribute('data-run-status', 'ready');
-    await expect(page.locator('.execution-bar code')).toHaveCount(0);
+    await expect(page.locator('.execution-bar')).not.toHaveAttribute('data-query-id');
 
     await runQuery(page);
-    const secondQueryId = await page.locator('.execution-bar code').innerText();
+    const secondQueryId = await currentQueryId(page);
     expect(secondQueryId).not.toBe(firstQueryId);
 
     await page.getByRole('tab').filter({ hasText: 'Getting started.sql' }).click();
     await expect(firstResultsPanel.getByRole('tab', { name: 'Chart', exact: true })).toHaveAttribute('aria-selected', 'true');
     await expect(firstResultsPanel.locator('.chart-canvas svg[role="img"]')).toBeVisible();
-    await expect(page.locator('.execution-bar code')).toHaveText(firstQueryId);
+    await expect(page.locator('.execution-bar')).toHaveAttribute('data-query-id', firstQueryId);
     await page.getByText('Standard', { exact: true }).click();
-    await expect(page.locator('.execution-bar code')).toHaveText(firstQueryId);
+    await expect(page.locator('.execution-bar')).toHaveAttribute('data-query-id', firstQueryId);
     await expect(firstResultsPanel.getByRole('tab', { name: 'Chart', exact: true })).toHaveAttribute('aria-selected', 'true');
     await page.getByText('Experimental', { exact: true }).click();
-    await expect(page.locator('.execution-bar code')).toHaveText(firstQueryId);
+    await expect(page.locator('.execution-bar')).toHaveAttribute('data-query-id', firstQueryId);
     await expect(page.getByRole('group', { name: 'Workspace layouts' })).toHaveCount(0);
     await expect(page.getByRole('navigation', { name: 'Workspace browser' })).toBeVisible();
     expect(runRequests).toBe(2);
@@ -411,7 +411,7 @@ test('A failed query stays in Results beside the previous success until retry', 
         await expect(results.locator('.result-provenance-header')).toContainText('The latest attempt failed.');
         await expect(results.getByRole('table', { name: 'Retained query rows' })).toBeVisible();
         await expect(page.locator('.execution-bar')).toHaveAttribute('data-run-status', 'failed');
-        await expect(page.locator('.execution-bar code')).toHaveCount(0);
+        await expect(page.locator('.execution-bar')).not.toHaveAttribute('data-query-id');
 
         await page.getByRole('button', { name: 'Dismiss error', exact: true }).click();
         await expect(failure).toBeVisible();
@@ -814,26 +814,26 @@ test('Experimental formatting preserves SQL comments when native formatting fall
 test('Connection switches keep run evidence isolated and recover each connection workspace', async ({ page }) => {
     await trust(page);
     await runQuery(page);
-    const firstQueryId = await page.locator('.execution-bar code').innerText();
+    const firstQueryId = await currentQueryId(page);
 
     const picker = page.locator('.connection-trigger');
     await picker.click();
     await page.getByRole('dialog', { name: 'Connection details' }).getByRole('button', { name: /Another sample/ }).click();
     await expect.poll(() => new URL(page.url()).searchParams.get('connection')).toBe('demo-second');
     await expect(page.locator('.execution-bar')).toHaveAttribute('data-run-status', 'ready');
-    await expect(page.locator('.execution-bar code')).toHaveCount(0);
+    await expect(page.locator('.execution-bar')).not.toHaveAttribute('data-query-id');
     await expect(page.getByRole('region', { name: 'Query results', exact: true }).getByRole('table', { name: 'Retained query rows' })).toHaveCount(0);
     await page.reload();
     await expect(page.locator('.connection-trigger')).toContainText('Another sample');
     await trustCurrentConnection(page);
     await runQuery(page);
-    const secondQueryId = await page.locator('.execution-bar code').innerText();
+    const secondQueryId = await currentQueryId(page);
     expect(secondQueryId).not.toBe(firstQueryId);
 
     await picker.click();
     await page.getByRole('dialog', { name: 'Connection details' }).getByRole('button', { name: /Sample data/ }).click();
     await expect.poll(() => new URL(page.url()).searchParams.get('connection')).toBe('demo');
-    await expect(page.locator('.execution-bar code')).toHaveText(firstQueryId);
+    await expect(page.locator('.execution-bar')).toHaveAttribute('data-query-id', firstQueryId);
 });
 
 test('Insights compare one run with its ClickHouse pipeline evidence', async ({ page }) => {
@@ -854,7 +854,7 @@ test('Insights compare one run with its ClickHouse pipeline evidence', async ({ 
     await expect(graph.locator('[data-node-id]').filter({ hasText: 'Resize 2 → 1' })).toBeVisible();
     await graph.locator('[data-node-id]').filter({ hasText: 'Resize 2 → 1' }).click();
     await expect(queryPlan.locator('.pipeline-node-inspector')).toContainText('Resize 2 → 1');
-    await expect(page.locator('.execution-bar code')).toHaveText(startedRun.queryId);
+    await expect(page.locator('.execution-bar')).toHaveAttribute('data-query-id', startedRun.queryId);
 });
 
 test('Refreshing a pipeline selects the first operator in the new graph', async ({ page }) => {
@@ -897,7 +897,7 @@ test('Refreshing a pipeline selects the first operator in the new graph', async 
 test('Result filtering searches only the visible retained page without mutating the run', async ({ page }) => {
     await trust(page);
     const results = await runQuery(page);
-    const queryId = await page.locator('.execution-bar code').innerText();
+    const queryId = await currentQueryId(page);
     const rows = results.locator('tbody tr');
     const filter = results.getByRole('searchbox', { name: 'Filter current page' });
     await expect(rows).toHaveCount(7);
@@ -909,7 +909,7 @@ test('Result filtering searches only the visible retained page without mutating 
     await filter.fill('no matching value');
     await expect(rows).toHaveCount(0);
     await expect(results).toContainText('No rows match on this page.');
-    await expect(page.locator('.execution-bar code')).toHaveText(queryId);
+    await expect(page.locator('.execution-bar')).toHaveAttribute('data-query-id', queryId);
 });
 
 test('SQL and parameter edits label old results without changing their run evidence', async ({ page }) => {
@@ -924,22 +924,22 @@ test('SQL and parameter edits label old results without changing their run evide
     await trust(page);
     await useAdvancedMode(page);
     const results = await runQuery(page);
-    const queryId = await page.locator('.execution-bar code').innerText();
+    const queryId = await currentQueryId(page);
 
     await replaceSql(page, 'SELECT 42');
     await expect(results.locator('.result-provenance-header')).toContainText('Previous result');
     await expect(results.locator('.result-provenance-header')).toContainText('SQL text, selection, or bound parameters changed');
-    await expect(page.locator('.execution-bar code')).toHaveText(queryId);
+    await expect(page.locator('.execution-bar')).toHaveAttribute('data-query-id', queryId);
     await replaceSql(page, submittedSql);
     await expect(results.locator('.result-provenance-header')).toHaveCount(0);
 
     await replaceSql(page, 'SELECT {threshold:UInt64}');
     await page.getByRole('textbox', { name: 'threshold:UInt64', exact: true }).fill('9007199254740993');
     await runQuery(page);
-    const parameterRunId = await page.locator('.execution-bar code').innerText();
+    const parameterRunId = await currentQueryId(page);
     await page.getByRole('textbox', { name: 'threshold:UInt64', exact: true }).fill('9007199254740994');
     await expect(results.locator('.result-provenance-header')).toContainText('parameters changed');
-    await expect(page.locator('.execution-bar code')).toHaveText(parameterRunId);
+    await expect(page.locator('.execution-bar')).toHaveAttribute('data-query-id', parameterRunId);
     expect(runRequests).toBe(2);
 });
 
@@ -1244,6 +1244,7 @@ test('Ask AI formats proposal citations in summaries and assumptions', async ({ 
     await expect(summary).toContainText('(laseriea.org)');
     await expect(summary).not.toContainText('[laseriea.org]');
 
+    await page.locator('.assistant-supporting-details > summary').click();
     const assumption = page.locator('.proposal-point').filter({ hasText: 'The 2004-05 season is omitted' });
     await expect(assumption.locator(':scope > span')).toHaveText('ASSUMPTION');
     const assumptionCitation = assumption.getByRole('link', { name: 'channelnewsasia.com', exact: true });
@@ -1449,14 +1450,14 @@ test('A query and its local draft recover after reload without rerunning', async
     await page.getByRole('textbox', { name: 'SQL document name', exact: true }).fill('ClickStudio demo.sql');
     await replaceSql(page, "SELECT 'draft survives reload'");
     const results = await runQuery(page);
-    const queryId = await page.locator('.execution-bar code').innerText();
+    const queryId = await currentQueryId(page);
     await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
     await page.reload();
 
     await expect(page.getByRole('textbox', { name: 'SQL document name', exact: true })).toHaveValue('ClickStudio demo.sql');
     await expect(page.locator('.cm-content')).toContainText("SELECT 'draft survives reload'");
     await expect(page.getByRole('region', { name: 'Query results', exact: true }).getByRole('table', { name: 'Retained query rows' })).toBeVisible();
-    await expect(page.locator('.execution-bar code')).toHaveText(queryId);
+    await expect(page.locator('.execution-bar')).toHaveAttribute('data-query-id', queryId);
     expect(runRequests).toBe(1);
     await expect(results).toHaveCount(1);
 });

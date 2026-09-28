@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { openBlankSql, trust, trustCurrentConnection } from './helpers.js';
+import { currentQueryId, openBlankSql, runButton, runIdentity, trust, trustCurrentConnection } from './helpers.js';
 
 function countRunRequests(page: Page) {
     let count = 0;
@@ -8,6 +8,21 @@ function countRunRequests(page: Page) {
     });
     return () => count;
 }
+
+test('Execution IDs are available from copyable details instead of the footer', async ({ page }) => {
+    await trust(page);
+    const response = page.waitForResponse(request => request.request().method() === 'POST' && new URL(request.url()).pathname === '/api/runs');
+    await runButton(page).click();
+    const run = runIdentity(await (await response).json());
+
+    await expect(page.locator('.execution-bar')).toHaveAttribute('data-query-id', run.queryId);
+    await expect(page.locator('.execution-bar')).not.toContainText(run.queryId);
+    await expect(page.locator('.execution-telemetry')).toHaveCount(0);
+    await page.getByTestId('execution-details').click();
+    const queryId = page.getByTestId('run-query-id');
+    await expect(queryId.locator('strong')).toHaveText(run.queryId);
+    await expect(queryId.locator('button[title="Copy query ID"]')).toBeVisible();
+});
 
 async function switchConnection(page: Page, name: string) {
     const picker = page.locator('.connection-trigger');
@@ -23,7 +38,7 @@ test('Run, chart, save and reload preserve the same execution evidence', async (
     const results = page.getByRole('region', { name: 'Query results' });
     await expect(results.locator('[data-run-status="succeeded"]')).toBeVisible();
     await expect(results.getByRole('cell', { name: '2026-01-01', exact: true })).toBeVisible();
-    const queryId = await page.locator('.execution-bar code').innerText();
+    const queryId = await currentQueryId(page);
     await results.getByRole('tab', { name: 'Chart', exact: true }).click();
     await expect(results.locator('svg[role="img"]')).toBeVisible();
     const saveResponse = page.waitForResponse(response =>
@@ -35,7 +50,7 @@ test('Run, chart, save and reload preserve the same execution evidence', async (
     const recovered = page.getByRole('region', { name: 'Query results' });
     await expect(recovered.locator('[data-run-status="succeeded"]')).toBeVisible();
     await expect(recovered.getByRole('cell', { name: '2026-01-01', exact: true })).toBeVisible();
-    await expect(page.locator('.execution-bar code')).toHaveText(queryId);
+    await expect(page.locator('.execution-bar')).toHaveAttribute('data-query-id', queryId);
     expect(runs()).toBe(1);
 });
 
@@ -63,7 +78,7 @@ test('Closing and reopening a result tab does not execute SQL again', async ({ p
     await page.getByTestId('run-button').click();
     const results = page.getByRole('region', { name: 'Query results' });
     await expect(results.locator('[data-run-status="succeeded"]')).toBeVisible();
-    const queryId = await page.locator('.execution-bar code').innerText();
+    const queryId = await currentQueryId(page);
     await page.getByRole('button', { name: 'Close Recoverable.sql', exact: true }).click();
     await expect(results).toHaveCount(0);
     const restoreTrigger = page.getByRole('button', { name: 'Restore', exact: true });
@@ -89,7 +104,7 @@ test('Closing and reopening a result tab does not execute SQL again', async ({ p
     await restoreMenu.getByRole('menuitem', { name: /Recoverable\.sql/ }).click();
     await expect(page.getByRole('textbox', { name: 'SQL document name', exact: true })).toHaveValue('Recoverable.sql');
     await expect(page.getByRole('textbox', { name: 'value:UInt64', exact: true })).toHaveValue('9007199254740993');
-    await expect(page.locator('.execution-bar code')).toHaveText(queryId);
+    await expect(page.locator('.execution-bar')).toHaveAttribute('data-query-id', queryId);
     expect(runs()).toBe(1);
 });
 

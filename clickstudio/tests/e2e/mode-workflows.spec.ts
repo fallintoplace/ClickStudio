@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { jsonRecord, openBlankSql, openWorkspacePanel, replaceSql, runIdentity, runScript, trust, trustCurrentConnection, useAdvancedMode } from './helpers.js';
+import { currentQueryId, jsonRecord, openBlankSql, openWorkspacePanel, replaceSql, runIdentity, runScript, trust, trustCurrentConnection, useAdvancedMode } from './helpers.js';
 
 const generatedSql = 'SELECT day, events FROM demo.events ORDER BY day';
 
@@ -28,6 +28,7 @@ async function beginInCompactMode(page: Page) {
     await expect(page.getByRole('tabpanel')).toHaveAttribute('aria-labelledby', /^document-tab-/);
     await expect(page.getByRole('textbox', { name: 'Describe your data question', exact: true })).toHaveCount(0);
     await trustCurrentConnection(page);
+    await expect(page.getByTestId('run-button')).toBeEnabled();
 }
 
 test('Standard exposes assignment actions and can run a query without opening AI', async ({ page }) => {
@@ -80,10 +81,10 @@ test('Standard exposes assignment actions and can run a query without opening AI
     expect(contextRequests).toBe(0);
     await expect(results.getByRole('tab', { name: 'Insights', exact: true })).toHaveCount(0);
 
-    const queryId = await page.locator('.execution-bar code').innerText();
+    const queryId = await currentQueryId(page);
     await useAdvancedMode(page);
     await expect(page.locator('.cm-content')).toContainText('SELECT');
-    await expect(page.locator('.execution-bar code')).toHaveText(queryId);
+    await expect(page.locator('.execution-bar')).toHaveAttribute('data-query-id', queryId);
     await expect(page.getByTestId('open-ai')).toBeVisible();
     await expect(page.getByTestId('save-query')).toBeVisible();
     await expect(page.locator('.editor-control-rail')).toBeVisible();
@@ -92,7 +93,7 @@ test('Standard exposes assignment actions and can run a query without opening AI
     await expect(results.getByRole('tab', { name: 'Insights', exact: true })).toBeVisible();
     await expect(page.getByRole('tablist', { name: 'SQL documents', exact: true }).getByRole('tab')).toHaveCount(1);
     await page.getByText('Standard', { exact: true }).click();
-    await expect(page.locator('.execution-bar code')).toHaveText(queryId);
+    await expect(page.locator('.execution-bar')).toHaveAttribute('data-query-id', queryId);
     await expect(results.getByRole('table', { name: 'Retained query rows', exact: true })).toBeVisible();
     await expect(results.getByRole('tab', { name: 'Chart', exact: true })).toBeVisible();
     await expect(page.getByTestId('open-ai')).toBeVisible();
@@ -226,6 +227,7 @@ test('Switching to Experimental keeps the AI chat, query and run evidence', asyn
     await expect(citation).toHaveAttribute('target', '_blank');
     await expect(citation).toHaveAttribute('rel', 'noreferrer');
     await expect(summary).not.toContainText('[nba.com]');
+    await page.locator('.assistant-supporting-details > summary').click();
     const webSource = page.locator('.assistant-web-sources').getByRole('link', { name: 'NBA champions', exact: true });
     await expect(webSource).toHaveAttribute('href', 'https://www.nba.com/news/history-nba-champions?lid=odtil4le7cgc');
     await expect(page.locator('.assistant-answer-markdown')).toHaveCount(0);
@@ -242,7 +244,7 @@ test('Switching to Experimental keeps the AI chat, query and run evidence', asyn
     const results = page.getByRole('region', { name: 'Query results', exact: true });
     await expect(results.locator('[data-run-status="succeeded"]')).toBeVisible();
     await expect(results.getByRole('cell', { name: '2026-01-01', exact: true })).toBeVisible();
-    const queryId = await page.locator('.execution-bar code').innerText();
+    const queryId = await currentQueryId(page);
     await results.getByRole('tab', { name: 'Chart', exact: true }).click();
     await expect(results.locator('.chart-canvas svg[role="img"]')).toBeVisible();
     await expect(results.getByRole('tab', { name: 'Insights', exact: true })).toBeVisible();
@@ -252,17 +254,64 @@ test('Switching to Experimental keeps the AI chat, query and run evidence', asyn
     await expect(results.getByText('Execution time', { exact: true })).toBeVisible();
 
     await expect(page.locator('.cm-content')).toContainText(generatedSql);
-    await expect(page.locator('.execution-bar code')).toHaveText(queryId);
+    await expect(page.locator('.execution-bar')).toHaveAttribute('data-query-id', queryId);
     await page.getByText('Standard', { exact: true }).click();
     await expect(page.getByTestId('open-ai')).toBeVisible();
     await expect(results.getByRole('tab', { name: 'Chart', exact: true })).toBeVisible();
     await expect(results.getByRole('tab', { name: 'Insights', exact: true })).toHaveCount(0);
     await expect(results.getByRole('table', { name: 'Retained query rows', exact: true })).toBeVisible();
-    await expect(page.locator('.execution-bar code')).toHaveText(queryId);
+    await expect(page.locator('.execution-bar')).toHaveAttribute('data-query-id', queryId);
     await useAdvancedMode(page);
     await expect(page.locator('.assistant-user-message')).toContainText('Show event counts by day');
     await expect(prompt).toHaveValue('');
     await expect(results.getByRole('tab', { name: 'Insights', exact: true })).toHaveAttribute('aria-selected', 'true');
+});
+
+test('An older accepted proposal says which SQL will run', async ({ page }) => {
+    const runRequests: Record<string, unknown>[] = [];
+    let proposalBaseSql = '';
+    page.on('request', request => {
+        if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/runs')
+            runRequests.push(jsonRecord(request.postDataJSON(), 'Run request'));
+    });
+    await page.route('**/api/assistant/sql', async route => {
+        const body = jsonRecord(route.request().postDataJSON(), 'Assistant request');
+        proposalBaseSql = String(body.sql ?? '');
+        await route.fulfill({ json: {
+            id: 'stale-proposal', owner: 'local-owner', connectionId: 'demo', action: 'ask', createdAt: '2026-09-23T00:00:00.000Z',
+            baseSql: proposalBaseSql, responseId: 'test-response', model: 'test-model', promptVersion: 'test', contextSummary: [], decision: 'pending',
+            sql: generatedSql, summary: 'Show event counts by day.', assumptions: [], tables: ['demo.events'], caveats: [], clarification: null, findings: [],
+        } });
+    });
+    await page.route('**/api/assistant/proposals/stale-proposal/decision', async route => {
+        const body = jsonRecord(route.request().postDataJSON(), 'Assistant decision');
+        await route.fulfill({ json: {
+            id: 'stale-proposal', owner: 'local-owner', connectionId: 'demo', action: 'ask', createdAt: '2026-09-23T00:00:00.000Z',
+            decidedAt: '2026-09-23T00:00:01.000Z', baseSql: proposalBaseSql, responseId: 'test-response', model: 'test-model',
+            promptVersion: 'test', contextSummary: [], decision: body.decision, sql: generatedSql, summary: 'Show event counts by day.',
+            assumptions: [], tables: ['demo.events'], caveats: [], clarification: null, findings: [],
+        } });
+    });
+
+    await beginInCompactMode(page);
+    const runButton = page.getByTestId('run-button');
+    await expect(runButton).toBeEnabled();
+    await page.getByTestId('open-ai').click();
+    await page.getByRole('textbox', { name: 'Ask AI', exact: true }).fill('Show event counts by day');
+    await page.locator('.assistant-panel').getByRole('button', { name: 'Send', exact: true }).click();
+    await expect(page.getByTestId('assistant-proposal-summary')).toContainText('Show event counts by day.');
+    await page.getByRole('button', { name: 'Use this query', exact: true }).click();
+    await replaceSql(page, 'SELECT 999 AS newer_draft');
+
+    const oldProposal = page.locator('.beginner-run-ready');
+    await expect(oldProposal).toContainText('Accepted from an earlier draft');
+    const runOldSql = oldProposal.getByRole('button', { name: 'Run older query', exact: true });
+    await expect(runOldSql).toBeVisible();
+    await expect(runOldSql).toHaveClass(/button-secondary/);
+    await runOldSql.click();
+
+    await expect.poll(() => runRequests.length).toBe(1);
+    expect(runRequests[0]).toMatchObject({ sql: generatedSql, connectionId: 'demo' });
 });
 
 test('Standard can run a script and open its statement results', async ({ page }) => {
@@ -319,7 +368,7 @@ test('Experimental insights and AI requests do not execute SQL', async ({ page }
     const activeRunId = runIdentity(await (await startedRun).json()).id;
     const results = page.getByRole('region', { name: 'Query results', exact: true });
     await expect(results.locator('[data-run-status="succeeded"]')).toBeVisible();
-    const queryId = await page.locator('.execution-bar code').innerText();
+    const queryId = await currentQueryId(page);
 
     await results.getByRole('tab', { name: 'Insights', exact: true }).click();
     const loadDetails = results.getByRole('button', { name: 'Load execution details', exact: true });
@@ -345,5 +394,5 @@ test('Experimental insights and AI requests do not execute SQL', async ({ page }
     expect(assistantRequests[0]).toMatchObject({ action: 'ask', question: 'Why is this query slow?', runId: activeRunId, includeRun: true });
     expect(assistantRequests[0]?.result).toBeTruthy();
     expect(runRequests).toHaveLength(1);
-    await expect(page.locator('.execution-bar code')).toHaveText(queryId);
+    await expect(page.locator('.execution-bar')).toHaveAttribute('data-query-id', queryId);
 });

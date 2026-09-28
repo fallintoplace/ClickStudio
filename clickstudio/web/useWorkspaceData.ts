@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateA
 import type { QueryDocument, Run, Schema } from '../shared/types';
 import { sameSavedContent } from '../shared/workspace-view';
 import { api, message } from './api';
+import { loadPlaygroundServerVersion, PLAYGROUND_CONNECTION_ID } from './playground';
 import type { WorkspaceState } from './workspace-state';
 import { startVisiblePolling } from './visible-polling';
 
@@ -24,6 +25,8 @@ export function useWorkspaceData({
     const [schemaLoading, setSchemaLoading] = useState(false);
     const [schemaLoadingMore, setSchemaLoadingMore] = useState(false);
     const [schemaError, setSchemaError] = useState('');
+    const [playgroundServerVersion, setPlaygroundServerVersion] = useState<string>();
+    const [playgroundServerVersionLoading, setPlaygroundServerVersionLoading] = useState(false);
     const [documents, setDocuments] = useState<QueryDocument[]>([]);
     const [documentsLoaded, setDocumentsLoaded] = useState(false);
     const [documentsReadError, setDocumentsReadError] = useState(false);
@@ -38,6 +41,23 @@ export function useWorkspaceData({
     const historyRequestRef = useRef(0);
     const documentsRequestRef = useRef(0);
     const revisionsRequestRef = useRef(0);
+
+    useEffect(() => {
+        let cancelled = false;
+        setPlaygroundServerVersion(undefined);
+        if (!trusted || connectionId !== PLAYGROUND_CONNECTION_ID) {
+            setPlaygroundServerVersionLoading(false);
+            return;
+        }
+        setPlaygroundServerVersionLoading(true);
+        void loadPlaygroundServerVersion().then(version => {
+            if (!cancelled) setPlaygroundServerVersion(version);
+        }).finally(() => {
+            if (!cancelled) setPlaygroundServerVersionLoading(false);
+        });
+        return () => { cancelled = true; };
+    }, [connectionId, trusted]);
+
     const invalidateRequests = useCallback(() => {
         schemaRequestRef.current++;
         historyRequestRef.current++;
@@ -203,6 +223,8 @@ export function useWorkspaceData({
         schema,
         schemaLoading,
         schemaError,
+        serverVersion: connectionId === PLAYGROUND_CONNECTION_ID ? playgroundServerVersion : undefined,
+        serverVersionLoading: connectionId === PLAYGROUND_CONNECTION_ID && playgroundServerVersionLoading,
         documents,
         setDocuments,
         documentsLoaded,

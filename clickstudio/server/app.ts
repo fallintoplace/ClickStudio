@@ -61,6 +61,12 @@ function registerAssistantSqlRoute(app: Express, dependencies: {
             const question = text(v.question, 'question', 4000), sql = text(v.sql, 'SQL', 200000, true);
             const conversation = validateAssistantConversation(v.conversation);
             const schema = await driver.schema(connectionId), connection = driver.connection(p, connectionId);
+            const reportedPlaygroundVersion = typeof v.serverVersion === 'string' && /^\d+(?:\.\d+){2,3}(?:[-+][A-Za-z0-9.-]+)?$/.test(v.serverVersion)
+                ? v.serverVersion
+                : undefined;
+            const serverVersion = connection.manifest?.serverVersion === 'ClickHouse SQL Playground'
+                ? reportedPlaygroundVersion
+                : connection.manifest?.serverVersion;
             let run: Run | undefined;
             if (v.includeRun === true) {
                 requireThat(Boolean(v.runId), 400, 'RUN_REQUIRED', 'Select a completed run before including its context');
@@ -70,7 +76,7 @@ function registerAssistantSqlRoute(app: Express, dependencies: {
             const documentation = await assistantReferenceDocs(driver, p, connectionId, question, sql, schema, connection.database);
             const result = run?.resultState === 'reopenable' ? runs.result(p, run.id) : undefined;
             const context = ai.prepare(p, { connectionId, database: connection.database, action: 'ask', question, conversation, sql, schema, result,
-                evidenceSql: run?.sql, error: run?.error?.message, serverVersion: connection.manifest?.serverVersion,
+                evidenceSql: run?.sql, error: run?.error?.message, serverVersion,
                 documentation, sensitiveColumns: config.sensitiveColumns });
             preparedContextId = context.id;
             if (!secretFree(context.payload)) {

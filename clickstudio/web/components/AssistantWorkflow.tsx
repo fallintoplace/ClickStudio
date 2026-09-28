@@ -28,6 +28,9 @@ export type AssistantWorkflowProps = {
     error: string;
     notice: string;
     trusted: boolean;
+    database: string;
+    serverLabel: string;
+    schemaFetchedAt?: string;
     onAskAI: () => void;
     onCancelRequest: () => void;
     schemaReady: boolean;
@@ -155,18 +158,23 @@ function AssistantOutput({ mode, sql, turn, busy, onDecideProposal, onRunQuery, 
     });
     return <div className={cx('proposal-card', beginner && 'beginner-proposal-card')}>
         <div className="proposal-heading">
-            {proposalSql !== null && <span className={cx('proposal-quality', proposal.quality?.status)}>{proposal.quality?.score ?? '—'}<small>QUALITY</small></span>}
+            {proposalSql !== null && <span className={cx('proposal-quality', proposal.quality?.status)} title="Automated SQL checks, not a guarantee that the query returns the right answer." aria-label={`Automated SQL check score: ${proposal.quality?.score ?? 'unavailable'}`}>{proposal.quality?.score ?? '—'}<small>CHECKS</small></span>}
             <div><span className="eyebrow">{proposalSql === null ? 'ANSWER' : `SQL PROPOSAL · ${proposal.decision.toUpperCase()}`}</span><AssistantMarkdown text={proposal.summary} sources={sources} className={proposalSql === null ? 'assistant-answer-markdown' : 'assistant-proposal-summary'} testId={proposalSql === null ? 'assistant-answer-markdown' : 'assistant-proposal-summary'}/></div>
         </div>
         {stale && <p className="assistant-stale-proposal" role="status">This accepted query comes from an earlier SQL draft. Running it uses the SQL shown here.</p>}
         {proposal.clarification && <div className="callout"><AssistantMarkdown text={proposal.clarification} sources={sources} className="assistant-proposal-markdown"/></div>}
-        {proposal.assumptions.map((item, index) => <div className="proposal-point" key={`${index}-${item}`}><span>ASSUMPTION</span><AssistantMarkdown text={item} sources={sources} className="assistant-proposal-markdown"/></div>)}
-        {proposal.caveats.map((item, index) => <div className="proposal-point" key={`${index}-${item}`}><span>NOTE</span><AssistantMarkdown text={item} sources={sources} className="assistant-proposal-markdown"/></div>)}
         {proposal.findings.map((item, index) => <div className="proposal-finding" key={`${index}-${item.severity}-${item.message}`}><strong>{item.severity}</strong><AssistantMarkdown text={item.message} sources={sources} className="assistant-proposal-markdown"/><AssistantMarkdown text={item.evidence} sources={sources} className="assistant-proposal-markdown assistant-proposal-finding-evidence"/></div>)}
-        {sources.length > 0 && <div className="assistant-web-sources"><span className="eyebrow">WEB SOURCES</span><ul>{sources.map(source => <li key={source.url}><a href={source.url} target="_blank" rel="noopener noreferrer">{source.label}</a></li>)}</ul></div>}
+        {(proposal.assumptions.length > 0 || proposal.caveats.length > 0 || sources.length > 0) && <details className="assistant-supporting-details">
+            <summary>Assumptions, notes and sources <span>{proposal.assumptions.length + proposal.caveats.length + sources.length}</span></summary>
+            <div className="assistant-supporting-details-content">
+                {proposal.assumptions.map((item, index) => <div className="proposal-point" key={`${index}-${item}`}><span>ASSUMPTION</span><AssistantMarkdown text={item} sources={sources} className="assistant-proposal-markdown"/></div>)}
+                {proposal.caveats.map((item, index) => <div className="proposal-point" key={`${index}-${item}`}><span>NOTE</span><AssistantMarkdown text={item} sources={sources} className="assistant-proposal-markdown"/></div>)}
+                {sources.length > 0 && <div className="assistant-web-sources"><span className="eyebrow">WEB SOURCES</span><ul>{sources.map(source => <li key={source.url}><a href={source.url} target="_blank" rel="noopener noreferrer">{source.label}</a></li>)}</ul></div>}
+            </div>
+        </details>}
         {proposalSql !== null && <>
             <AssistantSqlProposalDiff key={`${proposal.id}:${proposal.decision}`} proposal={proposal} currentSql={sql} busy={busy} mode={mode} turnId={turn.id} onDecideProposal={onDecideProposal}/>
-            {beginner && proposal.decision === 'accepted' && <div className="beginner-run-ready"><span><span className="status-light is-trusted"/> {stale ? 'Accepted from an earlier draft' : 'Added to your SQL draft'}</span><Button variant="primary" onClick={() => onRunQuery(proposalSql)} disabled={runDisabled(proposalSql) || busy}><Icon name="play"/>{busy ? 'Starting…' : proposalIsScript ? 'Run this script' : 'Run this query'}</Button></div>}
+            {beginner && proposal.decision === 'accepted' && <div className="beginner-run-ready"><span><span className="status-light is-trusted"/> {stale ? 'Accepted from an earlier draft' : 'Added to your SQL draft'}</span><Button variant={stale ? 'secondary' : 'primary'} title={stale ? 'Runs the SQL saved in this older assistant proposal.' : undefined} onClick={() => onRunQuery(proposalSql)} disabled={runDisabled(proposalSql) || busy}><Icon name="play"/>{busy ? 'Starting…' : stale ? proposalIsScript ? 'Run older script' : 'Run older query' : proposalIsScript ? 'Run this script' : 'Run this query'}</Button></div>}
         </>}
     </div>;
 }
@@ -174,9 +182,11 @@ function AssistantOutput({ mode, sql, turn, busy, onDecideProposal, onRunQuery, 
 export function AssistantWorkflow(props: AssistantWorkflowProps) {
     const { mode, sql, question, onQuestionChange, chats, activeChatId, turns, storageError, onNewChat, onSelectChat, onRenameChat, onDeleteChat,
         busy, error, trusted, cancelable, phase, notice, onAskAI, onCancelRequest,
+        database, serverLabel, schemaFetchedAt,
         schemaReady, schemaLoading, schemaStatus, onRefreshSchema, onDecideProposal, onRunQuery, runDisabled } = props;
     const transcriptViewport = useRef<HTMLDivElement>(null);
     const activeChat = chats.find(chat => chat.id === activeChatId);
+    const schemaTime = schemaFetchedAt ? new Date(schemaFetchedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : undefined;
 
     useLayoutEffect(() => {
         const viewport = transcriptViewport.current;
@@ -207,6 +217,7 @@ export function AssistantWorkflow(props: AssistantWorkflowProps) {
             {notice && <div className="assistant-feedback callout" role="status">{notice}</div>}
             {!trusted && <div className="assistant-feedback callout">Trust this connection before sharing its schema with the assistant.</div>}
             {!schemaReady && trusted && <div className="assistant-feedback callout assistant-schema-refresh"><span>{schemaStatus || 'Load the ClickHouse schema before asking the assistant.'}</span><Button variant="secondary" disabled={schemaLoading} onClick={onRefreshSchema}>{schemaLoading ? 'Loading…' : 'Refresh schema'}</Button></div>}
+            {trusted && <div className="assistant-context-meta" aria-label="Ask AI context"><span>Database <strong>{database}</strong></span><i>·</i><span>{serverLabel}</span>{schemaTime && <span className="assistant-context-schema">Schema refreshed {schemaTime}</span>}</div>}
             <div className="assistant-chat-composer">
                 <ScrollEdgeFrame<HTMLTextAreaElement> className="assistant-question-frame">{ref => <textarea ref={ref} id="assistant-question" className="field-textarea" aria-label="Ask AI" value={question} onChange={event => onQuestionChange(event.target.value)} onKeyDown={sendOnEnter} placeholder="Message… (Enter to send)" rows={2}/>}</ScrollEdgeFrame>
                 <div className="assistant-composer-footer"><span>Shift+Enter for a new line</span>{busy ? cancelable ? <Button variant="danger" onClick={onCancelRequest} aria-label="Stop assistant response" title="Stop generating">Stop</Button> : <Button variant="secondary" disabled>{phase === 'deciding' ? 'Applying…' : 'Working…'}</Button> : <Button variant="primary" disabled={!trusted || !schemaReady || !question.trim()} onClick={ask}><Icon name="send"/>Send</Button>}</div>

@@ -43,7 +43,7 @@ test('Run comparison selects two retained runs without executing another query',
         const submitted = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/runs');
         await runButton(page).click();
         const next = await (await submitted).json() as { queryId: string };
-        await expect(page.locator('.execution-bar code')).toHaveText(next.queryId);
+        await expect(page.locator('.execution-bar')).toHaveAttribute('data-query-id', next.queryId);
         await expect(page.locator('.execution-bar')).toHaveAttribute('data-run-status', 'succeeded');
     }
     let submissions = 0;

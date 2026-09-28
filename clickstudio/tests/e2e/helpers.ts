@@ -15,6 +15,12 @@ export function runIdentity(value: unknown): { id: string; queryId: string } {
     return { id: record.id, queryId: record.queryId };
 }
 
+export async function currentQueryId(page: Page) {
+    const queryId = await page.locator('.execution-bar').getAttribute('data-query-id');
+    if (!queryId) throw new Error('The execution bar has no active query ID');
+    return queryId;
+}
+
 export async function openBlankSql(page: Page) {
     await page.getByTestId('new-sql').click();
     await page.getByTestId('blank-sql').click();
@@ -52,6 +58,7 @@ export async function trustCurrentConnection(page: Page) {
     await expect(trigger).toBeVisible();
     await trigger.click();
     const details = page.getByRole('dialog', { name: 'Connection details', exact: true });
+    await expect(details).toBeVisible();
     const start = details.getByRole('button', { name: 'Start exploring', exact: true });
     if (await start.isVisible()) await start.click();
     if (await trigger.getAttribute('aria-expanded') === 'true') await trigger.click();

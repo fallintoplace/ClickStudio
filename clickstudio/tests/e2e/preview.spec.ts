@@ -217,7 +217,7 @@ test('Playground examples preview real SQL and open a draft without executing it
     await expect(page.getByRole('tab', { name: 'Daily activity.sql', exact: true })).toHaveAttribute('aria-selected', 'true');
     await expect(page.locator('.cm-content')).toContainText('FROM github.events');
     await expect(page.locator('.execution-bar')).toHaveAttribute('data-run-status', 'ready');
-    await expect(page.locator('.execution-bar code')).toHaveCount(0);
+    await expect(page.locator('.execution-bar')).not.toHaveAttribute('data-query-id');
     expect(exampleSqlRequests).toEqual([]);
 });
 
