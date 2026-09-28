@@ -8,7 +8,7 @@ export type CategoryFilter = SqlExampleCategory | 'charts' | 'all' | 'featured';
 
 export const helpCategories: CategoryFilter[] = [
     'featured', 'all', 'business', 'observability', 'operations', 'engineering', 'markets', 'cities',
-    'openSource', 'internet', 'datasets', 'clickhouse', 'charts', 'basics', 'aggregation',
+    'openSource', 'internet', 'datasets', 'clickhouse', 'writeOperations', 'charts', 'basics', 'aggregation',
     'timeSeries', 'schema',
 ];
 
@@ -24,6 +24,7 @@ export function categoryLabel(category: CategoryFilter, copy: Copy['common'], lo
     if (category === 'openSource') return localizeSqlExampleCategory(category, locale, 'Open source');
     if (category === 'internet') return localizeSqlExampleCategory(category, locale, 'Internet');
     if (category === 'datasets') return localizeSqlExampleCategory(category, locale, 'Datasets');
+    if (category === 'writeOperations') return copy.exampleWriteOperations;
     if (category === 'basics') return copy.exampleBasics;
     if (category === 'aggregation') return copy.exampleAggregation;
     if (category === 'timeSeries') return copy.exampleTimeSeries;

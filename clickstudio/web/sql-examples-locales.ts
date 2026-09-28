@@ -6,6 +6,8 @@ type Translation = readonly [name: string, description: string];
 
 const translations: Record<Exclude<Locale, 'en'>, Record<string, Translation>> = {
     de: {
+        'cloud-write-create-demo': ['Demotabelle erstellen und befüllen', 'Erstellt eine kleine MergeTree-Tabelle mit generierten Ereignissen. IF NOT EXISTS lässt eine vorhandene Tabelle unverändert. Erfordert CREATE-Berechtigung.'],
+        'cloud-write-insert-demo': ['Zeilen in die Demotabelle einfügen', 'Fügt zwei Beispielzeilen an. Führe zuerst das Erstellungsbeispiel aus; jeder Lauf fügt Zeilen hinzu. Erfordert INSERT-Berechtigung.'],
         'github-recent-events': ['Aktuelle GitHub-Ereignisse', 'Echte Ereignisse, Repositories, Akteure und Zeitstempel ansehen.'],
         'github-daily-activity': ['Tägliche Aktivität', 'Ereignisvolumen und aktive Akteure der letzten 30 Tage vergleichen.'],
         'github-top-star-events': ['Repositories mit den meisten Sternen', 'Repositories nach aktuellen GitHub-Stern-Ereignissen sortieren.'],
@@ -55,6 +57,8 @@ const translations: Record<Exclude<Locale, 'en'>, Record<string, Translation>> =
         'clickhouse-geo-delivery-zones': ['Bunte Lieferzonen', 'Vier Lieferregionen mit nativen ClickHouse-Polygonen abbilden und Bestellvolumen vergleichen.'],
     },
     es: {
+        'cloud-write-create-demo': ['Crear y cargar una tabla de ejemplo', 'Crea una tabla MergeTree pequeña con eventos generados. IF NOT EXISTS deja intacta una tabla existente. Requiere permiso CREATE.'],
+        'cloud-write-insert-demo': ['Insertar filas en la tabla de ejemplo', 'Añade dos filas de ejemplo. Ejecuta primero el ejemplo de creación; cada ejecución añade filas. Requiere permiso INSERT.'],
         'github-recent-events': ['Eventos recientes de GitHub', 'Explora eventos reales, repositorios, usuarios y fechas.'],
         'github-daily-activity': ['Actividad diaria', 'Compara el volumen de eventos y los usuarios activos de los últimos 30 días.'],
         'github-top-star-events': ['Repositorios con más estrellas', 'Ordena repositorios por eventos recientes de estrellas en GitHub.'],
@@ -104,6 +108,8 @@ const translations: Record<Exclude<Locale, 'en'>, Record<string, Translation>> =
         'clickhouse-geo-delivery-zones': ['Zonas de reparto coloridas', 'Representa cuatro regiones y compara sus pedidos con valores Polygon nativos de ClickHouse.'],
     },
     nl: {
+        'cloud-write-create-demo': ['Demotabel maken en vullen', 'Maakt een kleine MergeTree-tabel met gegenereerde gebeurtenissen. IF NOT EXISTS laat een bestaande tabel ongemoeid. Vereist CREATE-rechten.'],
+        'cloud-write-insert-demo': ['Rijen aan de demotabel toevoegen', 'Voegt twee voorbeeldrijen toe. Voer eerst het maakvoorbeeld uit; elke uitvoering voegt rijen toe. Vereist INSERT-rechten.'],
         'github-recent-events': ['Recente GitHub-gebeurtenissen', 'Bekijk echte gebeurtenissen, repositories, gebruikers en tijdstempels.'],
         'github-daily-activity': ['Dagelijkse activiteit', 'Vergelijk gebeurtenissen en actieve gebruikers van de afgelopen 30 dagen.'],
         'github-top-star-events': ['Repositories met de meeste sterren', 'Rangschik repositories op recente GitHub-stergebeurtenissen.'],
@@ -153,6 +159,8 @@ const translations: Record<Exclude<Locale, 'en'>, Record<string, Translation>> =
         'stackoverflow-technology-trends': ['Technologietrends voor developers', 'Vergelijk per kwartaal vragen over Python, JavaScript, Java en Rust als signaal van developerinteresse.'],
     },
     zh: {
+        'cloud-write-create-demo': ['创建并填充示例表', '创建一个包含生成事件的小型 MergeTree 表。表已存在时，IF NOT EXISTS 不会更改它。需要 CREATE 权限。'],
+        'cloud-write-insert-demo': ['向示例表插入行', '追加两行示例数据。请先运行创建示例；每次运行都会追加数据。需要 INSERT 权限。'],
         'github-recent-events': ['近期 GitHub 事件', '查看真实事件、仓库、用户和时间戳。'],
         'github-daily-activity': ['每日活动', '比较过去 30 天的事件量和活跃用户。'],
         'github-top-star-events': ['获星最多的仓库', '按近期 GitHub 获星事件对仓库排序。'],
@@ -202,6 +210,8 @@ const translations: Record<Exclude<Locale, 'en'>, Record<string, Translation>> =
         'stackoverflow-technology-trends': ['开发者技术趋势', '按季度比较 Python、JavaScript、Java 和 Rust 问题量，作为开发者关注度信号。'],
     },
     ru: {
+        'cloud-write-create-demo': ['Создать и заполнить демонстрационную таблицу', 'Создаёт небольшую таблицу MergeTree с сгенерированными событиями. IF NOT EXISTS оставляет существующую таблицу без изменений. Нужны права CREATE.'],
+        'cloud-write-insert-demo': ['Добавить строки в демонстрационную таблицу', 'Добавляет две строки примера. Сначала выполните пример создания; каждый запуск добавляет строки. Нужны права INSERT.'],
         'github-recent-events': ['Недавние события GitHub', 'Просмотр реальных событий, репозиториев, пользователей и времени.'],
         'github-daily-activity': ['Ежедневная активность', 'Сравнение числа событий и активных пользователей за последние 30 дней.'],
         'github-top-star-events': ['Репозитории с наибольшим числом звёзд', 'Ранжирование репозиториев по недавним событиям со звёздами GitHub.'],

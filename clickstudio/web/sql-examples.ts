@@ -3,7 +3,7 @@ import { DEMO_PREVIEW_STARTERS } from './demo-preview.js';
 import { GEO_HELP_EXAMPLES } from './help-demos.js';
 import { PLAYGROUND_CONNECTION_ID, PLAYGROUND_STARTER_SQL } from './playground.js';
 
-export type SqlExampleCategory = 'basics' | 'aggregation' | 'timeSeries' | 'clickhouse' | 'schema' | 'business' | 'observability' | 'operations' | 'engineering' | 'markets' | 'cities' | 'openSource' | 'internet' | 'datasets';
+export type SqlExampleCategory = 'basics' | 'aggregation' | 'timeSeries' | 'clickhouse' | 'writeOperations' | 'schema' | 'business' | 'observability' | 'operations' | 'engineering' | 'markets' | 'cities' | 'openSource' | 'internet' | 'datasets';
 
 export type SqlExample = {
     id: string;
@@ -480,6 +480,49 @@ ORDER BY day`,
 
 const quoteIdentifier = (value: string) => `\`${value.replaceAll('`', '``')}\``;
 
+function cloudWriteExamples(database: string): SqlExample[] {
+    const tableName = 'clickstudio_sql_examples_write_demo';
+    const table = `${quoteIdentifier(database)}.${quoteIdentifier(tableName)}`;
+    return [
+        {
+            id: 'cloud-write-create-demo',
+            name: 'Create and seed a demo table',
+            description: 'Create a small MergeTree table and seed it with generated events. IF NOT EXISTS leaves an existing table unchanged. Requires CREATE permission.',
+            dataset: `${database}.${tableName}`,
+            category: 'writeOperations',
+            sql: `CREATE TABLE IF NOT EXISTS ${table}
+(
+    event_id UInt64,
+    event_time DateTime,
+    event_name LowCardinality(String),
+    event_count UInt64
+)
+ENGINE = MergeTree
+ORDER BY (event_time, event_id)
+AS
+SELECT
+    number + 1 AS event_id,
+    now() - toIntervalHour(number) AS event_time,
+    ['view', 'click', 'purchase'][(number % 3) + 1] AS event_name,
+    (number % 3) + 1 AS event_count
+FROM numbers(6)`,
+            chart: { kind: 'table', x: 0, ys: [], title: 'Create and seed a demo table' },
+        },
+        {
+            id: 'cloud-write-insert-demo',
+            name: 'Insert rows into the demo table',
+            description: 'Append two sample rows. Run the create example first; each run adds rows. Requires INSERT permission.',
+            dataset: `${database}.${tableName}`,
+            category: 'writeOperations',
+            sql: `INSERT INTO ${table} (event_id, event_time, event_name, event_count)
+VALUES
+    (101, '2025-01-01 12:00:00', 'signup', 1),
+    (102, '2025-01-01 12:05:00', 'purchase', 3)`,
+            chart: { kind: 'table', x: 0, ys: [], title: 'Insert rows into the demo table' },
+        },
+    ];
+}
+
 function baseColumnType(type: string) {
     let base = type.trim();
     while (true) {
@@ -689,7 +732,7 @@ function cloudFeaturedExamples(schema?: Schema) {
         .map((example, index) => ({ ...example, featuredOrder: index + 1 }));
 }
 
-export function sqlExamplesFor(connection: Pick<Connection, 'id' | 'dataSource'>, schema?: Schema): SqlExample[] {
+export function sqlExamplesFor(connection: Pick<Connection, 'id' | 'dataSource'> & Partial<Pick<Connection, 'database'>>, schema?: Schema): SqlExample[] {
     if (connection.id === PLAYGROUND_CONNECTION_ID) return playgroundExamples;
     if (connection.dataSource === 'fixture') return [...demoExamples, ...GEO_HELP_EXAMPLES];
 
@@ -718,6 +761,12 @@ export function sqlExamplesFor(connection: Pick<Connection, 'id' | 'dataSource'>
         ? tableExamples.map((example, index) => index === 0 ? { ...example, featuredOrder: 1 } : example)
         : tableExamples;
     const cloudGeoExamples = GEO_HELP_EXAMPLES.map(example => ({ ...example, featuredOrder: undefined }));
+    const primaryFeaturedCount = featuredExamples.length || orderedTableExamples.filter(example => example.featuredOrder !== undefined).length;
+    const database = connection.database?.trim();
+    const writeExamples = database && connection.dataSource === 'clickhouse'
+        ? cloudWriteExamples(database)
+            .map((example, index) => ({ ...example, featuredOrder: primaryFeaturedCount + index + 1 }))
+        : [];
 
-    return [...orderedTableExamples, ...featuredExamples, ...genericExamples, ...cloudGeoExamples];
+    return [...orderedTableExamples, ...featuredExamples, ...genericExamples, ...cloudGeoExamples, ...writeExamples];
 }

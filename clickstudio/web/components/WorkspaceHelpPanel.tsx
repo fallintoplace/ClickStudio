@@ -398,18 +398,18 @@ export function WorkspaceHelpPanel({ examples, sourceLabel, copy, locale, open, 
                                     <span className="sql-example-option-description">{exampleText(example, locale, copy).description}</span>
                                     <span className="sql-example-option-meta">
                                         <span className="sql-example-option-category">{example.dataset ?? categoryLabel(example.category, copy, locale)}</span>
-                                        <span className="sql-example-chart-kind">{chartLabel(example, copy)}</span>
+                                        <span className="sql-example-chart-kind">{example.category === 'writeOperations' ? copy.exampleWriteOperations : chartLabel(example, copy)}</span>
                                     </span>
                                 </button>)}
                                 </div>
                                 {selected && <article className="sql-example-preview">
-                                <div className="sql-example-preview-heading"><div><span className="eyebrow">{selected.dataset ?? categoryLabel(selected.category, copy, locale)}</span><h3>{exampleText(selected, locale, copy).name}.sql</h3></div><span className="sql-example-readonly">{chartLabel(selected, copy)}</span></div>
+                                <div className="sql-example-preview-heading"><div><span className="eyebrow">{selected.dataset ?? categoryLabel(selected.category, copy, locale)}</span><h3>{exampleText(selected, locale, copy).name}.sql</h3></div><span className="sql-example-readonly">{selected.category === 'writeOperations' ? copy.exampleWriteOperations : chartLabel(selected, copy)}</span></div>
                                 <p>{exampleText(selected, locale, copy).description}</p>
                                 <pre><code>{selected.sql}</code></pre>
                                 <div className="sql-example-actions">
                                     <Button variant="secondary" className="sql-example-action" data-testid="open-sql-example" aria-label={copy.openInNewSql} title={copy.openInNewSql} onClick={() => { if (onOpenExample(selected)) onClose(false); }}><Icon name="plus"/>{copy.openExample}</Button>
                                     <Button variant="primary" className="sql-example-action" data-testid="run-sql-example" onClick={() => { if (onRunExample(selected, 'results')) onClose(false); }}><Icon name="play"/>{selectedIsScript ? copy.runScript : copy.run}</Button>
-                                    {!selectedIsScript && <Button variant="secondary" className="sql-example-action" data-testid="chart-sql-example" onClick={() => { if (onRunExample(selected, 'chart')) onClose(false); }}><Icon name="chart"/>{copy.chart}</Button>}
+                                    {!selectedIsScript && selected.category !== 'writeOperations' && <Button variant="secondary" className="sql-example-action" data-testid="chart-sql-example" onClick={() => { if (onRunExample(selected, 'chart')) onClose(false); }}><Icon name="chart"/>{copy.chart}</Button>}
                                 </div>
                                 </article>}
                             </div>}

@@ -101,6 +101,7 @@ export const english: Copy = {
         exampleAggregation: 'Aggregations',
         exampleTimeSeries: 'Time series',
         exampleClickHouse: 'ClickHouse',
+        exampleWriteOperations: 'Write operations',
         exampleCharts: 'Charts',
         exampleSchema: 'Your tables',
         exampleChartTable: 'Table',

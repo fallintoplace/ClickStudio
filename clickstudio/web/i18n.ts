@@ -123,6 +123,7 @@ export interface Copy {
         exampleAggregation: string;
         exampleTimeSeries: string;
         exampleClickHouse: string;
+        exampleWriteOperations: string;
         exampleCharts: string;
         exampleSchema: string;
         exampleChartTable: string;
