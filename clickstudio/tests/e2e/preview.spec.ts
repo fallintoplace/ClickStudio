@@ -38,7 +38,7 @@ const previewCloudConnectionTest: CloudConnectionTest = {
     parameters: { available: false, reason: 'Unavailable in this preview test.' },
 };
 
-async function mockCloudEndpoint(page: Page, commitOutcome: 'success' | 'unknown' = 'success', cloudSchema = previewCloudSchema, onSchemaAfterImport?: () => void) {
+async function mockCloudEndpoint(page: Page, commitOutcome: 'success' | 'unknown' | 'running' = 'success', cloudSchema = previewCloudSchema, onSchemaAfterImport?: () => void) {
     const imports: string[] = [];
     let activeSchema = cloudSchema;
     let importSucceeded = false;
@@ -58,7 +58,7 @@ async function mockCloudEndpoint(page: Page, commitOutcome: 'success' | 'unknown
                     ? fileContents.split(/\r?\n/).filter(Boolean).length
                     : Math.max(0, fileContents.trim().split(/\r?\n/).length - 1);
             const id = queryId.replace('clickstudio-import-', '');
-            if (commitOutcome === 'unknown') {
+            if (commitOutcome === 'unknown' || (commitOutcome === 'running' && imports.length === 1)) {
                 await route.fulfill({ status: 502, json: { error: { code: 'CLICKHOUSE_ERROR', message: 'The request ended before the insert response arrived.' } } });
                 return;
             }
@@ -87,7 +87,8 @@ async function mockCloudEndpoint(page: Page, commitOutcome: 'success' | 'unknown
             return;
         }
         if (body.action === 'import-status') {
-            await route.fulfill({ json: { id: (body.queryId ?? '').replace('clickstudio-import-', ''), connectionId: 'clickhouse-cloud', table: body.table, queryId: body.queryId, rows: body.rows, createdAt: '2026-09-28T00:00:00.000Z', status: 'unknown', error: 'ClickHouse could not confirm the insert. The rows may already be there.' } });
+            const running = commitOutcome === 'running';
+            await route.fulfill({ json: { id: (body.queryId ?? '').replace('clickstudio-import-', ''), connectionId: 'clickhouse-cloud', table: body.table, queryId: body.queryId, rows: body.rows, createdAt: '2026-09-28T00:00:00.000Z', status: running ? 'running' : 'unknown', ...(running ? { reconciliationRequired: true } : { error: 'ClickHouse could not confirm the insert. The rows may already be there.' }) } });
             return;
         }
         await route.fulfill({ status: 409, json: { error: { code: 'UNEXPECTED_ACTION', message: 'Unexpected Cloud action in this import test.' } } });
@@ -446,4 +447,45 @@ test('ClickHouse Cloud import shows clear choices after an interrupted write', a
     await expect(dialog.getByRole('button', { name: 'I see all rows' })).toBeVisible();
     await expect(dialog.getByRole('button', { name: 'No rows; retry import' })).toBeVisible();
     expect(imports).toHaveLength(1);
+});
+
+test('ClickHouse Cloud import can be closed and forgotten so another file can be imported', async ({ page }) => {
+    const imports = await mockCloudEndpoint(page, 'running');
+    await connectPreviewCloud(page);
+    await page.getByRole('button', { name: 'Import', exact: true }).last().click();
+
+    let dialog = page.getByRole('dialog', { name: 'Import data', exact: true });
+    await dialog.getByLabel('Choose a CSV, JSON, or NDJSON file').setInputFiles({
+        name: 'stuck.csv',
+        mimeType: 'text/csv',
+        buffer: Buffer.from('day,events\n2026-09-27,10\n2026-09-28,20\n'),
+    });
+    await dialog.getByRole('button', { name: 'Preview file' }).click();
+    await dialog.getByRole('button', { name: 'Map columns' }).click();
+    await dialog.getByRole('button', { name: 'Review import' }).click();
+    await dialog.getByRole('button', { name: 'Import rows', exact: true }).click();
+    await expect(dialog).toContainText('ClickHouse still reports this import as active.');
+    await expect(dialog.getByRole('button', { name: 'Close import wizard' })).toBeEnabled();
+
+    await dialog.getByRole('button', { name: 'Close import wizard' }).click();
+    await expect(dialog).not.toBeVisible();
+    await page.getByRole('button', { name: 'Import', exact: true }).last().click();
+    dialog = page.getByRole('dialog', { name: 'Import data', exact: true });
+    await expect(dialog).toContainText('ClickHouse still reports this import as active.');
+    await dialog.getByRole('button', { name: 'Forget import and continue' }).click();
+
+    await dialog.getByLabel('Choose a CSV, JSON, or NDJSON file').setInputFiles({
+        name: 'other.csv',
+        mimeType: 'text/csv',
+        buffer: Buffer.from('day,events\n2026-09-29,30\n'),
+    });
+    await dialog.getByRole('button', { name: 'Preview file' }).click();
+    await dialog.getByRole('button', { name: 'Map columns' }).click();
+    await dialog.getByRole('button', { name: 'Review import' }).click();
+    await dialog.getByRole('button', { name: 'Import rows', exact: true }).click();
+
+    await expect(dialog).toContainText('Inserted 1 row into default.events');
+    expect(imports).toHaveLength(2);
+    expect(imports[0]).toContain('filename="stuck.csv"');
+    expect(imports[1]).toContain('filename="other.csv"');
 });

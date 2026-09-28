@@ -11,6 +11,7 @@ import { flamegraphQuery, parseFlamegraphRows, type FlamegraphSource } from '../
 import { CREATE_TABLE_COLUMN_TYPES, isValidTableDatabase, type CreateTableColumn, type CreateTableColumnType } from '../shared/table-creation.js';
 import { createTableSql } from '../core/table-creation.js';
 import { canDropTableTarget, dropTableSql, isSystemDatabaseName, isViewEngine, tableDeletionConfirmation } from '../shared/table-deletion.js';
+import { cloudImportQueryLogOutcome } from '../shared/cloud-import-status.js';
 import { parseReplicationSnapshot, replicationQueueQuery, replicationReplicasQuery, type ReplicationCapabilities } from '../shared/replication.js';
 import { parseWorkloadSnapshot, WORKLOAD_WINDOWS, workloadFamiliesQuery, workloadPointsQuery, type QueryLogSource, type WorkloadWindow } from '../shared/workload.js';
 import { loadNativeExplorer, type NativeExplorerRequest, type NativeExplorerSnapshot } from '../shared/native-explorers.js';
@@ -575,26 +576,24 @@ async function inspectCloudImport(credentials: CloudCredentials, url: string, qu
                 'SELECT query_id FROM system.processes WHERE query_id IN ({queryId:String}, {createQueryId:String}) LIMIT 2', { queryId, createQueryId }, 8_000, 6);
             if (running.length) return { ...job, status: 'running', reconciliationRequired: true, error: 'ClickHouse still reports an import step as active.' };
         } catch { }
+        const insertEntries: { query_id: string; type: string; event_time: string }[] = [];
+        const createEntries: { query_id: string; type: string; event_time: string }[] = [];
         for (const source of ['user_query_log', 'query_log'] as const) {
             try {
                 const entries = await queryRows<{ query_id: string; type: string; event_time: string }>(client,
                     `SELECT query_id, type, event_time FROM system.${source} WHERE query_id IN ({queryId:String}, {createQueryId:String}) ORDER BY event_time DESC LIMIT 20`, { queryId, createQueryId }, 8_000, 6);
-                const insertEntries = entries.filter(entry => entry.query_id === queryId);
-                const createEntries = entries.filter(entry => entry.query_id === createQueryId);
-                tableCreated = createEntries.some(entry => entry.type === 'QueryFinish');
-                const targetExists = Boolean(target && await tableExists(client, target.database, target.table));
-                if (insertEntries.some(entry => entry.type === 'QueryFinish'))
-                    return { ...job, status: 'succeeded', tableCreated, tableExists: targetExists, error: undefined };
-                if (insertEntries.some(entry => entry.type === 'QueryStart'))
-                    return { ...job, status: 'running', reconciliationRequired: true, tableCreated, tableExists: targetExists, error: 'ClickHouse still reports this import as active.' };
-                if (insertEntries.some(entry => entry.type.startsWith('Exception'))) {
-                    return { ...job, tableCreated, tableExists: targetExists, error: targetExists
-                        ? `The destination table ${table} exists, but ClickHouse did not confirm its rows. Inspect the table before deciding what to do.`
-                        : 'ClickHouse recorded an import error. Check the destination before retrying.' };
-                }
+                insertEntries.push(...entries.filter(entry => entry.query_id === queryId));
+                createEntries.push(...entries.filter(entry => entry.query_id === createQueryId));
             } catch { }
         }
+        tableCreated = createEntries.some(entry => entry.type === 'QueryFinish');
         const targetExists = Boolean(target && await tableExists(client, target.database, target.table));
+        const outcome = cloudImportQueryLogOutcome(insertEntries);
+        if (outcome === 'finished') return { ...job, status: 'succeeded', tableCreated, tableExists: targetExists, error: undefined };
+        if (outcome === 'exception') return { ...job, tableCreated, tableExists: targetExists, error: targetExists
+            ? `The destination table ${table} exists, but ClickHouse did not confirm its rows. Inspect the table before deciding what to do.`
+            : 'ClickHouse recorded an import error. Check the destination before retrying.' };
+        if (outcome === 'started') return { ...job, tableCreated, tableExists: targetExists, error: 'The insert has no completion record. Check the destination before retrying.' };
         return { ...job, tableCreated, tableExists: targetExists, ...(targetExists ? { error: `The destination table ${table} exists, but ClickHouse has no success record for the imported rows. Inspect it before trying again.` } : {}) };
     } finally {
         await client.close();

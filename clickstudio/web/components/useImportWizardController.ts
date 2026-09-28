@@ -47,6 +47,26 @@ type ImportActionSetters = {
     setImportUnavailable: Dispatch<SetStateAction<string>>;
 };
 
+type ForgetCloudImportContext = Pick<ImportActionSetters, 'setStep' | 'setFields' | 'setRecoverableJobs'> & {
+    job?: ImportJob;
+    busy: BusyAction;
+    browserCloudImport: boolean;
+    clearPendingImport: () => void;
+    chooseFile: (file?: File) => void;
+    setRetryAttemptedFor: Dispatch<SetStateAction<string | undefined>>;
+};
+
+function forgetCloudImport(context: ForgetCloudImportContext) {
+    const { job, busy, browserCloudImport, clearPendingImport, chooseFile, setRecoverableJobs, setFields, setRetryAttemptedFor, setStep } = context;
+    if (!browserCloudImport || !job || busy || (job.status !== 'running' && job.status !== 'unknown')) return;
+    clearPendingImport();
+    setRecoverableJobs(items => items.filter(item => item.id !== job.id));
+    chooseFile(undefined);
+    setFields({});
+    setRetryAttemptedFor(undefined);
+    setStep('file');
+}
+
 async function runCommitImport(context: ImportActionSetters & {
     mapping?: ImportMapping;
     busy: BusyAction;
@@ -787,11 +807,11 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
     };
 
     async function closeWizard() {
-        if (busy || job?.status === 'running') return;
+        if (!browserCloudImport && (busy || job?.status === 'running')) return;
         if (preview?.id && !browserCloudImport) {
             void api(`/imports/${encodeURIComponent(preview.id)}`, { method: 'DELETE' }).catch(() => undefined);
         }
-        if (recoveryState === 'ready' && (job?.status !== 'unknown' || job.reviewedAt)) clearPendingImport();
+        if (recoveryState === 'ready' && (job?.status !== 'unknown' || job.reviewedAt) && (!browserCloudImport || job?.status !== 'running')) clearPendingImport();
         onClose();
     }
 
@@ -955,6 +975,7 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
         createColumnTypes: CREATE_TABLE_COLUMN_TYPES,
         updateCreateColumn,
         closeWizard,
+        forgetImport: () => forgetCloudImport({ job, busy, browserCloudImport, clearPendingImport, chooseFile, setRecoverableJobs, setFields, setRetryAttemptedFor, setStep }),
         chooseFile,
         previewFile,
         previewSampleFile,

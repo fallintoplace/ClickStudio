@@ -56,6 +56,7 @@ export function ImportWizard({ onImportQuery, ...controllerProps }: ImportWizard
         duplicateDestinations,
         sampleColumns,
         closeWizard,
+        forgetImport,
         chooseFile,
         previewFile,
         previewSampleFile,
@@ -129,8 +130,8 @@ export function ImportWizard({ onImportQuery, ...controllerProps }: ImportWizard
     return <dialog
         ref={dialogRef}
         aria-labelledby="import-wizard-title"
-        onCancel={event => { event.preventDefault(); if (openingQuery) return; if (importKind === 'query') closeQueryMode(); else if (!busy && job?.status !== 'running') void closeWizard(); }}
-        onClick={event => { if (event.target === dialogRef.current && !openingQuery) { if (importKind === 'query') closeQueryMode(); else if (!busy && job?.status !== 'running') void closeWizard(); } }}
+        onCancel={event => { event.preventDefault(); if (openingQuery) return; if (importKind === 'query') closeQueryMode(); else if (browserCloudImport || (!busy && job?.status !== 'running')) void closeWizard(); }}
+        onClick={event => { if (event.target === dialogRef.current && !openingQuery) { if (importKind === 'query') closeQueryMode(); else if (browserCloudImport || (!busy && job?.status !== 'running')) void closeWizard(); } }}
         className="import-wizard-dialog m-auto max-h-[min(90vh,800px)] w-[min(860px,calc(100vw-2rem))] max-w-none overflow-hidden rounded-2xl border border-[var(--line-bright)] bg-[var(--panel)] p-0 text-[var(--text)] shadow-[var(--shadow)] backdrop:bg-black/70 backdrop:backdrop-blur-sm"
     >
         <div className="import-wizard-shell flex max-h-[min(90vh,800px)] flex-col">
@@ -140,7 +141,7 @@ export function ImportWizard({ onImportQuery, ...controllerProps }: ImportWizard
                     <h2 id="import-wizard-title" className="mt-1 text-lg font-semibold tracking-tight">Import data</h2>
                     <p className="mt-1 text-xs text-[var(--text-soft)]">{importKind === 'query' ? 'Open a SQL file as a new draft. It will not run until you choose Run.' : browserDemoImport ? 'Preview, map, and save rows into this browser’s sample dataset.' : browserCloudImport ? 'Preview, map, and import rows with your connected Cloud account.' : 'Preview, map, and review rows before inserting them.'}</p>
                 </div>
-                <button type="button" aria-label="Close import wizard" disabled={openingQuery || (importKind === 'rows' && (Boolean(busy) || job?.status === 'running'))} onClick={() => importKind === 'query' ? closeQueryMode() : void closeWizard()} className="rounded-lg border border-[var(--line)] px-3 py-2 text-xs text-[var(--text-soft)] transition hover:bg-[var(--panel-hover)] disabled:cursor-not-allowed disabled:opacity-40">Close</button>
+                <button type="button" aria-label="Close import wizard" disabled={openingQuery || (importKind === 'rows' && !browserCloudImport && (Boolean(busy) || job?.status === 'running'))} onClick={() => importKind === 'query' ? closeQueryMode() : void closeWizard()} className="rounded-lg border border-[var(--line)] px-3 py-2 text-xs text-[var(--text-soft)] transition hover:bg-[var(--panel-hover)] disabled:cursor-not-allowed disabled:opacity-40">Close</button>
             </header>
 
             <div role="group" aria-label="Import type" className="import-kind-choice">
@@ -281,10 +282,10 @@ export function ImportWizard({ onImportQuery, ...controllerProps }: ImportWizard
                 </section>}
 
                 {recoveryState === 'ready' && !importUnavailable && step === 'status' && <ImportJobStatus
-                    job={job} pendingImport={pendingImport} browserDemoImport={browserDemoImport}
+                    job={job} pendingImport={pendingImport} browserDemoImport={browserDemoImport} browserCloudImport={browserCloudImport}
                     recoverableJobCount={recoverableJobs.length} busy={busy} retryAttempted={retryAttemptedFor === job?.id}
                     canRetry={canRetryUnknownImport} onReconcile={() => void reconcileJob()} onConfirm={() => void confirmUnknownImport()}
-                    onRetry={() => void (canRetryUnknownImport ? retryUnknownImport() : reviewUnknownImport())}
+                    onRetry={() => void (canRetryUnknownImport ? retryUnknownImport() : reviewUnknownImport())} onForget={forgetImport}
                 />}
 
                 {error && recoveryState !== 'failed' && <p role="alert" className="mt-4 rounded-lg border border-[var(--red)]/30 bg-[var(--red)]/5 px-3 py-2.5 text-xs leading-relaxed text-[var(--red)]">{error}</p>}
