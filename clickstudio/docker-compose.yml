@@ -49,8 +49,6 @@ services:
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?Reader password is required}
       CLICKHOUSE_WRITER_USER: clickstudio_writer
       CLICKHOUSE_WRITER_PASSWORD: ${CLICKHOUSE_WRITER_PASSWORD:?Writer password is required}
-      CLICKHOUSE_IMPORT_TABLES: default.import_events
-      CLICKHOUSE_CREATE_TABLES: ${CLICKHOUSE_CREATE_TABLES:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-}
     volumes:

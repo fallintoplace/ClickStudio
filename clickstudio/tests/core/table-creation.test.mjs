@@ -20,22 +20,22 @@ test('CREATE TABLE SQL accepts only bounded safe definitions', () => {
     assert.deepEqual(CREATE_TABLE_COLUMN_TYPES, ['String', 'UInt64', 'Int64', 'Float64', 'Decimal(18, 2)', 'Date', 'DateTime', 'UUID']);
 });
 
-test('Table creation requires owner, trust, exact allowlist, and typed confirmation', async () => {
+test('Table creation requires owner, trust, a valid name, and typed confirmation', async () => {
     let creates = 0;
-    const driver = { createTargets: () => ['default.events'], async createTable() { creates++; } };
+    const driver = { database: () => 'default', async createTable() { creates++; } };
     const service = new TableCreationService(new MemoryStore(), driver, (_principal, connectionId) => connectionId === 'trusted');
-    await assert.rejects(service.create(viewer, 'trusted', 'default.events', columns, 'id', 'CREATE TABLE default.events'), { code: 'ROLE_READ_ONLY' });
-    await assert.rejects(service.create(owner, 'untrusted', 'default.events', columns, 'id', 'CREATE TABLE default.events'), { code: 'WORKSPACE_UNTRUSTED' });
-    await assert.rejects(service.create(owner, 'trusted', 'default.other', columns, 'id', 'CREATE TABLE default.other'), { code: 'TABLE_CREATE_NOT_ALLOWED' });
-    await assert.rejects(service.create(owner, 'trusted', 'default.events', columns, 'id', 'yes'), { code: 'TABLE_CREATE_CONFIRMATION' });
+    await assert.rejects(service.create(viewer, 'trusted', 'events', columns, 'id', 'CREATE TABLE default.events'), { code: 'ROLE_READ_ONLY' });
+    await assert.rejects(service.create(owner, 'untrusted', 'events', columns, 'id', 'CREATE TABLE default.events'), { code: 'WORKSPACE_UNTRUSTED' });
+    await assert.rejects(service.create(owner, 'trusted', 'events; DROP TABLE x', columns, 'id', 'CREATE TABLE default.events'), { code: 'TABLE_NAME' });
+    await assert.rejects(service.create(owner, 'trusted', 'events', columns, 'id', 'yes'), { code: 'TABLE_CREATE_CONFIRMATION' });
     assert.equal(creates, 0);
 });
 
-test('Successful table creation sends the allowlisted definition and records an audit event', async () => {
+test('Successful table creation uses the connection database and records an audit event', async () => {
     const store = new MemoryStore(), calls = [];
-    const driver = { createTargets: () => ['default.events'], async createTable(...args) { calls.push(args); } };
+    const driver = { database: () => 'default', async createTable(...args) { calls.push(args); } };
     const service = new TableCreationService(store, driver, () => true);
-    const result = await service.create(owner, 'local', 'default.events', columns, 'id', 'CREATE TABLE default.events');
+    const result = await service.create(owner, 'local', 'events', columns, 'id', 'CREATE TABLE default.events');
     assert.equal(result.database, 'default');
     assert.equal(result.table, 'events');
     assert.deepEqual(calls[0].slice(0, 4), ['local', 'default.events', columns, 'id']);

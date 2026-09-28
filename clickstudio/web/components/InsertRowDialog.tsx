@@ -167,7 +167,7 @@ export function InsertRowDialog({ connectionId, table, columns, onClose, onInser
             <main className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-5 sm:px-7">
                 {loading && <p role="status" className="text-sm text-[var(--text-soft)]">Checking insert access…</p>}
                 {!loading && setupError && <p role="alert" className="rounded-lg border border-[var(--red)]/30 bg-[var(--red)]/5 p-3 text-xs text-[var(--red)]">{setupError}</p>}
-                {!loading && !setupError && !allowed && <p role="status" className="rounded-xl border border-[var(--line)] bg-[var(--page)] p-4 text-sm text-[var(--text-soft)]">This table is not enabled for row insertion. Add it to the connection writer allowlist.</p>}
+                {!loading && !setupError && !allowed && <p role="status" className="rounded-xl border border-[var(--line)] bg-[var(--page)] p-4 text-sm text-[var(--text-soft)]">This table is not available in the connection database.</p>}
                 {step === 'edit' && allowed && <form id="insert-row-form" onSubmit={event => void reviewRow(event)} className="space-y-3">
                     <p className="text-xs text-[var(--muted)]">Required columns are included. Leave defaulted or nullable columns out to use their ClickHouse defaults.</p>
                     {writableColumns.map(column => {

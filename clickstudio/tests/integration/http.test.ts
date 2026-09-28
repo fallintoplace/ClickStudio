@@ -1,9 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { randomUUID } from 'node:crypto';
 import { createApp } from '../../server/app.js';
 import { loadConfig } from '../../server/config.js';
+import { ClickHouseDriver } from '../../server/clickhouse.js';
 import { MemoryStore } from '../../core/store.js';
 import { DemoDriver } from '../../server/demo.js';
 import type { VoiceService } from '../../server/voice.js';
@@ -57,27 +59,74 @@ class ReferenceDocsDemoDriver extends DemoDriver {
 
 class TableCreationDemoDriver extends DemoDriver {
     readonly createdTables: Array<{ id: string; table: string; columns: CreateTableColumn[]; orderBy: string; queryId: string }> = [];
-    override createTargets(_id: string) { return ['demo.new_events']; }
+    override database(_id: string) { return 'demo'; }
     override async createTable(id: string, table: string, columns: CreateTableColumn[], orderBy: string, queryId: string) {
         this.createdTables.push({ id, table, columns, orderBy, queryId });
     }
 }
 
-test('Table creation needs trust, an exact target, and an exact confirmation', async (t) => {
+test('Table creation needs trust, a valid table name, and an exact confirmation', async (t) => {
     const driver = new TableCreationDemoDriver(), s = await start(undefined, undefined, undefined, driver);
     t.after(() => s.stop());
-    assert.deepEqual(await (await s.call('/connections/demo/create-table-targets')).json(), ['demo.new_events']);
-    const request = { table: 'demo.new_events', columns: [{ name: 'id', type: 'UInt64' }], orderBy: 'id', confirmation: 'CREATE TABLE demo.new_events' };
+    const request = { table: 'interview_events', columns: [{ name: 'id', type: 'UInt64' }], orderBy: 'id', confirmation: 'CREATE TABLE demo.interview_events' };
     assert.equal((await s.call('/connections/demo/tables', request)).status, 403);
     await s.call('/connections/demo/trust', { trusted: true, confirmation: 'demo' });
     assert.equal((await s.call('/connections/demo/tables', { ...request, confirmation: 'yes' })).status, 400);
+    assert.equal((await s.call('/connections/demo/tables', { ...request, table: 'other.interview_events' })).status, 400);
     assert.equal((await s.call('/connections/demo/tables', { ...request, columns: [{ name: 'id); DROP TABLE x', type: 'UInt64' }] })).status, 400);
     assert.equal((await s.call('/connections/demo/tables', { ...request, columns: [{ name: 'id', type: 'String); DROP TABLE x' }] })).status, 400);
     const response = await s.call('/connections/demo/tables', request);
     assert.equal(response.status, 201);
     assert.equal(driver.createdTables.length, 1);
-    assert.deepEqual(driver.createdTables[0], { id: 'demo', table: 'demo.new_events', columns: request.columns, orderBy: 'id', queryId: driver.createdTables[0].queryId });
+    assert.deepEqual(driver.createdTables[0], { id: 'demo', table: 'demo.interview_events', columns: request.columns, orderBy: 'id', queryId: driver.createdTables[0].queryId });
     assert.match(driver.createdTables[0].queryId, /^clickstudio-create-table-/);
+});
+
+test('Write targets are any valid table in the connection database', () => {
+    const driver = new ClickHouseDriver(loadConfig({ CLICKHOUSE_DATABASE: 'analytics', CLICKHOUSE_USER: 'interview_user' }));
+    assert.equal(driver.database('local'), 'analytics');
+    assert.equal(driver.allowed('local', 'analytics.interview_events'), true);
+    assert.equal(driver.allowed('local', 'default.interview_events'), false);
+    assert.equal(driver.allowed('local', 'analytics.events; DROP TABLE x'), false);
+});
+
+test('Import targets list tables from the connection database', async () => {
+    const driver = new ClickHouseDriver(loadConfig({ CLICKHOUSE_DATABASE: 'analytics', CLICKHOUSE_USER: 'interview_user' }));
+    const queryDriver = driver as unknown as { rows: (_id: string, query: string, parameters: Record<string, string>) => Promise<Array<{ name: string }>> };
+    queryDriver.rows = async (_id, query, parameters) => {
+        assert.match(query, /system\.tables/);
+        assert.deepEqual(parameters, { database: 'analytics' });
+        return [{ name: 'events' }, { name: 'interview_events' }];
+    };
+    assert.deepEqual(await driver.targets('local'), ['analytics.events', 'analytics.interview_events']);
+});
+
+test('Writes fall back to the connection identity when no writer is configured', async () => {
+    let captured: { url: string; body: string; headers: Record<string, string | string[] | undefined> } | undefined;
+    const server = createServer((request, response) => {
+        const chunks: Buffer[] = [];
+        request.on('data', chunk => chunks.push(Buffer.from(chunk)));
+        request.on('end', () => { captured = { url: request.url ?? '/', body: Buffer.concat(chunks).toString('utf8'), headers: request.headers }; response.end(''); });
+    });
+    server.listen(0, '127.0.0.1');
+    await new Promise<void>((resolve, reject) => { server.once('listening', resolve); server.once('error', reject); });
+    const port = (server.address() as AddressInfo).port;
+    const driver = new ClickHouseDriver(loadConfig({ CLICKHOUSE_URL: `http://127.0.0.1:${port}`, CLICKHOUSE_USER: 'interview_user', CLICKHOUSE_PASSWORD: 'connection-secret' }));
+    try {
+        await driver.createTable('local', 'default.interview_events', [{ name: 'id', type: 'UInt64' }], 'id', 'test-query-id');
+        assert.ok(captured);
+        assert.match(`${captured.url}\n${captured.body}`, /CREATE TABLE `default`\.`interview_events`/);
+        const url = new URL(captured.url, 'http://127.0.0.1');
+        const authorization = String(captured.headers.authorization ?? '');
+        const basic = authorization.startsWith('Basic ') ? Buffer.from(authorization.slice(6), 'base64').toString('utf8') : '';
+        const username = captured.headers['x-clickhouse-user'] ?? url.searchParams.get('user') ?? basic.split(':')[0];
+        const password = captured.headers['x-clickhouse-key'] ?? url.searchParams.get('password') ?? basic.slice(basic.indexOf(':') + 1);
+        assert.ok(username === 'interview_user' && password === 'connection-secret', 'The write request should use the connection identity');
+    } finally {
+        await driver.close();
+        server.closeAllConnections();
+        await new Promise<void>(resolve => server.close(() => resolve()));
+    }
 });
 
 test('Reference routes require trust, validate bounded filters, and preserve entry type identity', async (t) => {

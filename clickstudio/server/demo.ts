@@ -94,9 +94,9 @@ export class DemoDriver {
     }
     async cancel(_run: Run) { }
     async close() { }
-    targets(_id: string) { return []; }
+    async targets(_id: string) { return []; }
     allowed(_id: string, _table: string) { return false; }
-    createTargets(_id: string) { return []; }
+    database(id: string) { this.connection({ id: 'local-owner', role: 'owner' }, id); return 'demo'; }
     async createTable(_id: string, _table: string, _columns: CreateTableColumn[], _orderBy: string, _queryId: string) { throw new AppError(403, 'DEMO_READ_ONLY', 'Fixture mode never creates tables'); }
     async insert() { throw new AppError(403, 'DEMO_READ_ONLY', 'Fixture mode never inserts'); }
     async inspectInsert() { return 'unknown' as const; }

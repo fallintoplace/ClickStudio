@@ -182,7 +182,7 @@ export class ImportService {
         canWrite(principal);
         const input = this.get(principal, inputId);
         requireThat(this.trusted(principal, connectionId), 403, 'WORKSPACE_UNTRUSTED', 'Trust the destination connection first');
-        requireThat(this.driver.allowed(connectionId, table), 403, 'IMPORT_NOT_ALLOWED', 'This destination is not enabled for imports');
+        requireThat(this.driver.allowed(connectionId, table), 403, 'IMPORT_NOT_ALLOWED', 'Import destinations must belong to the connection database');
         const schema = await this.driver.schema(connectionId);
         const columns = targetColumns(schema, table);
         const destinations = Object.values(fields);
@@ -219,11 +219,11 @@ export class ImportService {
             (job.status === 'running' || (job.status === 'unknown' && !job.reviewedAt)));
         requireThat(!unresolved, 409, 'IMPORT_UNRESOLVED', 'Review or reconcile the previous import to this table before starting another write');
         this.get(principal, mapping.inputId);
-        requireThat(this.trusted(principal, mapping.connectionId) && this.driver.allowed(mapping.connectionId, mapping.table), 403, 'IMPORT_NOT_ALLOWED', 'Destination trust or import permission changed');
+        requireThat(this.trusted(principal, mapping.connectionId) && this.driver.allowed(mapping.connectionId, mapping.table), 403, 'IMPORT_NOT_ALLOWED', 'Destination trust or database scope changed');
         requireThat(confirmation === `INSERT ${mapping.rows.length} ROWS`, 400, 'IMPORT_CONFIRMATION', 'Confirm the exact row count before inserting');
         const schema = await this.driver.schema(mapping.connectionId);
         requireThat(hash(targetColumns(schema, mapping.table)) === mapping.schemaHash, 409, 'SCHEMA_CHANGED', 'The destination schema changed; review a new mapping');
-        requireThat(this.trusted(principal, mapping.connectionId) && this.driver.allowed(mapping.connectionId, mapping.table), 403, 'IMPORT_NOT_ALLOWED', 'Destination trust or import permission changed during schema validation');
+        requireThat(this.trusted(principal, mapping.connectionId) && this.driver.allowed(mapping.connectionId, mapping.table), 403, 'IMPORT_NOT_ALLOWED', 'Destination trust or database scope changed during schema validation');
         const existing = this.store.get<ImportJob>('imports', mappingId);
         if (existing)
             return existing;

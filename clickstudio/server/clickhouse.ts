@@ -36,9 +36,8 @@ export class ClickHouseDriver implements QueryDriver, ImportDriver, CreateTableD
         if (client)
             return client;
         const p = this.profile(id);
-        if (write)
-            requireThat(p.writer, 403, 'IMPORT_NOT_ALLOWED', 'No import identity is configured');
-        client = createClient({ url: p.url, database: p.database, username: write ? p.writer!.username : p.username, password: write ? p.writer!.password : p.password,
+        const identity = write ? p.writer ?? p : p;
+        client = createClient({ url: p.url, database: p.database, username: identity.username, password: identity.password,
             request_timeout: 135000, max_open_connections: 6, application: 'clickstudio' });
         pool.set(id, client);
         return client;
@@ -104,7 +103,7 @@ export class ClickHouseDriver implements QueryDriver, ImportDriver, CreateTableD
             ...(queryLogSource ? { queryLogSource } : {}), traceLog: flamegraphSource ? { available: true } : { available: false, reason: traceLogSymbolized.reason ?? traceLogAddresses.reason ?? 'ClickHouse trace-log symbols are unavailable to this reader.' },
             replication: replication.replicas || replication.queue ? { available: true } : { available: false, reason: replicas.reason ?? replicationQueue.reason ?? 'Replication system tables are unavailable to this reader.' },
             documentation, explain, explainPlan, queryTree, pipeline, explainAnalyze, cancellation,
-            import: { available: Boolean(this.profile(id).writer), reason: this.profile(id).writer ? 'Explicit allowlisted import identity configured' : 'Configure a separate writer and target allowlist to enable imports' }, scripts: { available: true }, parameters: { available: true } };
+            import: { available: true, reason: 'Writes use the connection identity or optional writer credentials; ClickHouse permissions apply' }, scripts: { available: true }, parameters: { available: true } };
         this.manifests.set(id, manifest);
         return this.connection({ id: 'local-owner', role: 'owner' }, id);
     }
@@ -398,11 +397,19 @@ export class ClickHouseDriver implements QueryDriver, ImportDriver, CreateTableD
         const rows = await this.rows<Record<string, unknown>>(run.connectionId, `EXPLAIN PIPELINE graph = 1, compact = 0\n${statement}`, run.parameters);
         return rows.map(row => String(Object.values(row)[0] ?? '')).filter(Boolean);
     }
-    targets(id: string) { const writer = this.profile(id).writer; return [...new Set([...(writer?.tables ?? []), ...(writer?.createTables ?? [])])]; }
-    allowed(id: string, table: string) { return this.targets(id).includes(table); }
-    createTargets(id: string) { return this.profile(id).writer?.createTables ?? []; }
+    async targets(id: string) {
+        const database = this.profile(id).database;
+        const rows = await this.rows<{ name: string }>(id,
+            'SELECT name FROM system.tables WHERE database = {database:String} AND engine NOT IN (\'View\', \'MaterializedView\', \'LiveView\', \'WindowView\') ORDER BY name LIMIT 1000', { database });
+        return rows.map(row => `${database}.${row.name}`);
+    }
+    allowed(id: string, table: string) {
+        const [database, name, ...extra] = table.split('.');
+        return database === this.profile(id).database && extra.length === 0 && /^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(name ?? '');
+    }
+    database(id: string) { return this.profile(id).database; }
     async createTable(id: string, table: string, columns: CreateTableColumn[], orderBy: string, queryId: string) {
-        requireThat(this.createTargets(id).includes(table), 403, 'TABLE_CREATE_NOT_ALLOWED', 'Table creation target is not allowlisted');
+        requireThat(this.allowed(id, table), 403, 'TABLE_CREATE_NOT_ALLOWED', 'Table creation is limited to the connection database');
         try {
             await this.client(id, true).command({ query: createTableSql(table, columns, orderBy), query_id: queryId, abort_signal: AbortSignal.timeout(60000),
                 clickhouse_settings: { max_execution_time: 55, max_memory_usage: '536870912' } });
@@ -412,7 +419,7 @@ export class ClickHouseDriver implements QueryDriver, ImportDriver, CreateTableD
         }
     }
     async insert(id: string, table: string, rows: Record<string, Json>[], queryId: string) {
-        requireThat(this.allowed(id, table), 403, 'IMPORT_NOT_ALLOWED', 'Import target is not allowlisted');
+        requireThat(this.allowed(id, table), 403, 'IMPORT_NOT_ALLOWED', 'Import destinations must belong to the connection database');
         try {
             await this.client(id, true).insert({ table: quotedTable(table), values: rows, format: 'JSONEachRow', query_id: queryId, abort_signal: AbortSignal.timeout(60000), clickhouse_settings: { max_execution_time: 55, max_memory_usage: '536870912' } });
         }

@@ -7,6 +7,6 @@
     "username": "clickstudio_reader",
     "passwordEnv": "CLICKHOUSE_PASSWORD",
     "limits": {"rows": 5000, "bytes": 2000000, "seconds": 30, "memory": 536870912, "threads": 4},
-    "writer": {"username": "clickstudio_writer", "passwordEnv": "CLICKHOUSE_WRITER_PASSWORD", "tables": ["default.import_events"], "createTables": []}
+    "writer": {"username": "clickstudio_writer", "passwordEnv": "CLICKHOUSE_WRITER_PASSWORD"}
   }
 ]

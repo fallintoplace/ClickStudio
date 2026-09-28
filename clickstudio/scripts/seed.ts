@@ -20,13 +20,12 @@ try {
         await command(`CREATE USER IF NOT EXISTS ${user} IDENTIFIED WITH sha256_password BY ${literal(password!)}${profile}`);
         await command(`ALTER USER ${user} IDENTIFIED WITH sha256_password BY ${literal(password!)}${profile}`);
     }
-    await command('GRANT SELECT ON default.events TO clickstudio_reader');
-    await command('GRANT SELECT ON default.import_events TO clickstudio_reader');
+    await command('GRANT SELECT ON default.* TO clickstudio_reader');
     for (const table of ['columns', 'tables', 'databases', 'processes', 'merges', 'mutations', 'view_refreshes'])
         await command(`GRANT SELECT ON system.${table} TO clickstudio_reader`);
-    await command('GRANT INSERT ON default.import_events TO clickstudio_writer');
+    await command('GRANT CREATE TABLE, INSERT ON default.* TO clickstudio_writer');
     // Do not grant global query_log access: it can reveal other users’ SQL. That capability is opt-in.
-    console.log('Local tables and restricted reader/import writer configured. No administrator credentials are used by the app.');
+    console.log('Local tables and reader/writer users configured. No administrator credentials are used by the app.');
 }
 catch {
     // ClickHouse errors may echo DDL containing a password. Do not print that error or query text.

@@ -19,27 +19,14 @@ test('A shared binding cannot use the default ClickHouse identity', () => assert
 test('Fixture mode cannot be exposed on a shared bind address', () => assert.throws(() => loadConfig({ HOST: '0.0.0.0', CLICKSTUDIO_TOKEN: 'a'.repeat(40), CLICKHOUSE_USER: 'reader', DEMO_MODE: 'true' }), { code: 'DEMO_LOCAL_ONLY' }));
 test('Connection URLs cannot carry credentials', () => assert.throws(() => loadConfig({ CLICKHOUSE_URL: 'https://user:secret@example.com' }), { code: 'CONNECTION_URL' }));
 test('Connection URLs cannot carry arbitrary paths', () => assert.throws(() => loadConfig({ CLICKHOUSE_URL: 'http://localhost:8123/other-api' }), { code: 'CONNECTION_URL' }));
-test('Public profiles omit read and write passwords', () => { const c = loadConfig({ CLICKHOUSE_PASSWORD: 'reader-pass', CLICKHOUSE_WRITER_USER: 'writer', CLICKHOUSE_WRITER_PASSWORD: 'writer-pass', CLICKHOUSE_IMPORT_TABLES: 'default.target' }); const output = JSON.stringify(publicProfile(c.profiles[0])); assert.ok(!output.includes('reader-pass')); assert.ok(!output.includes('writer-pass')); assert.ok(!output.includes('writer')); });
+test('Public profiles omit read and write passwords', () => { const c = loadConfig({ CLICKHOUSE_PASSWORD: 'reader-pass', CLICKHOUSE_WRITER_USER: 'writer', CLICKHOUSE_WRITER_PASSWORD: 'writer-pass' }); const output = JSON.stringify(publicProfile(c.profiles[0])); assert.ok(!output.includes('reader-pass')); assert.ok(!output.includes('writer-pass')); assert.ok(!output.includes('writer')); });
 test('Configured secrets are redacted before diagnostic truncation', () => { const c = loadConfig({ CLICKHOUSE_PASSWORD: 'private-password' }); const result = redactor(c)('x'.repeat(2995) + 'private-password'); assert.ok(!result.includes('private')); assert.ok(result.length <= 3000); });
-test('Import allowlists reject expressions and wildcard targets', () => { for (const target of ['default.*', 'url(http://other)', 'default.table;DROP'])
-    assert.throws(() => loadConfig({ CLICKHOUSE_WRITER_USER: 'writer', CLICKHOUSE_IMPORT_TABLES: target }), { code: 'IMPORT_TABLES' }); });
-test('Import targets must belong to their connection profile database', () => {
-    const config = loadConfig({ CLICKHOUSE_DATABASE: 'analytics', CLICKHOUSE_WRITER_USER: 'writer', CLICKHOUSE_IMPORT_TABLES: 'analytics.events,analytics.sessions' });
-    assert.deepEqual(config.profiles[0].writer.tables, ['analytics.events', 'analytics.sessions']);
-    assert.throws(() => loadConfig({ CLICKHOUSE_DATABASE: 'analytics', CLICKHOUSE_WRITER_USER: 'writer', CLICKHOUSE_IMPORT_TABLES: 'analytics.events,default.archive' }), { code: 'IMPORT_TABLES' });
-});
-test('Table creation targets are opt-in, exact, unique, and scoped to the profile database', () => {
-    const config = loadConfig({ CLICKHOUSE_WRITER_USER: 'writer', CLICKHOUSE_IMPORT_TABLES: 'default.events', CLICKHOUSE_CREATE_TABLES: 'default.new_events' });
-    assert.deepEqual(config.profiles[0].writer.createTables, ['default.new_events']);
-    assert.deepEqual(loadConfig({ CLICKHOUSE_WRITER_USER: 'writer', CLICKHOUSE_IMPORT_TABLES: 'default.events' }).profiles[0].writer.createTables, []);
-    assert.throws(() => loadConfig({ CLICKHOUSE_WRITER_USER: 'writer', CLICKHOUSE_CREATE_TABLES: 'default.*' }), { code: 'CREATE_TABLES' });
-    assert.throws(() => loadConfig({ CLICKHOUSE_DATABASE: 'analytics', CLICKHOUSE_WRITER_USER: 'writer', CLICKHOUSE_CREATE_TABLES: 'default.events' }), { code: 'CREATE_TABLES' });
-    assert.throws(() => loadConfig({ CLICKHOUSE_WRITER_USER: 'writer', CLICKHOUSE_CREATE_TABLES: 'default.events,default.events' }), { code: 'CREATE_TABLES' });
-});
-test('A writer can be configured only for table creation', () => {
-    const config = loadConfig({ CLICKHOUSE_WRITER_USER: 'writer', CLICKHOUSE_CREATE_TABLES: 'default.new_events' });
-    assert.deepEqual(config.profiles[0].writer.tables, []);
-    assert.deepEqual(config.profiles[0].writer.createTables, ['default.new_events']);
+test('The ClickHouse identity can write without target allowlist configuration', () => {
+    const connectionIdentity = loadConfig({ CLICKHOUSE_USER: 'interview_user' }).profiles[0];
+    assert.equal(connectionIdentity.writer, undefined);
+    assert.equal(loadConfig({ CLICKHOUSE_WRITER_USER: 'writer' }).profiles[0].writer, undefined);
+    const writer = loadConfig({ CLICKHOUSE_WRITER_USER: 'writer', CLICKHOUSE_WRITER_PASSWORD: 'writer-pass' }).profiles[0].writer;
+    assert.deepEqual(writer, { username: 'writer', password: 'writer-pass' });
 });
 test('Null child filters use IS NULL semantics rather than a printable value', () => { const child = insertChildFilter('SELECT NULL AS value', 'value', null); assert.ok(child.sql.includes('isNull(`value`)')); assert.deepEqual(child.parameters, {}); });
 test('Child filters do not overwrite an existing query parameter', () => { const child = insertChildFilter('SELECT {wb_filter:String} AS value', 'value', 'next'); assert.deepEqual(child.parameters, { wb_filter_child: 'next' }); assert.ok(child.sql.includes('{wb_filter_child:String}')); });
