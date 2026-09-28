@@ -1,8 +1,7 @@
 import OpenAI from 'openai';
-import { APIError } from 'openai';
-import type { AssistantDriver, PreparedContext } from '../core/assistant.js';
+import { APIConnectionTimeoutError, APIError } from 'openai';
+import { ASSISTANT_REQUEST_TIMEOUT_MS, ASSISTANT_TIMEOUT_MESSAGE, isAssistantTimeoutSignal, validateProposal, type AssistantDriver, type PreparedContext } from '../core/assistant.js';
 import { AppError } from '../core/errors.js';
-import { validateProposal } from '../core/assistant.js';
 import type { AssistantSource } from '../shared/types.js';
 const MAX_OUTPUT_TOKENS = 12_000;
 const DEFAULT_MAX_INPUT_TOKENS = 48_000;
@@ -24,9 +23,10 @@ function isContextLengthError(error: unknown): error is APIError {
 }
 
 function logProviderFailure(stage: string, error: unknown, inputTokens?: number) {
+    const errorType = error instanceof APIConnectionTimeoutError ? 'APIConnectionTimeoutError' : error instanceof Error ? error.name : 'unknown';
     const details = error instanceof APIError
-        ? { status: error.status, code: error.code, type: error.type, requestId: error.requestID }
-        : { errorType: error instanceof Error ? error.name : 'unknown' };
+        ? { errorType, status: error.status, code: error.code, type: error.type, requestId: error.requestID }
+        : { errorType };
     console.error('ClickStudio assistant request failed', { stage, ...details, ...(inputTokens === undefined ? {} : { inputTokens }) });
 }
 
@@ -46,7 +46,7 @@ export class OpenAIDriver implements AssistantDriver {
     private readonly maxInputTokens = maxInputTokens();
     private readonly client?: OpenAI;
     constructor(key?: string, model?: string) { this.available = Boolean(key && model); this.model = model ?? 'unconfigured'; if (this.available)
-        this.client = new OpenAI({ apiKey: key, maxRetries: 0, timeout: 45000 }); }
+        this.client = new OpenAI({ apiKey: key, maxRetries: 0, timeout: ASSISTANT_REQUEST_TIMEOUT_MS }); }
     async propose(context: PreparedContext, signal: AbortSignal) {
         if (!this.client)
             throw new AppError(503, 'AI_UNAVAILABLE', 'Set OPENAI_API_KEY on the server');
@@ -72,7 +72,7 @@ export class OpenAIDriver implements AssistantDriver {
                 try {
                     inputTokens = await countRequestTokens();
                 } catch (error) {
-                    if (signal.aborted) throw error;
+                    if (signal.aborted || error instanceof APIConnectionTimeoutError) throw error;
                     if (isContextLengthError(error)) {
                         logProviderFailure('input_tokens', error, inputTokens);
                         const reduced = dropOldestConversationTurn(conversation);
@@ -94,10 +94,9 @@ export class OpenAIDriver implements AssistantDriver {
                 conversation = reduced;
             }
         };
-        await fitConversationToBudget();
-
         let response: OpenAI.Responses.Response;
         try {
+            await fitConversationToBudget();
             while (true) {
                 try {
                     response = await this.client.responses.create({ model: this.model, store: false, instructions: context.payload.instructions, input: requestInput(),
@@ -139,6 +138,12 @@ export class OpenAIDriver implements AssistantDriver {
         }
         catch (error) {
             if (error instanceof AppError)
+                throw error;
+            if (error instanceof APIConnectionTimeoutError || isAssistantTimeoutSignal(signal)) {
+                logProviderFailure('timeout', error, inputTokens);
+                throw new AppError(504, 'AI_TIMEOUT', ASSISTANT_TIMEOUT_MESSAGE);
+            }
+            if (signal.aborted)
                 throw error;
             logProviderFailure('responses', error, inputTokens);
             throw new AppError(502, 'AI_PROVIDER_ERROR', 'The OpenAI request failed or returned invalid structured output. No SQL was applied or executed.');

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { AssistantAction, AssistantConversationMessage, AssistantEvaluationReport, ClickHouseDocumentationEntry, Principal, Proposal, ProposalContent, Result, Schema } from '../shared/types.js';
-import { requireThat } from './errors.js';
+import { AppError, requireThat } from './errors.js';
 import { canWrite, mustOwn } from './guards.js';
 import { audit, hash, type Store } from './store.js';
 import { choice, record, text } from './validation.js';
@@ -8,6 +8,12 @@ import { buildEvaluationReport, evaluateProposal, referencedTables } from './ass
 export const PROMPT_VERSION = 'clickstudio-assistant-v11';
 export const MAX_ASSISTANT_CONVERSATION_MESSAGES = 40;
 export const MAX_ASSISTANT_CONVERSATION_BYTES = 80_000;
+export const ASSISTANT_REQUEST_TIMEOUT_MS = 45_000;
+export const ASSISTANT_TIMEOUT_MESSAGE = 'The assistant took too long to respond. Try splitting the request into shorter questions. No SQL was applied or run.';
+
+export function isAssistantTimeoutSignal(signal: AbortSignal): boolean {
+    return signal.aborted && signal.reason instanceof DOMException && signal.reason.name === 'TimeoutError';
+}
 export const PLAYBOOKS = {
     ask: 'Handle the request based on its wording. Write or change SQL only when asked; otherwise answer in plain language. Ground claims about current data in the supplied ClickHouse SQL, schema, and selected result. Use reasonable, stated assumptions for new tables and sample data. Ask one focused question only when necessary. Never execute SQL.',
     generate: 'Propose ClickHouse SQL grounded in the supplied schema or clearly stated assumptions. Clarify missing definitions. Never execute.',
@@ -318,7 +324,8 @@ export class AssistantService {
         context.state = 'running';
         this.store.put('ai-contexts', contextId, context);
         audit(this.store, p, 'ai.send-context', contextId);
-        const signal = clientSignal ? AbortSignal.any([clientSignal, AbortSignal.timeout(45000)]) : AbortSignal.timeout(45000);
+        const timeoutSignal = AbortSignal.timeout(ASSISTANT_REQUEST_TIMEOUT_MS);
+        const signal = clientSignal ? AbortSignal.any([clientSignal, timeoutSignal]) : timeoutSignal;
         try {
             signal.throwIfAborted();
             const response = await this.driver.propose(context, signal);
@@ -343,6 +350,8 @@ export class AssistantService {
             }
             context.state = 'failed';
             audit(this.store, p, 'ai.proposal', contextId, 'failed');
+            if (isAssistantTimeoutSignal(signal))
+                throw new AppError(504, 'AI_TIMEOUT', ASSISTANT_TIMEOUT_MESSAGE);
             throw error;
         }
         finally {

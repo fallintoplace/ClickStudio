@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { APIConnectionTimeoutError } from 'openai';
 import handler from '../../api/assistant/sql.js';
 
 const endpoint = 'https://clickstudio.example/api/assistant/sql';
 
-function request(body: unknown, headers: Record<string, string> = {}) {
+function request(body: unknown, headers: Record<string, string> = {}, signal?: AbortSignal) {
     return new Request(endpoint, {
         method: 'POST',
         headers: {
@@ -15,7 +16,17 @@ function request(body: unknown, headers: Record<string, string> = {}) {
             ...headers,
         },
         body: JSON.stringify(body),
+        signal,
     });
+}
+
+function assistantBody() {
+    return {
+        connectionId: 'clickhouse-cloud',
+        question: 'Explain this SQL.',
+        sql: 'SELECT 1',
+        schema: { fetchedAt: new Date().toISOString(), tables: [], columns: [], truncated: false },
+    };
 }
 
 test('Vercel SQL generation requires a same-origin workspace request', async () => {
@@ -42,6 +53,100 @@ test('Vercel SQL generation reports a missing server-side API key', async () => 
         if (prior === undefined) delete process.env.OPENAI_API_KEY;
         else process.env.OPENAI_API_KEY = prior;
     }
+});
+
+test('Vercel assistant reports OpenAI request timeouts with a distinct 504 error', async t => {
+    const priorKey = process.env.OPENAI_API_KEY;
+    const priorFetch = globalThis.fetch;
+    process.env.OPENAI_API_KEY = 'test-key';
+    globalThis.fetch = async input => {
+        if (String(input).endsWith('/responses/input_tokens'))
+            return Response.json({ object: 'response.input_tokens', input_tokens: 200 });
+        throw new APIConnectionTimeoutError();
+    };
+    t.after(() => {
+        globalThis.fetch = priorFetch;
+        if (priorKey === undefined) delete process.env.OPENAI_API_KEY;
+        else process.env.OPENAI_API_KEY = priorKey;
+    });
+
+    const response = await handler.fetch(request(assistantBody()));
+    assert.equal(response.status, 504);
+    assert.deepEqual(await response.json(), { error: {
+        code: 'AI_TIMEOUT',
+        message: 'The assistant took too long to respond. Try splitting the request into shorter questions. No SQL was applied or run.',
+    } });
+});
+
+test('Vercel assistant keeps non-timeout provider failures as 502 errors', async t => {
+    const priorKey = process.env.OPENAI_API_KEY;
+    const priorFetch = globalThis.fetch;
+    process.env.OPENAI_API_KEY = 'test-key';
+    globalThis.fetch = async input => {
+        if (String(input).endsWith('/responses/input_tokens'))
+            return Response.json({ object: 'response.input_tokens', input_tokens: 200 });
+        return Response.json({ error: { message: 'Provider unavailable.' } }, { status: 500 });
+    };
+    t.after(() => {
+        globalThis.fetch = priorFetch;
+        if (priorKey === undefined) delete process.env.OPENAI_API_KEY;
+        else process.env.OPENAI_API_KEY = priorKey;
+    });
+
+    const response = await handler.fetch(request(assistantBody()));
+    assert.equal(response.status, 502);
+    assert.equal((await response.json() as { error: { code: string } }).error.code, 'AI_PROVIDER_ERROR');
+});
+
+test('Vercel assistant keeps malformed structured output separate from timeout errors', async t => {
+    const priorKey = process.env.OPENAI_API_KEY;
+    const priorFetch = globalThis.fetch;
+    process.env.OPENAI_API_KEY = 'test-key';
+    globalThis.fetch = async input => {
+        if (String(input).endsWith('/responses/input_tokens'))
+            return Response.json({ object: 'response.input_tokens', input_tokens: 200 });
+        return Response.json({ id: 'resp_invalid_json', status: 'completed', output_text: '{', output: [] });
+    };
+    t.after(() => {
+        globalThis.fetch = priorFetch;
+        if (priorKey === undefined) delete process.env.OPENAI_API_KEY;
+        else process.env.OPENAI_API_KEY = priorKey;
+    });
+
+    const response = await handler.fetch(request(assistantBody()));
+    assert.equal(response.status, 502);
+    assert.equal((await response.json() as { error: { code: string } }).error.code, 'AI_PROVIDER_ERROR');
+});
+
+test('Vercel assistant keeps caller cancellation separate from its timeout response', async t => {
+    const priorKey = process.env.OPENAI_API_KEY;
+    const priorFetch = globalThis.fetch;
+    const controller = new AbortController();
+    let markProviderStarted: () => void = () => {};
+    const providerStarted = new Promise<void>(resolve => { markProviderStarted = resolve; });
+    process.env.OPENAI_API_KEY = 'test-key';
+    globalThis.fetch = async (input, init) => {
+        if (String(input).endsWith('/responses/input_tokens'))
+            return Response.json({ object: 'response.input_tokens', input_tokens: 200 });
+        markProviderStarted();
+        const signal = init?.signal;
+        if (!signal) throw new Error('Expected an abort signal for the OpenAI request.');
+        return await new Promise<Response>((_resolve, reject) => {
+            if (signal.aborted) reject(signal.reason);
+            else signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+        });
+    };
+    t.after(() => {
+        globalThis.fetch = priorFetch;
+        if (priorKey === undefined) delete process.env.OPENAI_API_KEY;
+        else process.env.OPENAI_API_KEY = priorKey;
+    });
+
+    const responsePromise = handler.fetch(request(assistantBody(), {}, controller.signal));
+    await providerStarted;
+    controller.abort(new DOMException('Request cancelled.', 'AbortError'));
+    const response = await responsePromise;
+    assert.equal(response.status, 499);
 });
 
 test('Vercel SQL generation rejects an incomplete schema before contacting OpenAI', async () => {

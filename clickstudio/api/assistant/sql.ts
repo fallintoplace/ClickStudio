@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { Json, Proposal, Result, Schema, SchemaColumn, SchemaTable } from '../../shared/types.js';
-import { buildContext, PROMPT_VERSION, validateAssistantConversation, validateProposal, type PreparedContext } from '../../core/assistant.js';
+import { ASSISTANT_REQUEST_TIMEOUT_MS, ASSISTANT_TIMEOUT_MESSAGE, buildContext, PROMPT_VERSION, validateAssistantConversation, validateProposal, type PreparedContext } from '../../core/assistant.js';
 import { evaluateProposal } from '../../core/assistant-evaluation.js';
 import { AppError } from '../../core/errors.js';
 import { OpenAIDriver } from '../../server/openai.js';
@@ -125,6 +125,7 @@ async function post(request: Request): Promise<Response> {
     }
     if (!isRecord(body)) return fail('REQUEST_BODY', 'The request body must be a JSON object.');
 
+    let timeoutSignal: AbortSignal | undefined;
     try {
         const connectionId = field(body.connectionId, 'Connection ID', 128);
         const question = field(body.question, 'Question', 4_000);
@@ -152,7 +153,8 @@ async function post(request: Request): Promise<Response> {
             evaluationSchema: { tables: schema.tables, truncated: schema.truncated }, state: 'running',
         };
         const driver = new OpenAIDriver(process.env.OPENAI_API_KEY, MODEL);
-        const signal = AbortSignal.any([request.signal, AbortSignal.timeout(45_000)]);
+        timeoutSignal = AbortSignal.timeout(ASSISTANT_REQUEST_TIMEOUT_MS);
+        const signal = AbortSignal.any([request.signal, timeoutSignal]);
         const response = await driver.propose(context, signal);
         signal.throwIfAborted();
         const content = validateProposal(response.content);
@@ -166,6 +168,7 @@ async function post(request: Request): Promise<Response> {
         return json(proposal, 201);
     } catch (error) {
         if (request.signal.aborted) return new Response(null, { status: 499 });
+        if (timeoutSignal?.aborted) return fail('AI_TIMEOUT', ASSISTANT_TIMEOUT_MESSAGE, 504);
         if (error instanceof AppError) return fail(error.code, error.message, error.status);
         return fail('AI_PROVIDER_ERROR', 'The assistant request failed. No SQL was applied or run.', 502);
     }
