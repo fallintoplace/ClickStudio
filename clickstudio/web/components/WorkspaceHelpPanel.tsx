@@ -3,6 +3,7 @@ import type { SchemaTable } from '../../shared/types';
 import type { Copy, Locale } from '../i18n';
 import type { SqlExample } from '../sql-examples';
 import type { Connected } from '../workspace-types';
+import { PLAYGROUND_CONNECTION_ID } from '../playground';
 import { GEO_HELP_CITIES, GEO_HELP_EXAMPLE } from '../help-demos';
 import { geoHueForValue } from '../geo-color';
 import { safeStatementCount } from '../workspace-helpers';
@@ -55,7 +56,7 @@ function HelpSectionHeading({ eyebrow, title, description }: { eyebrow: string; 
     </header>;
 }
 
-export function WorkspaceHelpPanel({ examples, sourceLabel, copy, locale, open, section, onSectionChange, onClose, onOpenExample, onRunExample, onStartBlankSql, onOpenMonitoring, onOpenAssistant, connection, tables, schemaLoading, trusted, queryEngine, busy, unsupportedParameters, onRunExplain, comparison, onReferenceInsert }: {
+export function WorkspaceHelpPanel({ examples, sourceLabel, copy, locale, open, section, onSectionChange, onClose, onOpenExample, onRunExample, onStartBlankSql, onOpenMonitoring, onOpenAssistant, connection, tables, schemaLoaded, schemaLoading, schemaError, onRefreshSchema, trusted, queryEngine, busy, unsupportedParameters, onRunExplain, comparison, onReferenceInsert }: {
     examples: SqlExample[];
     sourceLabel: string;
     copy: Copy['common'];
@@ -71,7 +72,10 @@ export function WorkspaceHelpPanel({ examples, sourceLabel, copy, locale, open, 
     onOpenAssistant: () => void;
     connection: Connected;
     tables: SchemaTable[];
+    schemaLoaded: boolean;
     schemaLoading: boolean;
+    schemaError: string;
+    onRefreshSchema: () => void;
     trusted: boolean;
     queryEngine: SqlFlowViewProps;
     busy: boolean;
@@ -135,6 +139,14 @@ export function WorkspaceHelpPanel({ examples, sourceLabel, copy, locale, open, 
         if (value === 'charts') return examples.some(example => example.chart.kind !== 'table');
         return examples.some(example => example.category === value);
     });
+    const visibleTables = tables.some(table => !['system', 'information_schema'].includes(table.database.toLowerCase()));
+    const cloudSchemaNotice = connection.dataSource === 'clickhouse' && connection.id !== PLAYGROUND_CONNECTION_ID && trusted && !schemaLoading
+        ? schemaError
+            ? { message: schemaLoaded ? copy.sqlExamplesSchemaRefreshFailed : copy.sqlExamplesSchemaUnavailable, error: true }
+            : schemaLoaded && !visibleTables
+                ? { message: copy.sqlExamplesNoTables, error: false }
+                : undefined
+        : undefined;
 
     useEffect(() => {
         if (selected && selected.id !== selectedId) setSelectedId(selected.id);
@@ -364,6 +376,10 @@ export function WorkspaceHelpPanel({ examples, sourceLabel, copy, locale, open, 
                                     if (value.trim() && category === 'featured') setCategory('all');
                                 }}/></label>
                             </div>
+                            {cloudSchemaNotice && <div className={cx('sql-examples-schema-notice', cloudSchemaNotice.error && 'is-error')} role={cloudSchemaNotice.error ? 'alert' : 'status'}>
+                                <p>{cloudSchemaNotice.message}</p>
+                                <Button variant="ghost" className="toolbar-small" aria-label={copy.sqlExamplesRefreshSchema} title={copy.sqlExamplesRefreshSchema} disabled={schemaLoading} onClick={onRefreshSchema}>{schemaLoading ? copy.loading : copy.refresh}</Button>
+                            </div>}
                             {filteredExamples.length === 0 ? <p className="sql-examples-empty" role="status">{copy.noExamplesFound}</p> : <div className="sql-examples-layout">
                                 <div className="sql-examples-list" role="listbox" aria-label={copy.sqlExamples}>
                                 {filteredExamples.map((example, index) => <button key={example.id} data-testid={'sql-example-' + example.id} ref={element => { if (element) optionRefs.current.set(example.id, element); else optionRefs.current.delete(example.id); }} type="button" role="option" tabIndex={example.id === selected?.id ? 0 : -1} aria-selected={example.id === selected?.id} className={cx('sql-example-option', example.id === selected?.id && 'is-selected')} onFocus={() => setSelectedId(example.id)} onClick={() => setSelectedId(example.id)} onKeyDown={event => {

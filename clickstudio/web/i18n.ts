@@ -134,6 +134,10 @@ export interface Copy {
         exampleChartCandlestick: string;
         examplePreviewTable: string;
         exampleReadRows: string;
+        sqlExamplesNoTables: string;
+        sqlExamplesSchemaUnavailable: string;
+        sqlExamplesSchemaRefreshFailed: string;
+        sqlExamplesRefreshSchema: string;
         workspaceMode: string;
         parserMode: string;
         browse: string;

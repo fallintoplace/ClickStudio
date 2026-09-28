@@ -893,7 +893,10 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
                             locale={locale}
                             connection={connection}
                             tables={schema?.tables ?? []}
+                            schemaLoaded={schema !== undefined}
                             schemaLoading={schemaLoading}
+                            schemaError={schemaError}
+                            onRefreshSchema={() => void loadSchema(true)}
                             trusted={trusted}
                             queryEngine={{
                                 copy: copy.common,
