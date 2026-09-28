@@ -146,8 +146,8 @@ test('File import reports an unknown insert without retrying automatically', asy
     await dialog.getByLabel('Type INSERT 1 ROWS to confirm').fill('INSERT 1 ROWS');
     await dialog.getByRole('button', { name: 'Import rows', exact: true }).click();
 
-    await expect(dialog).toContainText('The insert outcome is not confirmed.');
-    await expect(dialog).toContainText('Inspect the destination; automatic retry is disabled.');
+    await expect(dialog).toContainText('We couldn’t confirm whether the import finished.');
+    await expect(dialog).toContainText('They may already be there. Check the table before retrying; another import could add duplicate rows.');
     expect(commitRequests).toBe(1);
 });
 
@@ -194,12 +194,12 @@ test('File import recovers ambiguous writes without local storage and records a 
 
     await page.getByRole('button', { name: 'Import', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Import data', exact: true });
-    await expect(dialog.getByRole('region', { name: 'Import status' })).toContainText('The insert outcome is not confirmed.');
+    await expect(dialog.getByRole('region', { name: 'Import status' })).toContainText('We couldn’t confirm whether the import finished.');
     await expect(dialog.getByLabel('Choose a CSV, JSON, or NDJSON file')).toHaveCount(0);
     await dialog.getByRole('button', { name: 'Check ClickHouse status' }).click();
-    await expect(dialog).toContainText('ClickHouse has no conclusive success record.');
+    await expect(dialog).toContainText('They may already be there. Check the table before retrying; another import could add duplicate rows.');
     expect(reconcileRequests).toBe(1);
-    await dialog.getByRole('button', { name: 'I inspected the destination; no insert is active' }).click();
+    await dialog.getByRole('button', { name: 'Continue anyway' }).click();
     await expect(dialog.getByLabel('Choose a CSV, JSON, or NDJSON file')).toBeVisible();
     expect(reviewBody).toEqual({ inspected: true, noActiveInsert: true });
     expect(previewRequests).toBe(0);

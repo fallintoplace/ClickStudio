@@ -304,9 +304,10 @@ test('ClickHouse Cloud import keeps an interrupted write blocked and does not re
     await dialog.getByLabel('Type INSERT 1 ROWS to confirm').fill('INSERT 1 ROWS');
     await dialog.getByRole('button', { name: 'Import rows' }).click();
 
-    await expect(dialog).toContainText('The insert outcome is not confirmed.');
-    await expect(dialog).toContainText('automatic retry is disabled');
+    await expect(dialog).toContainText('We couldn’t confirm whether the import finished.');
+    await expect(dialog).toContainText('another import could add duplicate rows');
     await dialog.getByRole('button', { name: 'Check ClickHouse status' }).click();
-    await expect(dialog).toContainText('The insert outcome is not confirmed.');
+    await expect(dialog).toContainText('We couldn’t confirm whether the import finished.');
+    await expect(dialog.getByRole('button', { name: 'Continue anyway' })).toBeVisible();
     expect(imports).toHaveLength(1);
 });
