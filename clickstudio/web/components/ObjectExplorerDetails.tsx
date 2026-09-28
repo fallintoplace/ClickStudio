@@ -1,18 +1,16 @@
-import type { SchemaColumn, SchemaTable } from '../../shared/types';
+import type { SchemaTable } from '../../shared/types';
 import { tableQuerySql, type ExplorerSelection } from '../../shared/object-explorer';
 import { quoteIdentifier } from '../../shared/sql';
 import type { Copy } from '../i18n';
 import { Button, cx, formatBytes, formatCount, Icon } from './ui';
 
-export function ObjectDetails({ copy, selection, trusted, allowRowInsert, copiedId, onClose, onInsert, onInsertRow, onCopy, onOpenSqlDraft, onOpenReference, onOpenParts }: {
+export function ObjectDetails({ copy, selection, trusted, copiedId, onClose, onInsert, onCopy, onOpenSqlDraft, onOpenReference, onOpenParts }: {
     copy: Copy['common'];
     selection: ExplorerSelection;
     trusted: boolean;
-    allowRowInsert: boolean;
     copiedId?: string;
     onClose?: () => void;
     onInsert: (value: string) => void;
-    onInsertRow: (table: SchemaTable, columns: readonly SchemaColumn[]) => void;
     onCopy: (value: string, id: string) => void;
     onOpenSqlDraft: (name: string, sql: string, run: boolean) => void;
     onOpenReference: (name: string, type: string) => void;
@@ -27,7 +25,6 @@ export function ObjectDetails({ copy, selection, trusted, allowRowInsert, copied
                 <div className="object-action-grid">
                     <Button variant="primary" className="toolbar-small object-preview-action" disabled={!trusted} title={!trusted ? copy.runActionTrustRequired : undefined} onClick={() => onOpenSqlDraft(`Preview ${table.name}.sql`, tableQuerySql(table, columns, 'preview'), true)}><Icon name="table"/>{copy.previewRows}</Button>
                     <Button variant="secondary" className="toolbar-small object-generate-action" onClick={() => onOpenSqlDraft(`Select ${table.name}.sql`, tableQuerySql(table, columns, 'select'), false)}><Icon name="parser"/>{copy.generateSelect}</Button>
-                    {selection.relationKind === 'table' && allowRowInsert && <Button variant="secondary" className="toolbar-small" disabled={!trusted} title={!trusted ? copy.runActionTrustRequired : undefined} onClick={() => onInsertRow(table, columns)}><Icon name="plus"/>{copy.insertRow}</Button>}
                 </div>
                 <div className="object-utility-actions">
                     <Button variant="ghost" className="toolbar-small" onClick={() => onInsert(qualified)}><Icon name="plus"/>{copy.insertName}</Button>
