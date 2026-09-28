@@ -80,8 +80,11 @@ export function ObjectExplorer({ copy, connection, schema, schemaLoading, schema
     const [createTableOpen, setCreateTableOpen] = useState(false);
     const [createdTableTarget, setCreatedTableTarget] = useState<{ database: string; table: string }>();
     const handledImportedTargetRef = useRef<string | undefined>(undefined);
+    const highlightedRevealRef = useRef<string | undefined>(undefined);
     const treeScroll = useRef<HTMLDivElement>(null);
     const copyTimer = useRef<number | undefined>(undefined);
+    const revealTimer = useRef<number | undefined>(undefined);
+    const [highlightedTableId, setHighlightedTableId] = useState<string>();
     const importedSchemaTable = useMemo(() => importedTableTarget
         ? schema?.tables.find(table => `${table.database}.${table.name}` === importedTableTarget.table)
         : undefined, [importedTableTarget, schema?.tables]);
@@ -91,6 +94,7 @@ export function ObjectExplorer({ copy, connection, schema, schemaLoading, schema
 
     useEffect(() => () => {
         if (copyTimer.current !== undefined) window.clearTimeout(copyTimer.current);
+        if (revealTimer.current !== undefined) window.clearTimeout(revealTimer.current);
     }, []);
 
     useEffect(() => {
@@ -125,6 +129,16 @@ export function ObjectExplorer({ copy, connection, schema, schemaLoading, schema
             const row = rows && [...rows].find(item => item.dataset.database === revealTarget.database && item.dataset.tableName === revealTarget.table);
             if (!row) return;
             row.scrollIntoView({ block: 'nearest' });
+            const highlightId = importedTableTarget?.id ?? id;
+            if (highlightedRevealRef.current !== highlightId) {
+                highlightedRevealRef.current = highlightId;
+                setHighlightedTableId(id);
+                if (revealTimer.current !== undefined) window.clearTimeout(revealTimer.current);
+                revealTimer.current = window.setTimeout(() => {
+                    setHighlightedTableId(current => current === id ? undefined : current);
+                    revealTimer.current = undefined;
+                }, 2200);
+            }
             if (createdTableTarget) setCreatedTableTarget(undefined);
             if (importedSchemaTable && importedTableTarget && handledImportedTargetRef.current !== importedTableTarget.id) {
                 handledImportedTargetRef.current = importedTableTarget.id;
@@ -191,7 +205,7 @@ export function ObjectExplorer({ copy, connection, schema, schemaLoading, schema
         const hasChildren = relation.columns.length > 0 || (relation.table.projections?.length ?? 0) > 0 || (relation.table.skipIndexes?.length ?? 0) > 0;
 
         return <div className="object-tree-branch" key={relation.id}>
-            <div role="treeitem" aria-level={level} aria-expanded={hasChildren ? relationExpanded : undefined} aria-selected={selectedId === relation.id} data-database={relation.table.database} data-table-name={relation.table.name} className={cx('object-tree-row', 'is-object', selectedId === relation.id && 'is-selected')} style={{ paddingLeft: `${Math.max(0, level - 1) * 10}px` }}>
+            <div role="treeitem" aria-level={level} aria-expanded={hasChildren ? relationExpanded : undefined} aria-selected={selectedId === relation.id} data-database={relation.table.database} data-table-name={relation.table.name} className={cx('object-tree-row', 'is-object', selectedId === relation.id && 'is-selected', highlightedTableId === relation.id && 'is-import-highlight')} style={{ paddingLeft: `${Math.max(0, level - 1) * 10}px` }}>
                 <button type="button" className="object-tree-toggle" aria-label={relationExpanded ? copy.collapse : copy.expand} disabled={!hasChildren} onClick={() => hasChildren && toggle(relation.id)}><span className={cx(relationExpanded && 'is-open')}>{hasChildren && <Icon name="chevron"/>}</span></button>
                 <button type="button" className="object-tree-main" title={`${relation.table.database}.${relation.table.name}`} onClick={() => selectObject(relation.id)}>
                     <span className={cx('object-kind-glyph', relation.kind === 'view' && 'is-view')}><Icon name={relation.kind === 'view' ? 'view' : 'table'}/></span>

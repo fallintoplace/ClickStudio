@@ -86,6 +86,15 @@
     .object-tree-row { position: relative; display: flex; min-width: 0; min-height: 33px; align-items: center; border: 1px solid transparent; border-radius: 8px; color: var(--text-soft); transition: border-color .16s ease, background .16s ease, color .16s ease, box-shadow .16s ease; }
     .object-tree-row:hover, .object-tree-row:focus-within { border-color: color-mix(in srgb, var(--explorer-signal) 15%, transparent); background: color-mix(in srgb, var(--explorer-signal) 6%, var(--panel-hover)); color: var(--text); }
     .object-tree-row.is-selected { border-color: color-mix(in srgb, var(--explorer-signal) 42%, var(--line)); background: linear-gradient(100deg, color-mix(in srgb, var(--explorer-signal) 16%, var(--panel-raised)), color-mix(in srgb, var(--explorer-signal) 7%, var(--panel))); color: var(--text); box-shadow: inset 3px 0 var(--explorer-signal); }
+    .object-tree-row.is-import-highlight { animation: object-import-highlight 2.2s ease-out both; }
+    @keyframes object-import-highlight {
+        0% { border-color: color-mix(in srgb, var(--explorer-signal) 70%, var(--line)); background: color-mix(in srgb, var(--explorer-signal) 27%, var(--panel-raised)); box-shadow: inset 3px 0 var(--explorer-signal), 0 0 0 2px color-mix(in srgb, var(--explorer-signal) 30%, transparent), 0 0 18px color-mix(in srgb, var(--explorer-signal) 18%, transparent); }
+        42% { border-color: color-mix(in srgb, var(--explorer-signal) 55%, var(--line)); background: color-mix(in srgb, var(--explorer-signal) 19%, var(--panel-raised)); box-shadow: inset 3px 0 var(--explorer-signal), 0 0 0 1px color-mix(in srgb, var(--explorer-signal) 19%, transparent), 0 0 10px color-mix(in srgb, var(--explorer-signal) 10%, transparent); }
+        100% { border-color: color-mix(in srgb, var(--explorer-signal) 42%, var(--line)); background: linear-gradient(100deg, color-mix(in srgb, var(--explorer-signal) 16%, var(--panel-raised)), color-mix(in srgb, var(--explorer-signal) 7%, var(--panel))); box-shadow: inset 3px 0 var(--explorer-signal); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .object-tree-row.is-import-highlight { animation: none; box-shadow: inset 3px 0 var(--explorer-signal), 0 0 0 1px color-mix(in srgb, var(--explorer-signal) 30%, transparent); }
+    }
     .object-tree-row.is-selected .object-tree-label strong { font-weight: 700; }
     .object-tree-row.is-database { margin-top: 2px; font-weight: 650; }
     .object-tree-toggle { display: grid; width: 25px; height: 29px; flex: none; place-items: center; border: 0; border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; }

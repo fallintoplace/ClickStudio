@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import type { ProfilePipeline, QueryDocument, QueryProfile, Result, Run, RunKind, Schema, Script } from '../shared/types';
 import { DEFAULT_LIMITS } from '../shared/types';
 import { exportCsv, recommendChart } from '../shared/results';
-import { lexSql, parameterNames, selectedStatement, splitSql } from '../shared/sql';
+import { parameterNames, selectedStatement, splitSql } from '../shared/sql';
 import { api, download, isFrontendDemoPreview, message, post } from './api';
 import { PLAYGROUND_CONNECTION_ID } from './playground';
 import type { EditorHandle } from './components/SqlEditor';
@@ -33,7 +33,7 @@ import { useRunEvidence } from './useRunEvidence';
 import { useResultSnapshot } from './useResultSnapshot';
 import { useWorkspaceTabs } from './useWorkspaceTabs';
 import { useWorkspaceData } from './useWorkspaceData';
-import { useImportedTableReveal } from './useImportedTableReveal';
+import { isSchemaChangingSql, useImportedTableReveal } from './useImportedTableReveal';
 import { useDefaultAssistantRunContext, useWorkspaceAssistant } from './useWorkspaceAssistant';
 import { useWorkspacePanels } from './useWorkspacePanels';
 import { useScriptExecution } from './useScriptExecution';
@@ -89,15 +89,6 @@ type WorkspaceProps = Readonly<{
     locale: Locale;
 }>;
 
-function isSchemaChangingSql(sql: string) {
-    try {
-        const firstWord = lexSql(sql).find(token => token.kind === 'word')?.text.toUpperCase();
-        return firstWord === 'CREATE' || firstWord === 'ALTER' || firstWord === 'DROP' || firstWord === 'RENAME';
-    } catch {
-        return false;
-    }
-}
-
 async function loadAssistantRunContext(run: Run | undefined, snapshot: Result | undefined, signal: AbortSignal) {
     if (!run || !terminal(run)) throw new Error('Wait for the latest run to finish before including it.');
     const result = run.resultState === 'reopenable'
@@ -105,6 +96,13 @@ async function loadAssistantRunContext(run: Run | undefined, snapshot: Result | 
         : undefined;
     signal.throwIfAborted();
     return { result, evidenceSql: run.sql, error: run.error?.message };
+}
+
+function openImportedSqlQuery(name: string, sql: string, openDraft: (draft: Draft) => boolean, markImported: (id: string) => void, setNotice: (notice: string) => void) {
+    const draft = newDraft(name, sql);
+    const opened = openDraft(draft);
+    if (opened) { markImported(draft.id); setNotice(`${name} opened in a new query tab. It has not been run.`); }
+    return opened;
 }
 
 type WorkspaceRunActionTitleContext = Readonly<{
@@ -238,6 +236,12 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         workspaceRef,
         setError,
     });
+    const importedReveal = useImportedTableReveal({
+        connectionId: connection.id, demoMode,
+        canRevealSqlTables: connection.dataSource === 'clickhouse' && connection.readonly === false,
+        loadSchema, setSearch, setInspector, setDrawerOpen,
+        openInspectorDrawer: experience === 'beginner' || compactViewport, setNotice,
+    });
     const sqlExamples = useMemo(() => sqlExamplesFor(connection, schema), [connection, schema]);
     useEffect(() => {
         if (inspector === 'revisions') void loadDocumentRevisions(active.serverId);
@@ -271,12 +275,6 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
     const selectableRunId = run && terminal(run) ? run.id : undefined;
     useDefaultAssistantRunContext(selectableRunId, includeRun, assistantBusy, setIncludeRun);
     const pendingExecution = usePendingExecution({ activeDraftId: active.id, busy, run, script });
-    const refreshSchemaAfterScript = useCallback((completed: Script) => {
-        if (completed.connectionId !== connection.id || connection.dataSource !== 'clickhouse' || connection.readonly) return;
-        if (completed.statements.some(statement =>
-            (statement.status === 'succeeded' || statement.status === 'truncated') && isSchemaChangingSql(statement.sql)))
-            void loadSchema(true);
-    }, [connection, loadSchema]);
     const scriptFollowRef = useScriptExecution({
         scriptId: active.scriptId,
         draftId: active.id,
@@ -284,7 +282,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         setScripts,
         loadHistory,
         setError,
-        onComplete: refreshSchemaAfterScript,
+        onComplete: importedReveal.refreshAfterImportedSqlScript,
     });
 
     const perform = async (task: () => Promise<void>, kind: BusyAction = 'save') => {
@@ -375,6 +373,8 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
             if (parameterNames(sql).length && connection.manifest?.parameters.available === false)
                 throw new Error(connection.manifest.parameters.reason ?? 'Query parameters are unavailable on this connection.');
 
+            const importedSqlBaseline = await importedReveal.captureImportedSqlBaseline(draft.id, isScript ? statements.some(item => isSchemaChangingSql(item.sql)) : Boolean(statement && isSchemaChangingSql(statement.sql)));
+
             const payload = {
                 clientRequestId: crypto.randomUUID(), connectionId: connection.id, documentId: draft.serverId,
                 sql: isScript ? sql : statement!.sql, parameters: draft.parameters,
@@ -398,6 +398,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
                     throw caught;
                 }
                 pendingExecution.acceptScript(payload.clientRequestId, created.id);
+                importedReveal.rememberImportedSqlScript(draft.id, created.id, importedSqlBaseline);
                 scriptFollowRef.current = { scriptId: created.id, enabled: true };
                 setScripts(current => ({ ...current, [created.id]: created }));
                 const first = created.statements.find(item => item.runId);
@@ -420,7 +421,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
                 pendingExecution.acceptRun(payload.clientRequestId, created.id);
                 setRunForRun(created.id, created, true);
                 if (created.status === 'succeeded' && connection.dataSource === 'clickhouse' && connection.readonly === false && isSchemaChangingSql(statement!.sql))
-                    void loadSchema(true);
+                    importedReveal.refreshAfterImportedSqlRun(draft.id, created.id, importedSqlBaseline);
                 setPage(0);
                 setView(kind === 'explain' ? 'indexes' : kind === 'plan' ? 'plan' : kind === 'pipeline' ? 'pipeline' : kind === 'analyze' ? 'runtime' : options.view ?? 'results');
                 update(draft.id, current => ({ ...current, activeRunId: created.id, scriptId: undefined, runIds: rememberRunIds(current.runIds, [created.id]) }));
@@ -634,7 +635,6 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         if (next === 'profile') void perform(loadProfile, 'save');
         if (next === 'pipeline') void perform(loadPipeline, 'save');
     };
-    const { importedTableTarget, onImported, onImportedTableRevealed } = useImportedTableReveal({ connectionId: connection.id, demoMode, loadSchema, setSearch, showInspector, setNotice });
     const inspectorDocked = drawerOpen && (experience === 'beginner' || compactViewport);
 
     const trustConnection = () => perform(async () => {
@@ -743,8 +743,8 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         comparisonProfiles: profilesByRun,
         comparisonPipelines: pipelinesByRun,
         onRefreshSchema: () => void loadSchema(true),
-        importedTableTarget,
-        onImportedTableRevealed,
+        importedTableTarget: importedReveal.importedTableTarget,
+        onImportedTableRevealed: importedReveal.onImportedTableRevealed,
         onRefreshHistory: () => void loadHistory(),
         onInsert: (value: string) => editor.current?.insert(value),
         onOpenSqlDraft: openSqlDraft,
@@ -1014,11 +1014,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
             {inspectorDocked && <InspectorPane {...inspectorProps} docked onClose={() => setDrawerOpen(false)}/>}
         </div>
         {observabilityOpen && <OverlayPortal><ObservabilityExplorer connectionId={connection.id} connectionLabel={connectionLabel} trusted={trusted} queryLog={connection.manifest?.queryLog} replication={connection.manifest?.replication} onClose={() => setObservabilityOpen(false)}/></OverlayPortal>}
-        <ImportWizard open={importOpen} connectionId={connection.id} trusted={trusted} demoMode={demoMode} onImportQuery={(name, sql) => {
-            const opened = openNewDraft(newDraft(name, sql));
-            if (opened) setNotice(`${name} opened in a new query tab. It has not been run.`);
-            return opened;
-        }} onClose={() => setImportOpen(false)} onImported={onImported}/>
+        <ImportWizard open={importOpen} connectionId={connection.id} trusted={trusted} demoMode={demoMode} onImportQuery={(name, sql) => openImportedSqlQuery(name, sql, openNewDraft, importedReveal.markImportedSqlDraft, setNotice)} onClose={() => setImportOpen(false)} onImported={importedReveal.onImported}/>
         <ExportDialog open={exportOpen} queryAvailable={Boolean(active.sql.trim())} rowsAvailable={run?.resultState === 'reopenable'} onClose={() => setExportOpen(false)} onExportQuery={() => { setExportOpen(false); exportCurrentQuery(); }} onExportRows={() => { setExportOpen(false); void exportCurrentCsv(); }}/>
         <ExecutionBar run={run} failedAttempt={Boolean(failedQueryError)} eventState={eventState} onCancel={() => void cancel()} cancelling={cancelling} scriptRunning={script?.status === 'running'} copy={copy.common} helpButton={<HelpButton copy={copy.common} open={helpPanelOpen} onOpen={openHelp}/>}/>
         {detachedEditor.detached && createPortal(queryPanel, detachedEditor.detached.container)}
