@@ -10,6 +10,7 @@ import { canDropTableTarget, dropTableSql, isSystemDatabaseName, isViewEngine, t
 import { parseReplicationSnapshot, replicationQueueQuery, replicationReplicasQuery, type ReplicationCapabilities } from '../shared/replication.js';
 import { parseWorkloadSnapshot, WORKLOAD_WINDOWS, workloadFamiliesQuery, workloadPointsQuery, type QueryLogSource, type WorkloadWindow } from '../shared/workload.js';
 import { loadNativeExplorer, type NativeExplorerRequest, type NativeExplorerSnapshot } from '../shared/native-explorers.js';
+import { mergeTreePartsQuery, parseMergeTreeParts, type MergeTreePartsSnapshot } from '../shared/parts.js';
 
 type CloudCredentials = { host: string; database: string; username: string; password: string };
 const MAX_SQL_LENGTH = 200_000;
@@ -343,6 +344,20 @@ async function readNativeExplorer(credentials: CloudCredentials, url: string, re
     }
 }
 
+async function readTableParts(credentials: CloudCredentials, url: string, database: string, table: string): Promise<MergeTreePartsSnapshot> {
+    const client = makeClient(credentials, url), parameters = { database, table };
+    try {
+        const target = (await queryRows<{ engine: string }>(client,
+            'SELECT engine FROM system.tables WHERE database = {database:String} AND name = {table:String} LIMIT 1', parameters, 10_000, 8))[0];
+        if (!target) throw new AppError(404, 'TABLE_NOT_FOUND', 'The selected table is not available on this connection.');
+        if (!target.engine.endsWith('MergeTree')) throw new AppError(409, 'PARTS_UNAVAILABLE', 'Storage visualization is available for MergeTree tables.');
+        const rows = await queryRows<Record<string, unknown>>(client, mergeTreePartsQuery(), parameters, 10_000, 8);
+        return parseMergeTreeParts(database, table, rows);
+    } finally {
+        await client.close();
+    }
+}
+
 async function readReplication(credentials: CloudCredentials, url: string) {
     const client = makeClient(credentials, url);
     try {
@@ -579,10 +594,8 @@ async function post(request: Request): Promise<Response> {
         if (body.action === 'schema')
             return json(await readSchema(credentials, url));
         if (body.action === 'native-explorer') {
-            if (typeof body.database !== 'string' || !body.database.trim() || body.database.length > 128)
-                return fail('NATIVE_EXPLORER_DATABASE', 'Choose a valid database to inspect.');
-            if (body.database !== credentials.database)
-                return fail('NATIVE_EXPLORER_DATABASE', 'The dependency view is limited to the connected database.');
+            if (typeof body.database !== 'string' || !body.database.trim() || body.database.length > 128 || isSystemDatabaseName(body.database))
+                return fail('NATIVE_EXPLORER_DATABASE', 'Choose a valid non-system database to inspect.');
             if (body.kind !== 'lineage' && body.kind !== 'merges' && body.kind !== 'mutations')
                 return fail('NATIVE_EXPLORER_KIND', 'Choose a supported metadata view.');
             let request: NativeExplorerRequest;
@@ -593,6 +606,13 @@ async function post(request: Request): Promise<Response> {
                 request = { kind: body.kind, database: body.database, table: body.table };
             }
             return json(await readNativeExplorer(credentials, url, request));
+        }
+        if (body.action === 'table-parts') {
+            if (typeof body.database !== 'string' || !body.database.trim() || body.database.length > 128 || isSystemDatabaseName(body.database))
+                return fail('TABLE_PARTS_DATABASE', 'Choose a valid non-system database to inspect.');
+            if (typeof body.table !== 'string' || !body.table.trim() || body.table.length > 128)
+                return fail('TABLE_PARTS_TABLE', 'Choose a valid table to inspect.');
+            return json(await readTableParts(credentials, url, body.database, body.table));
         }
         if (body.action === 'run') {
             if (typeof body.sql !== 'string') return fail('SQL_REQUIRED', 'Enter SQL to run.');
@@ -620,7 +640,7 @@ async function post(request: Request): Promise<Response> {
                 return fail('IMPORT_STATUS', 'The saved import details are invalid.');
             return json(await inspectCloudImport(credentials, url, body.queryId, targetTable, body.rows));
         }
-        return fail('CLOUD_ACTION', 'Choose test, schema, SQL, native metadata, workload, replication, table creation, table deletion, or import status.');
+        return fail('CLOUD_ACTION', 'Choose test, schema, SQL, native metadata, storage parts, workload, replication, table creation, table deletion, or import status.');
     } catch (error) {
         if (error instanceof AppError) return fail(error.code, error.message, error.status);
         return safeError(error, credentials.password);

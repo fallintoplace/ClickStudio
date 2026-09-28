@@ -4,6 +4,7 @@ import type { QueryLogSource, WorkloadSnapshot, WorkloadWindow } from '../shared
 import type { CloudImportColumn } from './cloud-import.js';
 import type { CreateTableColumn } from '../shared/table-creation.js';
 import type { NativeExplorerRequest, NativeExplorerSnapshot } from '../shared/native-explorers.js';
+import type { MergeTreePartsSnapshot } from '../shared/parts.js';
 
 export const CLICKHOUSE_CLOUD_CONNECTION_ID = 'clickhouse-cloud';
 
@@ -164,6 +165,11 @@ export async function loadClickHouseCloudSchema(): Promise<Schema> {
 export async function loadClickHouseCloudNativeExplorer(request: NativeExplorerRequest, signal: AbortSignal): Promise<NativeExplorerSnapshot> {
     if (!activeCloud) throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before inspecting metadata.', 401);
     return await requestCloud<NativeExplorerSnapshot>({ action: 'native-explorer', credentials: activeCloud.credentials, ...request }, signal);
+}
+
+export async function loadClickHouseCloudTableParts(database: string, table: string, signal: AbortSignal): Promise<MergeTreePartsSnapshot> {
+    if (!activeCloud) throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before inspecting storage.', 401);
+    return await requestCloud<MergeTreePartsSnapshot>({ action: 'table-parts', credentials: activeCloud.credentials, database, table }, signal);
 }
 
 export async function createClickHouseCloudTable(input: { database: string; name: string; columns: CreateTableColumn[]; orderBy: string }) {

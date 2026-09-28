@@ -1,5 +1,6 @@
 import type { MergeTreePart, MergeTreePartsSnapshot } from '../shared/parts';
 import { api, isFrontendDemoPreview } from './api';
+import { CLICKHOUSE_CLOUD_CONNECTION_ID, loadClickHouseCloudTableParts } from './cloud-connection';
 import { loadPlaygroundTableParts, PLAYGROUND_CONNECTION_ID } from './playground';
 
 const PART_TEXT_FIELDS = ['partition', 'name', 'rows', 'marks', 'compressedBytes', 'uncompressedBytes', 'minBlockNumber', 'maxBlockNumber', 'modifiedAt', 'diskName'];
@@ -27,13 +28,18 @@ function isPartsSnapshot(value: unknown): value is MergeTreePartsSnapshot {
 }
 
 export async function loadTableParts(connectionId: string, database: string, table: string, signal: AbortSignal): Promise<MergeTreePartsSnapshot> {
-    const snapshot: unknown = isFrontendDemoPreview && connectionId === PLAYGROUND_CONNECTION_ID
-        ? await loadPlaygroundTableParts(database, table, signal)
-        : await api<unknown>(`/connections/${encodeURIComponent(connectionId)}/table-parts`, {
+    let snapshot: unknown;
+    if (isFrontendDemoPreview && connectionId === PLAYGROUND_CONNECTION_ID) {
+        snapshot = await loadPlaygroundTableParts(database, table, signal);
+    } else if (connectionId === CLICKHOUSE_CLOUD_CONNECTION_ID) {
+        snapshot = await loadClickHouseCloudTableParts(database, table, signal);
+    } else {
+        snapshot = await api<unknown>(`/connections/${encodeURIComponent(connectionId)}/table-parts`, {
             method: 'POST',
             body: { database, table },
             signal,
         });
+    }
     if (!isPartsSnapshot(snapshot)) throw new Error('The server returned invalid table-parts data. Reopen the visualizer to try again.');
     return snapshot;
 }
