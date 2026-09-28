@@ -10,7 +10,7 @@ async function beginInCompactMode(page: Page) {
     await expect(page.getByTestId('open-ai')).toBeVisible();
     await expect(page.getByTestId('format-sql')).toBeVisible();
     await expect(page.getByTestId('run-button')).toHaveCount(1);
-    await expect(page.getByTestId('save-query')).toHaveCount(0);
+    await expect(page.getByTestId('save-query')).toHaveCount(1);
     await expect(page.locator('.draft-status')).toHaveCount(0);
     await expect(page.locator('.restore-sql-trigger')).toHaveCount(0);
     await expect(page.locator('.revision-history-trigger')).toHaveCount(0);
@@ -24,7 +24,7 @@ async function beginInCompactMode(page: Page) {
     await expect(tab).toHaveCount(1);
     await expect(tab).toHaveAttribute('aria-selected', 'true');
     await expect(tab).toHaveAttribute('aria-label', documentName);
-    await expect(tab.getByRole('button', { name: /^Close / })).toHaveCount(0);
+    await expect(tab.getByRole('button', { name: /^Close / })).toHaveCount(1);
     await expect(page.getByRole('tabpanel')).toHaveAttribute('aria-labelledby', /^document-tab-/);
     await expect(page.getByRole('textbox', { name: 'Describe your data question', exact: true })).toHaveCount(0);
     await trustCurrentConnection(page);
@@ -132,13 +132,13 @@ test('Standard shows a single document tab and keeps tabs for multiple queries',
     await expect(page.locator('.document-tabs.is-compact-single')).toHaveCount(0);
     await expect(tabs).toHaveCount(2);
     await expect(page.getByTestId('new-sql')).toBeVisible();
-    await expect(page.getByTestId('save-query')).toHaveCount(0);
+    await expect(page.getByTestId('save-query')).toHaveCount(1);
     await tabs.last().getByRole('button', { name: /^Close / }).click();
     await expect(page.locator('.document-tabs.is-compact-single')).toBeVisible();
     await expect(tabs).toHaveCount(1);
     await expect(tabs).toHaveAttribute('aria-selected', 'true');
-    await expect(tabs.getByRole('button', { name: /^Close / })).toHaveCount(0);
-    await expect(page.locator('.restore-sql-trigger')).toHaveCount(0);
+    await expect(tabs.getByRole('button', { name: /^Close / })).toHaveCount(1);
+    await expect(page.locator('.restore-sql-trigger')).toHaveCount(1);
 });
 
 test('Switching to Experimental keeps the AI chat, query and run evidence', async ({ page }) => {

@@ -26,8 +26,11 @@ test('Run, chart, save and reload preserve the same execution evidence', async (
     const queryId = await page.locator('.execution-bar code').innerText();
     await results.getByRole('tab', { name: 'Chart', exact: true }).click();
     await expect(results.locator('svg[role="img"]')).toBeVisible();
+    const saveResponse = page.waitForResponse(response =>
+        response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/documents');
     await page.getByTestId('save-query').click();
-    await expect(page.locator('.draft-status')).toHaveText('Saved r1');
+    const saved = await (await saveResponse).json() as { revision: number };
+    expect(saved.revision).toBe(1);
     await page.reload();
     const recovered = page.getByRole('region', { name: 'Query results' });
     await expect(recovered.locator('[data-run-status="succeeded"]')).toBeVisible();

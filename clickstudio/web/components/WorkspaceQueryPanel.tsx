@@ -139,9 +139,11 @@ export function WorkspaceQueryPanel({
                     const name = event.currentTarget.value.trim();
                     const savingButtonFocused = event.relatedTarget instanceof HTMLElement
                         && event.relatedTarget.closest('[data-testid="save-query"]');
+                    const runButtonFocused = event.relatedTarget instanceof HTMLElement
+                        && event.relatedTarget.closest('[data-testid="run-button"], [data-testid^="run-action-"]');
                     if (name && name !== queryNameAtFocus.current) {
                         actions.onPatch({ name });
-                        if (!savingButtonFocused) void actions.onSave({ ...active, name });
+                        if (!savingButtonFocused && !runButtonFocused) void actions.onSave({ ...active, name });
                     }
                 }}
                 onKeyDown={event => {

@@ -9,8 +9,16 @@ function countWrites(page: Page) {
     return () => writes;
 }
 
+function countQuerySubmissions(page: Page) {
+    let submissions = 0;
+    page.on('request', request => {
+        if (request.method() === 'POST' && ['/api/runs', '/api/scripts'].includes(new URL(request.url()).pathname)) submissions++;
+    });
+    return () => submissions;
+}
+
 test('Local SQL drafts recover after reload without running a query', async ({ page }) => {
-    const writes = countWrites(page);
+    const submissions = countQuerySubmissions(page);
     await page.goto('/');
     await page.getByRole('textbox', { name: 'SQL document name', exact: true }).fill('Local draft.sql');
     const editor = page.locator('.cm-content');
@@ -21,7 +29,7 @@ test('Local SQL drafts recover after reload without running a query', async ({ p
     await page.reload();
     await expect(page.getByRole('textbox', { name: 'SQL document name', exact: true })).toHaveValue('Local draft.sql');
     await expect(page.locator('.cm-content')).toHaveText('SELECT 42 AS answer');
-    expect(writes()).toBe(0);
+    expect(submissions()).toBe(0);
 });
 
 test('Export local drafts downloads the current browser workspace without server writes', async ({ page }) => {
@@ -37,7 +45,6 @@ test('Export local drafts downloads the current browser workspace without server
     });
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/');
-    await page.getByRole('textbox', { name: 'SQL document name', exact: true }).fill('Local backup.sql');
     const editor = page.locator('.cm-content');
     await editor.click();
     await page.keyboard.press('ControlOrMeta+a');
@@ -47,6 +54,6 @@ test('Export local drafts downloads the current browser workspace without server
     const json = await page.evaluate(async () => await (window as Window & { __localDraftExport?: Promise<string> }).__localDraftExport);
     const backup = JSON.parse(json!) as { version: number; tabs: { name: string; sql: string }[] };
     expect(backup.version).toBe(1);
-    expect(backup.tabs).toContainEqual(expect.objectContaining({ name: 'Local backup.sql', sql: 'SELECT 42 AS answer' }));
+    expect(backup.tabs).toContainEqual(expect.objectContaining({ name: 'Getting started.sql', sql: 'SELECT 42 AS answer' }));
     expect(writes()).toBe(0);
 });

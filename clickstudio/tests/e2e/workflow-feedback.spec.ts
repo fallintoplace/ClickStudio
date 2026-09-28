@@ -34,7 +34,9 @@ test('Reopening and saving a metric keeps its saved contract and dependency', as
         await route.fulfill({ json: { ...savedDocument, ...savePayload, revision: 5, updatedAt: '2026-01-03T00:00:00.000Z' } });
     });
     await trust(page);
-    await page.getByRole('navigation', { name: 'Workspace browser', exact: true }).getByRole('button', { name: 'Queries', exact: true }).click();
+    const browser = page.getByRole('navigation', { name: 'Workspace browser', exact: true });
+    await browser.getByRole('button', { name: 'More workspace panels', exact: true }).click();
+    await page.getByRole('menuitem', { name: 'Queries', exact: true }).click();
     await page.getByRole('button', { name: /Daily revenue/ }).click();
     await expect(page.locator('.cm-content')).toContainText(savedDocument.sql);
     await expect(page.locator('.execution-bar code')).toHaveText(savedRun.queryId);
@@ -46,16 +48,26 @@ test('Reopening and saving a metric keeps its saved contract and dependency', as
     });
 });
 
-test('Saving a query updates its revision status and later edits are marked unsaved', async ({ page }) => {
+test('Saving a query creates a revision and later edits stay local', async ({ page }) => {
     await trust(page);
     await replaceSql(page, 'SELECT 111');
+    let saveRequests = 0;
+    page.on('request', request => {
+        if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/documents') saveRequests++;
+    });
+    const saveResponse = page.waitForResponse(response =>
+        response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/documents');
     await page.getByTestId('save-query').click();
-    await expect(page.locator('.draft-status')).toHaveText('Saved r1');
+    const response = await saveResponse;
+    expect(response.ok()).toBe(true);
+    const saved = await response.json() as { revision: number; sql: string };
+    expect(saved).toMatchObject({ revision: 1, sql: 'SELECT 111' });
     await replaceSql(page, 'SELECT 222');
-    await expect(page.locator('.draft-status')).toHaveText('Unsaved changes');
+    await expect(page.locator('.cm-content')).toContainText('SELECT 222');
+    expect(saveRequests).toBe(1);
 });
 
-test('Editing during a delayed save leaves the newer SQL marked unsaved', async ({ page }) => {
+test('Editing during a delayed save preserves the newer local SQL', async ({ page }) => {
     let release!: () => void, executions = 0;
     const wait = new Promise<void>(resolve => { release = resolve; });
     page.on('request', request => {
@@ -68,11 +80,18 @@ test('Editing during a delayed save leaves the newer SQL marked unsaved', async 
     await trust(page);
     try {
         await replaceSql(page, 'SELECT 111');
+        const saveRequest = page.waitForRequest(request =>
+            request.method() === 'POST' && new URL(request.url()).pathname === '/api/documents');
+        const saveResponse = page.waitForResponse(response =>
+            response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/documents');
         await page.getByTestId('save-query').click();
-        await expect(page.locator('.draft-status')).toHaveText('Saving…');
+        const request = await saveRequest;
+        expect(request.postDataJSON()).toMatchObject({ sql: 'SELECT 111' });
         await replaceSql(page, 'SELECT 222');
         release();
-        await expect(page.locator('.draft-status')).toHaveText('Unsaved changes');
+        const response = await saveResponse;
+        expect(response.ok()).toBe(true);
+        expect(await response.json()).toMatchObject({ sql: 'SELECT 111' });
         await expect(page.locator('.cm-content')).toContainText('SELECT 222');
         expect(executions).toBe(0);
     } finally {
@@ -95,8 +114,10 @@ test('Chart snapshot loads while a save is still in progress', async ({ page }) 
     const results = page.getByRole('region', { name: 'Query results', exact: true });
     await expect(results.getByRole('table', { name: 'Retained query rows' })).toBeVisible();
     try {
+        const saveRequest = page.waitForRequest(request =>
+            request.method() === 'POST' && new URL(request.url()).pathname === '/api/documents');
         await page.getByTestId('save-query').click();
-        await expect(page.locator('.draft-status')).toHaveText('Saving…');
+        await saveRequest;
         await results.getByRole('tab', { name: 'Chart', exact: true }).click();
         await expect.poll(() => snapshotRequests).toBe(1);
         await expect(results.locator('.chart-workspace, .chart-table-fallback')).toBeVisible();

@@ -756,7 +756,9 @@ export function sqlExamplesFor(connection: Pick<Connection, 'id' | 'dataSource'>
             ? []
             : noUserTables
                 ? generatedDataExamples
-                : genericExamples.map((example, index) => ({ ...example, featuredOrder: index + 1 }));
+                : schema
+                    ? genericExamples.map((example, index) => ({ ...example, featuredOrder: index + 1 }))
+                    : [];
     const orderedTableExamples = !featured.length && tableExamples.length
         ? tableExamples.map((example, index) => index === 0 ? { ...example, featuredOrder: 1 } : example)
         : tableExamples;

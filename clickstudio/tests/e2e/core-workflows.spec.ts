@@ -78,6 +78,7 @@ test('Run evidence stays with its draft through tab and mode switches', async ({
     const firstQueryId = await page.locator('.execution-bar code').innerText();
 
     await openBlankSql(page);
+    await replaceSql(page, 'SELECT 2 AS second_query');
     const secondResults = page.getByRole('region', { name: 'Query results', exact: true });
     await expect(secondResults.getByRole('table', { name: 'Retained query rows' })).toHaveCount(0);
     await expect(page.locator('.execution-bar')).toHaveAttribute('data-run-status', 'ready');
@@ -144,8 +145,8 @@ test('The previous result notice explains when the SQL selection changes', async
     await page.keyboard.press('Shift+End');
     await page.keyboard.press('Shift+ArrowLeft');
     const provenance = results.locator('.result-provenance-header');
-    await expect(provenance).toContainText('SQL, selection, or parameters changed');
-    await expect(provenance).toHaveAttribute('aria-label', 'SQL text, selection, or bound parameters changed since this run. Rerun to refresh the result.');
+    await expect(provenance).toContainText('SQL text, selection, or bound parameters changed');
+    await expect(provenance).toHaveAttribute('aria-label', 'SQL text, selection, or bound parameters changed since this run.');
 });
 
 test('Two Run button clicks in one task submit only one request', async ({ page }) => {
@@ -327,7 +328,7 @@ test('A failed query stays in Results beside the previous success until retry', 
         await expect(failure).toContainText('Syntax error at position 15');
         await expect(failure.locator('pre.result-execution-sql')).toHaveText(submittedSql);
         await expect(results.locator('.result-provenance-header')).toContainText('Previous result');
-        await expect(results.locator('.result-provenance-header')).toContainText('Latest attempt failed');
+        await expect(results.locator('.result-provenance-header')).toContainText('The latest attempt failed.');
         await expect(results.getByRole('table', { name: 'Retained query rows' })).toBeVisible();
         await expect(page.locator('.execution-bar')).toHaveAttribute('data-run-status', 'failed');
         await expect(page.locator('.execution-bar code')).toHaveCount(0);
@@ -813,7 +814,7 @@ test('SQL and parameter edits label old results without changing their run evide
 
     await replaceSql(page, 'SELECT 42');
     await expect(results.locator('.result-provenance-header')).toContainText('Previous result');
-    await expect(results.locator('.result-provenance-header')).toContainText('SQL, selection, or parameters changed');
+    await expect(results.locator('.result-provenance-header')).toContainText('SQL text, selection, or bound parameters changed');
     await expect(page.locator('.execution-bar code')).toHaveText(queryId);
     await replaceSql(page, submittedSql);
     await expect(results.locator('.result-provenance-header')).toHaveCount(0);

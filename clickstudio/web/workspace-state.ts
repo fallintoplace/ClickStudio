@@ -140,7 +140,7 @@ export function recover(key: string, storage?: Pick<Storage, 'getItem'>): Worksp
             const incomplete = !Array.isArray(value.tabs) || tabs.length !== storedTabs.length ||
                 closedTabs.length !== storedClosed.length || (value.closedTabs !== undefined && !Array.isArray(value.closedTabs));
             // A damaged open-tab list must not erase an otherwise usable closed history.
-            if (!tabs.length && (!Array.isArray(value.tabs) || storedTabs.length > 0))
+            if (!tabs.length)
                 tabs.push(newDraft('Getting started.sql', SAMPLE_SQL));
             return {
                 version: 1, tabs, closedTabs,
@@ -160,8 +160,9 @@ export function closeDraft(state: WorkspaceState, draftId: string): WorkspaceSta
     if (i === -1) return state;
     const closed = state.tabs[i]!;
     const tabs = state.tabs.filter(d => d.id !== draftId);
-    return { ...state, tabs,
-        activeId: state.activeId === draftId ? tabs[Math.min(i, tabs.length - 1)]?.id : state.activeId,
+    const openTabs = tabs.length ? tabs : [newDraft()];
+    return { ...state, tabs: openTabs,
+        activeId: state.activeId === draftId ? openTabs[Math.min(i, openTabs.length - 1)]?.id : state.activeId ?? openTabs[0]?.id,
         closedTabs: [closed, ...(state.closedTabs ?? []).filter(d => d.id !== draftId)].slice(0, MAX_CLOSED_TABS),
     };
 }
