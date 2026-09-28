@@ -90,7 +90,7 @@ function capability(available: boolean, reason?: string) {
     return { available, ...(reason ? { reason } : {}) };
 }
 
-type CloudConnectionTest = {
+export type CloudConnectionTest = {
     host: string;
     database: string;
     username: string;

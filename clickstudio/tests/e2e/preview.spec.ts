@@ -1,10 +1,13 @@
 import { readFile } from 'node:fs/promises';
 import { test, expect, type Page } from '@playwright/test';
+import type { Schema } from '../../shared/types.js';
+import type { CloudConnectionTest } from '../../web/cloud-connection.js';
 import { openWorkspacePanel } from './helpers.js';
 
-const previewCloudSchema = {
+const previewCloudSchema: Schema = {
     connectionId: 'clickhouse-cloud',
     fetchedAt: '2026-09-28T00:00:00.000Z',
+    databases: ['default'],
     tables: [{ database: 'default', name: 'events', engine: 'MergeTree' }],
     columns: [
         { database: 'default', table: 'events', name: 'day', type: 'Date', defaultKind: '', comment: '' },
@@ -12,6 +15,27 @@ const previewCloudSchema = {
     ],
     warnings: [],
     truncated: false,
+};
+
+const previewCloudConnectionTest: CloudConnectionTest = {
+    host: 'service.region.provider.clickhouse.cloud:8443',
+    database: 'default',
+    username: 'demo',
+    serverVersion: '26.1',
+    queryLog: { available: true },
+    queryLogSource: 'user_query_log',
+    replication: { available: false, reason: 'Unavailable in this preview test.' },
+    progress: { available: false, reason: 'Unavailable in this preview test.' },
+    cancellation: { available: false, reason: 'Unavailable in this preview test.' },
+    explain: { available: false, reason: 'Unavailable in this preview test.' },
+    explainPlan: { available: false, reason: 'Unavailable in this preview test.' },
+    explainAnalyze: { available: false, reason: 'Unavailable in this preview test.' },
+    queryTree: { available: false, reason: 'Unavailable in this preview test.' },
+    explainPipeline: { available: false, reason: 'Unavailable in this preview test.' },
+    pipeline: { available: false, reason: 'Unavailable in this preview test.' },
+    traceLog: { available: false, reason: 'Unavailable in this preview test.' },
+    documentation: { available: false, reason: 'Unavailable in this preview test.' },
+    parameters: { available: false, reason: 'Unavailable in this preview test.' },
 };
 
 async function mockCloudEndpoint(page: Page, commitOutcome: 'success' | 'unknown' = 'success', cloudSchema = previewCloudSchema, onSchemaAfterImport?: () => void) {
@@ -54,7 +78,7 @@ async function mockCloudEndpoint(page: Page, commitOutcome: 'success' | 'unknown
         }
         const body = request.postDataJSON() as { action?: string; queryId?: string; table?: string; rows?: number };
         if (body.action === 'test') {
-            await route.fulfill({ json: { host: 'service.region.provider.clickhouse.cloud:8443', database: 'default', username: 'demo', serverVersion: '26.1', queryLog: { available: true }, queryLogSource: 'user_query_log', replication: { available: false, reason: 'Unavailable in this preview test.' } } });
+            await route.fulfill({ json: previewCloudConnectionTest });
             return;
         }
         if (body.action === 'schema') {
@@ -106,7 +130,7 @@ test('Static production preview loads the native parser and exports retained sam
     await page.getByRole('dialog', { name: 'Data source options' })
         .getByRole('button', { name: /Sample data/ }).click();
 
-    await page.getByRole('button', { name: 'Reference', exact: true }).click();
+    await page.getByRole('navigation', { name: 'Workspace browser' }).getByRole('button', { name: 'Reference' }).click();
     await expect(page.getByTestId('reference-source')).toContainText('Offline ClickHouse reference');
     await page.getByTestId('reference-search').fill('MergeTree');
     const mergeTree = page.getByRole('option', { name: /MergeTree Table Engine/ }).first();
@@ -119,7 +143,7 @@ test('Static production preview loads the native parser and exports retained sam
     await expect(page.locator('.cm-content')).toContainText('MergeTree');
     expect(documentationRequests).toEqual([]);
 
-    await page.getByRole('button', { name: 'Objects', exact: true }).click();
+    await page.getByRole('navigation', { name: 'Workspace browser' }).getByRole('button', { name: 'Objects' }).click();
     await page.getByTestId('schema-search').fill('events');
     const table = page.getByRole('button', { name: 'events MergeTree', exact: true });
     await expect(table).toBeVisible();
@@ -158,7 +182,7 @@ test('Static production preview searches native Playground docs with bound query
     });
 
     await page.goto('/');
-    await page.getByRole('button', { name: 'Reference', exact: true }).click();
+    await page.getByRole('navigation', { name: 'Workspace browser' }).getByRole('button', { name: 'Reference' }).click();
     await page.getByTestId('reference-search').fill('MergeTree');
     const mergeTree = page.getByRole('option', { name: /MergeTree Table Engine/ }).first();
     await expect(mergeTree).toBeVisible();
@@ -228,7 +252,7 @@ test('Static preview includes materialized views and storage activity in sample 
     await page.goto('/');
     await page.locator('.connection-trigger').click();
     await page.getByRole('dialog', { name: 'Data source options' }).getByRole('button', { name: /Sample data/ }).click();
-    await page.getByRole('button', { name: 'Objects', exact: true }).click();
+    await page.getByRole('navigation', { name: 'Workspace browser' }).getByRole('button', { name: 'Objects' }).click();
     await page.getByRole('button', { name: 'View dependencies', exact: true }).click();
     const graph = page.getByRole('dialog', { name: 'Materialized view dependencies', exact: true });
     await expect(graph).toContainText('SAMPLE DATA');
@@ -276,7 +300,7 @@ test('ClickHouse Cloud import maps and inserts into an existing table without ty
     await expect(dialog.getByRole('radio', { name: /Use an existing table/ })).toBeChecked();
     await expect(dialog.getByLabel('Map day to destination')).toHaveValue('day');
     await dialog.getByRole('button', { name: 'Review import' }).click();
-    await dialog.getByRole('button', { name: 'Import rows' }).click();
+    await dialog.getByRole('button', { name: 'Import rows', exact: true }).click();
 
     await expect(dialog).toContainText('Inserted 2 rows into default.events');
     expect(imports).toHaveLength(1);
@@ -337,6 +361,7 @@ test('ClickHouse Cloud import refreshes and reveals the created table', async ({
 
     await dialog.getByRole('button', { name: 'Done' }).click();
     await expect(page.getByRole('region', { name: 'Selected object' })).toContainText('default.interview_events');
+    await page.getByRole('button', { name: '‹ Objects', exact: true }).click();
     await expect(page.getByRole('button', { name: 'interview_events MergeTree', exact: true })).toBeVisible();
 });
 
@@ -347,7 +372,7 @@ test('ClickHouse Cloud insert row leaves defaulted columns out and needs no type
     };
     const imports = await mockCloudEndpoint(page, 'success', cloudSchema);
     await connectPreviewCloud(page);
-    await page.getByRole('button', { name: 'Objects', exact: true }).click();
+    await page.getByRole('navigation', { name: 'Workspace browser' }).getByRole('button', { name: 'Objects' }).click();
     await page.getByRole('button', { name: 'events MergeTree', exact: true }).click();
     await page.getByRole('button', { name: 'Insert row', exact: true }).click();
 
@@ -408,7 +433,7 @@ test('ClickHouse Cloud import shows clear choices after an interrupted write', a
     await dialog.getByRole('button', { name: 'Preview file' }).click();
     await dialog.getByRole('button', { name: 'Map columns' }).click();
     await dialog.getByRole('button', { name: 'Review import' }).click();
-    await dialog.getByRole('button', { name: 'Import rows' }).click();
+    await dialog.getByRole('button', { name: 'Import rows', exact: true }).click();
 
     await expect(dialog).toContainText('We couldn’t confirm the import.');
     await expect(dialog).toContainText('A late first import may add duplicate rows.');
