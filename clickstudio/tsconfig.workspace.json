@@ -25,6 +25,7 @@
     "web/workspace-persistence.ts",
     "web/visible-polling.ts",
     "web/demo-preview.ts",
+    "web/cloud-import.ts",
     "web/sql-examples.ts",
     "web/sql-examples-locales.ts",
     "web/i18n.ts",

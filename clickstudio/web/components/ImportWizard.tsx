@@ -31,8 +31,15 @@ export function ImportWizard(props: ImportWizardProps) {
         setConfirmation,
         importUnavailable,
         browserDemoImport,
+        browserCloudImport,
         availableTargets,
         destinationColumns,
+        creatingTable,
+        createTableName,
+        setCreateTableName,
+        createColumns,
+        createColumnTypes,
+        updateCreateColumn,
         selectedFields,
         destinationNames,
         duplicateDestinations,
@@ -59,9 +66,9 @@ export function ImportWizard(props: ImportWizardProps) {
         <div className="flex max-h-[min(90vh,800px)] flex-col">
             <header className="flex items-start justify-between gap-5 border-b border-[var(--line)] px-5 py-4 sm:px-7">
                 <div className="min-w-0">
-                    <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--muted)]">{browserDemoImport ? 'Interview demo · browser sandbox' : 'ClickHouse data'}</span>
+                    <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--muted)]">{browserDemoImport ? 'Interview demo · browser sandbox' : browserCloudImport ? 'ClickHouse Cloud' : 'ClickHouse data'}</span>
                     <h2 id="import-wizard-title" className="mt-1 text-lg font-semibold tracking-tight">Import data</h2>
-                    <p className="mt-1 text-xs text-[var(--text-soft)]">{browserDemoImport ? 'Preview, map, and save rows into this browser’s sample dataset.' : 'Preview, map, and review rows before inserting them.'}</p>
+                    <p className="mt-1 text-xs text-[var(--text-soft)]">{browserDemoImport ? 'Preview, map, and save rows into this browser’s sample dataset.' : browserCloudImport ? 'Preview, map, and import rows with your connected Cloud account.' : 'Preview, map, and review rows before inserting them.'}</p>
                 </div>
                 <button type="button" aria-label="Close import wizard" disabled={Boolean(busy) || job?.status === 'running'} onClick={() => void closeWizard()} className="rounded-lg border border-[var(--line)] px-3 py-2 text-xs text-[var(--text-soft)] transition hover:bg-[var(--panel-hover)] disabled:cursor-not-allowed disabled:opacity-40">Close</button>
             </header>
@@ -75,6 +82,7 @@ export function ImportWizard(props: ImportWizardProps) {
 
             <main className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-7">
                 {browserDemoImport && <div role="status" className="mb-4 flex items-start gap-3 rounded-xl border border-[var(--accent)]/25 bg-[var(--accent)]/5 p-3 text-xs leading-relaxed text-[var(--text-soft)]"><span className="mt-1 size-2 shrink-0 rounded-full bg-[var(--accent)]"/><span><strong className="text-[var(--text)]">Vercel demo mode.</strong> Your file stays in this browser and is added to <code className="font-mono">demo.interview_imports</code>. Nothing is written to the public ClickHouse Playground.</span></div>}
+                {browserCloudImport && <div role="status" className="mb-4 flex items-start gap-3 rounded-xl border border-[var(--accent)]/25 bg-[var(--accent)]/5 p-3 text-xs leading-relaxed text-[var(--text-soft)]"><span className="mt-1 size-2 shrink-0 rounded-full bg-[var(--accent)]"/><span><strong className="text-[var(--text)]">Cloud import.</strong> The connected ClickHouse user needs permission to insert into the selected table. Creating a table also needs CREATE TABLE permission.</span></div>}
                 {recoveryState === 'checking' && <div role="status" className="rounded-xl border border-[var(--line)] bg-[var(--page)] p-4 text-sm text-[var(--text-soft)]">Checking for imports that need review before allowing another write…</div>}
                 {recoveryState === 'failed' && <div role="alert" className="rounded-xl border border-[var(--red)]/30 bg-[var(--red)]/5 p-4 text-sm text-[var(--red)]"><p>{error || 'Previous import status could not be checked. Review it before starting another write.'}</p><button type="button" onClick={() => { setError(''); setRecoveryAttempt(value => value + 1); }} className="mt-3 rounded-lg border border-current px-3 py-2 text-xs font-semibold">Retry recovery check</button></div>}
                 {recoveryState === 'ready' && importUnavailable && <div role="status" className="rounded-xl border border-[var(--line)] bg-[var(--page)] p-4 text-sm text-[var(--text-soft)]">{importUnavailable}</div>}
@@ -93,22 +101,37 @@ export function ImportWizard(props: ImportWizardProps) {
                     </> : <>
                         <div className="flex flex-wrap items-start justify-between gap-3">
                             <div><span className="text-xs font-semibold">{preview.name}</span><p className="mt-1 text-[11px] text-[var(--muted)]">{preview.rowCount.toLocaleString()} rows · {preview.columns.length} columns · {preview.format.toUpperCase()}</p></div>
-                            <button type="button" onClick={() => { void api(`/imports/${encodeURIComponent(preview.id)}`, { method: 'DELETE' }).catch(() => undefined); setPreview(undefined); setMapping(undefined); setStep('file'); setError(''); }} className="rounded-lg border border-[var(--line)] px-3 py-2 text-[11px] text-[var(--text-soft)] hover:bg-[var(--panel-hover)]">Choose another file</button>
+                            <button type="button" onClick={() => { if (!browserCloudImport) void api(`/imports/${encodeURIComponent(preview.id)}`, { method: 'DELETE' }).catch(() => undefined); setPreview(undefined); setMapping(undefined); setStep('file'); setError(''); }} className="rounded-lg border border-[var(--line)] px-3 py-2 text-[11px] text-[var(--text-soft)] hover:bg-[var(--panel-hover)]">Choose another file</button>
                         </div>
                         <ImportPreviewTable preview={preview} columns={sampleColumns}/>
                     </>}
-                    {preview && availableTargets.length === 0 && <div role="status" className="rounded-lg border border-[var(--line)] p-3 text-xs text-[var(--muted)]">No configured import destination is available for this connection.</div>}
+                    {preview && availableTargets.length === 0 && !browserCloudImport && <div role="status" className="rounded-lg border border-[var(--line)] p-3 text-xs text-[var(--muted)]">No configured import destination is available for this connection.</div>}
                 </section>}
 
                 {recoveryState === 'ready' && !importUnavailable && step === 'mapping' && preview && <section aria-label="Map source columns" className="space-y-4">
                     <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
                         <label className="grid gap-1.5 text-xs font-medium text-[var(--text-soft)]">Destination table
                             <select aria-label="Import target table" value={target} onChange={event => changeTarget(event.target.value)} className="min-h-10 rounded-lg border border-[var(--line)] bg-[var(--page)] px-3 text-xs text-[var(--text)]">
+                                {browserCloudImport && <option value="__create_table_from_file__">Create table from file…</option>}
                                 {availableTargets.map(table => <option key={table} value={table}>{table}</option>)}
                             </select>
                         </label>
-                        <div className="rounded-lg border border-[var(--line)] bg-[var(--page)] px-3 py-2 text-[11px] text-[var(--muted)]"><strong className="text-[var(--text-soft)]">{preview.rowCount.toLocaleString()} rows</strong> from {preview.name}. {browserDemoImport ? 'The sample schema is checked in this browser.' : 'Values are sent as parsed; ClickHouse checks destination types.'}</div>
+                        <div className="rounded-lg border border-[var(--line)] bg-[var(--page)] px-3 py-2 text-[11px] text-[var(--muted)]"><strong className="text-[var(--text-soft)]">{preview.rowCount.toLocaleString()} rows</strong> from {preview.name}. {browserDemoImport ? 'The sample schema is checked in this browser.' : browserCloudImport ? 'The import uses the connected Cloud user permissions.' : 'Values are sent as parsed; ClickHouse checks destination types.'}</div>
                     </div>
+                    {creatingTable && <div className="rounded-xl border border-[var(--line)] bg-[var(--page)] p-4">
+                        <label className="grid max-w-sm gap-1.5 text-xs font-medium text-[var(--text-soft)]">New table name
+                            <input aria-label="New table name" value={createTableName} onChange={event => setCreateTableName(event.target.value)} maxLength={128} className="min-h-10 rounded-lg border border-[var(--line)] bg-[var(--panel)] px-3 font-mono text-xs text-[var(--text)]" />
+                        </label>
+                        <div className="mt-3 grid gap-2">
+                            {createColumns.map(column => <div key={column.source} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(150px,0.8fr)]">
+                                <span className="self-center truncate text-[11px] text-[var(--muted)]" title={column.source}>{column.source}</span>
+                                <input aria-label={`New column name for ${column.source}`} value={column.name} onChange={event => updateCreateColumn(column.source, 'name', event.target.value)} maxLength={128} className="min-h-9 rounded-lg border border-[var(--line)] bg-[var(--panel)] px-2.5 font-mono text-xs text-[var(--text)]" />
+                                <select aria-label={`Type for ${column.source}`} value={column.type} onChange={event => updateCreateColumn(column.source, 'type', event.target.value)} className="min-h-9 rounded-lg border border-[var(--line)] bg-[var(--panel)] px-2.5 font-mono text-xs text-[var(--text)]">
+                                    {createColumnTypes.map(type => <option key={type} value={type}>{type}</option>)}
+                                </select>
+                            </div>)}
+                        </div>
+                    </div>}
                     <div className="overflow-x-auto rounded-xl border border-[var(--line)]">
                         <table className="w-full min-w-[540px] border-collapse text-left text-xs">
                             <thead className="bg-[var(--page)] text-[10px] uppercase tracking-wider text-[var(--muted)]"><tr><th className="px-3 py-2.5">Source column</th><th className="px-3 py-2.5">Destination column</th><th className="px-3 py-2.5">Type</th></tr></thead>
@@ -127,7 +150,7 @@ export function ImportWizard(props: ImportWizardProps) {
                     <div className="rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-4 sm:p-5">
                         <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--muted)]">{browserDemoImport ? 'Ready to save in browser demo' : 'Ready to insert'}</span>
                         <h3 className="mt-1 text-base font-semibold">{mapping.rowCount.toLocaleString()} rows into <code className="rounded bg-[var(--page)] px-1.5 py-1 font-mono text-sm">{mapping.table}</code></h3>
-                        <p className="mt-2 text-xs leading-relaxed text-[var(--text-soft)]">{browserDemoImport ? 'This adds rows to the Vercel interview sandbox in this browser. It does not write to ClickHouse.' : 'This writes data to the selected ClickHouse table. The mapping and destination schema were checked by the server.'}</p>
+                        <p className="mt-2 text-xs leading-relaxed text-[var(--text-soft)]">{browserDemoImport ? 'This adds rows to the Vercel interview sandbox in this browser. It does not write to ClickHouse.' : browserCloudImport ? creatingTable ? 'This creates a MergeTree table in the connected database, then inserts the file rows.' : 'This writes to the selected Cloud table. ClickHouse checks your account permissions and destination types.' : 'This writes data to the selected ClickHouse table. The mapping and destination schema were checked by the server.'}</p>
                     </div>
                     <div className="rounded-xl border border-[var(--line)] bg-[var(--page)] p-4">
                         <h4 className="text-xs font-semibold">Column mapping</h4>
@@ -153,12 +176,12 @@ export function ImportWizard(props: ImportWizardProps) {
             </main>
 
             <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--line)] bg-[var(--page)] px-5 py-3 sm:px-7">
-                <span className="text-[10px] text-[var(--muted)]">{browserDemoImport ? 'Browser demo · nothing is written to ClickHouse' : step === 'file' ? 'Up to 2 MB · maximum 10,000 rows' : step === 'mapping' ? `${Object.keys(selectedFields).length} columns mapped` : step === 'review' ? 'Review before writing' : 'Server-owned import status'}</span>
+                <span className="text-[10px] text-[var(--muted)]">{browserDemoImport ? 'Browser demo · nothing is written to ClickHouse' : browserCloudImport ? 'Up to 2 MB · maximum 10,000 rows · ClickHouse Cloud permissions apply' : step === 'file' ? 'Up to 2 MB · maximum 10,000 rows' : step === 'mapping' ? `${Object.keys(selectedFields).length} columns mapped` : step === 'review' ? 'Review before writing' : 'Server-owned import status'}</span>
                 <div className="flex items-center gap-2">
                     {recoveryState === 'ready' && step === 'mapping' && <button type="button" onClick={() => { setStep('file'); setError(''); }} disabled={Boolean(busy)} className="rounded-lg border border-[var(--line)] px-3 py-2 text-xs text-[var(--text-soft)] hover:bg-[var(--panel-hover)] disabled:opacity-50">Back</button>}
                     {recoveryState === 'ready' && step === 'review' && <button type="button" onClick={() => { setStep('mapping'); setError(''); }} disabled={Boolean(busy)} className="rounded-lg border border-[var(--line)] px-3 py-2 text-xs text-[var(--text-soft)] hover:bg-[var(--panel-hover)] disabled:opacity-50">Back</button>}
                     {recoveryState === 'ready' && !importUnavailable && step === 'file' && !preview && <button type="button" onClick={() => void previewFile()} disabled={!file || !format || file.size > MAX_FILE_BYTES || Boolean(busy) || availableTargets.length === 0} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40">{busy === 'preview' ? 'Reading file…' : 'Preview file'}</button>}
-                    {recoveryState === 'ready' && !importUnavailable && step === 'file' && preview && <button type="button" onClick={startMapping} disabled={availableTargets.length === 0} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40">Map columns</button>}
+                    {recoveryState === 'ready' && !importUnavailable && step === 'file' && preview && <button type="button" onClick={startMapping} disabled={availableTargets.length === 0 && !browserCloudImport} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40">Map columns</button>}
                     {recoveryState === 'ready' && !importUnavailable && step === 'mapping' && <button type="button" onClick={() => void previewMapping()} disabled={!target || !destinationNames.length || duplicateDestinations || !destinationColumns.length || Boolean(busy)} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40">{busy === 'mapping' ? 'Checking mapping…' : 'Review import'}</button>}
                     {recoveryState === 'ready' && !importUnavailable && step === 'review' && <button type="button" onClick={() => void commitImport()} disabled={confirmation !== confirmationPhrase || Boolean(busy)} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40">{busy === 'commit' ? browserDemoImport ? 'Saving…' : 'Starting…' : browserDemoImport ? 'Save demo rows' : 'Import rows'}</button>}
                     {recoveryState === 'ready' && step === 'status' && job?.status !== 'running' && <button type="button" onClick={() => void closeWizard()} disabled={Boolean(busy)} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:opacity-40">Done</button>}

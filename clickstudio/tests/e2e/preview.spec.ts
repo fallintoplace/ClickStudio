@@ -1,6 +1,69 @@
 import { readFile } from 'node:fs/promises';
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { openWorkspacePanel } from './helpers.js';
+
+const previewCloudSchema = {
+    connectionId: 'clickhouse-cloud',
+    fetchedAt: '2026-09-28T00:00:00.000Z',
+    tables: [{ database: 'default', name: 'events', engine: 'MergeTree' }],
+    columns: [
+        { database: 'default', table: 'events', name: 'day', type: 'Date', defaultKind: '', comment: '' },
+        { database: 'default', table: 'events', name: 'events', type: 'UInt64', defaultKind: '', comment: '' },
+    ],
+    warnings: [],
+    truncated: false,
+};
+
+async function mockCloudEndpoint(page: Page, commitOutcome: 'success' | 'unknown' = 'success') {
+    const imports: string[] = [];
+    await page.route('**/api/cloud', async route => {
+        const request = route.request();
+        const contentType = request.headers()['content-type'] ?? '';
+        if (contentType.startsWith('multipart/form-data')) {
+            const body = request.postData() ?? '';
+            imports.push(body);
+            const queryId = body.match(/name="queryId"\r\n\r\n([^\r\n]+)/)?.[1] ?? 'clickstudio-import-00000000-0000-4000-8000-000000000000';
+            const table = body.match(/name="target"\r\n\r\n([^\r\n]+)/)?.[1] ?? 'default.events';
+            const id = queryId.replace('clickstudio-import-', '');
+            if (commitOutcome === 'unknown') {
+                await route.fulfill({ status: 502, json: { error: { code: 'CLICKHOUSE_ERROR', message: 'The request ended before the insert response arrived.' } } });
+                return;
+            }
+            const createValue = body.match(/name="createTable"\r\n\r\n([^\r\n]+)/)?.[1];
+            const targetValue = createValue ? `default.${JSON.parse(createValue).name}` : table;
+            await route.fulfill({ json: { id, connectionId: 'clickhouse-cloud', table: targetValue, queryId, rows: 2, createdAt: '2026-09-28T00:00:00.000Z', status: 'succeeded' } });
+            return;
+        }
+        const body = request.postDataJSON() as { action?: string; queryId?: string; table?: string; rows?: number };
+        if (body.action === 'test') {
+            await route.fulfill({ json: { host: 'service.region.provider.clickhouse.cloud:8443', database: 'default', username: 'demo', serverVersion: '26.1', queryLog: { available: true }, queryLogSource: 'user_query_log', replication: { available: false, reason: 'Unavailable in this preview test.' } } });
+            return;
+        }
+        if (body.action === 'schema') {
+            await route.fulfill({ json: previewCloudSchema });
+            return;
+        }
+        if (body.action === 'import-status') {
+            await route.fulfill({ json: { id: (body.queryId ?? '').replace('clickstudio-import-', ''), connectionId: 'clickhouse-cloud', table: body.table, queryId: body.queryId, rows: body.rows, createdAt: '2026-09-28T00:00:00.000Z', status: 'unknown', error: 'ClickHouse has no conclusive success record. Inspect the destination before deciding what to do; automatic retry is disabled.' } });
+            return;
+        }
+        await route.fulfill({ status: 409, json: { error: { code: 'UNEXPECTED_ACTION', message: 'Unexpected Cloud action in this import test.' } } });
+    });
+    return imports;
+}
+
+async function connectPreviewCloud(page: Page) {
+    await page.goto('/');
+    await page.locator('.connection-trigger').click();
+    await page.getByRole('button', { name: 'Connect ClickHouse Cloud' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Connect to your service' });
+    await dialog.getByLabel('HTTPS host').fill('service.region.provider.clickhouse.cloud:8443');
+    await dialog.getByLabel('Database').fill('default');
+    await dialog.getByLabel('Username').fill('demo');
+    await dialog.getByLabel('Password').fill('demo-password');
+    await dialog.getByRole('button', { name: 'Connect service' }).click();
+    await expect(page.locator('.connection-trigger')).toContainText('CLICKHOUSE CLOUD');
+}
 
 test('Static production preview loads the native parser and exports retained sample results', async ({ page }) => {
     const documentationRequests: string[] = [];
@@ -166,4 +229,84 @@ test('Geo Help demo runs native Point values and renders twenty cities', async (
     await expect(page.locator('.geo-feature.geo-point')).toHaveCount(20);
     await expect(page.locator('.geo-map-caption')).toContainText('20 valid features');
     await expect(page.getByText('No returned rows contain valid longitude/latitude geometry for this selection.', { exact: true })).toHaveCount(0);
+});
+
+test('ClickHouse Cloud import maps and confirms an existing table with the connected user', async ({ page }) => {
+    const imports = await mockCloudEndpoint(page);
+    await connectPreviewCloud(page);
+    await page.getByRole('button', { name: 'Import', exact: true }).last().click();
+
+    const dialog = page.getByRole('dialog', { name: 'Import data', exact: true });
+    await dialog.getByLabel('Choose a CSV, JSON, or NDJSON file').setInputFiles({
+        name: 'events.csv',
+        mimeType: 'text/csv',
+        buffer: Buffer.from('day,events\n2026-09-27,10\n2026-09-28,20\n'),
+    });
+    await dialog.getByRole('button', { name: 'Preview file' }).click();
+    await expect(dialog).toContainText('2 rows · 2 columns · CSV');
+    await dialog.getByRole('button', { name: 'Map columns' }).click();
+    await expect(dialog.getByLabel('Map day to destination')).toHaveValue('day');
+    await dialog.getByRole('button', { name: 'Review import' }).click();
+    await dialog.getByLabel('Type INSERT 2 ROWS to confirm').fill('INSERT 2 ROWS');
+    await dialog.getByRole('button', { name: 'Import rows' }).click();
+
+    await expect(dialog).toContainText('Inserted 2 rows into default.events');
+    expect(imports).toHaveLength(1);
+    expect(imports[0]).toContain('name="file"; filename="events.csv"');
+    expect(imports[0]).toContain('name="confirmation"\r\n\r\nINSERT 2 ROWS');
+    expect(imports[0]).toContain('name="fields"\r\n\r\n{"day":"day","events":"events"}');
+});
+
+test('ClickHouse Cloud import creates a table with editable inferred columns', async ({ page }) => {
+    const imports = await mockCloudEndpoint(page);
+    await connectPreviewCloud(page);
+    await page.getByRole('button', { name: 'Import', exact: true }).last().click();
+
+    const dialog = page.getByRole('dialog', { name: 'Import data', exact: true });
+    await dialog.getByLabel('Choose a CSV, JSON, or NDJSON file').setInputFiles({
+        name: 'interview events.csv',
+        mimeType: 'text/csv',
+        buffer: Buffer.from('day,events\n2026-09-27,10\n2026-09-28,20\n'),
+    });
+    await dialog.getByRole('button', { name: 'Preview file' }).click();
+    await dialog.getByRole('button', { name: 'Map columns' }).click();
+    await dialog.getByLabel('Import target table').selectOption('__create_table_from_file__');
+    await expect(dialog.getByLabel('New table name')).toHaveValue('interview_events');
+    await expect(dialog.getByLabel('Type for day')).toHaveValue('Date');
+    await expect(dialog.getByLabel('Type for events')).toHaveValue('UInt64');
+    await dialog.getByLabel('New table name').fill('interview_events');
+    await dialog.getByLabel('New column name for day').fill('event_day');
+    await dialog.getByRole('button', { name: 'Review import' }).click();
+    await expect(dialog).toContainText('2 rows into default.interview_events');
+    await dialog.getByLabel('Type INSERT 2 ROWS to confirm').fill('INSERT 2 ROWS');
+    await dialog.getByRole('button', { name: 'Import rows' }).click();
+
+    await expect(dialog).toContainText('Inserted 2 rows into default.interview_events');
+    const createTable = imports[0]?.match(/name="createTable"\r\n\r\n([^\r\n]+)/)?.[1];
+    expect(createTable).toBeTruthy();
+    expect(JSON.parse(createTable!)).toMatchObject({ name: 'interview_events', columns: [{ source: 'day', name: 'event_day', type: 'Date' }, { source: 'events', name: 'events', type: 'UInt64' }] });
+});
+
+test('ClickHouse Cloud import keeps an interrupted write blocked and does not retry it', async ({ page }) => {
+    const imports = await mockCloudEndpoint(page, 'unknown');
+    await connectPreviewCloud(page);
+    await page.getByRole('button', { name: 'Import', exact: true }).last().click();
+
+    const dialog = page.getByRole('dialog', { name: 'Import data', exact: true });
+    await dialog.getByLabel('Choose a CSV, JSON, or NDJSON file').setInputFiles({
+        name: 'events.csv',
+        mimeType: 'text/csv',
+        buffer: Buffer.from('day,events\n2026-09-28,20\n'),
+    });
+    await dialog.getByRole('button', { name: 'Preview file' }).click();
+    await dialog.getByRole('button', { name: 'Map columns' }).click();
+    await dialog.getByRole('button', { name: 'Review import' }).click();
+    await dialog.getByLabel('Type INSERT 1 ROWS to confirm').fill('INSERT 1 ROWS');
+    await dialog.getByRole('button', { name: 'Import rows' }).click();
+
+    await expect(dialog).toContainText('The insert outcome is not confirmed.');
+    await expect(dialog).toContainText('automatic retry is disabled');
+    await dialog.getByRole('button', { name: 'Check ClickHouse status' }).click();
+    await expect(dialog).toContainText('The insert outcome is not confirmed.');
+    expect(imports).toHaveLength(1);
 });

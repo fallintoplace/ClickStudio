@@ -81,7 +81,7 @@ function validateJson(value: unknown, depth = 0): Json {
     return result;
 }
 
-export function parseDemoImport(source: string, format: DemoImportFormat) {
+export function parseImportFile(source: string, format: DemoImportFormat) {
     if (new TextEncoder().encode(source).byteLength > 2_000_000) throw new Error('Import previews are limited to 2 MB');
     if (format === 'csv') return parseCsv(source);
     let parsed: unknown;
@@ -107,6 +107,8 @@ export function parseDemoImport(source: string, format: DemoImportFormat) {
     if (columns.size === 0 || columns.size > 200) throw new Error('Import previews support 1–200 columns');
     return { columns: [...columns], rows };
 }
+
+export const parseDemoImport = parseImportFile;
 
 export function demoImportQuery(sql: string, importedRows: DemoImportRow[]): DemoImportQueryResult | undefined {
     const match = sql.match(/^\s*SELECT\s+(.+?)\s+FROM\s+(?:`?demo`?\s*\.\s*)?`?interview_imports`?(?:\s|;|$)/i);

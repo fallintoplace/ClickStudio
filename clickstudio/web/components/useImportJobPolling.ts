@@ -1,5 +1,6 @@
 import { useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
 import { api, message, post } from '../api';
+import { checkClickHouseCloudImport } from '../cloud-connection';
 import type { BusyAction, ImportJob, Step } from './import-wizard-model';
 
 export function useImportJobPolling({
@@ -11,6 +12,7 @@ export function useImportJobPolling({
     setBusy,
     setError,
     onSucceeded,
+    cloudImport = false,
 }: {
     open: boolean;
     step: Step;
@@ -20,6 +22,7 @@ export function useImportJobPolling({
     setBusy: Dispatch<SetStateAction<BusyAction>>;
     setError: Dispatch<SetStateAction<string>>;
     onSucceeded: (id: string) => void;
+    cloudImport?: boolean;
 }) {
     const onSucceededRef = useRef(onSucceeded);
     onSucceededRef.current = onSucceeded;
@@ -32,9 +35,11 @@ export function useImportJobPolling({
             if (polling) return;
             polling = true;
             try {
-                const next = job.reconciliationRequired
-                    ? await post<ImportJob>(`/imports/${encodeURIComponent(job.id)}/reconcile`)
-                    : await api<ImportJob>(`/imports/${encodeURIComponent(job.id)}`);
+                const next = cloudImport && job.queryId
+                    ? await checkClickHouseCloudImport(job.queryId, job.table, job.rows)
+                    : job.reconciliationRequired
+                        ? await post<ImportJob>(`/imports/${encodeURIComponent(job.id)}/reconcile`)
+                        : await api<ImportJob>(`/imports/${encodeURIComponent(job.id)}`);
                 if (!current) return;
                 setJob(next);
                 setRecoverableJobs(items => next.status === 'succeeded' || next.reviewedAt
@@ -53,5 +58,5 @@ export function useImportJobPolling({
             current = false;
             window.clearInterval(timer);
         };
-    }, [open, step, job?.id, job?.status, job?.reconciliationRequired, setBusy, setError, setJob, setRecoverableJobs]);
+    }, [open, step, cloudImport, job?.id, job?.queryId, job?.table, job?.rows, job?.status, job?.reconciliationRequired, setBusy, setError, setJob, setRecoverableJobs]);
 }

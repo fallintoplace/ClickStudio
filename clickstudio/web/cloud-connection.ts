@@ -1,12 +1,24 @@
-import { DEFAULT_LIMITS, type Capability, type Column, type Connection, type Row, type Schema } from '../shared/types.js';
+import { DEFAULT_LIMITS, type Capability, type Column, type Connection, type Row, type Schema, type SchemaColumn } from '../shared/types.js';
 import type { ReplicationSnapshot } from '../shared/replication.js';
 import type { QueryLogSource, WorkloadSnapshot, WorkloadWindow } from '../shared/workload.js';
+import type { CloudImportColumn } from './cloud-import.js';
 
 export const CLICKHOUSE_CLOUD_CONNECTION_ID = 'clickhouse-cloud';
 
 export type CloudCredentials = { host: string; database: string; username: string; password: string };
 export type SavedCloudConnectionProfile = Pick<CloudCredentials, 'host' | 'database' | 'username'>;
 export type CloudQueryResult = { queryId: string; columns: Column[]; rows: Row[]; elapsedMs: number; bytes: number; truncated: boolean; writtenRows?: number };
+export type CloudImportJob = { id: string; connectionId: string; table: string; queryId: string; rows: number; createdAt: string; status: 'running' | 'succeeded' | 'unknown'; error?: string; reviewedAt?: string; reconciliationRequired?: boolean };
+export type CloudImportInput = {
+    file: File;
+    format: 'csv' | 'json' | 'ndjson';
+    target: string;
+    fields: Record<string, string>;
+    confirmation: string;
+    queryId: string;
+    expectedColumns?: Pick<SchemaColumn, 'name' | 'type' | 'defaultKind'>[];
+    createTable?: { name: string; columns: CloudImportColumn[] };
+};
 type CloudConnectionState = { credentials: CloudCredentials; connection: Connection & { trusted: boolean } };
 
 const CLOUD_PROFILE_STORAGE_KEY = 'clickstudio:cloud-connection-profile:v1';
@@ -43,6 +55,21 @@ async function requestCloud<T>(body: Record<string, unknown>, signal?: AbortSign
         body: JSON.stringify(body),
         ...(signal ? { signal } : {}),
     });
+    const payload: unknown = await response.json().catch(() => null);
+    if (!response.ok) {
+        const root = typeof payload === 'object' && payload !== null ? payload as Record<string, unknown> : {};
+        const detail = typeof root.error === 'object' && root.error !== null ? root.error as Record<string, unknown> : {};
+        throw new CloudRequestError(
+            typeof detail.code === 'string' ? detail.code : 'CLOUD_REQUEST',
+            typeof detail.message === 'string' ? detail.message : `ClickHouse Cloud returned HTTP ${response.status}.`,
+            response.status,
+        );
+    }
+    return payload as T;
+}
+
+async function requestCloudImport<T>(form: FormData): Promise<T> {
+    const response = await fetch('/api/cloud', { method: 'POST', credentials: 'same-origin', body: form });
     const payload: unknown = await response.json().catch(() => null);
     if (!response.ok) {
         const root = typeof payload === 'object' && payload !== null ? payload as Record<string, unknown> : {};
@@ -101,7 +128,7 @@ function makeConnection(credentials: CloudCredentials, tested: CloudConnectionTe
             traceLog: unavailable,
             replication: tested.replication,
             documentation: unavailable,
-            import: unavailable,
+            import: available,
             scripts: capability(true),
             parameters: unavailable,
         },
@@ -131,6 +158,27 @@ export async function runClickHouseCloudSql(sql: string, sessionId?: string): Pr
 export async function loadClickHouseCloudSchema(): Promise<Schema> {
     if (!activeCloud) throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before loading its schema.', 401);
     return await requestCloud<Schema>({ action: 'schema', credentials: activeCloud.credentials });
+}
+
+export async function importClickHouseCloudFile(input: CloudImportInput): Promise<CloudImportJob> {
+    if (!activeCloud) throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before importing data.', 401);
+    const form = new FormData();
+    form.set('action', 'import-commit');
+    form.set('credentials', JSON.stringify(activeCloud.credentials));
+    form.set('file', input.file, input.file.name);
+    form.set('format', input.format);
+    form.set('target', input.target);
+    form.set('fields', JSON.stringify(input.fields));
+    form.set('confirmation', input.confirmation);
+    form.set('queryId', input.queryId);
+    if (input.expectedColumns) form.set('expectedColumns', JSON.stringify(input.expectedColumns));
+    if (input.createTable) form.set('createTable', JSON.stringify(input.createTable));
+    return await requestCloudImport<CloudImportJob>(form);
+}
+
+export async function checkClickHouseCloudImport(queryId: string, table: string, rows: number): Promise<CloudImportJob> {
+    if (!activeCloud) throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before checking import status.', 401);
+    return await requestCloud<CloudImportJob>({ action: 'import-status', credentials: activeCloud.credentials, queryId, table, rows });
 }
 
 export async function loadClickHouseCloudWorkload(minutes: WorkloadWindow, signal: AbortSignal): Promise<WorkloadSnapshot> {

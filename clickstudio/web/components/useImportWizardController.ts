@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Schema } from '../../shared/types';
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import type { Json, Schema } from '../../shared/types';
 import { useImportJobPolling } from './useImportJobPolling';
 import { api, isFrontendDemoPreview, message, post, RequestError } from '../api';
-import { CLICKHOUSE_CLOUD_CONNECTION_ID } from '../cloud-connection';
-import { DEMO_IMPORT_SAMPLE_CSV } from '../demo-import-data';
+import { checkClickHouseCloudImport, CLICKHOUSE_CLOUD_CONNECTION_ID, CloudRequestError, getClickHouseCloudConnection, importClickHouseCloudFile, loadClickHouseCloudSchema } from '../cloud-connection';
+import { CREATE_TABLE_COLUMN_TYPES } from '../../shared/table-creation';
+import { DEMO_IMPORT_SAMPLE_CSV, parseImportFile } from '../demo-import-data';
+import { CREATE_CLOUD_TABLE_TARGET, cloudImportTargets, inferCloudImportColumns, suggestCloudTableName, type CloudImportColumn } from '../cloud-import';
 import {
     MAX_FILE_BYTES,
     fileFormat,
@@ -20,6 +22,246 @@ import {
     type PendingImport,
     type Step,
 } from './import-wizard-model';
+
+async function loadConnectionImportSetup(connectionId: string, cloudImport: boolean, signal?: AbortSignal): Promise<[string[], Schema]> {
+    if (cloudImport) {
+        const nextSchema = await loadClickHouseCloudSchema();
+        return [cloudImportTargets(nextSchema), nextSchema];
+    }
+    return await loadImportSetup(connectionId, signal);
+}
+
+type ImportActionSetters = {
+    setJob: Dispatch<SetStateAction<ImportJob | undefined>>;
+    setStep: Dispatch<SetStateAction<Step>>;
+    setBusy: Dispatch<SetStateAction<BusyAction>>;
+    setError: Dispatch<SetStateAction<string>>;
+    setMapping: Dispatch<SetStateAction<ImportMapping | undefined>>;
+    setTargets: Dispatch<SetStateAction<string[]>>;
+    setSchema: Dispatch<SetStateAction<Schema | undefined>>;
+    setTarget: Dispatch<SetStateAction<string>>;
+    setFields: Dispatch<SetStateAction<Record<string, string>>>;
+    setRecoveryState: Dispatch<SetStateAction<'checking' | 'ready' | 'failed'>>;
+    setRecoverableJobs: Dispatch<SetStateAction<ImportJob[]>>;
+    setPendingImport: Dispatch<SetStateAction<PendingImport | undefined>>;
+    setImportUnavailable: Dispatch<SetStateAction<string>>;
+};
+
+async function runCommitImport(context: ImportActionSetters & {
+    mapping?: ImportMapping;
+    confirmation: string;
+    confirmationPhrase: string;
+    busy: BusyAction;
+    browserDemoImport: boolean;
+    browserCloudImport: boolean;
+    file?: File;
+    format?: ImportFormat;
+    creatingTable: boolean;
+    schema?: Schema;
+    createTableName: string;
+    createColumns: CloudImportColumn[];
+    importConnectionId: string;
+    preview?: ImportPreview;
+    savePendingImport: (value: PendingImport) => void;
+    clearPendingImport: () => void;
+    rememberJob: (job: ImportJob) => void;
+}) {
+    const { mapping, confirmation, confirmationPhrase, busy, browserDemoImport, browserCloudImport, file, format, creatingTable, schema, createTableName, createColumns, importConnectionId, preview,
+        setJob, setStep, setBusy, setError, setMapping, setTargets, setSchema, setTarget, setFields, setRecoveryState, setRecoverableJobs, setPendingImport, savePendingImport, clearPendingImport, rememberJob } = context;
+    if (!mapping || (!browserDemoImport && confirmation !== confirmationPhrase) || busy) return;
+    const queryId = browserCloudImport ? `clickstudio-import-${mapping.id}` : undefined;
+    const record: PendingImport = { id: mapping.id, table: mapping.table, rows: mapping.rowCount, name: preview?.name ?? 'Selected file', ...(queryId ? { queryId } : {}) };
+    savePendingImport(record);
+    setJob({ id: mapping.id, table: mapping.table, rows: mapping.rowCount, status: 'running', ...(queryId ? { queryId } : {}) });
+    setStep('status');
+    setBusy('commit');
+    setError('');
+    try {
+        let next: ImportJob;
+        if (browserCloudImport) {
+            if (!file || !format || !queryId) throw new Error('Choose the file again before starting this import.');
+            const expectedColumns = creatingTable ? undefined : schema?.columns
+                .filter(column => `${column.database}.${column.table}` === mapping.table)
+                .map(({ name, type, defaultKind }) => ({ name, type, defaultKind }));
+            next = await importClickHouseCloudFile({
+                file,
+                format,
+                target: mapping.table,
+                fields: mapping.fields,
+                confirmation,
+                queryId,
+                ...(expectedColumns ? { expectedColumns } : {}),
+                ...(creatingTable ? { createTable: { name: createTableName, columns: createColumns } } : {}),
+            });
+        } else {
+            next = await post<ImportJob>(`/imports/${encodeURIComponent(mapping.id)}/commit`, { confirmation });
+        }
+        rememberJob(next);
+    } catch (caught) {
+        if (browserCloudImport && queryId) {
+            if (caught instanceof CloudRequestError && caught.status < 500) {
+                setJob(undefined);
+                clearPendingImport();
+                setStep('review');
+                if (caught.code === 'SCHEMA_CHANGED') {
+                    setMapping(undefined);
+                    setStep('mapping');
+                    try {
+                        const [nextTargets, nextSchema] = await loadConnectionImportSetup(importConnectionId, true);
+                        setTargets(nextTargets);
+                        setSchema(nextSchema);
+                        setTarget(nextTargets.includes(mapping.table) ? mapping.table : nextTargets[0] ?? CREATE_CLOUD_TABLE_TARGET);
+                        setFields(initialFields(preview?.columns ?? [], writableColumns(nextSchema, mapping.table)));
+                        setError('The destination schema changed. Review the updated mapping before importing.');
+                    } catch (refreshError) { setError(`The destination schema changed. Refresh failed: ${message(refreshError)}`); }
+                } else setError(message(caught));
+                return;
+            }
+            try {
+                const status = await checkClickHouseCloudImport(queryId, mapping.table, mapping.rowCount);
+                rememberJob(status);
+            } catch {
+                rememberJob({ id: mapping.id, connectionId: importConnectionId, table: mapping.table, rows: mapping.rowCount, queryId, status: 'unknown', error: 'The insert response was interrupted. Check ClickHouse status and inspect the destination before starting another write.' });
+            }
+            return;
+        }
+        if (browserDemoImport) {
+            setJob(undefined);
+            clearPendingImport();
+            setStep('review');
+            setError(message(caught));
+            return;
+        }
+        if (caught instanceof RequestError && caught.detail.code === 'SCHEMA_CHANGED') {
+            setJob(undefined);
+            clearPendingImport();
+            setMapping(undefined);
+            setStep('mapping');
+            try {
+                const [nextTargets, nextSchema] = await Promise.all([
+                    api<string[]>(`/connections/${encodeURIComponent(importConnectionId)}/import-targets`),
+                    api<Schema>(`/connections/${encodeURIComponent(importConnectionId)}/schema`),
+                ]);
+                setTargets(nextTargets);
+                setSchema(nextSchema);
+                const nextTarget = nextTargets.find(table => table === mapping.table && nextSchema.tables.some(item => `${item.database}.${item.name}` === table))
+                    ?? nextTargets.find(table => nextSchema.tables.some(item => `${item.database}.${item.name}` === table))
+                    ?? '';
+                setTarget(nextTarget);
+                setFields(initialFields(preview?.columns ?? [], writableColumns(nextSchema, nextTarget)));
+                setError('The destination schema changed. Review the updated mapping before importing.');
+            } catch (refreshError) {
+                setError(`The destination schema changed. Refresh failed: ${message(refreshError)}`);
+            }
+            return;
+        }
+        if (caught instanceof RequestError && caught.detail.code === 'IMPORT_UNRESOLVED') {
+            setBusy('recover');
+            try {
+                const jobs = await api<ImportJob[]>(`/imports?connectionId=${encodeURIComponent(importConnectionId)}&recoverable=true`);
+                setRecoverableJobs(jobs);
+                const unresolved = jobs[0];
+                if (unresolved) {
+                    const pending = { id: unresolved.id, table: unresolved.table, rows: unresolved.rows, name: 'Previous import' };
+                    setJob(unresolved);
+                    setPendingImport(pending);
+                    setStep('status');
+                    try { localStorage.setItem(importStateKey(importConnectionId), JSON.stringify(pending)); } catch { }
+                } else {
+                    setStep('review');
+                    setError(message(caught));
+                }
+            } catch (recoveryError) {
+                setRecoveryState('failed');
+                setError(`Could not check for unresolved imports: ${message(recoveryError)}`);
+            }
+            return;
+        }
+        if (caught instanceof RequestError && caught.status < 500) {
+            setJob(undefined);
+            clearPendingImport();
+            setStep('review');
+            setError(message(caught));
+            return;
+        }
+        setError('The response was interrupted. Checking the saved import status…');
+        try {
+            const next = await api<ImportJob>(`/imports/${encodeURIComponent(mapping.id)}`);
+            rememberJob(next);
+        } catch {
+            rememberJob({ id: mapping.id, table: mapping.table, rows: mapping.rowCount, status: 'unknown', reconciliationRequired: true, error: 'The server could not confirm this insert. Check for the saved import job before starting another write.' });
+        }
+    } finally { setBusy(''); }
+}
+
+async function runReviewUnknownImport(context: ImportActionSetters & {
+    job?: ImportJob;
+    busy: BusyAction;
+    browserCloudImport: boolean;
+    importConnectionId: string;
+    recoverableJobs: ImportJob[];
+    clearPendingImport: () => void;
+    rememberJob: (job: ImportJob) => void;
+}) {
+    const { job, busy, browserCloudImport, importConnectionId, recoverableJobs, clearPendingImport, rememberJob,
+        setJob, setStep, setBusy, setError, setTargets, setSchema, setTarget, setRecoverableJobs, setPendingImport, setImportUnavailable } = context;
+    if (!job || job.status !== 'unknown' || busy) return;
+    setBusy('review');
+    setError('');
+    try {
+        if (browserCloudImport && job.queryId) {
+            const status = await checkClickHouseCloudImport(job.queryId, job.table, job.rows);
+            if (status.status !== 'unknown') {
+                rememberJob(status);
+                return;
+            }
+            rememberJob({ ...status, reviewedAt: new Date().toISOString() });
+            clearPendingImport();
+            setRecoverableJobs([]);
+            setJob(undefined);
+            setStep('file');
+            setBusy('setup');
+            try {
+                const [nextTargets, nextSchema] = await loadConnectionImportSetup(importConnectionId, true);
+                setTargets(nextTargets);
+                setSchema(nextSchema);
+                setTarget(nextTargets[0] ?? CREATE_CLOUD_TABLE_TARGET);
+                setError('');
+            } catch (caught) { setError(message(caught)); }
+            finally { setBusy(''); }
+            return;
+        }
+        const next = await post<ImportJob>(`/imports/${encodeURIComponent(job.id)}/review`, { inspected: true, noActiveInsert: true });
+        if (!next.reviewedAt) {
+            rememberJob(next);
+            return;
+        }
+        const remaining = recoverableJobs.filter(item => item.id !== next.id);
+        setRecoverableJobs(remaining);
+        clearPendingImport();
+        setError('');
+        if (remaining.length) {
+            const following = remaining[0]!;
+            setJob(following);
+            setPendingImport({ id: following.id, table: following.table, rows: following.rows, name: 'Previous import' });
+            try { localStorage.setItem(importStateKey(importConnectionId), JSON.stringify({ id: following.id, table: following.table, rows: following.rows, name: 'Previous import' })); } catch { }
+        } else {
+            setJob(undefined);
+            setStep('file');
+            setBusy('setup');
+            try {
+                const [nextTargets, nextSchema] = await loadConnectionImportSetup(importConnectionId, false);
+                setTargets(nextTargets);
+                setSchema(nextSchema);
+                const first = nextTargets.find(table => nextSchema.tables.some(item => `${item.database}.${item.name}` === table)) ?? '';
+                setTarget(first);
+                setImportUnavailable(first ? '' : 'No import targets are configured for this connection. Ask the workspace owner to allow a destination table.');
+            } catch (caught) { setError(message(caught)); }
+            finally { setBusy(''); }
+        }
+    } catch (caught) { setError(`Could not record the import review: ${message(caught)}`); }
+    finally { setBusy(''); }
+}
 
 export type ImportWizardControllerOptions = {
     open: boolean;
@@ -38,6 +280,7 @@ function importUnavailableReason(connectionId: string) {
 
 export function useImportWizardController({ open, connectionId, trusted, demoMode, onClose, onImported }: ImportWizardControllerOptions) {
     const browserDemoImport = demoMode && isFrontendDemoPreview && connectionId === 'demo';
+    const browserCloudImport = demoMode && isFrontendDemoPreview && connectionId === CLICKHOUSE_CLOUD_CONNECTION_ID;
     const importConnectionId = browserDemoImport ? 'demo' : connectionId;
     const dialogRef = useRef<HTMLDialogElement>(null);
     const onImportedRef = useRef(onImported);
@@ -48,9 +291,12 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
     const [file, setFile] = useState<File>();
     const [format, setFormat] = useState<ImportFormat>();
     const [preview, setPreview] = useState<ImportPreview>();
+    const [cloudRows, setCloudRows] = useState<Record<string, Json>[]>([]);
     const [schema, setSchema] = useState<Schema>();
     const [targets, setTargets] = useState<string[]>([]);
     const [target, setTarget] = useState('');
+    const [createTableName, setCreateTableName] = useState('');
+    const [createColumns, setCreateColumns] = useState<CloudImportColumn[]>([]);
     const [fields, setFields] = useState<Record<string, string>>({});
     const [mapping, setMapping] = useState<ImportMapping>();
     const [job, setJob] = useState<ImportJob>();
@@ -64,7 +310,10 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
     const [importUnavailable, setImportUnavailable] = useState('');
 
     const availableTargets = useMemo(() => targets.filter(table => schema?.tables.some(item => `${item.database}.${item.name}` === table)), [schema, targets]);
-    const destinationColumns = useMemo(() => writableColumns(schema, target), [schema, target]);
+    const creatingTable = browserCloudImport && target === CREATE_CLOUD_TABLE_TARGET;
+    const destinationColumns = useMemo(() => creatingTable
+        ? createColumns.map(column => ({ database: getClickHouseCloudConnection()?.database ?? '', table: createTableName, name: column.name, type: column.type, defaultKind: '', comment: '' }))
+        : writableColumns(schema, target), [creatingTable, createColumns, createTableName, schema, target]);
     const selectedFields = useMemo(() => Object.fromEntries(Object.entries(fields).filter(([, destination]) => Boolean(destination))), [fields]);
     const destinationNames = Object.values(selectedFields);
     const duplicateDestinations = new Set(destinationNames).size !== destinationNames.length;
@@ -86,9 +335,12 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
         setFile(undefined);
         setFormat(undefined);
         setPreview(undefined);
+        setCloudRows([]);
         setSchema(undefined);
         setTargets([]);
         setTarget('');
+        setCreateTableName('');
+        setCreateColumns([]);
         setFields({});
         setMapping(undefined);
         setJob(undefined);
@@ -101,7 +353,7 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
         setRecoveryState('checking');
         reportedJobRef.current = undefined;
 
-        if (demoMode && !browserDemoImport) {
+        if (demoMode && !browserDemoImport && !browserCloudImport) {
             setRecoveryState('ready');
             setImportUnavailable(importUnavailableReason(connectionId));
             return () => { current = false; controller.abort(); };
@@ -121,6 +373,43 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
                 if (isPendingImport(parsed)) stored = parsed;
             }
         } catch { }
+
+        if (browserCloudImport) {
+            setBusy('recover');
+            void (async () => {
+                try {
+                    if (stored?.queryId) {
+                        const recovered = await checkClickHouseCloudImport(stored.queryId, stored.table, stored.rows);
+                        if (!current) return;
+                        setPendingImport(stored);
+                        setJob(recovered);
+                        setRecoverableJobs(recovered.status === 'succeeded' ? [] : [recovered]);
+                        setStep('status');
+                        try { localStorage.setItem(key, JSON.stringify(stored)); } catch { }
+                        if (recovered.status === 'succeeded') reportImported(recovered.id);
+                        setRecoveryState('ready');
+                        return;
+                    }
+                    if (stored) {
+                        try { localStorage.removeItem(key); } catch { }
+                    }
+                    setPendingImport(undefined);
+                    setStep('file');
+                    setBusy('setup');
+                    const [nextTargets, nextSchema] = await loadConnectionImportSetup(importConnectionId, true, controller.signal);
+                    if (!current) return;
+                    setTargets(nextTargets);
+                    setSchema(nextSchema);
+                    setTarget(nextTargets[0] ?? CREATE_CLOUD_TABLE_TARGET);
+                    setRecoveryState('ready');
+                } catch (caught) {
+                    if (!current) return;
+                    setRecoveryState('failed');
+                    setError(`Could not check Cloud import status: ${message(caught)}`);
+                } finally { if (current) setBusy(''); }
+            })();
+            return () => { current = false; controller.abort(); };
+        }
 
         setBusy('recover');
         void api<ImportJob[]>(`/imports?connectionId=${encodeURIComponent(importConnectionId)}&recoverable=true`, { signal: controller.signal }).then(async jobs => {
@@ -144,7 +433,7 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
             setStep('file');
             setBusy('setup');
             try {
-                const [nextTargets, nextSchema] = await loadImportSetup(importConnectionId, controller.signal);
+                const [nextTargets, nextSchema] = await loadConnectionImportSetup(importConnectionId, false, controller.signal);
                 if (!current) return;
                 setTargets(nextTargets);
                 setSchema(nextSchema);
@@ -162,7 +451,7 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
         }).finally(() => { if (current) setBusy(''); });
 
         return () => { current = false; controller.abort(); };
-    }, [open, connectionId, importConnectionId, trusted, demoMode, browserDemoImport, recoveryAttempt]);
+    }, [open, connectionId, importConnectionId, trusted, demoMode, browserDemoImport, browserCloudImport, recoveryAttempt]);
 
     useImportJobPolling({
         open,
@@ -173,6 +462,7 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
         setBusy,
         setError,
         onSucceeded: reportImported,
+        cloudImport: browserCloudImport,
     });
 
     function reportImported(id: string) {
@@ -203,7 +493,7 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
 
     async function closeWizard() {
         if (busy || job?.status === 'running') return;
-        if (preview?.id) {
+        if (preview?.id && !browserCloudImport) {
             void api(`/imports/${encodeURIComponent(preview.id)}`, { method: 'DELETE' }).catch(() => undefined);
         }
         if (recoveryState === 'ready' && (job?.status !== 'unknown' || job.reviewedAt)) clearPendingImport();
@@ -214,6 +504,9 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
         setFile(next);
         setPreview(undefined);
         setMapping(undefined);
+        setCloudRows([]);
+        setCreateColumns([]);
+        if (browserCloudImport && target === CREATE_CLOUD_TABLE_TARGET) setCreateTableName('');
         setJob(undefined);
         setError('');
         setConfirmation('');
@@ -230,7 +523,16 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
         setError('');
         try {
             const source = await nextFile.text();
-            const next = await post<ImportPreview>('/imports/preview', { name: nextFile.name, source, format: nextFormat });
+            let next: ImportPreview;
+            if (browserCloudImport) {
+                    const parsed = parseImportFile(source, nextFormat);
+                    if (!parsed.rows.length) throw new Error('The input contains no data rows.');
+                    setCloudRows(parsed.rows);
+                    next = { id: crypto.randomUUID(), name: nextFile.name.slice(0, 128), format: nextFormat, columns: parsed.columns, rows: parsed.rows.slice(0, 20), rowCount: parsed.rows.length };
+            } else {
+                setCloudRows([]);
+                next = await post<ImportPreview>('/imports/preview', { name: nextFile.name, source, format: nextFormat });
+            }
             setPreview(next);
             setStep('file');
             setError('');
@@ -254,8 +556,15 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
     }
 
     function startMapping() {
-        if (!preview || !target) return;
-        setFields(initialFields(preview.columns, writableColumns(schema, target)));
+        if (!preview || (!target && !browserCloudImport)) return;
+        if (browserCloudImport && target === CREATE_CLOUD_TABLE_TARGET) {
+            const columns = inferCloudImportColumns(cloudRows.length ? cloudRows : preview.rows, preview.columns);
+            setCreateColumns(columns);
+            setCreateTableName(createTableName || suggestCloudTableName(preview.name));
+            setFields(Object.fromEntries(columns.map(column => [column.source, column.name])));
+        } else {
+            setFields(initialFields(preview.columns, writableColumns(schema, target)));
+        }
         setMapping(undefined);
         setError('');
         setStep('mapping');
@@ -263,9 +572,23 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
 
     function changeTarget(next: string) {
         setTarget(next);
-        setFields(initialFields(preview?.columns ?? [], writableColumns(schema, next)));
+        if (browserCloudImport && next === CREATE_CLOUD_TABLE_TARGET && preview) {
+            const columns = inferCloudImportColumns(cloudRows.length ? cloudRows : preview.rows, preview.columns);
+            setCreateColumns(columns);
+            setCreateTableName(suggestCloudTableName(preview.name));
+            setFields(Object.fromEntries(columns.map(column => [column.source, column.name])));
+        } else {
+            setFields(initialFields(preview?.columns ?? [], writableColumns(schema, next)));
+        }
         setMapping(undefined);
         setConfirmation('');
+        setError('');
+    }
+
+    function updateCreateColumn(source: string, key: 'name' | 'type', value: string) {
+        setCreateColumns(current => current.map(column => column.source === source ? { ...column, [key]: value } as CloudImportColumn : column));
+        if (key === 'name') setFields(current => ({ ...current, [source]: value }));
+        setMapping(undefined);
         setError('');
     }
 
@@ -274,11 +597,20 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
         setBusy('mapping');
         setError('');
         try {
-            const next = await post<ImportMapping>(`/imports/${encodeURIComponent(preview.id)}/mapping`, {
-                connectionId: importConnectionId,
-                table: target,
-                fields: selectedFields,
-            });
+            let next: ImportMapping;
+            if (browserCloudImport) {
+                const cloud = getClickHouseCloudConnection();
+                if (!cloud) throw new Error('Reconnect to ClickHouse Cloud before reviewing the import.');
+                const table = creatingTable ? `${cloud.database}.${createTableName}` : target;
+                if (creatingTable && !/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(createTableName)) throw new Error('Use letters, numbers, and underscores for the new table name.');
+                next = { id: crypto.randomUUID(), inputId: preview.id, connectionId: importConnectionId, table, fields: selectedFields, rows: [], rowCount: preview.rowCount };
+            } else {
+                next = await post<ImportMapping>(`/imports/${encodeURIComponent(preview.id)}/mapping`, {
+                    connectionId: importConnectionId,
+                    table: target,
+                    fields: selectedFields,
+                });
+            }
             setMapping(next);
             setConfirmation('');
             setStep('review');
@@ -288,84 +620,13 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
     }
 
     async function commitImport() {
-        if (!mapping || (!browserDemoImport && confirmation !== confirmationPhrase) || busy) return;
-        const record = { id: mapping.id, table: mapping.table, rows: mapping.rowCount, name: preview?.name ?? 'Selected file' };
-        savePendingImport(record);
-        setJob({ id: mapping.id, table: mapping.table, rows: mapping.rowCount, status: 'running' });
-        setStep('status');
-        setBusy('commit');
-        setError('');
-        try {
-            const next = await post<ImportJob>(`/imports/${encodeURIComponent(mapping.id)}/commit`, { confirmation });
-            rememberJob(next);
-        } catch (caught) {
-            if (browserDemoImport) {
-                setJob(undefined);
-                clearPendingImport();
-                setStep('review');
-                setError(message(caught));
-                return;
-            }
-            if (caught instanceof RequestError && caught.detail.code === 'SCHEMA_CHANGED') {
-                setJob(undefined);
-                clearPendingImport();
-                setMapping(undefined);
-                setStep('mapping');
-                try {
-                    const [nextTargets, nextSchema] = await Promise.all([
-                        api<string[]>(`/connections/${encodeURIComponent(importConnectionId)}/import-targets`),
-                        api<Schema>(`/connections/${encodeURIComponent(importConnectionId)}/schema`),
-                    ]);
-                    setTargets(nextTargets);
-                    setSchema(nextSchema);
-                    const nextTarget = nextTargets.find(table => table === mapping.table && nextSchema.tables.some(item => `${item.database}.${item.name}` === table))
-                        ?? nextTargets.find(table => nextSchema.tables.some(item => `${item.database}.${item.name}` === table))
-                        ?? '';
-                    setTarget(nextTarget);
-                    setFields(initialFields(preview?.columns ?? [], writableColumns(nextSchema, nextTarget)));
-                    setError('The destination schema changed. Review the updated mapping before importing.');
-                } catch (refreshError) {
-                    setError(`The destination schema changed. Refresh failed: ${message(refreshError)}`);
-                }
-                return;
-            }
-            if (caught instanceof RequestError && caught.detail.code === 'IMPORT_UNRESOLVED') {
-                setBusy('recover');
-                try {
-                    const jobs = await api<ImportJob[]>(`/imports?connectionId=${encodeURIComponent(importConnectionId)}&recoverable=true`);
-                    setRecoverableJobs(jobs);
-                    const unresolved = jobs[0];
-                    if (unresolved) {
-                        const pending = { id: unresolved.id, table: unresolved.table, rows: unresolved.rows, name: 'Previous import' };
-                        setJob(unresolved);
-                        setPendingImport(pending);
-                        setStep('status');
-                        try { localStorage.setItem(importStateKey(importConnectionId), JSON.stringify(pending)); } catch { }
-                    } else {
-                        setStep('review');
-                        setError(message(caught));
-                    }
-                } catch (recoveryError) {
-                    setRecoveryState('failed');
-                    setError(`Could not check for unresolved imports: ${message(recoveryError)}`);
-                }
-                return;
-            }
-            if (caught instanceof RequestError && caught.status < 500) {
-                setJob(undefined);
-                clearPendingImport();
-                setStep('review');
-                setError(message(caught));
-                return;
-            }
-            setError('The response was interrupted. Checking the saved import status…');
-            try {
-                const next = await api<ImportJob>(`/imports/${encodeURIComponent(mapping.id)}`);
-                rememberJob(next);
-            } catch {
-                rememberJob({ id: mapping.id, table: mapping.table, rows: mapping.rowCount, status: 'unknown', reconciliationRequired: true, error: 'The server could not confirm this insert. Check for the saved import job before starting another write.' });
-            }
-        } finally { setBusy(''); }
+        await runCommitImport({
+            mapping, confirmation, confirmationPhrase, busy, browserDemoImport, browserCloudImport, file, format,
+            creatingTable, schema, createTableName, createColumns, importConnectionId, preview,
+            setJob, setStep, setBusy, setError, setMapping, setTargets, setSchema, setTarget, setFields,
+            setRecoveryState, setRecoverableJobs, setPendingImport, setImportUnavailable,
+            savePendingImport, clearPendingImport, rememberJob,
+        });
     }
 
     async function reconcileJob() {
@@ -373,49 +634,22 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
         setBusy('reconcile');
         setError('');
         try {
-            const next = await post<ImportJob>(`/imports/${encodeURIComponent(job.id)}/reconcile`);
+            const next = browserCloudImport && job.queryId
+                ? await checkClickHouseCloudImport(job.queryId, job.table, job.rows)
+                : await post<ImportJob>(`/imports/${encodeURIComponent(job.id)}/reconcile`);
             rememberJob(next);
         } catch (caught) { setError(`Could not check ClickHouse import status: ${message(caught)}`); }
         finally { setBusy(''); }
     }
 
     async function reviewUnknownImport() {
-        if (!job || job.status !== 'unknown' || busy) return;
-        setBusy('review');
-        setError('');
-        try {
-            const next = await post<ImportJob>(`/imports/${encodeURIComponent(job.id)}/review`, { inspected: true, noActiveInsert: true });
-            if (!next.reviewedAt) {
-                rememberJob(next);
-                return;
-            }
-            const remaining = recoverableJobs.filter(item => item.id !== next.id);
-            setRecoverableJobs(remaining);
-            clearPendingImport();
-            setError('');
-            if (remaining.length) {
-                const following = remaining[0]!;
-                setJob(following);
-                setPendingImport({ id: following.id, table: following.table, rows: following.rows, name: 'Previous import' });
-                try { localStorage.setItem(importStateKey(importConnectionId), JSON.stringify({ id: following.id, table: following.table, rows: following.rows, name: 'Previous import' })); } catch { }
-            } else {
-                setJob(undefined);
-                setStep('file');
-                setBusy('setup');
-                try {
-                    const [nextTargets, nextSchema] = await loadImportSetup(importConnectionId);
-                    setTargets(nextTargets);
-                    setSchema(nextSchema);
-                    const first = nextTargets.find(table => nextSchema.tables.some(item => `${item.database}.${item.name}` === table)) ?? '';
-                    setTarget(first);
-                    setImportUnavailable(first ? '' : 'No import targets are configured for this connection. Ask the workspace owner to allow a destination table.');
-                } catch (caught) { setError(message(caught)); }
-                finally { setBusy(''); }
-            }
-        } catch (caught) { setError(`Could not record the import review: ${message(caught)}`); }
-        finally { setBusy(''); }
+        await runReviewUnknownImport({
+            job, busy, browserCloudImport, importConnectionId, recoverableJobs,
+            setJob, setStep, setBusy, setError, setMapping, setTargets, setSchema, setTarget, setFields,
+            setRecoveryState, setRecoverableJobs, setPendingImport, setImportUnavailable,
+            clearPendingImport, rememberJob,
+        });
     }
-
 
     return {
         dialogRef,
@@ -449,6 +683,13 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
         duplicateDestinations,
         confirmationPhrase,
         sampleColumns,
+        browserCloudImport,
+        creatingTable,
+        createTableName,
+        setCreateTableName,
+        createColumns,
+        createColumnTypes: CREATE_TABLE_COLUMN_TYPES,
+        updateCreateColumn,
         closeWizard,
         chooseFile,
         previewFile,

@@ -41,7 +41,7 @@ export type ImportJob = {
     demoRows?: Record<string, Json>[];
     demoPersisted?: boolean;
 };
-export type PendingImport = { id: string; table: string; rows: number; name: string };
+export type PendingImport = { id: string; table: string; rows: number; name: string; queryId?: string };
 export type BusyAction = '' | 'setup' | 'preview' | 'mapping' | 'commit' | 'recover' | 'reconcile' | 'review';
 
 export function isPendingImport(value: unknown): value is PendingImport {
