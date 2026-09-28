@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
-import { tsImport } from 'tsx/esm/api';
+import test, { after } from 'node:test';
+import { register } from 'tsx/esm/api';
 
+// Use canonical module URLs so Node and browser coverage can be merged.
+const unregister = register();
+after(unregister);
 const { categoryLabel, exampleText, helpCategories } =
-    await tsImport('../../web/components/workspace-help-model.ts', import.meta.url);
+    await import('../../web/components/workspace-help-model.ts');
 const { getCopy, supportedLocales } = await import('../../.workspace-build/web/i18n.js');
 const { localizeSqlExampleCategory } = await import('../../.workspace-build/web/sql-examples-locales.js');
 
