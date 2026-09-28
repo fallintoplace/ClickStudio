@@ -61,6 +61,14 @@ test('File import previews, maps, and reports a successful insert without typed 
     await page.getByRole('button', { name: 'Import', exact: true }).click();
     const dialog = await previewCsv(page);
     await dialog.getByRole('button', { name: 'Map columns', exact: true }).click();
+    const mappingColumnWidths = await dialog.locator('.import-column-map thead th').evaluateAll(headers => headers.map(header => header.getBoundingClientRect().width));
+    expect(mappingColumnWidths[1]).toBeGreaterThan(mappingColumnWidths[0]!);
+    expect(mappingColumnWidths[2]).toBeLessThan(mappingColumnWidths[0]!);
+    await page.setViewportSize({ width: 390, height: 844 });
+    const viewportOverflow = await page.evaluate(() => Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - innerWidth);
+    expect(viewportOverflow).toBeLessThanOrEqual(1);
+    const mappingScroll = await dialog.locator('.import-column-map').evaluate(element => ({ clientWidth: element.clientWidth, scrollWidth: element.scrollWidth }));
+    expect(mappingScroll.scrollWidth).toBeGreaterThan(mappingScroll.clientWidth);
     await expect(dialog.getByLabel('Map day to destination')).toHaveValue('day');
     await dialog.getByRole('button', { name: 'Review import', exact: true }).click();
     await expect(dialog).toContainText('2 rows into demo.events');
@@ -72,6 +80,51 @@ test('File import previews, maps, and reports a successful insert without typed 
     await expect(dialog).toContainText('Inserted 2 rows into demo.events');
     expect(mappingBody).toMatchObject({ connectionId: 'live', table: 'demo.events', fields: { day: 'day', events: 'events' } });
     expect(commitBody).toEqual({});
+});
+
+test('File import review lists skipped columns and success can start another import', async ({ page }) => {
+    await mockWritableWorkspace(page);
+    let previewRequests = 0;
+    let mappingBody: Record<string, unknown> | undefined;
+    await page.route('**/api/imports/preview', async route => {
+        previewRequests++;
+        await route.fulfill({ status: 201, json: {
+            id: `input-${previewRequests}`, name: 'events.csv', format: 'csv', columns: ['day', 'events', 'unused'],
+            rows: [{ day: '2026-01-01', events: '10', unused: 'not imported' }], rowCount: 1,
+        } });
+    });
+    await page.route('**/api/imports/input-1/mapping', async route => {
+        mappingBody = route.request().postDataJSON() as Record<string, unknown>;
+        await route.fulfill({ json: { id: 'mapping-1', inputId: 'input-1', connectionId: 'live', table: 'demo.events', fields: { day: 'day', events: 'events' }, rows: [{ day: '2026-01-01', events: '10' }], rowCount: 1 } });
+    });
+    await page.route('**/api/imports/mapping-1/commit', route => route.fulfill({ json: { id: 'mapping-1', table: 'demo.events', rows: 1, status: 'succeeded' } }));
+    await page.route('**/api/imports/input-1', route => route.request().method() === 'DELETE' ? route.fulfill({ json: { ok: true } }) : route.fallback());
+
+    await page.getByRole('button', { name: 'Import', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Import data', exact: true });
+    const input = dialog.getByLabel('Choose a CSV, JSON, or NDJSON file');
+    await input.setInputFiles({ name: 'events.csv', mimeType: 'text/csv', buffer: Buffer.from('day,events,unused\n2026-01-01,10,not imported\n') });
+    await dialog.getByRole('button', { name: 'Preview file', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Map columns', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Review import', exact: true }).click();
+
+    const mapping = dialog.getByRole('table', { name: 'Import column mapping' });
+    await expect(mapping).toBeVisible();
+    await expect(dialog).toContainText('2 mapped · 1 skipped');
+    await expect(mapping.locator('tbody tr').nth(2)).toContainText('unused');
+    await expect(mapping.locator('tbody tr').nth(2)).toContainText('Skipped');
+    await dialog.getByRole('button', { name: 'Import rows', exact: true }).click();
+    await expect(dialog).toContainText('Inserted 1 row into demo.events');
+    expect(mappingBody).toMatchObject({ fields: { day: 'day', events: 'events' } });
+    await dialog.getByRole('button', { name: 'Import another file' }).click();
+
+    await expect(dialog.getByLabel('Choose a CSV, JSON, or NDJSON file')).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Done' })).toHaveCount(0);
+    await dialog.getByLabel('Choose a CSV, JSON, or NDJSON file').setInputFiles({ name: 'events.csv', mimeType: 'text/csv', buffer: Buffer.from('day,events,unused\n2026-01-01,10,not imported\n') });
+    await expect(dialog.getByRole('button', { name: 'Preview file', exact: true })).toBeEnabled();
+    await dialog.getByRole('button', { name: 'Preview file', exact: true }).click();
+    await expect(dialog).toContainText('1 row · 3 columns · CSV');
+    expect(previewRequests).toBe(2);
 });
 
 test('File import rejects oversized files in the browser before upload', async ({ page }) => {
@@ -147,6 +200,7 @@ test('File import reports an unknown insert without retrying automatically', asy
     await expect(dialog).toContainText('The rows may already be in demo.events. Check the table before choosing. A late first import may add duplicate rows.');
     await expect(dialog.getByRole('button', { name: 'I see all rows' })).toBeVisible();
     await expect(dialog.getByRole('button', { name: 'No rows; retry import' })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Import another file' })).toHaveCount(0);
     expect(commitRequests).toBe(1);
 });
 
