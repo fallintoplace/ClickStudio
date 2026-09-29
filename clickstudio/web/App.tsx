@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, message, post } from './api';
 import { Button, cx, Icon, SelectControl } from './components/ui';
 import { CloudConnectionDialog } from './components/CloudConnectionDialog';
-import { CLICKHOUSE_CLOUD_CONNECTION_ID, disconnectClickHouseCloud, type SavedCloudConnectionProfile } from './cloud-connection';
+import { CLICKHOUSE_CLOUD_CONNECTION_ID, disconnectClickHouseCloud, restoreClickHouseCloudSession, type SavedCloudConnectionProfile } from './cloud-connection';
 import { Workspace } from './Workspace';
 import { experienceOptions, getCopy, localeOptions, resolveLocale, themeAppearance, themeOptions, type ExperienceLevel, type Locale, type Theme } from './i18n';
 import { RadioGroup } from '@clickhouse/click-ui/RadioGroup';
@@ -26,6 +26,13 @@ const pref = <T extends string>(key: string, values: readonly T[], fallback: T):
 const browserLocales = (): readonly string[] => typeof navigator === 'undefined'
     ? []
     : navigator.languages.length ? navigator.languages : [navigator.language];
+
+function writeConnectionToUrl(id: string) {
+    const url = new URL(window.location.href);
+    if (id) url.searchParams.set('connection', id);
+    else url.searchParams.delete('connection');
+    window.history.replaceState(window.history.state, '', url);
+}
 
 function cloudProfileDefaults(connection?: Connected): SavedCloudConnectionProfile | undefined {
     if (!connection) return undefined;
@@ -52,12 +59,14 @@ function App() {
     const [connectionPicker, setConnectionPicker] = useState(false);
     const [cloudDialogOpen, setCloudDialogOpen] = useState(false);
     const [connectionActionBusy, setConnectionActionBusy] = useState(false);
+    const [cloudConnectionError, setCloudConnectionError] = useState('');
     const trustActionRef = useRef<() => Promise<void>>(async () => undefined);
     const testConnectionActionRef = useRef<() => Promise<void>>(async () => undefined);
     const copy = getCopy(locale);
     const connection = connections.find(item => item.id === connectionId) ?? connections[0];
     const hasPreviewSourceSwitcher = Boolean(session?.demo && connections.some(item => item.id === 'playground'));
     const hasCloudConnection = connections.some(item => item.id === CLICKHOUSE_CLOUD_CONNECTION_ID);
+    const persistCloudInLocalServer = session?.cloudConnectionPersistence === 'local-server';
     const isSampleData = Boolean(session?.demo && connection?.dataSource === 'fixture');
     const isPlayground = Boolean(connection?.id === 'playground');
     const isCloudConnection = connection?.id === CLICKHOUSE_CLOUD_CONNECTION_ID;
@@ -71,13 +80,13 @@ function App() {
     const dark = themeAppearance[theme].dark;
     const selectConnection = useCallback((id: string) => {
         setConnectionId(id);
-        const url = new URL(window.location.href);
-        url.searchParams.set('connection', id);
-        window.history.replaceState(window.history.state, '', url);
+        writeConnectionToUrl(id);
     }, []);
 
-    const disconnectCloud = () => {
-        disconnectClickHouseCloud();
+    const disconnectCloud = async () => {
+        setCloudConnectionError('');
+        try { await disconnectClickHouseCloud(); }
+        catch (error) { setCloudConnectionError(`Could not disconnect Cloud: ${message(error)}`); return; }
         setConnections(current => current.filter(item => item.id !== CLICKHOUSE_CLOUD_CONNECTION_ID));
         if (isCloudConnection) {
             const fallback = connections.find(item => item.id === 'playground') ?? connections[0];
@@ -88,6 +97,7 @@ function App() {
 
     const connectCloud = (connected: Connected) => {
         setConnections(current => [...current.filter(item => item.id !== connected.id), connected]);
+        setCloudConnectionError('');
         selectConnection(connected.id);
         setConnectionPicker(false);
         setCloudDialogOpen(false);
@@ -112,9 +122,20 @@ function App() {
         const next = await api<Session>('/session');
         setSession(next);
         if (next.principal) {
-            const profiles = await api<Connected[]>('/connections');
+            let profiles = await api<Connected[]>('/connections');
+            if (next.cloudConnectionPersistence === 'local-server') {
+                try {
+                    const cloud = await restoreClickHouseCloudSession();
+                    if (cloud) profiles = [...profiles.filter(item => item.id !== CLICKHOUSE_CLOUD_CONNECTION_ID), cloud];
+                    else profiles = profiles.filter(item => item.id !== CLICKHOUSE_CLOUD_CONNECTION_ID);
+                    setCloudConnectionError('');
+                }
+                catch (error) { setCloudConnectionError(`Could not restore Cloud connection: ${message(error)}`); }
+            }
             setConnections(profiles);
-            setConnectionId(current => resolveConnectionSelection(profiles, current));
+            const selected = resolveConnectionSelection(profiles, new URLSearchParams(location.search).get('connection') ?? '');
+            setConnectionId(selected);
+            writeConnectionToUrl(selected);
         }
     }, []);
 
@@ -165,7 +186,7 @@ function App() {
                         <div className="connection-menu-current">
                             <span className="connection-menu-heading">{hasPreviewSourceSwitcher ? 'Current data source' : 'Current connection'}</span>
                             <strong>{connectionLabel(connection, session.demo)}</strong>
-                            <small>{isSampleData ? 'Generated sample data · SQL stays in this browser' : isPlayground ? `${connection.host} · public read-only access` : isCloudConnection ? `${connection.host} · ${connection.database} · password held in this tab` : session.demo ? 'Local sample data' : `Database: ${connection.database} · Server: ${connection.host}`}</small>
+                            <small>{isSampleData ? 'Generated sample data · SQL stays in this browser' : isPlayground ? `${connection.host} · public read-only access` : isCloudConnection ? `${connection.host} · ${connection.database} · ${persistCloudInLocalServer ? 'local server session' : 'password held in this tab'}` : session.demo ? 'Local sample data' : `Database: ${connection.database} · Server: ${connection.host}`}</small>
                         </div>
                         <p className={cx('connection-menu-note', isSampleData ? 'is-sample' : isPlayground || connection.trusted && !connectionNeedsTest ? 'is-ready' : 'is-review')} role="status">
                             {isSampleData ? 'Sample rows are generated for the preview. SQL is not sent to a database.' : isPlayground ? 'Queries run against the public ClickHouse SQL Playground. Access is read only.' : isCloudConnection ? 'Queries pass through this site to your Cloud service over HTTPS. Your Cloud user controls which reads and writes are allowed.' : session.demo ? 'This demo uses sample data. Your SQL is not sent to a real database.' : connectionNeedsTest ? connection.trusted ? 'Read-only access is on, but this server needs a fresh capability check.' : 'Test this connection to discover its ClickHouse features.' : connection.trusted ? 'Read-only access is on. Queries can read data but cannot change it.' : 'Connection tested. Turn on read-only access when you are ready to query.'}
@@ -187,7 +208,7 @@ function App() {
                 </div>}
             </div>
             {hasCloudConnection
-                ? <div className="cloud-connection-actions"><Button variant="danger" className="cloud-topbar-action cloud-topbar-disconnect" onClick={disconnectCloud}>Disconnect Cloud</Button></div>
+                ? <div className="cloud-connection-actions"><Button variant="danger" className="cloud-topbar-action cloud-topbar-disconnect" onClick={() => void disconnectCloud()}>Disconnect Cloud</Button></div>
                 : (!session.demo || hasPreviewSourceSwitcher) && <div className="cloud-connection-actions"><Button variant="secondary" className="cloud-topbar-action cloud-topbar-connect" onClick={() => { setConnectionPicker(false); setCloudDialogOpen(true); }}>Connect Cloud</Button></div>}
             <div className="topbar-spacer"/>
             <div className="topbar-control-rail">
@@ -235,8 +256,9 @@ function App() {
                 </div>
             </div>
         </header>
+        {cloudConnectionError && <div className="callout callout-error cloud-session-error" role="alert">{cloudConnectionError}</div>}
         {connection ? <Workspace key={connection.id} connection={connection} connectionLabel={connectionLabel(connection, session.demo)} connections={connections} onSelectConnection={selectConnection} onRefreshConnections={async () => { const latest = await api<Connected[]>('/connections'); setConnections(latest); }} trustActionRef={trustActionRef} testConnectionActionRef={testConnectionActionRef} demoMode={session.demo} experience={experience} nativeParserEnabled={parserMode === 'wasm'} dark={dark} copy={copy} locale={locale}/> : <div className="empty-connection"><Icon name="schema"/><h1>{copy.app.name}</h1><p>No connection profiles are configured for this workspace.</p></div>}
-        {cloudDialogOpen && <CloudConnectionDialog initialProfile={cloudProfileDefaults(connection)} onClose={() => setCloudDialogOpen(false)} onConnect={connectCloud}/>}
+        {cloudDialogOpen && <CloudConnectionDialog initialProfile={cloudProfileDefaults(connection)} persistInLocalServer={persistCloudInLocalServer} onClose={() => setCloudDialogOpen(false)} onConnect={connectCloud}/>}
     </div>;
 }
 

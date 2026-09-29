@@ -1,7 +1,7 @@
 import type { Connection, Principal } from '../shared/types.js';
 
 export type Connected = Connection & { trusted: boolean };
-export type Session = { principal: Principal | null; requiresLogin: boolean; demo: boolean };
+export type Session = { principal: Principal | null; requiresLogin: boolean; demo: boolean; cloudConnectionPersistence?: 'local-server' };
 export type Inspector = 'schema' | 'reference' | 'history' | 'documents' | 'revisions' | 'details' | 'profile' | 'pipeline' | 'parser' | 'assistant';
 export type ResultsView = 'results' | 'chart' | 'map' | 'insights' | 'sqlmap' | 'indexes' | 'plan' | 'pipeline' | 'runtime';
 export type BusyAction = 'run' | 'script' | 'save' | '';

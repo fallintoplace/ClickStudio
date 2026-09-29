@@ -5,7 +5,7 @@ import type { Connected } from '../workspace-types';
 import { Button, Icon } from './ui';
 import { OverlayPortal } from './OverlayPortal';
 
-export function CloudConnectionDialog({ onClose, onConnect, initialProfile }: { onClose: () => void; onConnect: (connection: Connection & { trusted: boolean }) => void; initialProfile?: SavedCloudConnectionProfile }) {
+export function CloudConnectionDialog({ onClose, onConnect, initialProfile, persistInLocalServer }: { onClose: () => void; onConnect: (connection: Connection & { trusted: boolean }) => void; initialProfile?: SavedCloudConnectionProfile; persistInLocalServer: boolean }) {
     const [savedProfile] = useState(() => loadSavedCloudConnectionProfile() ?? initialProfile);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
@@ -46,7 +46,7 @@ export function CloudConnectionDialog({ onClose, onConnect, initialProfile }: { 
         const password = String(form.get('password') ?? '');
         const credentials: CloudCredentials = { host, database, username, password };
         try {
-            const connection: Connected = await connectClickHouseCloud(credentials);
+            const connection: Connected = await connectClickHouseCloud(credentials, persistInLocalServer);
             saveCloudConnectionProfile({ host, database, username });
             onConnect(connection);
         } catch (caught) {
@@ -72,7 +72,9 @@ export function CloudConnectionDialog({ onClose, onConnect, initialProfile }: { 
                         <label className="field-label">Username<input className="field-input" name="username" defaultValue={savedProfile?.username ?? 'default'} autoComplete="username" required/></label>
                     </div>
                     <label className="field-label">Password<input className="field-input" name="password" type="password" autoComplete="current-password" required/></label>
-                    <div className="cloud-connect-notice"><Icon name="lock"/><span>The host, database, and username are saved in this browser. The password stays in this tab’s memory and is sent to this ClickStudio server, which connects to Cloud over HTTPS. It is cleared on reload or disconnect. Your ClickHouse user’s permissions control what SQL can change.</span></div>
+                    <div className="cloud-connect-notice"><Icon name="lock"/><span>{persistInLocalServer
+                        ? 'The host, database, and username are saved in this browser. Your password stays in this local ClickStudio server’s memory and is restored after refresh. Disconnect, stop the server, or leave it unused for 12 hours to clear it. The server connects to Cloud over HTTPS.'
+                        : 'The host, database, and username are saved in this browser. The password stays in this tab’s memory and is sent to this ClickStudio server, which connects to Cloud over HTTPS. It is cleared on reload or disconnect.'} Your ClickHouse user’s permissions control what SQL can change.</span></div>
                     {error && <div className="callout callout-error cloud-connect-error" role="alert">{error}</div>}
                     <div className="cloud-connect-actions"><Button variant="secondary" disabled={busy} onClick={onClose}>Cancel</Button><Button variant="primary" type="submit" disabled={busy}>{busy ? <><span className="loading-orbit" aria-hidden="true"/> Connecting…</> : 'Connect service'}</Button></div>
                 </form>

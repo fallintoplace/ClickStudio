@@ -22,10 +22,10 @@ export type CloudImportInput = {
     expectedColumns?: Pick<SchemaColumn, 'name' | 'type' | 'defaultKind'>[];
     createTable?: { database: string; name: string; columns: CloudImportColumn[]; generateId?: boolean };
 };
-type CloudConnectionState = { credentials: CloudCredentials; connection: Connection & { trusted: boolean } };
+type ActiveCloudConnection = { credentials?: CloudCredentials; connection: Connection & { trusted: boolean }; localSession: boolean };
 
 const CLOUD_PROFILE_STORAGE_KEY = 'clickstudio:cloud-connection-profile:v1';
-let activeCloud: CloudConnectionState | undefined;
+let activeCloud: ActiveCloudConnection | undefined;
 
 export function loadSavedCloudConnectionProfile(): SavedCloudConnectionProfile | undefined {
     try {
@@ -51,14 +51,37 @@ export class CloudRequestError extends Error {
 }
 
 async function requestCloud<T>(body: Record<string, unknown>, signal?: AbortSignal): Promise<T> {
+    const requestBody = activeCloud?.localSession
+        ? Object.fromEntries(Object.entries(body).filter(([key]) => key !== 'credentials'))
+        : body;
     const response = await fetch('/api/cloud', {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json', 'X-ClickStudio-Intent': '1' },
-        body: JSON.stringify(body),
+        body: JSON.stringify(requestBody),
         ...(signal ? { signal } : {}),
     });
     const payload: unknown = await response.json().catch(() => null);
+    if (!response.ok) {
+        const root = typeof payload === 'object' && payload !== null ? payload as Record<string, unknown> : {};
+        const detail = typeof root.error === 'object' && root.error !== null ? root.error as Record<string, unknown> : {};
+        throw new CloudRequestError(
+            typeof detail.code === 'string' ? detail.code : 'CLOUD_REQUEST',
+            typeof detail.message === 'string' ? detail.message : `ClickHouse Cloud returned HTTP ${response.status}.`,
+            response.status,
+        );
+    }
+    return payload as T;
+}
+
+async function localCloudSession<T>(method: 'GET' | 'POST' | 'DELETE', body?: unknown): Promise<T> {
+    const response = await fetch('/api/cloud/session', {
+        method,
+        credentials: 'same-origin',
+        headers: { 'X-ClickStudio-Intent': '1', ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
+    const payload: unknown = method === 'DELETE' ? null : await response.json().catch(() => null);
     if (!response.ok) {
         const root = typeof payload === 'object' && payload !== null ? payload as Record<string, unknown> : {};
         const detail = typeof root.error === 'object' && root.error !== null ? root.error as Record<string, unknown> : {};
@@ -112,7 +135,7 @@ export type CloudConnectionTest = {
     parameters: Capability;
 };
 
-function makeConnection(credentials: CloudCredentials, tested: CloudConnectionTest): Connection & { trusted: boolean } {
+function makeConnection(credentials: SavedCloudConnectionProfile, tested: CloudConnectionTest): Connection & { trusted: boolean } {
     const available = capability(true);
     return {
         dataSource: 'clickhouse',
@@ -150,10 +173,22 @@ function makeConnection(credentials: CloudCredentials, tested: CloudConnectionTe
     };
 }
 
-export async function connectClickHouseCloud(credentials: CloudCredentials) {
-    const tested = await requestCloud<CloudConnectionTest>({ action: 'test', credentials });
+export async function connectClickHouseCloud(credentials: CloudCredentials, persistInLocalServer = false) {
+    const tested = persistInLocalServer
+        ? await localCloudSession<CloudConnectionTest>('POST', { credentials })
+        : await requestCloud<CloudConnectionTest>({ action: 'test', credentials });
     const connection = makeConnection(credentials, tested);
-    activeCloud = { credentials: { ...credentials }, connection };
+    activeCloud = persistInLocalServer
+        ? { connection, localSession: true }
+        : { credentials: { ...credentials }, connection, localSession: false };
+    return connection;
+}
+
+export async function restoreClickHouseCloudSession() {
+    const payload = await localCloudSession<{ session: { profile: SavedCloudConnectionProfile; tested: CloudConnectionTest } | null }>('GET');
+    if (!payload.session) return undefined;
+    const connection = makeConnection(payload.session.profile, payload.session.tested);
+    activeCloud = { connection, localSession: true };
     return connection;
 }
 
@@ -161,7 +196,8 @@ export function getClickHouseCloudConnection() {
     return activeCloud?.connection;
 }
 
-export function disconnectClickHouseCloud() {
+export async function disconnectClickHouseCloud() {
+    if (activeCloud?.localSession) await localCloudSession<void>('DELETE');
     activeCloud = undefined;
 }
 
@@ -252,7 +288,7 @@ export async function importClickHouseCloudFile(input: CloudImportInput): Promis
     if (!activeCloud) throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before importing data.', 401);
     const form = new FormData();
     form.set('action', 'import-commit');
-    form.set('credentials', JSON.stringify(activeCloud.credentials));
+    if (activeCloud.credentials) form.set('credentials', JSON.stringify(activeCloud.credentials));
     form.set('file', input.file, input.file.name);
     form.set('format', input.format);
     form.set('target', input.target);

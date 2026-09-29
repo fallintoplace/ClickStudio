@@ -16,6 +16,7 @@ import { CREATE_TABLE_COLUMN_TYPES, TableCreationService, type CreateTableColumn
 import { TableDeletionService } from '../core/table-deletion.js';
 import { MonitorService } from '../core/monitors.js';
 import { SessionService } from '../core/sessions.js';
+import { CLOUD_SESSION_COOKIE, CloudConnectionSessions, type CloudCredentials } from './cloud-sessions.js';
 import { FileStore, type Store } from '../core/store.js';
 import { AppError, asError, requireThat } from '../core/errors.js';
 import { canWrite, guardSql } from '../core/guards.js';
@@ -167,7 +168,11 @@ async function assistantReferenceDocs(driver: Driver, p: Principal, connectionId
         }
     }));
 }
-function configureHttp(app: Express, config: Config, runs: RunService, artifacts: ArtifactService, sessions: SessionService, parserWasm: () => Promise<Uint8Array>) {
+function cloudSessionCookieOptions(config: Config) {
+    return { httpOnly: true, sameSite: 'strict' as const, secure: config.origin.startsWith('https:'), path: '/api' };
+}
+
+function configureHttp(app: Express, config: Config, runs: RunService, artifacts: ArtifactService, sessions: SessionService, cloudSessions: CloudConnectionSessions, parserWasm: () => Promise<Uint8Array>) {
     app.disable('x-powered-by');
     app.set('trust proxy', false);
     app.use((req, res, next) => {
@@ -192,9 +197,9 @@ function configureHttp(app: Express, config: Config, runs: RunService, artifacts
     app.use(express.json({ limit: '3mb' }));
     app.use('/api', telemetry);
     app.get('/api/health', (_req, res) => res.status(runs.acceptingRuns ? 200 : 503).json({ ok: runs.acceptingRuns, demo: config.demo, version: '0.1.0' }));
-    app.get('/api/session', (req, res) => res.json({ principal: sessions.principal(req.get('cookie')) ?? null, requiresLogin: sessions.requiresLogin, demo: config.demo, storageMode: 'single-owner local-first' }));
+    app.get('/api/session', (req, res) => res.json({ principal: sessions.principal(req.get('cookie')) ?? null, requiresLogin: sessions.requiresLogin, demo: config.demo, storageMode: 'single-owner local-first', cloudConnectionPersistence: 'local-server' }));
     app.post('/api/session', (req, res) => { const token = sessions.login(body(req).token, req.socket.remoteAddress ?? 'unknown'); res.cookie('clickstudio_session', token, { httpOnly: true, sameSite: 'strict', secure: config.origin.startsWith('https:'), path: '/', maxAge: 12 * 3600000 }); res.json({ ok: true }); });
-    app.delete('/api/session', (req, res) => { sessions.logout(req.get('cookie')); res.clearCookie('clickstudio_session', { path: '/', sameSite: 'strict', secure: config.origin.startsWith('https:') }); res.json({ ok: true }); });
+    app.delete('/api/session', (req, res) => { sessions.logout(req.get('cookie')); cloudSessions.revoke(req.get('cookie')); res.clearCookie('clickstudio_session', { path: '/', sameSite: 'strict', secure: config.origin.startsWith('https:') }); res.clearCookie(CLOUD_SESSION_COOKIE, cloudSessionCookieOptions(config)); res.json({ ok: true }); });
     app.get('/api/shared/:token', (req, res) => res.json(artifacts.resolveShare(text(req.params.token, 'share token', 100))));
     app.use('/api', (req, res, next) => {
         const p = sessions.principal(req.get('cookie'));
@@ -217,29 +222,117 @@ function configureHttp(app: Express, config: Config, runs: RunService, artifacts
     });
 }
 
-function registerCloudApi(app: Express) {
+function registerCloudApi(app: Express, config: Config, cloudSessions: CloudConnectionSessions, cloudApiClient: Pick<typeof cloudApi, 'fetch'>) {
+    const cloudUrl = (req: Request) => new URL('/api/cloud', `${req.protocol}://${req.get('host') ?? '127.0.0.1'}`);
+    const cloudHeaders = (req: Request) => {
+        const headers = new Headers();
+        const origin = req.get('origin');
+        if (origin) headers.set('origin', origin);
+        return headers;
+    };
+    const forward = async (response: globalThis.Response, res: Response) => {
+        response.headers.forEach((value, name) => res.setHeader(name, value));
+        res.status(response.status).send(Buffer.from(await response.arrayBuffer()));
+    };
+    const sameOrigin = (req: Request) => {
+        const origin = req.get('origin');
+        return !origin || origin === `${req.protocol}://${req.get('host') ?? ''}`;
+    };
+    app.get('/api/cloud/session', (req, res) => {
+        res.setHeader('Cache-Control', 'no-store');
+        const snapshot = cloudSessions.snapshot(req.get('cookie'));
+        if (!snapshot) res.clearCookie(CLOUD_SESSION_COOKIE, cloudSessionCookieOptions(config));
+        res.json({ session: snapshot ?? null });
+    });
+    app.post('/api/cloud/session', async (req, res, next) => {
+        try {
+            if (!sameOrigin(req)) {
+                res.status(403).json({ error: { code: 'ORIGIN', message: 'This endpoint accepts requests from the ClickStudio site only.' } });
+                return;
+            }
+            const credentialsValue = body(req).credentials;
+            if (typeof credentialsValue !== 'object' || credentialsValue === null || Array.isArray(credentialsValue)) {
+                res.status(400).json({ error: { code: 'CLOUD_CREDENTIALS', message: 'Enter your ClickHouse Cloud connection details.' } });
+                return;
+            }
+            const credentials = credentialsValue as Partial<CloudCredentials>;
+            if (typeof credentials.host !== 'string' || typeof credentials.database !== 'string' || typeof credentials.username !== 'string' || typeof credentials.password !== 'string') {
+                res.status(400).json({ error: { code: 'CLOUD_CREDENTIALS', message: 'Check the host, database, username, and password.' } });
+                return;
+            }
+            const headers = cloudHeaders(req);
+            headers.set('content-type', 'application/json');
+            const request = new globalThis.Request(cloudUrl(req), {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ action: 'test', credentials }),
+            });
+            const response = await cloudApiClient.fetch(request);
+            if (!response.ok) {
+                await forward(response, res);
+                return;
+            }
+            const tested: unknown = await response.json();
+            if (typeof tested !== 'object' || tested === null || Array.isArray(tested)) {
+                res.status(502).json({ error: { code: 'CLOUD_RESPONSE', message: 'ClickHouse Cloud returned an invalid connection response.' } });
+                return;
+            }
+            const test = tested as Record<string, unknown>;
+            const savedCredentials: CloudCredentials = {
+                host: typeof test.host === 'string' ? test.host : credentials.host,
+                database: typeof test.database === 'string' ? test.database : credentials.database,
+                username: typeof test.username === 'string' ? test.username : credentials.username,
+                password: credentials.password,
+            };
+            const token = cloudSessions.create(savedCredentials, test, req.get('cookie'));
+            res.cookie(CLOUD_SESSION_COOKIE, token, cloudSessionCookieOptions(config));
+            res.setHeader('Cache-Control', 'no-store');
+            res.json(test);
+        }
+        catch (error) { next(error); }
+    });
+    app.delete('/api/cloud/session', (req, res) => {
+        if (!sameOrigin(req)) {
+            res.status(403).json({ error: { code: 'ORIGIN', message: 'This endpoint accepts requests from the ClickStudio site only.' } });
+            return;
+        }
+        cloudSessions.revoke(req.get('cookie'));
+        res.clearCookie(CLOUD_SESSION_COOKIE, cloudSessionCookieOptions(config));
+        res.status(204).end();
+    });
     app.post('/api/cloud', async (req, res, next) => {
         try {
-            const host = req.get('host') ?? '127.0.0.1';
-            const url = new URL(req.originalUrl, `${req.protocol}://${host}`);
-            const headers = new Headers();
-            const origin = req.get('origin');
+            const url = cloudUrl(req);
+            const headers = cloudHeaders(req);
             const contentType = req.get('content-type') ?? '';
-            if (origin)
-                headers.set('origin', origin);
-            if (contentType)
+            const credentials = cloudSessions.credentials(req.get('cookie'));
+            let request: globalThis.Request;
+            if (contentType.toLowerCase().startsWith('multipart/form-data') && credentials) {
+                const incomingHeaders = cloudHeaders(req);
+                incomingHeaders.set('content-type', contentType);
+                const incomingInit: RequestInit & { duplex?: 'half' } = { method: req.method, headers: incomingHeaders, body: Readable.toWeb(req) as ReadableStream, duplex: 'half' };
+                const incoming = new globalThis.Request(url, incomingInit);
+                const form = await incoming.formData();
+                form.set('credentials', JSON.stringify(credentials));
+                request = new globalThis.Request(url, { method: req.method, headers, body: form });
+            }
+            else if (contentType.toLowerCase().startsWith('multipart/form-data')) {
                 headers.set('content-type', contentType);
-            const init: RequestInit & { duplex?: 'half' } = { method: req.method, headers };
-            if (contentType.toLowerCase().startsWith('multipart/form-data')) {
-                init.body = Readable.toWeb(req) as ReadableStream;
-                init.duplex = 'half';
+                const incomingInit: RequestInit & { duplex?: 'half' } = { method: req.method, headers, body: Readable.toWeb(req) as ReadableStream, duplex: 'half' };
+                request = new globalThis.Request(url, incomingInit);
             }
             else if (contentType.toLowerCase().startsWith('application/json')) {
-                init.body = JSON.stringify(req.body ?? {});
+                const incoming = body(req);
+                const payload = credentials ? { ...incoming, credentials } : incoming;
+                headers.set('content-type', 'application/json');
+                request = new globalThis.Request(url, { method: req.method, headers, body: JSON.stringify(payload) });
             }
-            const response = await cloudApi.fetch(new Request(url, init));
-            response.headers.forEach((value, name) => res.setHeader(name, value));
-            res.status(response.status).send(Buffer.from(await response.arrayBuffer()));
+            else {
+                if (contentType) headers.set('content-type', contentType);
+                request = new globalThis.Request(url, { method: req.method, headers, body: req.method === 'GET' || req.method === 'HEAD' ? undefined : Readable.toWeb(req) as ReadableStream, ...(req.method === 'GET' || req.method === 'HEAD' ? {} : { duplex: 'half' as const }) });
+            }
+            const response = await cloudApiClient.fetch(request);
+            await forward(response, res);
         }
         catch (error) {
             next(error);
@@ -251,12 +344,19 @@ function assistantConnectionAuthorized(authorized: (principal: Principal, connec
     return connectionId === CLIENT_CLOUD_CONNECTION_ID ? principal.role === 'owner' : authorized(principal, connectionId);
 }
 
+function createSecretGuards(config: Config) {
+    const secretFree = (value: unknown) => !configuredSecrets(config).some(secret => JSON.stringify(value).includes(secret));
+    const safeExport = (value: unknown) => requireThat(secretFree(value), 400, 'SECRET_IN_EXPORT', 'This data contains a configured secret and cannot be exported or shared');
+    return { secretFree, safeExport };
+}
+
 export function createApp(config: Config, overrides: {
     store?: Store;
     driver?: Driver;
     assistant?: AssistantDriver;
     voice?: VoiceService;
     parserWasm?: () => Promise<Uint8Array>;
+    cloudApi?: Pick<typeof cloudApi, 'fetch'>;
 } = {}) {
     const app = express(), store = overrides.store ?? new FileStore(config.dataDir), driver: Driver = overrides.driver ?? (config.demo ? new DemoDriver() : new ClickHouseDriver(config));
     const runs = new RunService(store, driver, (p, c) => driver.connection(p, c)), artifacts = new ArtifactService(store, runs, (p, c) => driver.connection(p, c));
@@ -265,11 +365,10 @@ export function createApp(config: Config, overrides: {
     const authorized = (p: Principal, c: string) => { driver.connection(p, c); return runs.isTrusted(p, c); };
     const ai = new AssistantService(store, overrides.assistant ?? new OpenAIDriver(config.demo ? undefined : config.openaiKey, config.openaiModel), (p, c) => assistantConnectionAuthorized(authorized, p, c));
     const voice = overrides.voice ?? new OpenAIVoiceService(config.demo ? undefined : config.openaiKey, config.openaiRealtimeModel);
-    const imports = new ImportService(store, driver, authorized), tableCreation = new TableCreationService(store, driver, authorized), tableDeletion = new TableDeletionService(store, driver, authorized), monitors = new MonitorService(store, runs, artifacts), sessions = new SessionService(config.token), redact = redactor(config), parserWasm = overrides.parserWasm ?? cachedClickHouseParserWasm;
-    const secretFree = (value: unknown) => !configuredSecrets(config).some(secret => JSON.stringify(value).includes(secret));
-    const safeExport = (value: unknown) => requireThat(secretFree(value), 400, 'SECRET_IN_EXPORT', 'This data contains a configured secret and cannot be exported or shared');
-    configureHttp(app, config, runs, artifacts, sessions, parserWasm);
-    registerCloudApi(app);
+    const imports = new ImportService(store, driver, authorized), tableCreation = new TableCreationService(store, driver, authorized), tableDeletion = new TableDeletionService(store, driver, authorized), monitors = new MonitorService(store, runs, artifacts), sessions = new SessionService(config.token), cloudSessions = new CloudConnectionSessions(), redact = redactor(config), parserWasm = overrides.parserWasm ?? cachedClickHouseParserWasm;
+    const { secretFree, safeExport } = createSecretGuards(config);
+    configureHttp(app, config, runs, artifacts, sessions, cloudSessions, parserWasm);
+    registerCloudApi(app, config, cloudSessions, overrides.cloudApi ?? cloudApi);
     app.get('/api/connections', (_req, res) => { const p = principal(res); res.json(driver.connections(p).map(c => ({ ...c, trusted: runs.isTrusted(p, c.id) }))); });
     app.post('/api/connections/:id/test', async (req, res) => { canWrite(principal(res)); res.json(await driver.test(id(req))); });
     app.post('/api/connections/:id/trust', (req, res) => { const p = principal(res), v = body(req), connectionId = id(req); requireThat(v.confirmation === connectionId, 400, 'TRUST_CONFIRMATION', 'Confirm the selected connection ID'); runs.trust(p, connectionId, boolean(v.trusted, 'trusted')); res.json({ trusted: runs.isTrusted(p, connectionId) }); });

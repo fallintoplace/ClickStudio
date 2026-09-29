@@ -13,9 +13,10 @@ import type { VoiceService } from '../../server/voice.js';
 import type { ImportJob } from '../../core/imports.js';
 import type { CreateTableColumn } from '../../core/table-creation.js';
 import type { ClickHouseDocumentationEntry, ClickHouseDocumentationSummary, QueryDocument, ReferenceCategory, Run, Published } from '../../shared/types.js';
-async function start(token?: string, voice?: VoiceService, parserWasm?: () => Promise<Uint8Array>, driver = new DemoDriver(), assistant?: AssistantDriver) {
+type CloudApiStub = { fetch: (request: Request) => Promise<Response> };
+async function start(token?: string, voice?: VoiceService, parserWasm?: () => Promise<Uint8Array>, driver = new DemoDriver(), assistant?: AssistantDriver, cloudApi?: CloudApiStub) {
     const config = loadConfig({ DEMO_MODE: 'true', CLICKSTUDIO_TOKEN: token });
-    const service = createApp(config, { store: new MemoryStore(), driver, voice, parserWasm, ...(assistant ? { assistant } : {}) });
+    const service = createApp(config, { store: new MemoryStore(), driver, voice, parserWasm, ...(assistant ? { assistant } : {}), ...(cloudApi ? { cloudApi } : {}) });
     const server = service.app.listen(0, '127.0.0.1');
     await new Promise<void>((resolve, reject) => { server.once('listening', resolve); server.once('error', reject); });
     config.port = (server.address() as AddressInfo).port;
