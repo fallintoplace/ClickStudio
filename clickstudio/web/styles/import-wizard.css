@@ -109,7 +109,7 @@
 .import-new-table-heading strong { color: var(--text); font-size: 13px; font-weight: 680; }
 .import-new-table-heading span { color: var(--muted); font-size: 10px; }
 .import-new-table-card > label { max-width: none; margin: 0; }
-.import-new-table-card > label > select, .import-new-table-card > label > input { width: 100%; min-height: 40px; border-color: var(--line-bright); border-radius: 9px; }
+.import-new-table-card > label > select, .import-new-table-card > label > input:not([type="checkbox"]) { width: 100%; min-height: 40px; border-color: var(--line-bright); border-radius: 9px; }
 .import-new-table-card > p[role="status"], .import-new-table-card > .import-generated-id-option, .import-new-table-card > .import-id-source-note, .import-new-table-card > .mt-3 { grid-column: 1 / -1; }
 .import-new-table-card > p[role="status"] { align-self: start; margin: -4px 0 0; line-height: 1.5; }
 .import-generated-id-option { display: flex; align-items: flex-start; gap: 10px; padding: 11px 12px; border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--line)); border-radius: 10px; background: color-mix(in srgb, var(--accent) 5%, var(--page)); color: var(--text-soft); cursor: pointer; }
