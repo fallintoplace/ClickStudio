@@ -89,6 +89,18 @@
     .schema-key { display: grid; gap: 4px; }
     .schema-key code, .schema-view-target code { overflow-wrap: anywhere; color: var(--text-soft); font-family: var(--font-mono); font-size: 8px; line-height: 1.5; }
     .schema-ttl, .schema-view-target { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px; border: 1px solid var(--line); border-radius: 6px; background: var(--page-raised); }
+    .object-details .schema-table-metadata { gap: 10px; }
+    .object-details .schema-stat-grid { gap: 8px; }
+    .object-details .schema-stat { min-height: 72px; align-content: space-between; gap: 8px; padding: 11px 12px; border-color: color-mix(in srgb, var(--object-detail-accent) 25%, var(--line)); border-radius: 9px; background: var(--page); }
+    .object-details .schema-stat > span { font-size: 8px; letter-spacing: .09em; }
+    .object-details .schema-stat > strong { color: var(--text); font-size: 13px; }
+    .object-details .schema-key-list { grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 8px; padding: 9px; border-color: color-mix(in srgb, var(--object-detail-accent) 25%, var(--line)); border-radius: 9px; background: var(--page); }
+    .object-details .schema-key { min-width: 0; gap: 6px; padding: 8px 9px; border-left: 2px solid var(--object-detail-accent); border-radius: 6px; background: var(--panel-raised); }
+    .object-details .schema-key > span { color: var(--object-detail-accent); font-size: 8px; letter-spacing: .09em; }
+    .object-details .schema-key code { color: var(--text); font-size: 10px; }
+    .object-details .schema-ttl, .object-details .schema-view-target { min-height: 42px; padding: 9px 11px; border-color: color-mix(in srgb, var(--object-detail-accent) 25%, var(--line)); border-radius: 9px; background: var(--page); }
+    .object-details .schema-ttl > span, .object-details .schema-view-target > span { font-size: 8px; letter-spacing: .09em; }
+    .object-details .schema-view-target code { color: var(--text); font-size: 9px; }
     .schema-ttl > span, .schema-index-heading > span { color: var(--muted); font-size: 7px; font-weight: 750; letter-spacing: .08em; }
     .schema-ttl > strong { color: var(--text-soft); font-size: 8px; }
     .schema-ttl.is-configured > strong { color: var(--green); }

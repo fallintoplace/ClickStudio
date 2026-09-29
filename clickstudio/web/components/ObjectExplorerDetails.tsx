@@ -20,8 +20,8 @@ export function ObjectDetails({ copy, selection, trusted, expert, copiedId, onCl
     if (selection.kind === 'relation') {
         const { table, columns } = selection;
         const qualified = qualifiedTableName(table);
-        return <section className="object-details" aria-label="Selected object">{onClose && <button type="button" className="object-details-close" aria-label="Close object details" onClick={onClose}>×</button>}
-            <div className="object-details-hero"><span className={cx('object-kind-badge', selection.relationKind === 'view' && 'is-view')}>{selection.relationKind === 'view' ? 'VIEW' : 'TABLE'}</span><strong>{table.name}</strong><code>{table.database}.{table.name}</code><small>{table.engine} · {tableSummary(table, copy)}</small></div>
+        return <section className="object-details" data-kind={selection.relationKind} aria-label="Selected object">{onClose && <button type="button" className="object-details-close" aria-label="Close object details" onClick={onClose}>×</button>}
+            <div className="object-details-hero"><span className="object-kind-badge">{selection.relationKind === 'view' ? 'VIEW' : 'TABLE'}</span><strong>{table.name}</strong><code>{table.database}.{table.name}</code><small>{table.engine} · {tableSummary(table, copy)}</small></div>
             <div className="object-relation-actions">
                 <div className="object-action-grid">
                     <Button variant="primary" className="toolbar-small object-preview-action" disabled={!trusted} title={!trusted ? copy.runActionTrustRequired : undefined} onClick={() => onOpenSqlDraft(`Preview ${table.name}.sql`, tableQuerySql(table, columns, 'preview'), true, true)}><Icon name="table"/>{copy.previewRows}</Button>
@@ -42,7 +42,7 @@ export function ObjectDetails({ copy, selection, trusted, expert, copiedId, onCl
 
     if (selection.kind === 'column') {
         const quoted = quoteIdentifier(selection.column.name);
-        return <section className="object-details" aria-label="Selected object">{onClose && <button type="button" className="object-details-close" aria-label="Close object details" onClick={onClose}>×</button>}
+        return <section className="object-details" data-kind="column" aria-label="Selected object">{onClose && <button type="button" className="object-details-close" aria-label="Close object details" onClick={onClose}>×</button>}
             <div className="object-details-hero"><span className="object-kind-badge">COLUMN</span><strong>{selection.column.name}</strong><code>{selection.table.database}.{selection.table.name}</code><small>{selection.column.type}</small></div>
             <div className="object-action-grid compact">
                 <Button variant="secondary" className="toolbar-small" onClick={() => onInsert(quoted)}>{copy.insertName}</Button>
@@ -59,8 +59,8 @@ export function ObjectDetails({ copy, selection, trusted, expert, copiedId, onCl
     if (selection.kind === 'dictionary') {
         const dictionary = selection.dictionary;
         const qualified = dictionary.database ? `${quoteIdentifier(dictionary.database)}.${quoteIdentifier(dictionary.name)}` : quoteIdentifier(dictionary.name);
-        return <section className="object-details" aria-label="Selected object">{onClose && <button type="button" className="object-details-close" aria-label="Close object details" onClick={onClose}>×</button>}
-            <div className="object-details-hero"><span className="object-kind-badge is-dictionary">DICTIONARY</span><strong>{dictionary.name}</strong><code>{dictionary.database || 'Server level'}</code><small>{dictionary.type || 'Dictionary'} · {dictionary.status.toLowerCase().replaceAll('_', ' ')}</small></div>
+        return <section className="object-details" data-kind="dictionary" aria-label="Selected object">{onClose && <button type="button" className="object-details-close" aria-label="Close object details" onClick={onClose}>×</button>}
+            <div className="object-details-hero"><span className="object-kind-badge">DICTIONARY</span><strong>{dictionary.name}</strong><code>{dictionary.database || 'Server level'}</code><small>{dictionary.type || 'Dictionary'} · {dictionary.status.toLowerCase().replaceAll('_', ' ')}</small></div>
             <div className="object-action-grid compact">
                 <Button variant="secondary" className="toolbar-small" onClick={() => onInsert(qualified)}>{copy.insertName}</Button>
                 <Button variant="ghost" className="toolbar-small" onClick={() => void onCopy(qualified, selection.id)}>{copiedId === selection.id ? copy.copied : copy.copyName}</Button>
@@ -76,10 +76,10 @@ export function ObjectDetails({ copy, selection, trusted, expert, copiedId, onCl
     }
 
     if (selection.kind === 'projection') {
-        return <section className="object-details" aria-label="Selected object">{onClose && <button type="button" className="object-details-close" aria-label="Close object details" onClick={onClose}>×</button>}<div className="object-details-hero"><span className="object-kind-badge">PROJECTION</span><strong>{selection.projection.name}</strong><code>{selection.table.database}.{selection.table.name}</code><small>{selection.projection.type}</small></div><div className="object-fact-list">{selection.projection.sortingKey && <ObjectFact label="SORTING KEY" value={selection.projection.sortingKey}/>}</div></section>;
+        return <section className="object-details" data-kind="projection" aria-label="Selected object">{onClose && <button type="button" className="object-details-close" aria-label="Close object details" onClick={onClose}>×</button>}<div className="object-details-hero"><span className="object-kind-badge">PROJECTION</span><strong>{selection.projection.name}</strong><code>{selection.table.database}.{selection.table.name}</code><small>{selection.projection.type}</small></div><div className="object-fact-list">{selection.projection.sortingKey && <ObjectFact label="SORTING KEY" value={selection.projection.sortingKey}/>}</div></section>;
     }
 
-    return <section className="object-details" aria-label="Selected object">{onClose && <button type="button" className="object-details-close" aria-label="Close object details" onClick={onClose}>×</button>}<div className="object-details-hero"><span className="object-kind-badge">SKIP INDEX</span><strong>{selection.index.name}</strong><code>{selection.table.database}.{selection.table.name}</code><small>{selection.index.type}</small></div><div className="object-fact-list"><ObjectFact label="EXPRESSION" value={selection.index.expression}/><ObjectFact label="GRANULARITY" value={selection.index.granularity}/></div></section>;
+    return <section className="object-details" data-kind="skip-index" aria-label="Selected object">{onClose && <button type="button" className="object-details-close" aria-label="Close object details" onClick={onClose}>×</button>}<div className="object-details-hero"><span className="object-kind-badge">SKIP INDEX</span><strong>{selection.index.name}</strong><code>{selection.table.database}.{selection.table.name}</code><small>{selection.index.type}</small></div><div className="object-fact-list"><ObjectFact label="EXPRESSION" value={selection.index.expression}/><ObjectFact label="GRANULARITY" value={selection.index.granularity}/></div></section>;
 }
 
 function ObjectFact({ label, value }: { label: string; value: string }) {

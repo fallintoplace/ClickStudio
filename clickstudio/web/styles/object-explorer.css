@@ -137,36 +137,41 @@
     .object-empty-search { display: grid; min-height: 150px; place-items: center; align-content: center; gap: 5px; padding: 18px; border: 1px dashed var(--line-bright); border-radius: 8px; background: var(--panel-raised); color: var(--muted); text-align: center; }
     .object-empty-search strong { color: var(--text-soft); font-size: 10px; }
     .object-empty-search span { max-width: 240px; font-size: 8px; line-height: 1.5; }
-    .object-details { position: relative; display: grid; max-height: min(46%, 410px); flex: none; gap: 8px; overflow: auto; padding: 12px; border: 1px solid color-mix(in srgb, var(--explorer-signal) 22%, var(--line)); border-radius: 11px; background: radial-gradient(ellipse at 100% 0%, color-mix(in srgb, var(--explorer-signal) 9%, transparent), transparent 50%), linear-gradient(145deg, color-mix(in srgb, var(--panel-raised) 88%, var(--panel)), var(--panel)); box-shadow: inset 0 1px #ffffff09, 0 8px 22px #00000010; }
-    .object-details-close { position: absolute; top: 7px; right: 7px; display: grid; width: 26px; height: 26px; place-items: center; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--muted); font-size: 15px; cursor: pointer; }
-    .object-details-close:hover, .object-details-close:focus-visible { border-color: color-mix(in srgb, var(--explorer-signal) 28%, var(--line)); background: color-mix(in srgb, var(--explorer-signal) 9%, var(--panel)); color: var(--explorer-signal); outline: none; }
-    .object-compact-details { display: flex; min-height: 0; flex: 1; flex-direction: column; gap: 8px; }
-    .object-back-button { display: flex; min-height: 36px; flex: none; align-items: center; gap: 7px; padding: 0 4px; border: 0; border-bottom: 1px solid color-mix(in srgb, var(--explorer-signal) 20%, var(--line)); background: transparent; color: var(--text-soft); font-size: 10px; font-weight: 680; cursor: pointer; }
+    .object-details { --object-detail-accent: var(--explorer-signal); position: relative; display: grid; max-height: min(46%, 410px); flex: none; gap: 10px; overflow: auto; padding: 12px; border: 1px solid color-mix(in srgb, var(--object-detail-accent) 28%, var(--line)); border-radius: 12px; background: var(--panel-raised); box-shadow: 0 8px 22px #00000010; }
+    .object-details[data-kind="table"] { --object-detail-accent: var(--explorer-table); }
+    .object-details[data-kind="view"] { --object-detail-accent: var(--explorer-view); }
+    .object-details[data-kind="column"] { --object-detail-accent: var(--explorer-column); }
+    .object-details[data-kind="dictionary"] { --object-detail-accent: var(--explorer-dictionary); }
+    .object-details[data-kind="projection"] { --object-detail-accent: var(--explorer-projection); }
+    .object-details[data-kind="skip-index"] { --object-detail-accent: var(--explorer-index); }
+    .object-details-close { position: absolute; z-index: 1; top: 10px; right: 10px; display: grid; width: 30px; height: 30px; place-items: center; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--muted); font-size: 17px; cursor: pointer; }
+    .object-details-close:hover, .object-details-close:focus-visible { border-color: color-mix(in srgb, var(--object-detail-accent) 52%, var(--line)); background: color-mix(in srgb, var(--object-detail-accent) 9%, var(--panel)); color: var(--object-detail-accent); outline: none; }
+    .object-compact-details { display: flex; min-height: 0; flex: 1; flex-direction: column; gap: 10px; }
+    .object-back-button { display: flex; min-height: 36px; flex: none; align-self: flex-start; align-items: center; gap: 8px; padding: 0 10px 0 6px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--muted); font-size: 10px; font-weight: 680; cursor: pointer; transition: border-color .16s ease, background .16s ease, color .16s ease; }
     .object-back-button span { color: var(--explorer-signal); font-size: 20px; line-height: 1; }
-    .object-back-button:hover, .object-back-button:focus-visible { color: var(--text); outline: none; }
+    .object-back-button:hover, .object-back-button:focus-visible { border-color: var(--line); background: var(--panel-raised); color: var(--text); outline: none; }
     .object-explorer-section.is-detail-mode { padding-top: 4px; }
-    .object-explorer-section.is-detail-mode .object-details { align-content: start; max-height: none; flex: 1; gap: 6px; padding: 8px 12px 12px; border-top: 0; }
-    .object-details-hero { display: grid; min-width: 0; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 3px 7px; }
-    .object-kind-badge { padding: 3px 6px; border: 1px solid color-mix(in srgb, var(--explorer-signal) 34%, var(--line)); border-radius: 5px; background: color-mix(in srgb, var(--explorer-signal) 9%, transparent); color: var(--explorer-signal); font-size: 7px; font-weight: 800; letter-spacing: .1em; }
-    .object-kind-badge.is-view { border-color: color-mix(in srgb, #9c8fe7 35%, var(--line)); color: #9c8fe7; }
-    .object-kind-badge.is-dictionary { border-color: color-mix(in srgb, var(--green) 35%, var(--line)); color: var(--green); }
-    .object-details-hero > strong { overflow: hidden; color: var(--text); font-family: var(--font-display); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
-    .object-details-hero > code, .object-details-hero > small { grid-column: 1 / -1; overflow: hidden; color: var(--muted); font-family: var(--font-mono); font-size: 8px; line-height: 1.5; text-overflow: ellipsis; white-space: nowrap; }
-    .object-details-hero > small { width: max-content; max-width: 100%; padding: 4px 7px; border: 1px solid color-mix(in srgb, var(--explorer-signal) 16%, var(--line)); border-radius: 7px; background: color-mix(in srgb, var(--explorer-signal) 5%, var(--panel-raised)); color: var(--text-soft); font-family: var(--font-sans); font-size: 8px; font-variant-numeric: tabular-nums; line-height: 1.35; }
+    .object-explorer-section.is-detail-mode .object-details { align-content: start; width: 100%; max-height: calc(100% - 46px); flex: 0 1 auto; gap: 12px; padding: 14px; border: 1px solid color-mix(in srgb, var(--object-detail-accent) 36%, var(--line-bright)); border-left: 3px solid var(--object-detail-accent); border-radius: 13px; background: var(--panel-raised); box-shadow: 0 12px 30px #0000001c; }
+    .object-details-hero { display: grid; min-width: 0; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 7px 10px; padding: 12px; border: 1px solid color-mix(in srgb, var(--object-detail-accent) 24%, var(--line)); border-radius: 10px; background: var(--panel); }
+    .object-kind-badge { width: max-content; padding: 5px 8px; border: 1px solid color-mix(in srgb, var(--object-detail-accent) 42%, var(--line)); border-radius: 6px; background: color-mix(in srgb, var(--object-detail-accent) 10%, var(--panel)); color: var(--object-detail-accent); font-size: 8px; font-weight: 800; letter-spacing: .1em; }
+    .object-details-hero > strong { min-width: 0; overflow-wrap: anywhere; color: var(--text); font-family: var(--font-display); font-size: clamp(14px, 1.5vw, 19px); font-weight: 720; letter-spacing: -.025em; line-height: 1.25; }
+    .object-details-hero > code, .object-details-hero > small { grid-column: 1 / -1; min-width: 0; overflow: hidden; color: var(--muted); font-family: var(--font-mono); font-size: 9px; line-height: 1.5; text-overflow: ellipsis; white-space: nowrap; }
+    .object-details-hero > code { color: var(--text-soft); }
+    .object-details-hero > small { width: max-content; max-width: 100%; padding: 5px 8px; border: 1px solid color-mix(in srgb, var(--object-detail-accent) 30%, var(--line)); border-radius: 7px; background: var(--panel-raised); color: var(--text-soft); font-family: var(--font-sans); font-size: 9px; font-variant-numeric: tabular-nums; line-height: 1.35; }
     .object-action-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
     .object-action-grid.compact { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .object-action-grid .toolbar-small { min-width: 0; justify-content: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .object-relation-actions { display: grid; min-width: 0; gap: 5px; }
-    .object-relation-actions > .object-action-grid .toolbar-small { min-height: 32px; border-radius: 8px; font-size: 8px; font-weight: 690; letter-spacing: .015em; }
+    .object-relation-actions { display: grid; min-width: 0; gap: 8px; }
+    .object-relation-actions > .object-action-grid .toolbar-small { min-height: 40px; border-radius: 9px; font-size: 9px; font-weight: 690; letter-spacing: .015em; }
     .object-relation-actions > .object-action-grid svg { width: 12px; height: 12px; flex: none; }
-    .object-utility-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; padding-top: 4px; border-top: 1px solid color-mix(in srgb, var(--explorer-signal) 16%, var(--line)); }
-    .object-utility-actions .toolbar-small { min-width: 0; min-height: 27px; justify-content: center; gap: 5px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--explorer-signal) 12%, var(--line)); border-radius: 7px; background: color-mix(in srgb, var(--explorer-signal) 3%, var(--panel-raised)); color: var(--muted); font-size: 8px; letter-spacing: .015em; text-overflow: ellipsis; white-space: nowrap; transition: border-color .16s ease, background .16s ease, color .16s ease; }
-    .object-utility-actions .toolbar-small:hover:not(:disabled), .object-utility-actions .toolbar-small:focus-visible { border-color: color-mix(in srgb, var(--explorer-signal) 42%, var(--line)); background: color-mix(in srgb, var(--explorer-signal) 9%, var(--panel-raised)); color: var(--explorer-signal); outline: none; }
-    .object-utility-actions svg { width: 12px; height: 12px; flex: none; color: var(--explorer-signal); }
-    .object-fact-list { display: grid; gap: 5px; }
-    .object-fact { display: grid; gap: 4px; padding: 7px; border: 1px solid var(--line); border-radius: 6px; background: var(--page-raised); }
-    .object-fact > span { color: var(--explorer-signal); font-size: 8px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
-    .object-fact > code { overflow-wrap: anywhere; color: var(--text-soft); font-family: var(--font-mono); font-size: 9px; line-height: 1.5; }
+    .object-utility-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; padding-top: 8px; border-top: 1px solid color-mix(in srgb, var(--object-detail-accent) 20%, var(--line)); }
+    .object-utility-actions .toolbar-small { min-width: 0; min-height: 34px; justify-content: center; gap: 5px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--object-detail-accent) 20%, var(--line)); border-radius: 8px; background: var(--panel); color: var(--text-soft); font-size: 9px; letter-spacing: .015em; text-overflow: ellipsis; white-space: nowrap; transition: border-color .16s ease, background .16s ease, color .16s ease; }
+    .object-utility-actions .toolbar-small:hover:not(:disabled), .object-utility-actions .toolbar-small:focus-visible { border-color: color-mix(in srgb, var(--object-detail-accent) 55%, var(--line)); background: color-mix(in srgb, var(--object-detail-accent) 10%, var(--panel)); color: var(--object-detail-accent); outline: none; }
+    .object-utility-actions svg { width: 13px; height: 13px; flex: none; color: var(--object-detail-accent); }
+    .object-fact-list { display: grid; gap: 8px; }
+    .object-fact { display: grid; gap: 6px; padding: 10px 11px; border: 1px solid color-mix(in srgb, var(--object-detail-accent) 18%, var(--line)); border-radius: 9px; background: var(--panel); }
+    .object-fact > span { color: var(--object-detail-accent); font-size: 8px; font-weight: 780; letter-spacing: .09em; text-transform: uppercase; }
+    .object-fact > code { overflow-wrap: anywhere; color: var(--text-soft); font-family: var(--font-mono); font-size: 10px; line-height: 1.5; }
     .object-reference-actions { display: flex; flex-wrap: wrap; gap: 5px; padding-top: 5px; border-top: 1px solid color-mix(in srgb, var(--explorer-signal) 16%, var(--line)); }
     .object-reference-actions .toolbar-small { min-height: 29px; flex: 1 1 calc(50% - 3px); justify-content: center; gap: 6px; border-radius: 8px; font-size: 8px; letter-spacing: .015em; }
     .object-reference-actions .object-parts-action { border-color: color-mix(in srgb, var(--explorer-signal) 34%, var(--line-bright)); background: color-mix(in srgb, var(--explorer-signal) 6%, var(--panel-raised)); color: var(--explorer-signal); }
