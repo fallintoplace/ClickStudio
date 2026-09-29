@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import type { Schema, SchemaColumn, SchemaDictionary, SchemaTable } from '../../shared/types';
 import {
     buildObjectExplorer,
@@ -209,7 +209,7 @@ export function ObjectExplorer({ copy, connection, expert, schema, schemaLoading
         const hasChildren = relation.columns.length > 0 || (relation.table.projections?.length ?? 0) > 0 || (relation.table.skipIndexes?.length ?? 0) > 0;
 
         return <div className="object-tree-branch" key={relation.id}>
-            <div role="treeitem" aria-level={level} aria-expanded={hasChildren ? relationExpanded : undefined} aria-selected={selectedId === relation.id} data-database={relation.table.database} data-table-name={relation.table.name} className={cx('object-tree-row', 'is-object', selectedId === relation.id && 'is-selected', highlightedTableId === relation.id && 'is-import-highlight')} style={{ paddingLeft: `${Math.max(0, level - 1) * 10}px` }}>
+            <div role="treeitem" aria-level={level} aria-expanded={hasChildren ? relationExpanded : undefined} aria-selected={selectedId === relation.id} data-database={relation.table.database} data-table-name={relation.table.name} className={cx('object-tree-row', 'is-object', selectedId === relation.id && 'is-selected', highlightedTableId === relation.id && 'is-import-highlight')} style={{ '--tree-indent': `${Math.max(0, level - 1) * 12}px` } as CSSProperties}>
                 <button type="button" className="object-tree-toggle" aria-label={relationExpanded ? copy.collapse : copy.expand} disabled={!hasChildren} onClick={() => hasChildren && toggle(relation.id)}><span className={cx(relationExpanded && 'is-open')}>{hasChildren && <Icon name="chevron"/>}</span></button>
                 <button type="button" className="object-tree-main" title={`${relation.table.database}.${relation.table.name}`} onClick={() => selectObject(relation.id)}>
                     <span className={cx('object-kind-glyph', relation.kind === 'view' && 'is-view')}><Icon name={relation.kind === 'view' ? 'view' : 'table'}/></span>
@@ -332,14 +332,14 @@ function DictionaryCategory({ label, database, dictionaries, level, query, expan
 }
 
 function ExplorerGroupRow({ level, label, count, expanded, onToggle, database = false, kind = 'table' }: { level: number; label: string; count: number; expanded: boolean; onToggle: () => void; database?: boolean; kind?: 'table' | 'view' | 'dictionary' | 'column' | 'projection' | 'index' }) {
-    return <div role="treeitem" aria-level={level} aria-expanded={expanded} className={cx('object-tree-row', 'is-group', database && 'is-database')} style={{ paddingLeft: `${Math.max(0, level - 1) * 10}px` }}>
+    return <div role="treeitem" aria-level={level} aria-expanded={expanded} className={cx('object-tree-row', 'is-group', database && 'is-database')} style={{ '--tree-indent': `${Math.max(0, level - 1) * 12}px` } as CSSProperties}>
         <button type="button" className="object-tree-toggle" aria-label={expanded ? `Collapse ${label}` : `Expand ${label}`} onClick={onToggle}><span className={cx(expanded && 'is-open')}><Icon name="chevron"/></span></button>
         <button type="button" className="object-tree-main" title={label} onClick={onToggle}><span className={cx('object-kind-glyph', database && 'is-database')}><Icon name={database ? 'database' : kind}/></span><span className="object-tree-label"><strong>{label}</strong></span><small className="object-tree-count">{count.toLocaleString()}</small></button>
     </div>;
 }
 
 function ObjectLeafRow({ level, selected, glyph, label, meta, onSelect, onInsert, insertLabel }: { level: number; selected: boolean; glyph: 'column' | 'projection' | 'index' | 'dictionary'; label: string; meta?: string; onSelect: () => void; onInsert?: () => void; insertLabel?: string }) {
-    return <div role="treeitem" aria-level={level} aria-selected={selected} className={cx('object-tree-row', 'is-object', 'is-leaf', selected && 'is-selected')} style={{ paddingLeft: `${Math.max(0, level - 1) * 10}px` }}>
+    return <div role="treeitem" aria-level={level} aria-selected={selected} className={cx('object-tree-row', 'is-object', 'is-leaf', selected && 'is-selected')} style={{ '--tree-indent': `${Math.max(0, level - 1) * 12}px` } as CSSProperties}>
         <span className="object-tree-toggle object-tree-spacer"/>
         <button type="button" className="object-tree-main" title={meta ? `${label} · ${meta}` : label} onClick={onSelect}><span className="object-kind-glyph"><Icon name={glyph}/></span><span className="object-tree-label"><strong>{label}</strong>{meta && <small>{meta}</small>}</span></button>
         {onInsert && <button type="button" className="object-tree-inline-action" title={insertLabel} aria-label={`${insertLabel}: ${label}`} onClick={onInsert}><Icon name="plus"/></button>}
