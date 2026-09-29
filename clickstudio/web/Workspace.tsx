@@ -6,6 +6,7 @@ import { exportCsv, recommendChart } from '../shared/results';
 import { parameterNames, selectedStatement, splitSql } from '../shared/sql';
 import { sqlReferencesQualifiedTable } from '../shared/table-deletion';
 import { api, download, isFrontendDemoPreview, message, post } from './api';
+import { CLICKHOUSE_CLOUD_CONNECTION_ID } from './cloud-connection';
 import { PLAYGROUND_CONNECTION_ID } from './playground';
 import type { EditorHandle } from './components/SqlEditor';
 import { ImportWizard } from './components/ImportWizard';
@@ -627,7 +628,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
     const exportCurrentCsv = async () => {
         if (!run) return;
         try {
-            if (isFrontendDemoPreview) {
+            if (isFrontendDemoPreview || run.connectionId === CLICKHOUSE_CLOUD_CONNECTION_ID) {
                 const full = snapshot?.runId === run.id ? snapshot : await api<Result>(`/runs/${encodeURIComponent(run.id)}/snapshot`);
                 download(`${run.queryId}.csv`, exportCsv(full), 'text/csv;charset=utf-8');
                 return;

@@ -1,6 +1,42 @@
 import { test, expect, type Page, type Download } from '@playwright/test';
-import type { Result } from '../../shared/types.js';
+import type { Result, Schema } from '../../shared/types.js';
+import { PLAYGROUND_CONNECTION } from '../../shared/playground.js';
+import type { CloudConnectionTest } from '../../web/cloud-connection.js';
 import { trust } from './helpers.js';
+
+const cloudSchema: Schema = {
+    connectionId: 'clickhouse-cloud',
+    fetchedAt: '2026-09-28T00:00:00.000Z',
+    databases: ['default'],
+    tables: [{ database: 'default', name: 'events', engine: 'MergeTree' }],
+    columns: [
+        { database: 'default', table: 'events', name: 'day', type: 'Date', defaultKind: '', comment: '' },
+        { database: 'default', table: 'events', name: 'events', type: 'UInt64', defaultKind: '', comment: '' },
+    ],
+    warnings: [],
+    truncated: false,
+};
+
+const cloudConnectionTest: CloudConnectionTest = {
+    host: 'service.region.provider.clickhouse.cloud:8443',
+    database: 'default',
+    username: 'demo',
+    serverVersion: '26.1',
+    queryLog: { available: true },
+    queryLogSource: 'user_query_log',
+    replication: { available: false, reason: 'Unavailable in this test.' },
+    progress: { available: false, reason: 'Unavailable in this test.' },
+    cancellation: { available: false, reason: 'Unavailable in this test.' },
+    explain: { available: false, reason: 'Unavailable in this test.' },
+    explainPlan: { available: false, reason: 'Unavailable in this test.' },
+    explainAnalyze: { available: false, reason: 'Unavailable in this test.' },
+    queryTree: { available: false, reason: 'Unavailable in this test.' },
+    explainPipeline: { available: false, reason: 'Unavailable in this test.' },
+    pipeline: { available: false, reason: 'Unavailable in this test.' },
+    traceLog: { available: false, reason: 'Unavailable in this test.' },
+    documentation: { available: false, reason: 'Unavailable in this test.' },
+    parameters: { available: false, reason: 'Unavailable in this test.' },
+};
 
 function countRuns(page: Page) {
     let count = 0;
@@ -64,6 +100,73 @@ test('Result export downloads the complete retained CSV from the server', async 
     expect(csv.split('\r\n')[0]).toBe('day,events');
     expect(csv).toContain('2026-01-07,70');
     expect(runs()).toBe(1);
+});
+
+test('Cloud result export downloads the retained CSV from the browser workspace', async ({ page }) => {
+    const cloudActions: string[] = [];
+    const serverExportRequests: string[] = [];
+    await page.route('**/api/connections', async route => {
+        const response = await route.fetch();
+        const connections = await response.json() as { id: string }[];
+        if (!connections.some(connection => connection.id === PLAYGROUND_CONNECTION.id)) connections.push(PLAYGROUND_CONNECTION);
+        await route.fulfill({ response, json: connections });
+    });
+    await page.route('**/api/cloud', async route => {
+        const body = route.request().postDataJSON() as { action?: string; queryId?: string };
+        cloudActions.push(body.action ?? '');
+        if (body.action === 'test') {
+            await route.fulfill({ json: cloudConnectionTest });
+            return;
+        }
+        if (body.action === 'schema') {
+            await route.fulfill({ json: cloudSchema });
+            return;
+        }
+        if (body.action === 'run') {
+            await route.fulfill({ json: {
+                queryId: body.queryId ?? 'clickstudio-run-test',
+                columns: [{ name: 'day', type: 'Date' }, { name: 'events', type: 'UInt64' }],
+                rows: [['2026-01-01', '10'], ['2026-01-02', '20']],
+                elapsedMs: 8,
+                bytes: 32,
+                truncated: false,
+            } });
+            return;
+        }
+        await route.fulfill({ status: 409, json: { error: { code: 'UNEXPECTED_ACTION', message: 'Unexpected Cloud action in this export test.' } } });
+    });
+    page.on('request', request => {
+        const url = new URL(request.url());
+        if (url.pathname.startsWith('/api/runs/') && url.pathname.endsWith('/export')) serverExportRequests.push(url.pathname);
+    });
+
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Connect Cloud' }).click();
+    const connectionDialog = page.getByRole('dialog', { name: 'Connect to your service' });
+    await connectionDialog.getByLabel('HTTPS host').fill('service.region.provider.clickhouse.cloud:8443');
+    await connectionDialog.getByLabel('Database').fill('default');
+    await connectionDialog.getByLabel('Username').fill('demo');
+    await connectionDialog.getByLabel('Password').fill('demo-password');
+    await connectionDialog.getByRole('button', { name: 'Connect service' }).click();
+    await expect(page.locator('.connection-trigger')).toContainText('CLICKHOUSE CLOUD');
+
+    await page.getByTestId('run-button').click();
+    const results = page.getByRole('region', { name: 'Query results', exact: true });
+    const resultTable = results.getByRole('table', { name: 'Retained query rows' });
+    await expect(resultTable).toBeVisible();
+    await expect(resultTable).toContainText('2026-01-02');
+
+    await page.locator('.inspector-footer').getByRole('button', { name: 'Export', exact: true }).click();
+    const exportDialog = page.getByRole('dialog', { name: 'Export', exact: true });
+    const [download] = await Promise.all([
+        page.waitForEvent('download'),
+        exportDialog.getByRole('button', { name: /Export rows \(\.csv\)/ }).click(),
+    ]);
+    const csv = await downloadedText(download);
+    expect(csv.split('\r\n')[0]).toBe('day,events');
+    expect(csv).toContain('2026-01-02,20');
+    expect(cloudActions).toContain('run');
+    expect(serverExportRequests).toEqual([]);
 });
 
 test('Wide retained results remain horizontally scrollable and keyboard accessible', async ({ page }) => {
