@@ -31,13 +31,12 @@
     .data-table th span, .data-table th small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .data-table th span { font-size: 10px; font-weight: 720; }
     .data-table th small { display: inline-flex; width: max-content; max-width: 100%; align-items: center; margin-top: 6px; padding: 3px 6px; border: 1px solid color-mix(in srgb, var(--result-type-accent, var(--muted)) 28%, var(--line)); border-radius: 5px; background: color-mix(in srgb, var(--result-type-accent, var(--muted)) 8%, var(--panel)); color: var(--result-type-accent, var(--muted)); font-size: 8px; font-weight: 560; }
-    .data-table td { max-width: 330px; padding: 9px 13px; overflow: hidden; border-right: 1px solid color-mix(in srgb, var(--line) 36%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--line) 62%, transparent); text-overflow: ellipsis; white-space: nowrap; }
+    .data-table td { max-width: 330px; padding: 9px 13px; overflow: hidden; border-right: 1px solid color-mix(in srgb, var(--line) 36%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--line) 62%, transparent); text-align: left; text-overflow: ellipsis; white-space: nowrap; }
     .data-table tbody tr { animation: rowReveal .28s ease both; }
     .data-table tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--accent) 2%, var(--page)); }
     .data-table tbody tr:hover td { background: color-mix(in srgb, var(--accent) 8%, var(--panel)); }
-    .data-table tbody td[data-type-group="number"] { text-align: right; }
-    .data-table tbody td[data-type-group="boolean"] { color: var(--result-boolean); font-weight: 620; text-align: center; }
-    .data-table .row-number { position: sticky; z-index: var(--z-local-control); left: 0; min-width: 46px; max-width: 46px; border-right-color: var(--line-bright); background: var(--panel-raised); color: var(--muted); font-size: 9px; font-weight: 630; text-align: right; }
+    .data-table tbody td[data-type-group="boolean"] { color: var(--result-boolean); font-weight: 620; }
+    .data-table .row-number { position: sticky; z-index: var(--z-local-control); left: 0; min-width: 46px; max-width: 46px; border-right-color: var(--line-bright); background: var(--panel-raised); color: var(--muted); font-size: 9px; font-weight: 630; text-align: left; }
     .data-table th.row-number { z-index: var(--z-local-intersection); }
     .data-table .cell-null { color: var(--muted); font-style: italic; }
     .no-rows { padding: 45px; color: var(--muted); text-align: center; font-size: 11px; }
