@@ -56,7 +56,7 @@ export const english = {
         helpPartsRequiresTrust: 'Trust this connection to inspect its storage metadata.',
         helpTour: 'Tour',
         helpTourTitle: 'Everything worth showing is one click away',
-        helpTourDescription: 'Use this panel as a fast tour of SQL examples, query workflows, monitoring, query structure, EXPLAIN, storage, dependencies, run evidence, and reference docs.',
+        helpTourDescription: 'Use this panel as a fast tour of SQL examples, query workflows, AI assistance, and reference docs, plus experimental monitoring, query structure, EXPLAIN, storage, data flow, and run comparisons.',
         helpQueryWorkflows: 'Query workflows',
         helpQueryWorkflowsDescription: 'Prepare SQL, choose what to run, then inspect each result and its execution status.',
         helpAssistant: 'AI assistant',
