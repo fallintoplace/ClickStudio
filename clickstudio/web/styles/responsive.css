@@ -80,6 +80,7 @@
     .connection-env, .connection-quick-status { font-size: 7px; letter-spacing: .06em; }
     .connection-trigger > strong { font-size: 9px; }
     .connection-database { font-size: 8px; }
+    .cloud-topbar-action { min-height: 30px; padding-inline: 8px; font-size: 9px; }
     .workspace-layout, .workspace-root.is-expert .workspace-layout { grid-template-columns: 44px minmax(0, 1fr); }
     .icon-rail { padding: 10px 3px; }
     .rail-icon-button { width: 35px; height: 35px; }
@@ -132,7 +133,7 @@
 
 @media (max-width: 560px) {
     .application { min-height: 710px; }
-    .topbar { flex-wrap: wrap; min-height: 96px; align-content: center; justify-content: space-between; row-gap: 5px; padding: 7px 9px; }
+    .topbar { flex-wrap: wrap; min-height: 96px; align-content: center; justify-content: space-between; gap: 5px; padding: 7px 9px; }
     .topbar-spacer { display: none; }
     .topbar-control-rail { order: 3; width: 100%; max-width: 100%; flex-wrap: wrap; justify-content: space-between; gap: 2px; padding: 3px; }
     .topbar-control-rail > .topbar-divider { display: none; }
@@ -142,9 +143,11 @@
     .brand-lockup { order: 0; }
     .experience-switch { order: 2; }
     .connection-wrap { order: 1; max-width: 150px; }
+    .cloud-connection-actions { order: 2; }
     .topbar-preferences { order: 3; }
     .select-control select { max-width: 91px; }
-    .connection-wrap { min-width: 0; width: 150px; max-width: 150px; }
+    .connection-wrap { min-width: 0; width: 140px; max-width: 140px; }
+    .cloud-topbar-action { min-height: 30px; padding-inline: 7px; font-size: 9px; }
     .connection-menu { position: fixed; top: 64px; right: 8px; left: 8px; width: auto; max-height: calc(100dvh - 80px); padding: 7px; border-radius: 12px; }
     .connection-env, .connection-quick-status { font-size: 6px; letter-spacing: .04em; }
     .workspace-content.has-run { grid-template-rows: minmax(285px, 1fr) minmax(250px, .94fr); }

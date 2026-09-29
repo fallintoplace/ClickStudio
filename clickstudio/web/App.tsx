@@ -57,6 +57,7 @@ function App() {
     const copy = getCopy(locale);
     const connection = connections.find(item => item.id === connectionId) ?? connections[0];
     const hasPreviewSourceSwitcher = Boolean(session?.demo && connections.some(item => item.id === 'playground'));
+    const hasCloudConnection = connections.some(item => item.id === CLICKHOUSE_CLOUD_CONNECTION_ID);
     const isSampleData = Boolean(session?.demo && connection?.dataSource === 'fixture');
     const isPlayground = Boolean(connection?.id === 'playground');
     const isCloudConnection = connection?.id === CLICKHOUSE_CLOUD_CONNECTION_ID;
@@ -169,11 +170,11 @@ function App() {
                         <p className={cx('connection-menu-note', isSampleData ? 'is-sample' : isPlayground || connection.trusted && !connectionNeedsTest ? 'is-ready' : 'is-review')} role="status">
                             {isSampleData ? 'Sample rows are generated for the preview. SQL is not sent to a database.' : isPlayground ? 'Queries run against the public ClickHouse SQL Playground. Access is read only.' : isCloudConnection ? 'Queries pass through this site to your Cloud service over HTTPS. Your Cloud user controls which reads and writes are allowed.' : session.demo ? 'This demo uses sample data. Your SQL is not sent to a real database.' : connectionNeedsTest ? connection.trusted ? 'Read-only access is on, but this server needs a fresh capability check.' : 'Test this connection to discover its ClickHouse features.' : connection.trusted ? 'Read-only access is on. Queries can read data but cannot change it.' : 'Connection tested. Turn on read-only access when you are ready to query.'}
                         </p>
-                        {isCloudConnection
-                            ? <Button variant="danger" className="connection-menu-action connection-menu-disconnect" onClick={disconnectCloud}>Disconnect ClickHouse Cloud</Button>
-                            : ((!session.demo && !isPlayground) || !connection.trusted) && <Button variant={!session.demo && connection.trusted ? 'ghost' : 'primary'} className="connection-menu-action" disabled={connectionActionBusy} onClick={() => void runConnectionAction(connectionNeedsTest)}>
+                        {!isCloudConnection && ((!session.demo && !isPlayground) || !connection.trusted) && (
+                            <Button variant={!session.demo && connection.trusted ? 'ghost' : 'primary'} className="connection-menu-action" disabled={connectionActionBusy} onClick={() => void runConnectionAction(connectionNeedsTest)}>
                                 {connectionActionBusy ? connectionNeedsTest ? 'Testing…' : 'Saving…' : session.demo ? 'Start exploring' : connectionNeedsTest ? connection.trusted ? 'Retest connection' : 'Test connection' : connection.trusted ? 'Turn off read-only access' : 'Trust connection'}
-                            </Button>}
+                            </Button>
+                        )}
                         {sourceChoices.length > 0 && <div className="connection-switch-list">
                             <span className="connection-menu-heading">{hasPreviewSourceSwitcher ? 'Choose data source' : 'Switch connection'}</span>
                             {sourceChoices.map(item => <button key={item.id} type="button" aria-pressed={item.id === connection.id} onClick={() => { selectConnection(item.id); setConnectionPicker(false); }}>
@@ -182,9 +183,12 @@ function App() {
                             </button>)}
                         </div>}
                     </div>
-                    {(!session.demo || hasPreviewSourceSwitcher) && <div className="connection-menu-footer"><Button variant="secondary" className="connection-menu-action cloud-connect-trigger" onClick={() => { setConnectionPicker(false); setCloudDialogOpen(true); }}>{isCloudConnection ? 'Change Cloud service' : 'Connect ClickHouse Cloud'}</Button></div>}
+                    {hasCloudConnection && <div className="connection-menu-footer"><Button variant="secondary" className="connection-menu-action cloud-connect-trigger" onClick={() => { setConnectionPicker(false); setCloudDialogOpen(true); }}>Change Cloud service</Button></div>}
                 </div>}
             </div>
+            {hasCloudConnection
+                ? <div className="cloud-connection-actions"><Button variant="danger" className="cloud-topbar-action cloud-topbar-disconnect" onClick={disconnectCloud}>Disconnect Cloud</Button></div>
+                : (!session.demo || hasPreviewSourceSwitcher) && <div className="cloud-connection-actions"><Button variant="secondary" className="cloud-topbar-action cloud-topbar-connect" onClick={() => { setConnectionPicker(false); setCloudDialogOpen(true); }}>Connect Cloud</Button></div>}
             <div className="topbar-spacer"/>
             <div className="topbar-control-rail">
                 <div className="experience-switch">

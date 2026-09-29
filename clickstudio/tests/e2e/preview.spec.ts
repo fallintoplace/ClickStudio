@@ -98,8 +98,10 @@ async function mockCloudEndpoint(page: Page, commitOutcome: 'success' | 'unknown
 
 async function connectPreviewCloud(page: Page) {
     await page.goto('/');
-    await page.locator('.connection-trigger').click();
-    await page.getByRole('button', { name: 'Connect ClickHouse Cloud' }).click();
+    const connectButton = page.getByRole('button', { name: 'Connect Cloud' });
+    await expect(connectButton).toBeVisible();
+    await expect(page.getByRole('dialog', { name: 'Data source options' })).toHaveCount(0);
+    await connectButton.click();
     const dialog = page.getByRole('dialog', { name: 'Connect to your service' });
     await dialog.getByLabel('HTTPS host').fill('service.region.provider.clickhouse.cloud:8443');
     await dialog.getByLabel('Database').fill('default');
@@ -107,12 +109,46 @@ async function connectPreviewCloud(page: Page) {
     await dialog.getByLabel('Password').fill('demo-password');
     await dialog.getByRole('button', { name: 'Connect service' }).click();
     await expect(page.locator('.connection-trigger')).toContainText('CLICKHOUSE CLOUD');
+    await expect(page.getByRole('button', { name: 'Disconnect Cloud' })).toBeVisible();
 }
 
 async function chooseExistingCloudTable(dialog: Locator) {
     await dialog.getByRole('radio', { name: /Use an existing table/ }).check();
     await dialog.getByLabel('Import target table').selectOption('default.events');
 }
+
+test('Cloud actions stay outside the source picker and disconnect preserves another source', async ({ page }) => {
+    await mockCloudEndpoint(page);
+    await page.setViewportSize({ width: 384, height: 768 });
+    await connectPreviewCloud(page);
+
+    const disconnectButton = page.getByRole('button', { name: 'Disconnect Cloud' });
+    await expect(disconnectButton).toBeVisible();
+    const bounds = await disconnectButton.boundingBox();
+    expect(bounds).not.toBeNull();
+    if (!bounds) throw new Error('Disconnect button should have a visible bounding box.');
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(384);
+
+    await page.locator('.connection-trigger').click();
+    await page.getByRole('dialog', { name: 'Data source options' })
+        .getByRole('button', { name: /ClickHouse Playground/ }).click();
+    await expect(page.locator('.connection-trigger')).toContainText('PLAYGROUND');
+    await expect(disconnectButton).toBeVisible();
+
+    await disconnectButton.click();
+    await expect(page.locator('.connection-trigger')).toContainText('PLAYGROUND');
+    await expect(page.getByRole('button', { name: 'Connect Cloud' })).toBeVisible();
+});
+
+test('Disconnecting the active Cloud source falls back to Playground', async ({ page }) => {
+    await mockCloudEndpoint(page);
+    await connectPreviewCloud(page);
+
+    await page.getByRole('button', { name: 'Disconnect Cloud' }).click();
+
+    await expect(page.locator('.connection-trigger')).toContainText('PLAYGROUND');
+    await expect(page.getByRole('button', { name: 'Connect Cloud' })).toBeVisible();
+});
 
 test('Static production preview loads the native parser and exports retained sample results', async ({ page }) => {
     const documentationRequests: string[] = [];
