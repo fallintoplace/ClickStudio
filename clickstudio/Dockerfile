@@ -4,7 +4,7 @@ COPY package*.json ./
 # The first offline delivery has no generated lock; commit one after npm install.
 RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 COPY . .
-RUN npm run build
+RUN npm run build:app
 
 FROM node:22-bookworm-slim AS runtime
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=8080 DATA_DIR=/app/.data
