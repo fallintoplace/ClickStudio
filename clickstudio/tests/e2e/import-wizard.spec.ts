@@ -278,3 +278,21 @@ test('Fixture workspace explains that imports never write sample data', async ({
     await expect(dialog.getByRole('status')).toContainText('This workspace never writes to a database');
     await expect(dialog.getByLabel('Choose a CSV, JSON, or NDJSON file')).toHaveCount(0);
 });
+
+test('Import wizard resets scroll when entering the mapping step', async ({ page }) => {
+    await mockWritableWorkspace(page);
+    await page.route('**/api/imports/preview', route => route.fulfill({ status: 201, json: {
+        id: 'input-1', name: 'events.csv', format: 'csv', columns: ['day', 'events'], rows: [{ day: '2026-01-01', events: '10' }, { day: '2026-01-02', events: '20' }], rowCount: 2,
+    } }));
+
+    await page.getByRole('button', { name: 'Import', exact: true }).click();
+    await page.setViewportSize({ width: 600, height: 450 });
+    const dialog = await previewCsv(page);
+    const main = dialog.locator('.import-wizard-main');
+    await main.evaluate(element => { element.scrollTop = element.scrollHeight; });
+    expect(await main.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+
+    await dialog.getByRole('button', { name: 'Map columns', exact: true }).click();
+    await expect(dialog.getByRole('region', { name: 'Map source columns' })).toBeVisible();
+    expect(await main.evaluate(element => element.scrollTop)).toBe(0);
+});

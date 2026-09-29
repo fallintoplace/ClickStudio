@@ -160,7 +160,7 @@ export function ImportWizard({ onImportQuery, ...controllerProps }: ImportWizard
                 })}
             </nav>}
 
-            <main className="import-wizard-main min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-7">
+            <main key={importKind === 'query' ? 'query' : step} className="import-wizard-main min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-7">
                 {importKind === 'query' ? <section aria-label="Import SQL query" className="space-y-4">
                     <div><h3 className="text-sm font-semibold">Open a SQL query file</h3><p className="mt-1 text-xs leading-relaxed text-[var(--text-soft)]">The file opens as a new draft. It will not run until you choose Run.</p></div>
                     <label className="import-query-picker block rounded-xl border border-dashed border-[var(--line-bright)] bg-[var(--page)] p-5 transition hover:border-[var(--accent)] sm:p-7">
