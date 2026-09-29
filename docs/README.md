@@ -1,39 +1,39 @@
-# ClickStudio documentation
+# ClickStudio docs
 
-Use these guides to run ClickStudio, learn its features, or review the implementation.
+Find guides to start ClickStudio, explore its features, and understand how it works.
 
 ## Start here
 
-1. [Repository README](../README.md): install the app, start it, and try a query.
-2. [Project highlights](PROJECT-STATUS.md): see what is implemented and the project's current scope.
-3. [Engineering choices](ENGINEERING-NOTES.md): understand the main design decisions.
+- [Main README](../README.md): setup, sample workspace, data sources, and AI.
+- [Project highlights](PROJECT-STATUS.md): features available in the app.
+- [Engineering choices](ENGINEERING-NOTES.md): how the app is designed.
 
-## Detailed guides
+## Guides
 
-| Guide | What you will learn |
+| Guide | Topics |
 | --- | --- |
-| [Setup and implementation reference](CLICKSTUDIO.md) | Setup, configuration, query runs, saved data, imports, the assistant, and tests. |
-| [SQL editing tools](EDITOR-TOOLS.md) | Move between statements, insert snippets, and use autocomplete. |
-| [Native exploration workflows](../clickstudio/docs/native-explorers.md) | Inspect materialized views, parts, merges, mutations, and query-run comparisons. |
-| [Map data](../clickstudio/web/geo-data.md) | Find the source and local file for the map background. |
-| [ClickHouse documentation data](../clickstudio/CLICKHOUSE-DOCS-NOTICE.md) | Find the source, license, and regeneration command for the offline reference. |
-| [ClickHouse native parser](../clickstudio/vendor/clickhouse-parser/SOURCE.md) | Find the parser's source revision, build details, and license. |
+| [Setup and implementation](CLICKSTUDIO.md) | Setup, settings, query runs, saved data, imports, AI, and checks. |
+| [SQL editing tools](EDITOR-TOOLS.md) | Statements, snippets, and autocomplete. |
+| [Explore ClickHouse](../clickstudio/docs/native-explorers.md) | Materialized views, data parts, merges, mutations, and query comparisons. |
+| [Map data](../clickstudio/web/geo-data.md) | Map background source and local file. |
+| [ClickHouse docs data](../clickstudio/CLICKHOUSE-DOCS-NOTICE.md) | Offline reference source, license, and update command. |
+| [ClickHouse parser](../clickstudio/vendor/clickhouse-parser/SOURCE.md) | Source revision, build steps, and license. |
 
-## Future ideas
+## Product ideas
 
-[Product exploration](product-roadmap/) describes possible future work, including collaboration, AI assistance, and team policies. These notes are not a release schedule or a promise that every feature is available. Use [Project highlights](PROJECT-STATUS.md) for implemented features.
+[Explore product ideas](product-roadmap/) for collaboration, AI support, and team settings. [Project highlights](PROJECT-STATUS.md) describes features available today.
 
 ## Common terms
 
-| Term | Meaning in these guides |
+| Term | Meaning |
 | --- | --- |
-| Connection profile | Server settings for a database connection, such as its address, database name, and user. |
-| Schema | The structure of a database, including its tables, columns, and data types. |
-| Parameter | A named value supplied to a query, such as `minimum` in `{minimum:UInt64}`. |
-| Run | One execution of a query, with its own ID and saved details. |
-| Execution evidence | Saved information about a run, such as its SQL, parameters, limits, results, and measurements. |
-| Snapshot | A saved copy of data at a particular point. It does not change when you edit the draft. |
-| Lineage | Links from a result, chart, or follow-up query back to the work that produced it. |
-| Deterministic sample data | Fixed example responses that stay the same for repeatable tours and tests. |
-| Reader and writer | Separate database users: one reads data; the other performs configured write operations. |
-| Playbook | A reusable set of instructions and expected outputs for an assistant task. |
+| Connection profile | Saved settings for one database connection. |
+| Schema | A database’s tables, columns, and data types. |
+| Parameter | A named value used by a query. |
+| Run | One query execution with saved details and results. |
+| Execution evidence | SQL, settings, results, and measurements saved for a run. |
+| Snapshot | A saved copy of data from one point in time. |
+| Lineage | Shows which query created a result or chart. |
+| Fixed sample data | Example data that gives the same results each time. |
+| Reader and writer | Database users for reading or writing data. |
+| Playbook | Instructions and expected results for an assistant task. |
