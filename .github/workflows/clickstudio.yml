@@ -74,7 +74,7 @@ jobs:
   clickhouse-integration:
     name: ClickHouse integration
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -91,20 +91,33 @@ jobs:
         run: CLICKHOUSE_INTEGRATION=1 npm run test:integration
       - name: Deterministic SQL evaluations
         run: npm run eval
+      - name: Build and start the full Docker Compose app
+        run: docker compose --profile app up -d --build
+      - name: Check containerized app health
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --max-time 3 http://127.0.0.1:8080/api/health > /dev/null; then
+              echo "ClickStudio API is healthy."
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose --profile app logs --no-color --tail=100 app
+          exit 1
       - name: Capture ClickHouse diagnostics
         if: ${{ failure() && steps.database.outcome != 'skipped' }}
-        run: docker compose logs --no-color > clickhouse-compose.log 2>&1 || true
+        run: docker compose --profile app logs --no-color > clickstudio-compose.log 2>&1 || true
       - name: Preserve ClickHouse diagnostics
         if: ${{ failure() && steps.database.outcome != 'skipped' }}
         uses: actions/upload-artifact@v4
         with:
-          name: clickstudio-clickhouse-diagnostics
-          path: clickstudio/clickhouse-compose.log
+          name: clickstudio-compose-diagnostics
+          path: clickstudio/clickstudio-compose.log
           if-no-files-found: ignore
           retention-days: 7
       - name: Stop local services
         if: ${{ always() && steps.database.outcome != 'skipped' }}
-        run: docker compose down -v
+        run: docker compose --profile app down -v
 
   browser-e2e:
     name: Browser E2E

@@ -58,7 +58,7 @@ Start with the sample workspace, then choose a live data source when you are rea
 
 ## Quick start
 
-Install **Node.js 22.12 or newer** and npm. Docker runs the optional local ClickHouse server.
+Install **Node.js 22.12 or newer** and npm. Docker can run the optional local ClickHouse server or the full app stack.
 
 From the repository folder, install the app and create your local settings file:
 
@@ -123,6 +123,14 @@ The setup adds sample data to `default.events`. Try this query:
     ORDER BY day;
 
 The menu beside **Run statement** has **EXPLAIN INDEXES**, **EXPLAIN PLAN**, **EXPLAIN PIPELINE**, and **EXPLAIN ANALYZE**. ClickHouse 26.7 or newer supports **EXPLAIN ANALYZE**. The bundled ClickHouse 24.6 server supports the other query plan views.
+
+### Full app with Docker Compose
+
+After creating `clickstudio/.env` above, stop `npm run dev` if it is still running, then run this from the `clickstudio` folder to start ClickStudio and its bundled ClickHouse database:
+
+    docker compose --profile app up --build
+
+Open http://localhost:8080 and sign in with `CLICKSTUDIO_TOKEN` from `.env`. Compose waits for ClickHouse, creates the sample tables and app users, then starts ClickStudio.
 
 ### Example files
 
