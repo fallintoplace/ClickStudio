@@ -1,7 +1,8 @@
-import type { Copy, Locale } from '../i18n';
-import type { SqlExample, SqlExampleCategory } from '../sql-examples';
-import { localizeSqlExample, localizeSqlExampleCategory } from '../sql-examples-locales';
-import type { IconName } from './ui';
+import type { Copy, Locale } from '../i18n.js';
+import type { SqlExample, SqlExampleCategory } from '../sql-examples.js';
+import { localizeSqlExample, localizeSqlExampleCategory } from '../sql-examples-locales.js';
+
+type HelpSectionIcon = 'help' | 'examples' | 'play' | 'assistant' | 'observability' | 'parser' | 'chart' | 'bolt' | 'database' | 'pipeline' | 'history' | 'reference';
 
 export type HelpPanelSection = 'tour' | 'examples' | 'workflows' | 'assistant' | 'monitoring' | 'query' | 'geo' | 'explain' | 'storage' | 'dependencies' | 'compare' | 'reference';
 export type CategoryFilter = SqlExampleCategory | 'charts' | 'all' | 'featured';
@@ -61,7 +62,8 @@ export type HelpSectionDefinition = {
     id: HelpPanelSection;
     label: string;
     description: string;
-    icon: IconName;
+    icon: HelpSectionIcon;
+    experimental?: boolean;
 };
 
 export function helpSections(copy: Copy['common']): HelpSectionDefinition[] {
@@ -71,12 +73,12 @@ export function helpSections(copy: Copy['common']): HelpSectionDefinition[] {
         { id: 'workflows', label: copy.helpQueryWorkflows, description: copy.helpQueryWorkflowsDescription, icon: 'play' },
         { id: 'assistant', label: copy.helpAssistant, description: copy.helpAssistantDescription, icon: 'assistant' },
         { id: 'monitoring', label: copy.helpMonitoring, description: copy.helpMonitoringDescription, icon: 'observability' },
-        { id: 'query', label: copy.helpQueryEngine, description: copy.helpQueryEngineDescription, icon: 'parser' },
-        { id: 'geo', label: copy.helpGeo, description: copy.helpGeoDescription, icon: 'chart' },
-        { id: 'explain', label: copy.helpExplain, description: copy.helpExplainDescription, icon: 'bolt' },
-        { id: 'storage', label: copy.helpStorage, description: copy.helpStorageDescription, icon: 'database' },
-        { id: 'dependencies', label: copy.helpDependencies, description: copy.helpDependenciesDescription, icon: 'pipeline' },
-        { id: 'compare', label: copy.helpCompareRuns, description: copy.helpCompareRunsDescription, icon: 'history' },
         { id: 'reference', label: copy.helpReference, description: copy.helpReferenceDescription, icon: 'reference' },
+        { id: 'query', label: copy.helpQueryEngine, description: copy.helpQueryEngineDescription, icon: 'parser', experimental: true },
+        { id: 'geo', label: copy.helpGeo, description: copy.helpGeoDescription, icon: 'chart', experimental: true },
+        { id: 'explain', label: copy.helpExplain, description: copy.helpExplainDescription, icon: 'bolt', experimental: true },
+        { id: 'storage', label: copy.helpStorage, description: copy.helpStorageDescription, icon: 'database', experimental: true },
+        { id: 'dependencies', label: copy.helpDependencies, description: copy.helpDependenciesDescription, icon: 'pipeline', experimental: true },
+        { id: 'compare', label: copy.helpCompareRuns, description: copy.helpCompareRunsDescription, icon: 'history', experimental: true },
     ];
 }

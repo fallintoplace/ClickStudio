@@ -951,6 +951,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
                             examples={sqlExamples}
                             sourceLabel={connectionLabel}
                             copy={copy.common}
+                            experimentalLabel={copy.app.expert}
                             locale={locale}
                             connection={connection}
                             databases={schema?.databases ?? [connection.database]}

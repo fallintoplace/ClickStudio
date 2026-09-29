@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import type { SchemaTable } from '../../shared/types';
 import type { Copy, Locale } from '../i18n';
 import type { SqlExample } from '../sql-examples';
@@ -60,6 +60,7 @@ type WorkspaceHelpPanelProps = {
     examples: SqlExample[];
     sourceLabel: string;
     copy: Copy['common'];
+    experimentalLabel: string;
     locale: Locale;
     open: boolean;
     section: HelpPanelSection;
@@ -88,7 +89,7 @@ type WorkspaceHelpPanelProps = {
 
 export function WorkspaceHelpPanel(props: WorkspaceHelpPanelProps) {
     const {
-        examples, sourceLabel, copy, locale, open, section, onSectionChange, onClose, onOpenExample,
+        examples, sourceLabel, copy, experimentalLabel, locale, open, section, onSectionChange, onClose, onOpenExample,
         onRunExample, onStartBlankSql, onOpenMonitoring, onOpenAssistant, connection,
         databases = [props.connection.database], tables, schemaLoaded, schemaLoading, schemaError,
         onRefreshSchema, trusted, queryEngine, busy, unsupportedParameters, onRunExplain, comparison, onReferenceInsert,
@@ -238,6 +239,14 @@ export function WorkspaceHelpPanel(props: WorkspaceHelpPanelProps) {
 
     const renderTabPanel = (id: HelpPanelSection, className: string, children: ReactNode) =>
         <div id={'workspace-help-panel-' + id} className={cx('workspace-help-tabpanel', className)} role="tabpanel" aria-labelledby={'workspace-help-tab-' + id} hidden={section !== id}>{children}</div>;
+    const tourSections = sections.filter(item => item.id !== 'tour');
+    const standardTourSections = tourSections.filter(item => !item.experimental);
+    const experimentalTourSections = tourSections.filter(item => item.experimental);
+    const renderTourCard = (item: typeof sections[number]) => <button type="button" key={item.id} className="workspace-help-feature-card" onClick={() => onSectionChange(item.id)}>
+        <span className="workspace-help-feature-icon"><Icon name={item.icon}/></span>
+        <span className="workspace-help-feature-copy"><strong>{item.label}</strong><small>{item.description}</small></span>
+        <span className="workspace-help-feature-arrow">›</span>
+    </button>;
 
     return <>
         {open && <OverlayPortal><div className="workspace-help-backdrop" onClick={event => {
@@ -253,31 +262,34 @@ export function WorkspaceHelpPanel(props: WorkspaceHelpPanelProps) {
                 </header>
                 <div className="workspace-help-body">
                     <div className="workspace-help-tabs" role="tablist" aria-label={copy.helpPanelSections}>
-                        {sections.map(item => <button
-                            key={item.id}
+                        {sections.map((item, index) => <Fragment key={item.id}>
+                            {item.experimental && !sections[index - 1]?.experimental && <div className="workspace-help-tabs-group-label" role="presentation" aria-hidden="true"><span className="workspace-help-experimental-indicator"/>{experimentalLabel}</div>}
+                            <button
                             ref={element => { if (element) tabRefs.current.set(item.id, element); else tabRefs.current.delete(item.id); }}
                             id={'workspace-help-tab-' + item.id}
                             data-testid={'help-section-' + item.id}
                             type="button"
                             role="tab"
+                            aria-label={item.experimental ? `${experimentalLabel}: ${item.label}` : item.label}
                             aria-selected={section === item.id}
                             aria-controls={'workspace-help-panel-' + item.id}
                             tabIndex={section === item.id ? 0 : -1}
-                            className={cx('workspace-help-tab', section === item.id && 'is-active')}
+                            className={cx('workspace-help-tab', item.experimental && 'is-experimental', section === item.id && 'is-active')}
                             onClick={() => onSectionChange(item.id)}
                             onKeyDown={event => handleTabKeyDown(event, item.id)}
-                        ><Icon name={item.icon}/><span><strong>{item.label}</strong><small>{item.description}</small></span></button>)}
+                            ><Icon name={item.icon}/><span className="workspace-help-tab-copy"><span className="workspace-help-tab-title"><strong>{item.label}</strong>{item.experimental && <span className="workspace-help-tab-short-tag" aria-hidden="true">EXP</span>}</span><small>{item.description}</small></span></button>
+                        </Fragment>)}
                     </div>
                     <div className="workspace-help-content">
                         {renderTabPanel('tour', 'workspace-help-tour', <>
                             <HelpSectionHeading eyebrow="CLICKSTUDIO TOUR" title={copy.helpTourTitle} description={copy.helpTourDescription}/>
                             <div className="workspace-help-feature-grid">
-                                {sections.filter(item => item.id !== 'tour').map(item => <button type="button" key={item.id} className="workspace-help-feature-card" onClick={() => onSectionChange(item.id)}>
-                                    <span className="workspace-help-feature-icon"><Icon name={item.icon}/></span>
-                                    <span className="workspace-help-feature-copy"><strong>{item.label}</strong><small>{item.description}</small></span>
-                                    <span className="workspace-help-feature-arrow">›</span>
-                                </button>)}
+                                {standardTourSections.map(renderTourCard)}
                             </div>
+                            {experimentalTourSections.length > 0 && <section className="workspace-help-tour-experimental" aria-label={experimentalLabel}>
+                                <h4 className="workspace-help-tour-experimental-heading"><span className="workspace-help-experimental-label"><Icon name="bolt"/>{experimentalLabel}</span></h4>
+                                <div className="workspace-help-feature-grid">{experimentalTourSections.map(renderTourCard)}</div>
+                            </section>}
                         </>)}
 
                         {renderTabPanel('workflows', 'workspace-help-feature-view workspace-help-workflows', section === 'workflows' ? <>

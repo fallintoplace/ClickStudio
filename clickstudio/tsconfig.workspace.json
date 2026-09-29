@@ -29,6 +29,7 @@
     "web/cloud-import.ts",
     "web/sql-examples.ts",
     "web/sql-examples-locales.ts",
+    "web/components/workspace-help-model.ts",
     "web/i18n.ts",
     "shared/evidence.ts",
     "shared/workspace-view.ts",
