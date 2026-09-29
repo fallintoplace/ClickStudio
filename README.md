@@ -8,6 +8,10 @@ The app uses React, Click UI, and CodeMirror. The server sets limits for query t
 
 ## Explore ClickStudio
 
+![ClickStudio workspace with an SQL editor, query results, and AI panel](docs/images/clickstudio-workspace.png)
+
+*Write queries, review results, and ask the AI assistant in one workspace.*
+
 Start with the sample workspace, then choose a live data source when you are ready:
 
 - **ClickHouse Playground** runs SQL on public data with read-only access.
