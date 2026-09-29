@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, message, post } from './api';
 import { Button, cx, Icon, SelectControl } from './components/ui';
 import { CloudConnectionDialog } from './components/CloudConnectionDialog';
-import { CLICKHOUSE_CLOUD_CONNECTION_ID, disconnectClickHouseCloud } from './cloud-connection';
+import { CLICKHOUSE_CLOUD_CONNECTION_ID, disconnectClickHouseCloud, type SavedCloudConnectionProfile } from './cloud-connection';
 import { Workspace } from './Workspace';
 import { experienceOptions, getCopy, localeOptions, resolveLocale, themeAppearance, themeOptions, type ExperienceLevel, type Locale, type Theme } from './i18n';
 import { RadioGroup } from '@clickhouse/click-ui/RadioGroup';
@@ -25,6 +25,16 @@ const pref = <T extends string>(key: string, values: readonly T[], fallback: T):
 const browserLocales = (): readonly string[] => typeof navigator === 'undefined'
     ? []
     : navigator.languages.length ? navigator.languages : [navigator.language];
+
+function cloudProfileDefaults(connection?: Connected): SavedCloudConnectionProfile | undefined {
+    if (!connection) return undefined;
+    try {
+        const host = new URL(connection.host);
+        if (!host.hostname.toLowerCase().endsWith('.clickhouse.cloud')) return undefined;
+        return { host: host.origin, database: connection.database, username: connection.username };
+    }
+    catch { return undefined; }
+}
 
 function App() {
     const [locale, setLocale] = useState<Locale>(() => resolveLocale(storedPreference('clickstudio:locale'), ...browserLocales()));
@@ -173,7 +183,7 @@ function App() {
                             </button>)}
                         </div>}
                     </div>
-                    {hasPreviewSourceSwitcher && <div className="connection-menu-footer"><Button variant="secondary" className="connection-menu-action cloud-connect-trigger" onClick={() => { setConnectionPicker(false); setCloudDialogOpen(true); }}>{isCloudConnection ? 'Change Cloud service' : 'Connect ClickHouse Cloud'}</Button></div>}
+                    {(!session.demo || hasPreviewSourceSwitcher) && <div className="connection-menu-footer"><Button variant="secondary" className="connection-menu-action cloud-connect-trigger" onClick={() => { setConnectionPicker(false); setCloudDialogOpen(true); }}>{isCloudConnection ? 'Change Cloud service' : 'Connect ClickHouse Cloud'}</Button></div>}
                 </div>}
             </div>
             <div className="topbar-spacer"/>
@@ -223,7 +233,7 @@ function App() {
             </div>
         </header>
         {connection ? <Workspace key={connection.id} connection={connection} connectionLabel={connectionLabel(connection, session.demo)} connections={connections} onSelectConnection={selectConnection} onRefreshConnections={async () => { const latest = await api<Connected[]>('/connections'); setConnections(latest); }} trustActionRef={trustActionRef} testConnectionActionRef={testConnectionActionRef} demoMode={session.demo} experience={experience} nativeParserEnabled={parserMode === 'wasm'} dark={dark} copy={copy} locale={locale}/> : <div className="empty-connection"><Icon name="schema"/><h1>{copy.app.name}</h1><p>No connection profiles are configured for this workspace.</p></div>}
-        {cloudDialogOpen && <CloudConnectionDialog onClose={() => setCloudDialogOpen(false)} onConnect={connectCloud}/>}
+        {cloudDialogOpen && <CloudConnectionDialog initialProfile={cloudProfileDefaults(connection)} onClose={() => setCloudDialogOpen(false)} onConnect={connectCloud}/>}
     </div>;
 }
 

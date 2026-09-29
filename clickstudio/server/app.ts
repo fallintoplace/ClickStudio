@@ -3,6 +3,8 @@ import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { Readable } from 'node:stream';
+import cloudApi from '../api/cloud.js';
 import type { AssistantAction, AuditEvent, ClickHouseDocumentationEntry, ClickHouseDocumentationSummary, Principal, Run, Schema } from '../shared/types.js';
 import type { QueryDriver } from '../core/runs.js';
 import { RunService, terminal } from '../core/runs.js';
@@ -186,6 +188,37 @@ function configureHttp(app: Express, config: Config, runs: RunService, artifacts
         }
     });
 }
+
+function registerCloudApi(app: Express) {
+    app.post('/api/cloud', async (req, res, next) => {
+        try {
+            const host = req.get('host') ?? '127.0.0.1';
+            const url = new URL(req.originalUrl, `${req.protocol}://${host}`);
+            const headers = new Headers();
+            const origin = req.get('origin');
+            const contentType = req.get('content-type') ?? '';
+            if (origin)
+                headers.set('origin', origin);
+            if (contentType)
+                headers.set('content-type', contentType);
+            const init: RequestInit & { duplex?: 'half' } = { method: req.method, headers };
+            if (contentType.toLowerCase().startsWith('multipart/form-data')) {
+                init.body = Readable.toWeb(req) as ReadableStream;
+                init.duplex = 'half';
+            }
+            else if (contentType.toLowerCase().startsWith('application/json')) {
+                init.body = JSON.stringify(req.body ?? {});
+            }
+            const response = await cloudApi.fetch(new Request(url, init));
+            response.headers.forEach((value, name) => res.setHeader(name, value));
+            res.status(response.status).send(Buffer.from(await response.arrayBuffer()));
+        }
+        catch (error) {
+            next(error);
+        }
+    });
+}
+
 export function createApp(config: Config, overrides: {
     store?: Store;
     driver?: Driver;
@@ -202,6 +235,7 @@ export function createApp(config: Config, overrides: {
     const secretFree = (value: unknown) => !configuredSecrets(config).some(secret => JSON.stringify(value).includes(secret));
     const safeExport = (value: unknown) => requireThat(secretFree(value), 400, 'SECRET_IN_EXPORT', 'This data contains a configured secret and cannot be exported or shared');
     configureHttp(app, config, runs, artifacts, sessions, parserWasm);
+    registerCloudApi(app);
     app.get('/api/connections', (_req, res) => { const p = principal(res); res.json(driver.connections(p).map(c => ({ ...c, trusted: runs.isTrusted(p, c.id) }))); });
     app.post('/api/connections/:id/test', async (req, res) => { canWrite(principal(res)); res.json(await driver.test(id(req))); });
     app.post('/api/connections/:id/trust', (req, res) => { const p = principal(res), v = body(req), connectionId = id(req); requireThat(v.confirmation === connectionId, 400, 'TRUST_CONFIRMATION', 'Confirm the selected connection ID'); runs.trust(p, connectionId, boolean(v.trusted, 'trusted')); res.json({ trusted: runs.isTrusted(p, connectionId) }); });

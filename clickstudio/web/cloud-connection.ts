@@ -54,7 +54,7 @@ async function requestCloud<T>(body: Record<string, unknown>, signal?: AbortSign
     const response = await fetch('/api/cloud', {
         method: 'POST',
         credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-ClickStudio-Intent': '1' },
         body: JSON.stringify(body),
         ...(signal ? { signal } : {}),
     });
@@ -72,7 +72,7 @@ async function requestCloud<T>(body: Record<string, unknown>, signal?: AbortSign
 }
 
 async function requestCloudImport<T>(form: FormData): Promise<T> {
-    const response = await fetch('/api/cloud', { method: 'POST', credentials: 'same-origin', body: form });
+    const response = await fetch('/api/cloud', { method: 'POST', credentials: 'same-origin', headers: { 'X-ClickStudio-Intent': '1' }, body: form });
     const payload: unknown = await response.json().catch(() => null);
     if (!response.ok) {
         const root = typeof payload === 'object' && payload !== null ? payload as Record<string, unknown> : {};

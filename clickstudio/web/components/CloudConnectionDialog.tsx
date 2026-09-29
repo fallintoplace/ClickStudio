@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import type { Connection } from '../../shared/types';
-import { connectClickHouseCloud, loadSavedCloudConnectionProfile, saveCloudConnectionProfile, type CloudCredentials } from '../cloud-connection';
+import { connectClickHouseCloud, loadSavedCloudConnectionProfile, saveCloudConnectionProfile, type CloudCredentials, type SavedCloudConnectionProfile } from '../cloud-connection';
 import type { Connected } from '../workspace-types';
 import { Button, Icon } from './ui';
 import { OverlayPortal } from './OverlayPortal';
 
-export function CloudConnectionDialog({ onClose, onConnect }: { onClose: () => void; onConnect: (connection: Connection & { trusted: boolean }) => void }) {
-    const [savedProfile] = useState(loadSavedCloudConnectionProfile);
+export function CloudConnectionDialog({ onClose, onConnect, initialProfile }: { onClose: () => void; onConnect: (connection: Connection & { trusted: boolean }) => void; initialProfile?: SavedCloudConnectionProfile }) {
+    const [savedProfile] = useState(() => loadSavedCloudConnectionProfile() ?? initialProfile);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
     const dialog = useRef<HTMLElement>(null);
@@ -72,7 +72,7 @@ export function CloudConnectionDialog({ onClose, onConnect }: { onClose: () => v
                         <label className="field-label">Username<input className="field-input" name="username" defaultValue={savedProfile?.username ?? 'default'} autoComplete="username" required/></label>
                     </div>
                     <label className="field-label">Password<input className="field-input" name="password" type="password" autoComplete="current-password" required/></label>
-                    <div className="cloud-connect-notice"><Icon name="lock"/><span>The host, database, and username from your last successful connection are saved in this browser. ClickStudio never saves the password; your browser’s password manager can fill it after a refresh. The password stays in this tab’s memory, is sent over HTTPS with each request, and is cleared on reload or disconnect. Your ClickHouse user’s permissions control what SQL can change.</span></div>
+                    <div className="cloud-connect-notice"><Icon name="lock"/><span>The host, database, and username are saved in this browser. The password stays in this tab’s memory and is sent to this ClickStudio server, which connects to Cloud over HTTPS. It is cleared on reload or disconnect. Your ClickHouse user’s permissions control what SQL can change.</span></div>
                     {error && <div className="callout callout-error cloud-connect-error" role="alert">{error}</div>}
                     <div className="cloud-connect-actions"><Button variant="secondary" disabled={busy} onClick={onClose}>Cancel</Button><Button variant="primary" type="submit" disabled={busy}>{busy ? <><span className="loading-orbit" aria-hidden="true"/> Connecting…</> : 'Connect service'}</Button></div>
                 </form>
