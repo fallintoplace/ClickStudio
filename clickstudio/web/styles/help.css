@@ -105,14 +105,14 @@
 
     .sql-example-blank {
         display: inline-flex;
-        min-height: var(--help-control-height);
+        min-height: 40px;
         align-items: center;
         gap: 7px;
-        padding: 0 12px;
+        padding: 0 15px;
         font-size: var(--help-text-small);
     }
 
-    .sql-example-blank svg { width: 15px; height: 15px; }
+    .sql-example-blank svg { width: 16px; height: 16px; }
 
     .workspace-help-close {
         display: grid;
@@ -539,7 +539,7 @@
     .workspace-help-header h2 { font-size: 18px; }
     .workspace-help-header p { max-width: 270px; }
     .workspace-help-header-actions { gap: 6px; }
-    .sql-example-blank { min-height: 34px; padding: 0 9px; }
+    .sql-example-blank { min-height: 36px; padding: 0 10px; }
     .workspace-help-close { width: 34px; height: 34px; }
     .workspace-help-tabs { padding: 6px 8px; }
     .workspace-help-tab { min-height: 36px; padding: 5px 8px; }

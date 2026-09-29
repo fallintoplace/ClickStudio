@@ -256,7 +256,7 @@ export function WorkspaceHelpPanel(props: WorkspaceHelpPanelProps) {
                 <header className="workspace-help-header">
                     <div><span className="eyebrow">{sourceLabel}</span><h2 id="workspace-help-title">{copy.helpCenterTitle}</h2><p>{copy.helpCenterDescription}</p></div>
                     <div className="workspace-help-header-actions">
-                        <Button variant="secondary" className="sql-example-blank" data-testid="blank-sql" onClick={() => { if (onStartBlankSql()) onClose(false); }}><Icon name="plus"/>{copy.startBlankSql}</Button>
+                        <Button variant="primary" className="sql-example-blank" data-testid="blank-sql" onClick={() => { if (onStartBlankSql()) onClose(false); }}><Icon name="plus"/>{copy.startBlankSql}</Button>
                         <button type="button" className="workspace-help-close" aria-label={copy.closeHelp} title={copy.closeHelp} onClick={() => onClose()}><Icon name="close"/></button>
                     </div>
                 </header>
