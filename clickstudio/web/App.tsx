@@ -155,7 +155,7 @@ function App() {
                 <button className="connection-trigger" type="button" aria-haspopup="dialog" aria-expanded={connectionPicker} aria-controls="connection-menu" onClick={() => setConnectionPicker(value => !value)}>
                     <span className={cx('connection-env', isSampleData && 'is-demo', isPlayground && 'is-playground', isCloudConnection && 'is-cloud')} title={isSampleData ? 'Sample rows are generated in this browser.' : isPlayground ? 'SQL runs on the public ClickHouse Playground with read-only access.' : undefined}><span className={cx('status-light', isSampleData || !connection?.trusted ? 'is-warning' : 'is-trusted')}/>{isSampleData ? 'SAMPLE DATA' : isPlayground ? 'PLAYGROUND' : isCloudConnection ? 'CLICKHOUSE CLOUD' : 'LIVE CONNECTION'}</span>
                     {isPlayground && <span className="connection-quick-status is-ready">{copy.common.readOnly}</span>}
-                    {(!session.demo || isCloudConnection) && <span className={cx('connection-quick-status', connection?.trusted && !connectionNeedsTest ? 'is-ready' : 'is-review')}>{connectionStatus}</span>}
+                    {(!session.demo || isCloudConnection) && !isPlayground && <span className={cx('connection-quick-status', connection?.trusted && !connectionNeedsTest ? 'is-ready' : 'is-review')}>{connectionStatus}</span>}
                     <strong title={connection?.name}>{connection ? isPlayground ? 'ClickHouse' : connectionLabel(connection, session.demo) : 'Choose connection'}</strong>
                     <span className="connection-database">{connection?.database ?? '—'} <Icon name="chevron"/></span>
                 </button>
