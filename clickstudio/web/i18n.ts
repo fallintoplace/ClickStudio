@@ -9,6 +9,7 @@ import {
     referenceCatalogTranslations,
     referenceTranslations,
     emptyWorkspaceTranslations,
+    importTranslations,
     translations,
     workspaceCommonTranslations,
 } from './i18n-translations.js';
@@ -76,6 +77,7 @@ export function getCopy(locale: Locale): Copy {
     return {
         app: { ...mergeSection(english.app, translated), ...chrome.app },
         auth: { ...mergeSection(english.auth, translated), ...chrome.auth },
+        imports: mergeSection(english.imports, importTranslations[locale] ?? {}),
         common: { ...mergeSection(english.common, translated), ...exampleCommonTranslations[locale], ...workspaceCommonTranslations[locale], ...referenceTranslations[locale], ...referenceCatalogTranslations[locale], ...objectExplorerTranslations[locale], ...explainCommonTranslations[locale], ...emptyWorkspaceTranslations[locale] },
         chart: mergeSection(english.chart, translated),
     };

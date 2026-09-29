@@ -12,11 +12,63 @@ function aiFixture(content = proposal) { const store = new MemoryStore(); let ca
 function imageDataUri(size = 1_900_000) { const data = Buffer.alloc(size); Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]).copy(data); return `data:image/png;base64,${data.toString('base64')}`; }
 test('CSV handles BOM, quoted commas, CRLF and multiline cells', () => { const p = parseCsv('\ufeffn,label\r\n1,"a,b"\r\n2,"two\nlines"\r\n'); assert.equal(p.rows[0].label, 'a,b'); assert.equal(p.rows[1].label, 'two\nlines'); });
 test('CSV handles escaped quotes', () => assert.equal(parseCsv('n\n"say ""hi"""').rows[0].n, 'say "hi"'));
+test('CSV keeps prototype-like header names as own fields', () => { const row = parseCsv('__proto__,constructor\nvalue,other').rows[0]; assert.equal(Object.hasOwn(row, '__proto__'), true); assert.equal(row.__proto__, 'value'); assert.equal(Object.hasOwn(row, 'constructor'), true); });
 for (const csv of ['a,a\n1,2', 'a,b\n1', 'a\n"oops', 'a\n"quoted"tail'])
     test(`CSV invalid input ${csv}`, () => assert.throws(() => parseCsv(csv)));
 test('JSON nested values retain structure and large integer strings', () => { const p = parseInput('[{"id":"18446744073709551615","v":[1,null]}]', 'json'); assert.equal(p.rows[0].id, '18446744073709551615'); assert.deepEqual(p.rows[0].v, [1, null]); });
 test('JSON unsafe numeric imports reject', () => assert.throws(() => parseInput('[{"id":18446744073709551615}]', 'json'), { code: 'UNSAFE_NUMBER' }));
 test('Import preview has no write side effect; commit is idempotent', async () => { let inserts = 0; const driver = { schema: async () => schema, allowed: () => true, insert: async () => { inserts++; } }; const imports = new ImportService(new MemoryStore(), driver, () => true); const input = imports.preview(owner, 'a.csv', 'n\n1\n2', 'csv'); assert.equal(inserts, 0); const map = await imports.map(owner, input.id, 'local', 'default.events', { n: 'n' }); assert.equal(inserts, 0); assert.throws(() => imports.get(other, input.id), { code: 'NOT_FOUND' }); const [a, b] = await Promise.all([imports.commit(owner, map.id), imports.commit(owner, map.id)]); assert.equal(a.id, b.id); assert.equal(inserts, 1); });
+test('Sparse JSON rows omit missing nullable fields and report their counts', async () => {
+    let insertedRows;
+    const targetSchema = { ...schema, columns: [
+        ...schema.columns,
+        { database: 'default', table: 'events', name: 'label', type: 'Nullable(String)', defaultKind: '', comment: '' },
+        { database: 'default', table: 'events', name: 'created_at', type: 'DateTime', defaultKind: 'DEFAULT', comment: '' },
+    ] };
+    const imports = new ImportService(new MemoryStore(), { schema: async () => targetSchema, allowed: () => true, insert: async (_connection, _table, rows) => { insertedRows = rows; } }, () => true);
+    const input = imports.preview(owner, 'events.json', '[{"n":1,"label":"first"},{"n":2}]', 'json');
+    const mapping = await imports.map(owner, input.id, 'local', 'default.events', { n: 'n', label: 'label' });
+
+    assert.deepEqual({ ...mapping.missingFields }, { label: 1 });
+    assert.equal(Object.hasOwn(mapping.rows[1], 'label'), false);
+    assert.equal(Object.hasOwn(mapping.rows[1], 'created_at'), false);
+    assert.equal((await imports.commit(owner, mapping.id)).status, 'succeeded');
+    assert.equal(Object.hasOwn(insertedRows[1], 'label'), false);
+    assert.equal(Object.hasOwn(insertedRows[1], 'created_at'), false);
+});
+test('Import mapping blocks omitted required target columns', async () => {
+    const targetSchema = { ...schema, columns: [
+        ...schema.columns,
+        { database: 'default', table: 'events', name: 'required_label', type: 'String', defaultKind: '', comment: '' },
+    ] };
+    const imports = new ImportService(new MemoryStore(), { schema: async () => targetSchema, allowed: () => true }, () => true);
+    const input = imports.preview(owner, 'events.csv', 'n\n1', 'csv');
+
+    await assert.rejects(imports.map(owner, input.id, 'local', 'default.events', { n: 'n' }), { code: 'IMPORT_REQUIRED_COLUMNS' });
+});
+test('Import mapping treats nested nullable values as a required array column', async () => {
+    const targetSchema = { ...schema, columns: [
+        ...schema.columns,
+        { database: 'default', table: 'events', name: 'items', type: 'Array(Nullable(String))', defaultKind: '', comment: '' },
+    ] };
+    const imports = new ImportService(new MemoryStore(), { schema: async () => targetSchema, allowed: () => true }, () => true);
+    const input = imports.preview(owner, 'events.csv', 'n\n1', 'csv');
+
+    await assert.rejects(imports.map(owner, input.id, 'local', 'default.events', { n: 'n' }), { code: 'IMPORT_REQUIRED_COLUMNS' });
+});
+test('Import mapping rejects explicit null for non-nullable destinations but preserves nullable nulls', async () => {
+    const targetSchema = { ...schema, columns: [
+        ...schema.columns,
+        { database: 'default', table: 'events', name: 'label', type: 'Nullable(String)', defaultKind: '', comment: '' },
+    ] };
+    const imports = new ImportService(new MemoryStore(), { schema: async () => targetSchema, allowed: () => true }, () => true);
+    const invalid = imports.preview(owner, 'events.json', '[{"n":null}]', 'json');
+    const valid = imports.preview(owner, 'label.json', '[{"n":1,"label":null}]', 'json');
+
+    await assert.rejects(imports.map(owner, invalid.id, 'local', 'default.events', { n: 'n' }), { code: 'IMPORT_NULL_VALUE' });
+    const mapping = await imports.map(owner, valid.id, 'local', 'default.events', { n: 'n', label: 'label' });
+    assert.equal(mapping.rows[0].label, null);
+});
 test('Concurrent imports to the same table recheck the write guard after schema loading', async () => {
     let schemaCalls = 0, inserts = 0, releaseSchema;
     let pauseSchema = false;

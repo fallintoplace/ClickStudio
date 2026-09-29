@@ -346,7 +346,7 @@ test('ClickHouse Cloud import maps and inserts into an existing table without ty
     await dialog.getByRole('button', { name: 'Review import' }).click();
     await dialog.getByRole('button', { name: 'Import rows', exact: true }).click();
 
-    await expect(dialog).toContainText('Inserted 2 rows into default.events');
+    await expect(dialog).toContainText('2 source rows processed successfully');
     expect(imports).toHaveLength(1);
     expect(imports[0]).toContain('name="file"; filename="events.csv"');
     expect(imports[0]).not.toContain('name="confirmation"');
@@ -446,7 +446,7 @@ test('ClickHouse Cloud import creates a table with editable inferred columns', a
     await expect(generatedIdRow).toContainText('UInt64');
     await dialog.getByRole('button', { name: 'Create table and import' }).click();
 
-    await expect(dialog).toContainText('Inserted 2 rows into default.interview_events');
+    await expect(dialog).toContainText('2 source rows processed successfully');
     const createTable = imports[0]?.match(/name="createTable"\r\n\r\n([^\r\n]+)/)?.[1];
     expect(createTable).toBeTruthy();
     expect(JSON.parse(createTable!)).toMatchObject({ name: 'interview_events', generateId: true, columns: [{ source: 'day', name: 'event_day', type: 'Date' }, { source: 'events', name: 'events', type: 'UInt64' }] });
@@ -468,7 +468,7 @@ test('ClickHouse Cloud import refreshes and reveals the created table', async ({
     await dialog.getByRole('radio', { name: /Create a table/ }).check();
     await dialog.getByRole('button', { name: 'Review import' }).click();
     await dialog.getByRole('button', { name: 'Create table and import' }).click();
-    await expect(dialog).toContainText('Inserted 1 row into default.interview_events');
+    await expect(dialog).toContainText('1 source row processed successfully');
     await expect.poll(() => schemaRefreshesAfterImport).toBeGreaterThan(0);
 
     await dialog.getByRole('button', { name: 'Done' }).click();
@@ -496,7 +496,7 @@ test('ClickHouse Cloud insert row leaves defaulted columns out and needs no type
     await expect(dialog.locator('pre')).not.toContainText('created_at');
     await dialog.getByRole('button', { name: 'Insert row', exact: true }).click();
 
-    await expect(dialog).toContainText('Inserted one row into default.events.');
+    await expect(dialog).toContainText('ClickHouse acknowledged an insert request containing one row for default.events');
     expect(imports).toHaveLength(1);
     expect(imports[0]).not.toContain('name="confirmation"');
     expect(imports[0]).toContain('name="fields"\r\n\r\n{"day":"day","events":"events"}');
@@ -527,7 +527,7 @@ test('ClickHouse Cloud can create a table from a file when no tables exist', asy
     await dialog.getByRole('button', { name: 'Review import' }).click();
     await dialog.getByRole('button', { name: 'Create table and import' }).click();
 
-    await expect(dialog).toContainText('Inserted 1 row into default.events');
+    await expect(dialog).toContainText('1 source row processed successfully');
     expect(imports).toHaveLength(1);
     const createTable = imports[0]?.match(/name="createTable"\r\n\r\n([^\r\n]+)/)?.[1];
     expect(JSON.parse(createTable!)).toMatchObject({ name: 'events', generateId: true });
@@ -593,7 +593,7 @@ test('ClickHouse Cloud import can be closed and forgotten so another file can be
     await dialog.getByRole('button', { name: 'Review import' }).click();
     await dialog.getByRole('button', { name: 'Import rows', exact: true }).click();
 
-    await expect(dialog).toContainText('Inserted 1 row into default.events');
+    await expect(dialog).toContainText('1 source row processed successfully');
     expect(imports).toHaveLength(2);
     expect(imports[0]).toContain('filename="stuck.csv"');
     expect(imports[1]).toContain('filename="other.csv"');

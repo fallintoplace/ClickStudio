@@ -4,6 +4,7 @@ import { AppError } from '../core/errors.js';
 import { cloudResultStreamQuery } from '../core/cloud-query.js';
 import { collectCompactStream } from '../core/compact-stream.js';
 import { parseInput } from '../core/imports.js';
+import { ImportMappingError, mapImportRows } from '../core/import-mapping.js';
 import type { Capability, ClickHouseDocumentationEntry, ClickHouseDocumentationSummary, Column, Json, Row, Schema, SchemaColumn, SchemaTable } from '../shared/types.js';
 import { lexSql, quoteIdentifier, quoteStringLiteral, splitSql } from '../shared/sql.js';
 import { buildReferenceEntryQuery, buildReferenceSearchQuery, isReferenceCategory } from '../shared/reference.js';
@@ -661,7 +662,7 @@ async function commitCloudImport(form: FormData, credentials: CloudCredentials, 
             if (!database.length) throw new AppError(403, 'IMPORT_DATABASE', 'The selected database is not visible to this Cloud user.');
             if (existing.length) throw new AppError(409, 'TABLE_EXISTS', 'A table with this name already exists. Choose an existing table or a different name.');
         } finally { await client.close(); }
-        destinationColumns = createColumns.map(column => ({ database: tableDatabase, table: tableName, name: column.name, type: column.type, defaultKind: '', comment: '' }));
+        destinationColumns = createColumns.map(column => ({ database: tableDatabase, table: tableName, name: column.name, type: `Nullable(${column.type})`, defaultKind: '', comment: '' }));
     } else {
         const selectedTarget = parseImportTarget(target);
         if (!selectedTarget) throw new AppError(400, 'IMPORT_TABLE', 'Choose a valid table in an accessible database.');
@@ -688,19 +689,13 @@ async function commitCloudImport(form: FormData, credentials: CloudCredentials, 
             throw new AppError(400, 'IMPORT_MAPPING', 'Mapping references an unknown source or a non-writable destination column.');
     }
 
-    const columnTypes = new Map(destinationColumns.map(column => [column.name, column.type]));
-    const mappedRows = parsed.rows.map((row, index) => {
-        const mapped = Object.create(null) as Record<string, Json>;
-        for (const [sourceName, destination] of entries) {
-            if (!Object.hasOwn(row, sourceName)) throw new AppError(400, 'IMPORT_MISSING_FIELD', `Input row ${index + 1} is missing ${sourceName}.`);
-            const value = row[sourceName]!;
-            const type = columnTypes.get(destination as string) ?? '';
-            mapped[destination as string] = value !== null && typeof value !== 'string' && /String\)?$/.test(type)
-                ? typeof value === 'object' ? JSON.stringify(value) : String(value)
-                : value;
-        }
-        return mapped;
-    });
+    let mappedRows: Record<string, Json>[];
+    try {
+        mappedRows = mapImportRows(parsed.rows, parsed.columns, fields as Record<string, string>, destinationColumns).rows;
+    } catch (error) {
+        if (error instanceof ImportMappingError) throw new AppError(400, error.code, error.message);
+        throw error;
+    }
 
     const client = makeClient(credentials, url);
     try {
@@ -722,7 +717,7 @@ async function commitCloudImport(form: FormData, credentials: CloudCredentials, 
             format: 'JSONEachRow',
             query_id: queryId,
             abort_signal: AbortSignal.timeout(48_000),
-            clickhouse_settings: { ...clickhouseSettings, ...(deduplicationToken ? { insert_deduplication_token: deduplicationToken } : {}) },
+            clickhouse_settings: { ...clickhouseSettings, input_format_defaults_for_omitted_fields: 1, input_format_null_as_default: 0, ...(deduplicationToken ? { insert_deduplication_token: deduplicationToken } : {}) },
         });
     } finally {
         await client.close();

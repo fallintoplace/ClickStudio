@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { Json, Schema } from '../../shared/types';
+import { mapImportRows } from '../../core/import-mapping';
 import { useImportJobPolling } from './useImportJobPolling';
 import { api, isFrontendDemoPreview, message, post, RequestError } from '../api';
 import { checkClickHouseCloudImport, CLICKHOUSE_CLOUD_CONNECTION_ID, CloudRequestError, getClickHouseCloudConnection, importClickHouseCloudFile, loadClickHouseCloudSchema } from '../cloud-connection';
@@ -964,7 +965,7 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
     const availableTargets = useMemo(() => targets.filter(table => schema?.tables.some(item => `${item.database}.${item.name}` === table)), [schema, targets]);
     const creatingTable = browserCloudImport && target === CREATE_CLOUD_TABLE_TARGET;
     const destinationColumns = useMemo(() => creatingTable
-        ? createColumns.map(column => ({ database: createTableDatabase, table: createTableName, name: column.name, type: column.type, defaultKind: '', comment: '' }))
+        ? createColumns.map(column => ({ database: createTableDatabase, table: createTableName, name: column.name, type: `Nullable(${column.type})`, defaultKind: '', comment: '' }))
         : writableColumns(schema, target), [creatingTable, createColumns, createTableDatabase, createTableName, schema, target]);
     const selectedFields = useMemo(() => Object.fromEntries(Object.entries(fields).filter(([, destination]) => Boolean(destination))), [fields]);
     const destinationNames = Object.values(selectedFields);
@@ -1103,7 +1104,9 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
                 const retryMapping = retryImportConfirmed && pendingImport?.table === table && pendingImport.retryDeduplicationToken !== undefined;
                 if (creatingTable && !schema?.databases?.includes(createTableDatabase)) throw new Error('Choose a database visible to this ClickHouse user.');
                 if (creatingTable && !/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(createTableName)) throw new Error('Use letters, numbers, and underscores for the new table name.');
-                next = { id: crypto.randomUUID(), deduplicationToken: retryMapping ? pendingImport.retryDeduplicationToken! : crypto.randomUUID(), inputId: preview.id, connectionId: importConnectionId, table, fields: selectedFields, rows: [], rowCount: preview.rowCount };
+                const sourceRows = cloudRows.length ? cloudRows : preview.rows;
+                const mapped = mapImportRows(sourceRows, preview.columns, selectedFields, destinationColumns);
+                next = { id: crypto.randomUUID(), deduplicationToken: retryMapping ? pendingImport.retryDeduplicationToken! : crypto.randomUUID(), inputId: preview.id, connectionId: importConnectionId, table, fields: selectedFields, rows: [], rowCount: sourceRows.length, missingFields: mapped.missingFields };
             } else {
                 const retryMapping = retryImportConfirmed && pendingImport?.table === target && pendingImport.retryDeduplicationToken !== undefined;
                 next = await post<ImportMapping>(`/imports/${encodeURIComponent(preview.id)}/mapping`, {

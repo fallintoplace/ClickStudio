@@ -4,3 +4,4 @@ export { workspaceCommonTranslations } from './i18n-workspace-translations.js';
 export { objectExplorerTranslations, referenceCatalogTranslations, referenceTranslations } from './i18n-reference-translations.js';
 export { explainCommonTranslations } from './i18n-explain-translations.js';
 export { emptyWorkspaceTranslations } from './i18n-empty-workspace-translations.js';
+export { importTranslations } from './i18n-import-translations.js';

@@ -23,6 +23,12 @@ export const english = {
         retry: 'Try again',
         credentialsNotice: 'Credentials are handled by the workspace server.',
     },
+    imports: {
+        inputRow: 'input row',
+        inputRows: 'input rows',
+        reviewOmittedTargets: 'Unmapped destination columns use ClickHouse defaults: {columns}.',
+        reviewMissingValues: '{source} is missing in {count} {rowLabel}. ClickHouse will apply the default for {destination}.',
+    },
     common: {
         run: 'Run',
         runStatement: 'Run statement',

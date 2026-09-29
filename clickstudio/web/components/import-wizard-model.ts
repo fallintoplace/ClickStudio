@@ -27,6 +27,7 @@ export type ImportMapping = {
     fields: Record<string, string>;
     rows: Record<string, Json>[];
     rowCount: number;
+    missingFields?: Record<string, number>;
 };
 export type ImportJob = {
     id: string;

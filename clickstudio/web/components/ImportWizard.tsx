@@ -6,14 +6,20 @@ import { ImportPreviewTable } from './ImportPreviewTable';
 import { formatImportColumnCount, formatImportRowCount, MAX_FILE_BYTES, importSteps } from './import-wizard-model';
 import { useImportWizardController, type ImportWizardControllerOptions } from './useImportWizardController';
 import { Icon } from './ui';
+import type { Copy } from '../i18n';
 
 const MAX_QUERY_FILE_BYTES = 200_000;
 
+function fillImportCopy(template: string, values: Record<string, string>) {
+    return template.replace(/\{([A-Za-z][A-Za-z0-9_]*)\}/g, (placeholder, key: string) => values[key] ?? placeholder);
+}
+
 type ImportWizardProps = ImportWizardControllerOptions & {
     onImportQuery: (name: string, sql: string) => boolean;
+    importCopy: Copy['imports'];
 };
 
-export function ImportWizard({ onImportQuery, ...controllerProps }: ImportWizardProps) {
+export function ImportWizard({ onImportQuery, importCopy, ...controllerProps }: ImportWizardProps) {
     const {
         dialogRef,
         step,
@@ -79,6 +85,9 @@ export function ImportWizard({ onImportQuery, ...controllerProps }: ImportWizard
     const mappedFields = mapping?.fields ?? selectedFields;
     const mappedColumnCount = preview?.columns.filter(source => Boolean(mappedFields[source])).length ?? 0;
     const skippedColumnCount = (preview?.columns.length ?? 0) - mappedColumnCount;
+    const mappedDestinations = new Set(Object.values(mappedFields).filter(Boolean));
+    const omittedDestinationColumns = destinationColumns.filter(column => !mappedDestinations.has(column.name));
+    const missingSourceFields = Object.entries(mapping?.missingFields ?? {}).filter(([, count]) => count > 0);
     const [importKind, setImportKind] = useState<'rows' | 'query'>('rows');
     const [queryFile, setQueryFile] = useState<File>();
     const [queryFileError, setQueryFileError] = useState('');
@@ -361,6 +370,15 @@ export function ImportWizard({ onImportQuery, ...controllerProps }: ImportWizard
                             <div><dt>Skipped</dt><dd>{formatImportColumnCount(skippedColumnCount)}</dd></div>
                         </dl>
                     </div>
+                    {omittedDestinationColumns.length > 0 && <p className="rounded-lg border border-[var(--line)] bg-[var(--page)] px-3 py-2.5 text-xs leading-relaxed text-[var(--text-soft)]">{fillImportCopy(importCopy.reviewOmittedTargets, { columns: omittedDestinationColumns.map(column => column.name).join(', ') })}</p>}
+                    {missingSourceFields.length > 0 && <div className="space-y-2 rounded-lg border border-[var(--line)] bg-[var(--page)] px-3 py-2.5 text-xs leading-relaxed text-[var(--text-soft)]">
+                        {missingSourceFields.map(([source, count]) => {
+                            const destination = mapping.fields[source];
+                            if (!destination) return null;
+                            const rowLabel = count === 1 ? importCopy.inputRow : importCopy.inputRows;
+                            return <p key={source}>{fillImportCopy(importCopy.reviewMissingValues, { source, count: count.toLocaleString(), rowLabel, destination })}</p>;
+                        })}
+                    </div>}
                     <div className="import-review-mapping rounded-xl border border-[var(--line)] bg-[var(--page)]">
                         <div className="import-review-mapping-header"><h4 className="text-xs font-semibold">Column mapping</h4><span>{mappedColumnCount} mapped · {skippedColumnCount} skipped</span></div>
                         <div className="import-review-mapping-list">

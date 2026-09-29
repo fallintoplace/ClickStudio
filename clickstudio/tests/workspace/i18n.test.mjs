@@ -67,3 +67,13 @@ test('Localized copy preserves the English key shape and placeholder contracts',
         }
     }
 });
+
+test('Import review copy is translated for Chinese', () => {
+    const english = getCopy('en').imports;
+    const chinese = getCopy('zh').imports;
+
+    assert.notEqual(chinese.reviewOmittedTargets, english.reviewOmittedTargets);
+    assert.notEqual(chinese.reviewMissingValues, english.reviewMissingValues);
+    assert.equal(chinese.inputRow, '行');
+    assert.equal(chinese.inputRows, '行');
+});

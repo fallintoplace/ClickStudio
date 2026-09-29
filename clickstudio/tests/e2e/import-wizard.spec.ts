@@ -13,14 +13,14 @@ const schema = {
     truncated: false,
 };
 
-async function mockWritableWorkspace(page: Page, targets = ['demo.events']) {
+async function mockWritableWorkspace(page: Page, targets = ['demo.events'], workspaceSchema = schema) {
     await page.route('**/api/session', route => route.fulfill({ json: { principal: { id: 'test-owner', role: 'owner' }, requiresLogin: false, demo: false } }));
     await page.route('**/api/connections', route => route.fulfill({ json: [{
         id: 'live', name: 'Test database', host: 'https://clickhouse.example', database: 'demo', username: 'reader', readonly: true, trusted: true,
         limits: { rows: 5000, bytes: 2000000, seconds: 30, memory: 536870912, threads: 4 },
         manifest: { version: 1, serverVersion: '26.1', testedAt: '2026-09-23T00:00:00.000Z', schema: { available: true }, progress: { available: true }, cancellation: { available: true }, explain: { available: true }, pipeline: { available: true }, queryLog: { available: true }, documentation: { available: false }, import: { available: true }, scripts: { available: true }, parameters: { available: true } },
     }] }));
-    await page.route('**/api/connections/live/schema', route => route.fulfill({ json: schema }));
+    await page.route('**/api/connections/live/schema', route => route.fulfill({ json: workspaceSchema }));
     await page.route('**/api/connections/live/import-targets', route => route.fulfill({ json: targets }));
     await page.route('**/api/runs**', route => route.fulfill({ json: [] }));
     await page.route('**/api/documents**', route => route.fulfill({ json: [] }));
@@ -109,9 +109,40 @@ test('File import previews, maps, and reports a successful insert without typed 
     await expect(commit).toBeEnabled();
     await commit.click();
 
-    await expect(dialog).toContainText('Inserted 2 rows into demo.events');
+    await expect(dialog).toContainText('2 source rows processed successfully');
     expect(mappingBody).toMatchObject({ connectionId: 'live', table: 'demo.events', fields: { day: 'day', events: 'events' } });
     expect(commitBody).toEqual({});
+});
+
+test('Import review explains sparse source values and unmapped default columns', async ({ page }) => {
+    const schemaWithDefaults = { ...schema, columns: [
+        ...schema.columns,
+        { database: 'demo', table: 'events', name: 'label', type: 'Nullable(String)', defaultKind: '', comment: '' },
+        { database: 'demo', table: 'events', name: 'ingested_at', type: 'DateTime', defaultKind: 'DEFAULT', comment: '' },
+    ] };
+    await mockWritableWorkspace(page, ['demo.events'], schemaWithDefaults);
+    await page.route('**/api/imports/preview', route => route.fulfill({ status: 201, json: {
+        id: 'input-sparse', name: 'events.json', format: 'json', columns: ['day', 'events', 'label'],
+        rows: [{ day: '2026-01-01', events: 10, label: 'first' }, { day: '2026-01-02', events: 20 }], rowCount: 2,
+    } }));
+    await page.route('**/api/imports/input-sparse/mapping', route => route.fulfill({ json: {
+        id: 'mapping-sparse', inputId: 'input-sparse', connectionId: 'live', table: 'demo.events',
+        fields: { day: 'day', events: 'events', label: 'label' }, rows: [{ day: '2026-01-01', events: 10, label: 'first' }, { day: '2026-01-02', events: 20 }],
+        missingFields: { label: 1 }, rowCount: 2,
+    } }));
+
+    await page.getByRole('button', { name: 'Import', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Import data', exact: true });
+    await dialog.getByLabel('Choose a CSV, JSON, or NDJSON file').setInputFiles({
+        name: 'events.json', mimeType: 'application/json', buffer: Buffer.from('[{"day":"2026-01-01","events":10,"label":"first"},{"day":"2026-01-02","events":20}]'),
+    });
+    await dialog.getByRole('button', { name: 'Read file and continue' }).click();
+    await chooseExistingTable(dialog);
+    await dialog.getByRole('button', { name: 'Review import' }).click();
+
+    const review = dialog.getByRole('region', { name: 'Review import', exact: true });
+    await expect(review).toContainText('Unmapped destination columns use ClickHouse defaults: ingested_at.');
+    await expect(review).toContainText('label is missing in 1 input row. ClickHouse will apply the default for label.');
 });
 
 test('File import review lists skipped columns and success can start another import', async ({ page }) => {
@@ -155,7 +186,7 @@ test('File import review lists skipped columns and success can start another imp
     await expect(mapping.locator('tbody tr').nth(2)).toContainText('unused');
     await expect(mapping.locator('tbody tr').nth(2)).toContainText('Skipped');
     await dialog.getByRole('button', { name: 'Import rows', exact: true }).click();
-    await expect(dialog).toContainText('Inserted 1 row into demo.events');
+    await expect(dialog).toContainText('1 source row processed successfully');
     expect(mappingBody).toMatchObject({ fields: { day: 'day', events: 'events' } });
     await dialog.getByRole('button', { name: 'Import another file' }).click();
 
