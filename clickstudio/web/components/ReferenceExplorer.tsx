@@ -233,7 +233,7 @@ export function ReferenceExplorer({ copy, connection, trusted, target, onTargetH
                 {loading && <div className="inspector-empty"><span className="loading-orbit"/><p>{copy.loading}</p></div>}
                 {!loading && !error && !results.length && <div className="object-empty-search"><strong>{copy.referenceNoMatches}</strong><span>{copy.referenceEmptyHint}</span></div>}
                 {!loading && results.length > 0 && <div ref={resultListRef} className="reference-results" role="listbox" aria-label={copy.referenceResults} aria-activedescendant={visibleResults[activeIndex] ? `reference-option-${activeIndex}` : undefined}>
-                    {visibleResults.map((entry, index) => <button ref={canLoadMore && index === visibleResults.length - 1 ? lastVisibleResultRef : undefined} id={`reference-option-${index}`} data-reference-index={index} key={referenceId(entry)} type="button" role="option" aria-selected={index === activeIndex} className={cx('reference-result', index === activeIndex && 'is-active')} onMouseEnter={() => setActiveIndex(index)} onClick={() => { setActiveIndex(index); void openEntry(entry); }}>
+                    {visibleResults.map((entry, index) => <button ref={canLoadMore && index === visibleResults.length - 1 ? lastVisibleResultRef : undefined} id={`reference-option-${index}`} data-reference-index={index} key={referenceId(entry)} type="button" role="option" aria-selected={index === activeIndex} className={cx('reference-result', referenceResultTone(entry.type), index === activeIndex && 'is-active')} onMouseEnter={() => setActiveIndex(index)} onClick={() => { setActiveIndex(index); void openEntry(entry); }}>
                         <span className="reference-result-glyph"><Icon name={entry.type === 'System Table' ? 'table' : entry.type.includes('Engine') ? 'database' : entry.type.includes('Type') ? 'column' : 'documents'}/></span>
                         <span className="reference-result-copy"><strong>{entry.type === 'System Table' ? `system.${entry.name}` : entry.name}</strong><small>{entry.type}</small></span><span className="history-open">›</span>
                     </button>)}
@@ -251,4 +251,15 @@ export function ReferenceExplorer({ copy, connection, trusted, target, onTargetH
 function referenceInsertValue(entry: ClickHouseDocumentationSummary) {
     if (entry.type === 'System Table') return `system.${entry.name}`;
     return entry.name;
+}
+
+function referenceResultTone(type: string) {
+    if (type.includes('Aggregate')) return 'is-aggregate';
+    if (type === 'Data Type') return 'is-type';
+    if (['Table Engine', 'Database Engine', 'Dictionary Layout', 'Dictionary Source', 'Data Skipping Index', 'Disk Type', 'Compression Codec'].includes(type)) return 'is-engine';
+    if (type.includes('Setting')) return 'is-setting';
+    if (['System Table', 'Profile Event', 'Current Metric', 'Asynchronous Metric'].includes(type)) return 'is-system';
+    if (type === 'Format') return 'is-format';
+    if (['Statement', 'SQL Statement', 'SQL Operator', 'SQL Syntax', 'Protocol'].includes(type)) return 'is-sql';
+    return 'is-function';
 }

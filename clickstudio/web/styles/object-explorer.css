@@ -172,28 +172,44 @@
     .object-reference-actions .object-parts-action { border-color: color-mix(in srgb, var(--explorer-signal) 34%, var(--line-bright)); background: color-mix(in srgb, var(--explorer-signal) 6%, var(--panel-raised)); color: var(--explorer-signal); }
     .object-reference-actions .object-parts-action:hover:not(:disabled) { border-color: color-mix(in srgb, var(--explorer-signal) 58%, var(--line-bright)); background: color-mix(in srgb, var(--explorer-signal) 12%, var(--panel-raised)); color: var(--text); }
     .object-reference-actions svg { width: 12px; height: 12px; flex: none; }
-    .reference-explorer { --explorer-signal: var(--signal-accent); }
+    .reference-explorer { --explorer-signal: var(--signal-accent); --reference-aggregate: var(--explorer-table); --reference-function: var(--explorer-index); --reference-type: var(--explorer-view); --reference-engine: var(--accent-clickhouse-yellow); --reference-setting: var(--explorer-dictionary); --reference-system: var(--explorer-column); --reference-format: var(--explorer-projection); --reference-sql: var(--accent-cyan); }
     .reference-source-footer { display: flex; min-height: 22px; flex: none; align-items: center; gap: 6px; overflow: hidden; margin-top: auto; padding: 0 7px; border: 1px solid color-mix(in srgb, var(--explorer-signal) 16%, var(--line)); border-radius: 6px; background: color-mix(in srgb, var(--explorer-signal) 4%, var(--panel-raised)); color: var(--text-soft); font-size: 8px; font-weight: 620; }
     .reference-source-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .reference-source-footer small { min-width: 0; max-width: 55%; margin-left: auto; overflow: hidden; color: var(--muted); font-size: 7px; font-weight: 450; text-overflow: ellipsis; white-space: nowrap; }
     .reference-source-light { width: 6px; height: 6px; flex: none; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 2px color-mix(in srgb, var(--green) 12%, transparent), 0 0 6px color-mix(in srgb, var(--green) 50%, transparent); }
     .reference-source-light.is-bundled { background: var(--amber); box-shadow: 0 0 0 2px color-mix(in srgb, var(--amber) 12%, transparent), 0 0 6px color-mix(in srgb, var(--amber) 40%, transparent); }
-    .reference-search { width: 100%; }
-    .reference-categories { display: flex; flex: none; gap: 4px; overflow-x: auto; padding: 2px 0 3px; scrollbar-width: thin; }
-    .reference-categories button { min-height: 27px; flex: none; padding: 0 8px; border: 1px solid var(--line); border-radius: 7px; background: color-mix(in srgb, var(--panel-raised) 88%, transparent); color: var(--muted); font-size: 8px; font-weight: 620; cursor: pointer; transition: .16s ease; }
-    .reference-categories button:hover { border-color: color-mix(in srgb, var(--explorer-signal) 35%, var(--line)); color: var(--text-soft); }
-    .reference-categories button[aria-pressed="true"] { border-color: color-mix(in srgb, var(--explorer-signal) 48%, var(--line)); background: color-mix(in srgb, var(--explorer-signal) 10%, var(--panel-raised)); color: var(--explorer-signal); box-shadow: inset 0 1px #ffffff08; }
-    .reference-list-heading { display: flex; min-height: 24px; flex: none; align-items: center; justify-content: space-between; gap: 8px; padding: 0 2px 4px; border-bottom: 1px solid color-mix(in srgb, var(--explorer-signal) 18%, var(--line)); color: var(--muted); font-family: var(--font-mono); font-size: 8px; font-weight: 760; letter-spacing: .12em; text-transform: uppercase; }
-    .reference-list-heading small { color: var(--explorer-signal); font-size: 8px; letter-spacing: 0; }
-    .reference-results { display: grid; min-height: 130px; flex: 1; align-content: start; gap: 2px; overflow: auto; padding: 4px; border: 1px solid color-mix(in srgb, var(--explorer-signal) 18%, var(--line)); border-radius: 10px; background: color-mix(in srgb, var(--panel-raised) 82%, transparent); scrollbar-color: var(--scrollbar-thumb) transparent; scrollbar-gutter: stable; }
-    .reference-result { display: flex; min-width: 0; min-height: 38px; align-items: center; gap: 8px; padding: 4px 7px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--text-soft); text-align: left; cursor: pointer; transition: .14s ease; }
-    .reference-result:hover, .reference-result.is-active { border-color: color-mix(in srgb, var(--explorer-signal) 28%, var(--line)); background: color-mix(in srgb, var(--explorer-signal) 8%, var(--panel)); color: var(--text); }
-    .reference-result:focus-visible { outline: 2px solid color-mix(in srgb, var(--explorer-signal) 68%, transparent); outline-offset: -2px; }
-    .reference-result-glyph { display: grid; width: 23px; height: 23px; flex: none; place-items: center; border: 1px solid color-mix(in srgb, var(--explorer-signal) 23%, var(--line)); border-radius: 7px; background: color-mix(in srgb, var(--explorer-signal) 7%, var(--panel)); color: var(--explorer-signal); }
-    .reference-result-glyph svg { width: 13px; height: 13px; }
-    .reference-result-copy { display: grid; min-width: 0; flex: 1; gap: 2px; }
-    .reference-result-copy strong { overflow: hidden; font-family: var(--font-mono); font-size: 9px; font-weight: 630; text-overflow: ellipsis; white-space: nowrap; }
-    .reference-result-copy small { overflow: hidden; color: var(--muted); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+    .reference-search { width: 100%; border-color: color-mix(in srgb, var(--explorer-signal) 24%, var(--line)); background: var(--page); }
+    .reference-search:focus-within { border-color: var(--explorer-signal); box-shadow: 0 0 0 3px color-mix(in srgb, var(--explorer-signal) 12%, transparent); }
+    .reference-categories { display: flex; flex: none; gap: 5px; overflow-x: auto; padding: 2px 0 4px; scrollbar-width: thin; }
+    .reference-categories button { min-height: 28px; flex: none; padding: 0 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel-raised); color: var(--muted); font-size: 8px; font-weight: 650; cursor: pointer; transition: .16s ease; }
+    .reference-categories button:hover { border-color: color-mix(in srgb, var(--explorer-signal) 42%, var(--line)); color: var(--text-soft); }
+    .reference-categories button[aria-pressed="true"] { border-color: color-mix(in srgb, var(--explorer-signal) 58%, var(--line)); background: color-mix(in srgb, var(--explorer-signal) 12%, var(--panel-raised)); color: var(--explorer-signal); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--explorer-signal) 10%, transparent); }
+    .reference-list-heading { display: flex; min-height: 25px; flex: none; align-items: center; justify-content: space-between; gap: 8px; padding: 0 2px 4px; border-bottom: 1px solid color-mix(in srgb, var(--explorer-signal) 24%, var(--line)); color: var(--muted); font-family: var(--font-mono); font-size: 8px; font-weight: 760; letter-spacing: .12em; text-transform: uppercase; }
+    .reference-list-heading small { min-width: 24px; padding: 3px 7px; border: 1px solid color-mix(in srgb, var(--explorer-signal) 34%, var(--line)); border-radius: 999px; background: color-mix(in srgb, var(--explorer-signal) 8%, var(--panel)); color: var(--explorer-signal); font-size: 8px; letter-spacing: 0; text-align: center; }
+    .reference-results { display: grid; min-height: 130px; flex: 1; align-content: start; gap: 4px; overflow: auto; padding: 6px; border: 1px solid color-mix(in srgb, var(--explorer-signal) 24%, var(--line)); border-radius: 12px; background: var(--page); scrollbar-color: var(--scrollbar-thumb) transparent; scrollbar-gutter: stable; }
+    .reference-result { --reference-kind-color: var(--accent); position: relative; display: flex; min-width: 0; min-height: 40px; align-items: center; gap: 9px; overflow: hidden; padding: 5px 9px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel); color: var(--text-soft); text-align: left; cursor: pointer; transition: border-color .14s ease, background .14s ease, color .14s ease, transform .14s ease, box-shadow .14s ease; }
+    .reference-result::before { position: absolute; top: 7px; bottom: 7px; left: 0; width: 2px; border-radius: 0 3px 3px 0; background: var(--reference-kind-color); content: ""; opacity: .8; }
+    .reference-result.is-aggregate { --reference-kind-color: var(--reference-aggregate); }
+    .reference-result.is-function { --reference-kind-color: var(--reference-function); }
+    .reference-result.is-type { --reference-kind-color: var(--reference-type); }
+    .reference-result.is-engine { --reference-kind-color: var(--reference-engine); }
+    .reference-result.is-setting { --reference-kind-color: var(--reference-setting); }
+    .reference-result.is-system { --reference-kind-color: var(--reference-system); }
+    .reference-result.is-format { --reference-kind-color: var(--reference-format); }
+    .reference-result.is-sql { --reference-kind-color: var(--reference-sql); }
+    .reference-result:hover { transform: translateX(1px); border-color: color-mix(in srgb, var(--reference-kind-color) 42%, var(--line)); background: color-mix(in srgb, var(--reference-kind-color) 7%, var(--panel)); color: var(--text); }
+    .reference-result.is-active { border-color: color-mix(in srgb, var(--reference-kind-color) 58%, var(--line)); background: color-mix(in srgb, var(--reference-kind-color) 12%, var(--panel-raised)); color: var(--text); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--reference-kind-color) 12%, transparent); }
+    .reference-result.is-active::before { width: 3px; opacity: 1; }
+    .reference-result:focus-visible { outline: 2px solid var(--reference-kind-color); outline-offset: -2px; }
+    .reference-result-glyph { display: grid; width: 25px; height: 25px; flex: none; place-items: center; border: 1px solid color-mix(in srgb, var(--reference-kind-color) 42%, var(--line)); border-radius: 8px; background: color-mix(in srgb, var(--reference-kind-color) 11%, var(--page)); color: var(--reference-kind-color); }
+    .reference-result-glyph svg { width: 14px; height: 14px; }
+    .reference-result-copy { display: grid; min-width: 0; flex: 1; gap: 3px; }
+    .reference-result-copy strong { overflow: hidden; color: var(--text); font-family: var(--font-mono); font-size: 10px; font-weight: 640; letter-spacing: -.01em; text-overflow: ellipsis; white-space: nowrap; }
+    .reference-result-copy small { width: fit-content; max-width: 100%; overflow: hidden; padding: 2px 6px; border: 1px solid color-mix(in srgb, var(--reference-kind-color) 27%, var(--line)); border-radius: 999px; background: color-mix(in srgb, var(--reference-kind-color) 7%, var(--page)); color: var(--reference-kind-color); font-size: 7px; font-weight: 680; letter-spacing: .025em; text-overflow: ellipsis; white-space: nowrap; }
+    .reference-result > .history-open { display: grid; width: 22px; height: 22px; flex: none; place-items: center; border: 1px solid transparent; border-radius: 7px; color: var(--muted); font-size: 17px; line-height: 1; transition: border-color .14s ease, background .14s ease, color .14s ease, transform .14s ease; }
+    .reference-result:hover > .history-open, .reference-result.is-active > .history-open { transform: translateX(1px); border-color: color-mix(in srgb, var(--reference-kind-color) 30%, var(--line)); background: color-mix(in srgb, var(--reference-kind-color) 10%, var(--panel)); color: var(--reference-kind-color); }
+    .reference-result:focus-visible .history-open { color: var(--reference-kind-color); }
+    @media (prefers-reduced-motion: reduce) { .reference-categories button, .reference-result, .reference-result > .history-open { transition: none; } }
     .reference-detail-view { display: flex; min-height: 0; flex: 1; flex-direction: column; gap: 8px; overflow: hidden; }
     .reference-back { display: flex; min-height: 34px; flex: none; align-items: center; gap: 7px; padding: 0 4px; border: 0; border-bottom: 1px solid color-mix(in srgb, var(--explorer-signal) 18%, var(--line)); background: transparent; color: var(--text-soft); font-size: 9px; font-weight: 670; text-align: left; cursor: pointer; }
     .reference-back:hover, .reference-back:focus-visible { color: var(--explorer-signal); outline: none; }
