@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-const { getCopy, localeOptions, resolveLocale, supportedLocales, themeOptions } =
+const { allLocales, getCopy, localeOptions, resolveLocale, supportedLocales, themeOptions } =
     await import('../../.workspace-build/web/i18n.js');
 
 const nonEnglishLocales = supportedLocales.filter(locale => locale !== 'en');
@@ -59,7 +59,7 @@ test('Localized copy preserves the English key shape and placeholder contracts',
     const english = flattenStrings(getCopy('en'));
     const englishPaths = [...english.keys()].sort();
 
-    for (const locale of supportedLocales) {
+    for (const locale of allLocales) {
         const localized = flattenStrings(getCopy(locale));
         assert.deepEqual([...localized.keys()].sort(), englishPaths, `${locale} copy shape`);
         for (const [path, englishText] of english) {

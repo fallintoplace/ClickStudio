@@ -1,4 +1,4 @@
-import type { Copy, Locale } from './i18n.js';
+import type { Copy, Locale } from './i18n-types.js';
 
 export const chromeTranslations: Record<Exclude<Locale, 'en'>, {
     app: Pick<Copy['app'], 'darkTheme' | 'lightTheme' | 'accent' | 'cyanAccent' | 'clickhouseYellowAccent'>;

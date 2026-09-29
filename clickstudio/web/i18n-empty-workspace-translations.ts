@@ -1,4 +1,4 @@
-import type { Copy, Locale } from './i18n.js';
+import type { Copy, Locale } from './i18n-types.js';
 
 type EmptyWorkspaceTranslation = Pick<Copy['common'], 'noSqlTabsOpen' | 'noSqlTabsOpenDescription'>;
 

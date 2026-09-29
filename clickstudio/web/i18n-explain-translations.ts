@@ -1,4 +1,4 @@
-import type { Copy, Locale } from './i18n.js';
+import type { Copy, Locale } from './i18n-types.js';
 
 export const explainCommonTranslations: Record<Exclude<Locale, 'en'>, Pick<Copy['common'],
     'explain' | 'explainPlan' | 'indexAnalysisGraph' | 'indexAnalysisDescription' | 'indexAnalysisItem' | 'indexAnalysisSelected' | 'indexAnalysisInspect' | 'indexAnalysisDetails' | 'indexAnalysisHint' | 'indexAnalysisNoOutput' | 'logicalPlan' | 'logicalPlanDescription' | 'planGraphView' | 'planTreeView' | 'planGraphHint' | 'planStep' | 'planSelectedStep' | 'planInspectStep' | 'planStepDetails' | 'planUnknownStep' | 'planDepthLimit' | 'pipelineGraph' | 'pipelineGraphDescription' |

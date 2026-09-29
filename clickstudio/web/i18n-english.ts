@@ -1,6 +1,4 @@
-import type { Copy } from './i18n.js';
-
-export const english: Copy = {
+export const english = {
     app: {
         name: 'ClickStudio',
         tagline: 'ClickHouse SQL, results, and performance',
@@ -483,4 +481,4 @@ export const english: Copy = {
         retainedRowsAcrossOneMeasure: '{rows} retained rows across 1 measure',
         retainedRowsAcrossManyMeasures: '{rows} retained rows across {measures} measures',
     },
-};
+} as const;

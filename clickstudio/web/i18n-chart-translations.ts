@@ -1,4 +1,4 @@
-import type { Copy, Locale } from './i18n.js';
+import type { Copy, Locale } from './i18n-types.js';
 
 type LocalizedCopy = Partial<Copy['app'] & Copy['common'] & Copy['auth']> & Copy['chart'];
 export const translations: Record<Exclude<Locale, 'en'>, LocalizedCopy> = {

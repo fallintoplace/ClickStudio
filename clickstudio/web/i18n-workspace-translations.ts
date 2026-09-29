@@ -1,4 +1,4 @@
-import type { Copy, Locale } from './i18n.js';
+import type { Copy, Locale } from './i18n-types.js';
 
 type WorkspaceCommonTranslation = Pick<Copy['common'],
     'workspaceMode' | 'parserMode' | 'browse' | 'readOnly' | 'tables' | 'queries' | 'more' | 'localDraft' | 'query' | 'format' |

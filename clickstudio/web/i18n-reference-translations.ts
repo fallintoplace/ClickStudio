@@ -1,4 +1,4 @@
-import type { Copy, Locale } from './i18n.js';
+import type { Copy, Locale } from './i18n-types.js';
 
 type ReferenceTranslation = Pick<Copy['common'],
     'reference' | 'referenceSearch' | 'referenceAll' | 'referenceFunctions' | 'referenceTypes' | 'referenceEngines' |

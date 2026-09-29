@@ -1,4 +1,4 @@
-import type { Locale } from './i18n.js';
+import type { Locale } from './i18n-types.js';
 import type { SqlExample, SqlExampleCategory } from './sql-examples.js';
 
 type ExampleText = Pick<SqlExample, 'name' | 'description'>;
