@@ -102,14 +102,32 @@ test('Result export downloads the complete retained CSV from the server', async 
     expect(runs()).toBe(1);
 });
 
-test('Cloud result export downloads the retained CSV from the browser workspace', async ({ page }) => {
+test('Local Cloud connection restores after refresh and exports retained rows from the browser workspace', async ({ page }) => {
     const cloudActions: string[] = [];
+    const cloudSessionMethods: string[] = [];
     const serverExportRequests: string[] = [];
+    let savedCloudSession: { profile: { host: string; database: string; username: string }; tested: CloudConnectionTest } | null = null;
     await page.route('**/api/connections', async route => {
         const response = await route.fetch();
         const connections = await response.json() as { id: string }[];
         if (!connections.some(connection => connection.id === PLAYGROUND_CONNECTION.id)) connections.push(PLAYGROUND_CONNECTION);
         await route.fulfill({ response, json: connections });
+    });
+    await page.route('**/api/cloud/session', async route => {
+        const method = route.request().method();
+        cloudSessionMethods.push(method);
+        if (method === 'GET') {
+            await route.fulfill({ json: { session: savedCloudSession } });
+            return;
+        }
+        if (method === 'POST') {
+            const { credentials } = route.request().postDataJSON() as { credentials: { host: string; database: string; username: string } };
+            savedCloudSession = { profile: credentials, tested: cloudConnectionTest };
+            await route.fulfill({ json: cloudConnectionTest });
+            return;
+        }
+        savedCloudSession = null;
+        await route.fulfill({ status: 204 });
     });
     await page.route('**/api/cloud', async route => {
         const body = route.request().postDataJSON() as { action?: string; queryId?: string };
@@ -167,6 +185,15 @@ test('Cloud result export downloads the retained CSV from the browser workspace'
     expect(csv).toContain('2026-01-02,20');
     expect(cloudActions).toContain('run');
     expect(serverExportRequests).toEqual([]);
+
+    await page.reload();
+    await expect(page.locator('.connection-trigger')).toContainText('CLICKHOUSE CLOUD');
+    const firstConnect = cloudSessionMethods.indexOf('POST');
+    expect(firstConnect).toBeGreaterThanOrEqual(0);
+    expect(cloudSessionMethods.slice(firstConnect + 1)).toContain('GET');
+    const restoredResults = await run(page);
+    await expect(restoredResults.getByRole('table', { name: 'Retained query rows' })).toContainText('2026-01-02');
+    expect(cloudActions.filter(action => action === 'run')).toHaveLength(2);
 });
 
 test('Wide retained results remain horizontally scrollable and keyboard accessible', async ({ page }) => {
