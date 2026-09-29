@@ -5,11 +5,12 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { Readable } from 'node:stream';
 import cloudApi from '../api/cloud.js';
-import type { AssistantAction, AuditEvent, ClickHouseDocumentationEntry, ClickHouseDocumentationSummary, Principal, Run, Schema } from '../shared/types.js';
+import type { AssistantAction, AuditEvent, ClickHouseDocumentationEntry, ClickHouseDocumentationSummary, Principal, Result, Run, Schema } from '../shared/types.js';
 import type { QueryDriver } from '../core/runs.js';
 import { RunService, terminal } from '../core/runs.js';
 import { ArtifactService } from '../core/artifacts.js';
 import { AssistantService, type AssistantDriver, validateAssistantConversation } from '../core/assistant.js';
+import { assistantResultFrom, assistantSchemaFrom } from '../core/assistant-input.js';
 import { ImportService, type ImportDriver } from '../core/imports.js';
 import { CREATE_TABLE_COLUMN_TYPES, TableCreationService, type CreateTableColumn } from '../core/table-creation.js';
 import { TableDeletionService } from '../core/table-deletion.js';
@@ -35,6 +36,7 @@ const MAX_WASM_PARSER_BYTES = 64 * 1024 * 1024;
 const ASSISTANT_ACTIONS = ['ask', 'generate', 'explain', 'repair', 'result', 'performance', 'review'] as const satisfies readonly AssistantAction[];
 const IMPORT_FORMATS = ['csv', 'json', 'ndjson'] as const;
 const MONITOR_CONDITIONS = ['changed', 'nonempty', 'failure'] as const;
+const CLIENT_CLOUD_CONNECTION_ID = 'clickhouse-cloud';
 let parserWasmCache: Promise<Uint8Array> | undefined;
 
 function registerAssistantSqlRoute(app: Express, dependencies: {
@@ -60,25 +62,51 @@ function registerAssistantSqlRoute(app: Express, dependencies: {
             const p = principal(res), v = body(req), connectionId = identifier(v.connectionId, 'connectionId');
             canWrite(p);
             requireThat(authorized(p, connectionId), 403, 'WORKSPACE_UNTRUSTED', 'Trust this connection before sharing context');
+            const browserCloud = connectionId === CLIENT_CLOUD_CONNECTION_ID;
+            if (browserCloud)
+                requireThat(Buffer.byteLength(JSON.stringify(v)) <= 300_000, 413, 'REQUEST_SIZE', 'The assistant request is too large.');
             const question = text(v.question, 'question', 4000), sql = text(v.sql, 'SQL', 200000, true);
             const conversation = validateAssistantConversation(v.conversation);
-            const schema = await driver.schema(connectionId), connection = driver.connection(p, connectionId);
-            const reportedPlaygroundVersion = typeof v.serverVersion === 'string' && /^\d+(?:\.\d+){2,3}(?:[-+][A-Za-z0-9.-]+)?$/.test(v.serverVersion)
+            const schema = browserCloud ? assistantSchemaFrom(v.schema, connectionId) : await driver.schema(connectionId);
+            const reportedServerVersion = typeof v.serverVersion === 'string' && /^\d+(?:\.\d+){2,3}(?:[-+][A-Za-z0-9.-]+)?$/.test(v.serverVersion)
                 ? v.serverVersion
                 : undefined;
-            const serverVersion = connection.manifest?.serverVersion === 'ClickHouse SQL Playground'
-                ? reportedPlaygroundVersion
-                : connection.manifest?.serverVersion;
+            let database: string, serverVersion: string | undefined;
+            if (browserCloud) {
+                database = text(v.database, 'database', 128);
+                serverVersion = reportedServerVersion;
+            } else {
+                const connection = driver.connection(p, connectionId);
+                database = connection.database;
+                serverVersion = connection.manifest?.serverVersion === 'ClickHouse SQL Playground'
+                    ? reportedServerVersion
+                    : connection.manifest?.serverVersion;
+            }
             let run: Run | undefined;
+            let result: Result | undefined;
+            let evidenceSql: string | undefined;
+            let errorMessage: string | undefined;
             if (v.includeRun === true) {
                 requireThat(Boolean(v.runId), 400, 'RUN_REQUIRED', 'Select a completed run before including its context');
-                run = runs.get(p, identifier(v.runId, 'runId'));
-                requireThat(run.connectionId === connectionId, 409, 'CONNECTION_MISMATCH', 'Selected evidence belongs to another connection');
+                const runId = identifier(v.runId, 'runId');
+                if (browserCloud) {
+                    result = assistantResultFrom(v.result);
+                    requireThat(!result || result.runId === runId, 409, 'CONNECTION_MISMATCH', 'Selected result belongs to another run');
+                    evidenceSql = v.evidenceSql === undefined ? undefined : text(v.evidenceSql, 'Selected run SQL', 200000, true);
+                    errorMessage = v.error === undefined ? undefined : text(v.error, 'Selected run error', 3000, true);
+                } else {
+                    run = runs.get(p, runId);
+                    requireThat(run.connectionId === connectionId, 409, 'CONNECTION_MISMATCH', 'Selected evidence belongs to another connection');
+                    result = run.resultState === 'reopenable' ? runs.result(p, run.id) : undefined;
+                    evidenceSql = run.sql;
+                    errorMessage = run.error?.message;
+                }
             }
-            const documentation = await assistantReferenceDocs(driver, p, connectionId, question, sql, schema, connection.database);
-            const result = run?.resultState === 'reopenable' ? runs.result(p, run.id) : undefined;
-            const context = ai.prepare(p, { connectionId, database: connection.database, action: 'ask', question, conversation, sql, schema, result,
-                evidenceSql: run?.sql, error: run?.error?.message, serverVersion,
+            const documentation = browserCloud
+                ? selectAssistantReferenceDocs(question, sql, { schema, database })
+                : await assistantReferenceDocs(driver, p, connectionId, question, sql, schema, database);
+            const context = ai.prepare(p, { connectionId, database, action: 'ask', question, conversation, sql, schema, result,
+                evidenceSql, error: errorMessage, serverVersion,
                 documentation, sensitiveColumns: config.sensitiveColumns });
             preparedContextId = context.id;
             if (!secretFree(context.payload)) {
@@ -219,6 +247,10 @@ function registerCloudApi(app: Express) {
     });
 }
 
+function assistantConnectionAuthorized(authorized: (principal: Principal, connectionId: string) => boolean, principal: Principal, connectionId: string) {
+    return connectionId === CLIENT_CLOUD_CONNECTION_ID ? principal.role === 'owner' : authorized(principal, connectionId);
+}
+
 export function createApp(config: Config, overrides: {
     store?: Store;
     driver?: Driver;
@@ -231,7 +263,7 @@ export function createApp(config: Config, overrides: {
     for (const profile of config.profiles)
         if (profile.publicPlayground) runs.trust({ id: 'local-owner', role: 'owner' }, profile.id, true);
     const authorized = (p: Principal, c: string) => { driver.connection(p, c); return runs.isTrusted(p, c); };
-    const ai = new AssistantService(store, overrides.assistant ?? new OpenAIDriver(config.demo ? undefined : config.openaiKey, config.openaiModel), authorized);
+    const ai = new AssistantService(store, overrides.assistant ?? new OpenAIDriver(config.demo ? undefined : config.openaiKey, config.openaiModel), (p, c) => assistantConnectionAuthorized(authorized, p, c));
     const voice = overrides.voice ?? new OpenAIVoiceService(config.demo ? undefined : config.openaiKey, config.openaiRealtimeModel);
     const imports = new ImportService(store, driver, authorized), tableCreation = new TableCreationService(store, driver, authorized), tableDeletion = new TableDeletionService(store, driver, authorized), monitors = new MonitorService(store, runs, artifacts), sessions = new SessionService(config.token), redact = redactor(config), parserWasm = overrides.parserWasm ?? cachedClickHouseParserWasm;
     const secretFree = (value: unknown) => !configuredSecrets(config).some(secret => JSON.stringify(value).includes(secret));
@@ -480,7 +512,7 @@ export function createApp(config: Config, overrides: {
         }
         res.status(201).json({ ...context, evidenceSql: run?.sql ?? null });
     });
-    registerAssistantSqlRoute(app, { config, driver, runs, ai, store, authorized, secretFree });
+    registerAssistantSqlRoute(app, { config, driver, runs, ai, store, authorized: (p, c) => assistantConnectionAuthorized(authorized, p, c), secretFree });
     app.post('/api/assistant/proposals', async (req, res) => { const v = body(req); res.json(await ai.propose(principal(res), identifier(v.contextId, 'contextId'), v.consent === true)); });
     app.get('/api/assistant/proposals/:id', (req, res) => res.json(ai.get(principal(res), id(req))));
     app.post('/api/assistant/proposals/:id/decision', (req, res) => { const v = body(req); requireThat(v.decision === 'accepted' || v.decision === 'rejected', 400, 'DECISION', 'Unknown proposal decision'); res.json(ai.decide(principal(res), id(req), v.decision, identifier(v.connectionId, 'connectionId'), text(v.currentSql, 'current SQL', 200000, true))); });

@@ -65,6 +65,14 @@ class PlaygroundVersionDemoDriver extends DemoDriver {
     }
 }
 
+class AssistantSchemaTrackingDemoDriver extends DemoDriver {
+    readonly schemaCalls: string[] = [];
+    override async schema(id: string) {
+        this.schemaCalls.push(id);
+        return await super.schema(id);
+    }
+}
+
 class TableCreationDemoDriver extends DemoDriver {
     readonly createdTables: Array<{ id: string; table: string; columns: CreateTableColumn[]; orderBy: string; queryId: string }> = [];
     override database(_id: string) { return 'demo'; }
@@ -287,6 +295,70 @@ test('Ask AI uses a validated Playground server version supplied by the browser'
     });
     assert.equal(invalid.status, 201);
     assert.equal(sentVersion, 'unknown');
+});
+
+test('Ask AI uses browser Cloud schema and run evidence without resolving a local connection', async (t) => {
+    let sentContext: Record<string, unknown> | undefined;
+    const assistant: AssistantDriver = {
+        available: true,
+        model: 'fixture',
+        propose: async context => {
+            sentContext = JSON.parse(context.payload.context) as Record<string, unknown>;
+            return { content: { sql: 'SELECT player FROM default.world_cup_golden_boot', summary: 'List the players', assumptions: [], tables: ['default.world_cup_golden_boot'], caveats: [], clarification: null, findings: [] }, completeness: 'complete', columns: [], rows: [] };
+        },
+    };
+    const driver = new AssistantSchemaTrackingDemoDriver();
+    const s = await start(undefined, undefined, undefined, driver, assistant);
+    t.after(() => s.stop());
+    const runId = randomUUID();
+    const response = await s.call('/assistant/sql', {
+        connectionId: 'clickhouse-cloud',
+        question: 'List the World Cup Golden Boot winners',
+        sql: 'SELECT player FROM default.world_cup_golden_boot',
+        database: 'default',
+        serverVersion: '25.8.4.5',
+        schema: {
+            connectionId: 'clickhouse-cloud',
+            fetchedAt: '2026-09-29T12:00:00.000Z',
+            tables: [{ database: 'default', name: 'world_cup_golden_boot', engine: 'MergeTree' }],
+            columns: [{ database: 'default', table: 'world_cup_golden_boot', name: 'player', type: 'String' }],
+            warnings: [],
+            truncated: false,
+        },
+        includeRun: true,
+        runId,
+        result: {
+            runId,
+            queryId: 'cloud-query-1',
+            columns: [{ name: 'player', type: 'String' }],
+            rows: [['Marta']],
+            completeness: 'complete',
+            createdAt: '2026-09-29T12:00:00.000Z',
+            expiresAt: '2026-09-29T12:05:00.000Z',
+        },
+        evidenceSql: 'SELECT player FROM default.world_cup_golden_boot',
+    });
+    assert.equal(response.status, 201);
+    assert.deepEqual(driver.schemaCalls, []);
+    assert.equal(sentContext?.serverVersion, '25.8.4.5');
+    assert.deepEqual(sentContext?.tables, [{ database: 'default', name: 'world_cup_golden_boot' }]);
+    assert.deepEqual(sentContext?.schema, [{ database: 'default', table: 'world_cup_golden_boot', name: 'player', type: 'String' }]);
+    assert.equal(sentContext?.evidenceSql, 'SELECT player FROM default.world_cup_golden_boot');
+    assert.deepEqual((sentContext?.result as { rows: unknown[][] }).rows, [['Marta']]);
+
+    const proposal = await response.json() as { id: string; decision: string };
+    const accepted = await s.call(`/assistant/proposals/${proposal.id}/decision`, {
+        decision: 'accepted', connectionId: 'clickhouse-cloud', currentSql: 'SELECT player FROM default.world_cup_golden_boot',
+    });
+    assert.equal(accepted.status, 200);
+    assert.equal((await accepted.json() as { decision: string }).decision, 'accepted');
+
+    const invalidSchema = await s.call('/assistant/sql', {
+        connectionId: 'clickhouse-cloud', question: 'Use my schema', sql: '', database: 'default',
+        schema: { tables: [], columns: [{ database: 'default', table: 't', name: 'c', type: 'x'.repeat(2_049) }] },
+    });
+    assert.equal(invalidSchema.status, 400);
+    assert.equal(driver.schemaCalls.length, 0);
 });
 
 test('Voice sessions require trust and keep the provider behind the server', async (t) => {
