@@ -40,7 +40,7 @@ export function useImportJobPolling({
             polling = true;
             try {
                 const next = cloudImport && job.queryId
-                    ? await checkClickHouseCloudImport(job.queryId, job.table, job.rows)
+                    ? await checkClickHouseCloudImport(job.queryId, job.table, job.rows, job.deduplicationToken)
                     : job.reconciliationRequired
                         ? await post<ImportJob>(`/imports/${encodeURIComponent(job.id)}/reconcile`)
                         : await api<ImportJob>(`/imports/${encodeURIComponent(job.id)}`);
@@ -63,5 +63,5 @@ export function useImportJobPolling({
             current = false;
             window.clearInterval(timer);
         };
-    }, [open, step, cloudImport, job?.id, job?.queryId, job?.table, job?.rows, job?.status, job?.reconciliationRequired, setBusy, setError, setJob, setRecoverableJobs]);
+    }, [open, step, cloudImport, job?.id, job?.queryId, job?.deduplicationToken, job?.table, job?.rows, job?.status, job?.reconciliationRequired, setBusy, setError, setJob, setRecoverableJobs]);
 }

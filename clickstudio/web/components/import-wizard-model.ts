@@ -20,6 +20,7 @@ export type ImportPreview = {
 };
 export type ImportMapping = {
     id: string;
+    deduplicationToken?: string | null;
     inputId: string;
     connectionId: string;
     table: string;
@@ -32,6 +33,7 @@ export type ImportJob = {
     connectionId?: string;
     table: string;
     queryId?: string;
+    deduplicationToken?: string;
     rows: number;
     createdAt?: string;
     status: 'running' | 'succeeded' | 'unknown';
@@ -43,7 +45,7 @@ export type ImportJob = {
     demoRows?: Record<string, Json>[];
     demoPersisted?: boolean;
 };
-export type PendingImport = { id: string; table: string; rows: number; name: string; queryId?: string };
+export type PendingImport = { id: string; table: string; rows: number; name: string; queryId?: string; deduplicationToken?: string; retryDeduplicationToken?: string | null; retryOriginId?: string };
 export type BusyAction = '' | 'setup' | 'preview' | 'mapping' | 'commit' | 'recover' | 'reconcile' | 'review';
 
 export function isPendingImport(value: unknown): value is PendingImport {
@@ -51,7 +53,10 @@ export function isPendingImport(value: unknown): value is PendingImport {
         'id' in value && typeof value.id === 'string' && value.id.length > 0 &&
         'table' in value && typeof value.table === 'string' && value.table.length > 0 &&
         'rows' in value && typeof value.rows === 'number' && Number.isSafeInteger(value.rows) && value.rows >= 0 &&
-        'name' in value && typeof value.name === 'string';
+        'name' in value && typeof value.name === 'string' &&
+        (!('deduplicationToken' in value) || typeof value.deduplicationToken === 'string' && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(value.deduplicationToken)) &&
+        (!('retryDeduplicationToken' in value) || value.retryDeduplicationToken === null || typeof value.retryDeduplicationToken === 'string' && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(value.retryDeduplicationToken)) &&
+        (!('retryOriginId' in value) || typeof value.retryOriginId === 'string' && value.retryOriginId.length > 0);
 }
 
 export const MAX_FILE_BYTES = 2_000_000;
@@ -59,6 +64,14 @@ export const importStateKey = (connectionId: string) => `clickstudio:import:${co
 
 export function formatImportRowCount(count: number): string {
     return `${count.toLocaleString()} ${count === 1 ? 'row' : 'rows'}`;
+}
+
+export function formatImportColumnCount(count: number): string {
+    return `${count.toLocaleString()} ${count === 1 ? 'column' : 'columns'}`;
+}
+
+export function formatImportColumnRange(shown: number, total: number): string {
+    return `${shown.toLocaleString()} of ${total.toLocaleString()} ${total === 1 ? 'column' : 'columns'}`;
 }
 
 export function fileFormat(file: File): ImportFormat | undefined {

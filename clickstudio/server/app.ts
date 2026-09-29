@@ -624,7 +624,7 @@ export function createApp(config: Config, overrides: {
         res.json(imports.listRecoverable(p, connectionId));
     });
     app.post('/api/imports/preview', (req, res) => { const v = body(req), format = choice(v.format, IMPORT_FORMATS, 400, 'IMPORT_FORMAT', 'Use CSV, JSON, or NDJSON'); const input = imports.preview(principal(res), text(v.name, 'filename', 128), text(v.source, 'input', 2000000), format); res.status(201).json({ ...input, rows: input.rows.slice(0, 20), rowCount: input.rows.length }); });
-    app.post('/api/imports/:id/mapping', async (req, res) => { const v = body(req), mapping = await imports.map(principal(res), id(req), identifier(v.connectionId, 'connectionId'), text(v.table, 'table', 256), mappingFields(v.fields)); res.json({ ...mapping, rows: mapping.rows.slice(0, 20), rowCount: mapping.rows.length }); });
+    app.post('/api/imports/:id/mapping', async (req, res) => { const v = body(req), deduplicationToken = v.deduplicationToken === null ? null : v.deduplicationToken === undefined ? undefined : text(v.deduplicationToken, 'deduplication token', 36), mapping = await imports.map(principal(res), id(req), identifier(v.connectionId, 'connectionId'), text(v.table, 'table', 256), mappingFields(v.fields), deduplicationToken); res.json({ ...mapping, ...(deduplicationToken === null ? { deduplicationToken: null } : {}), rows: mapping.rows.slice(0, 20), rowCount: mapping.rows.length }); });
     app.post('/api/imports/:id/commit', async (req, res) => res.json(await imports.commit(principal(res), id(req))));
     app.get('/api/imports/:id', (req, res) => res.json(imports.getJob(principal(res), id(req))));
     app.post('/api/imports/:id/reconcile', async (req, res) => res.json(await imports.reconcile(principal(res), id(req))));

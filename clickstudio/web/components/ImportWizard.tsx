@@ -3,7 +3,7 @@ import { api } from '../api';
 import { cloudImportDatabases, CREATE_CLOUD_TABLE_TARGET } from '../cloud-import';
 import { ImportJobStatus } from './ImportJobStatus';
 import { ImportPreviewTable } from './ImportPreviewTable';
-import { formatImportRowCount, MAX_FILE_BYTES, importSteps } from './import-wizard-model';
+import { formatImportColumnCount, formatImportRowCount, MAX_FILE_BYTES, importSteps } from './import-wizard-model';
 import { useImportWizardController, type ImportWizardControllerOptions } from './useImportWizardController';
 import { Icon } from './ui';
 
@@ -31,6 +31,9 @@ export function ImportWizard({ onImportQuery, ...controllerProps }: ImportWizard
         job,
         recoverableJobs,
         pendingImport,
+        retryImportConfirmed,
+        resumePendingRetry,
+        startNewImport,
         recoveryState,
         setRecoveryAttempt,
         busy,
@@ -65,12 +68,12 @@ export function ImportWizard({ onImportQuery, ...controllerProps }: ImportWizard
         previewMapping,
         commitImport,
         reconcileJob,
-        reviewUnknownImport,
         confirmUnknownImport,
         retryUnknownImport,
         retryAttemptedFor,
     } = useImportWizardController(controllerProps);
-    const canRetryUnknownImport = Boolean(job && job.status === 'unknown' && preview && mapping && (!browserCloudImport || (file && format)) && retryAttemptedFor !== job.id);
+    const canRetryUnknownImport = Boolean(job && job.status === 'unknown' && preview && mapping?.id === job.id && (!browserCloudImport || (file && format)) && retryAttemptedFor !== job.id);
+    const retryChoiceRequired = pendingImport?.retryDeduplicationToken !== undefined && !retryImportConfirmed;
     const hasCreateIdColumn = createColumns.some(column => column.name.toLowerCase() === 'id');
     const importableDatabases = cloudImportDatabases(schema);
     const mappedFields = mapping?.fields ?? selectedFields;
@@ -202,8 +205,19 @@ export function ImportWizard({ onImportQuery, ...controllerProps }: ImportWizard
                 {recoveryState === 'ready' && busy === 'recover' && step === 'status' && <div role="status" className="mb-4 rounded-xl border border-[var(--line)] bg-[var(--page)] p-3 text-xs text-[var(--text-soft)]">Checking the saved import status…</div>}
 
                 {recoveryState === 'ready' && !importUnavailable && step === 'file' && <section aria-label="Choose and preview a file" className="space-y-4">
+                    {pendingImport?.retryDeduplicationToken !== undefined ? <div role="status" className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-[var(--amber)]/35 bg-[var(--amber)]/5 p-4 text-xs leading-relaxed text-[var(--text-soft)]">
+                        <div className="min-w-0 flex-1">
+                            <strong className="text-[var(--text)]">A previous import was reviewed.</strong>
+                            <p className="mt-1">Retry it for <code>{pendingImport.table}</code>, or start a new import that treats the CSV as a new write. Choose the original file to retry.</p>
+                            {retryImportConfirmed ? <p className="mt-2 text-[var(--accent)]">Retry selected. Choose the original file, then review the mapping.</p> : null}
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            <button type="button" onClick={resumePendingRetry} disabled={retryImportConfirmed} className="rounded-lg border border-[var(--line)] px-3 py-2 font-semibold text-[var(--text-soft)] disabled:opacity-50">Retry previous import</button>
+                            <button type="button" onClick={startNewImport} className="rounded-lg border border-[var(--line)] px-3 py-2 font-semibold text-[var(--text-soft)]">Start a new import</button>
+                        </div>
+                    </div> : null}
                     {!preview ? <>
-                        {browserDemoImport && <div className="import-sample-card flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--line-bright)] bg-[var(--page)] p-4"><div><strong className="block text-sm">Try a sample import</strong><span className="mt-1 block text-xs text-[var(--muted)]">Six rows of marketing data, ready to preview.</span></div><button type="button" onClick={loadSampleFile} disabled={Boolean(busy)} className="rounded-lg border border-[var(--line-bright)] px-3 py-2 text-xs font-semibold text-[var(--text)] transition hover:bg-[var(--panel-hover)] disabled:opacity-50">{busy === 'preview' ? 'Loading sample…' : 'Load sample file'}</button></div>}
+                        {browserDemoImport && <div className="import-sample-card flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--line-bright)] bg-[var(--page)] p-4"><div><strong className="block text-sm">Try a sample import</strong><span className="mt-1 block text-xs text-[var(--muted)]">Six rows of marketing data, ready to preview.</span></div><button type="button" onClick={loadSampleFile} disabled={Boolean(busy) || retryChoiceRequired} className="rounded-lg border border-[var(--line-bright)] px-3 py-2 text-xs font-semibold text-[var(--text)] transition hover:bg-[var(--panel-hover)] disabled:opacity-50">{busy === 'preview' ? 'Loading sample…' : 'Load sample file'}</button></div>}
                         <label className="import-file-picker import-file-picker-rows">
                             <span className="import-file-icon" aria-hidden="true"><Icon name="importFile"/></span>
                             <span className="import-file-copy"><strong>Choose a data file</strong><small>CSV, JSON, NDJSON, or JSONL · up to 2 MB</small></span>
@@ -212,7 +226,7 @@ export function ImportWizard({ onImportQuery, ...controllerProps }: ImportWizard
                         {file && <div className="import-selected-file flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--line)] bg-[var(--page)] px-4 py-3 text-xs"><span className="min-w-0 truncate font-medium">{file.name}</span><span className="text-[var(--muted)]">{format ? format.toUpperCase() : 'Unsupported'} · {(file.size / 1024).toFixed(1)} KB</span></div>}
                     </> : <>
                         <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div><span className="text-xs font-semibold">{preview.name}</span><p className="mt-1 text-[11px] text-[var(--muted)]">{formatImportRowCount(preview.rowCount)} · {preview.columns.length} columns · {preview.format.toUpperCase()}</p></div>
+                            <div><span className="text-xs font-semibold">{preview.name}</span><p className="mt-1 text-[11px] text-[var(--muted)]">{formatImportRowCount(preview.rowCount)} · {formatImportColumnCount(preview.columns.length)} · {preview.format.toUpperCase()}</p></div>
                             <button type="button" onClick={() => { if (!browserCloudImport) void api(`/imports/${encodeURIComponent(preview.id)}`, { method: 'DELETE' }).catch(() => undefined); setPreview(undefined); setMapping(undefined); setStep('file'); setError(''); }} className="rounded-lg border border-[var(--line)] px-3 py-2 text-[11px] text-[var(--text-soft)] hover:bg-[var(--panel-hover)]">Choose another file</button>
                         </div>
                         <ImportPreviewTable preview={preview} columns={sampleColumns}/>
@@ -226,7 +240,7 @@ export function ImportWizard({ onImportQuery, ...controllerProps }: ImportWizard
                         <div className="import-setup-source-copy">
                             <span className="import-setup-kicker">SOURCE FILE</span>
                             <strong title={preview.name}>{preview.name}</strong>
-                            <span>{formatImportRowCount(preview.rowCount)} · {preview.columns.length} columns · {preview.format.toUpperCase()}</span>
+                            <span>{formatImportRowCount(preview.rowCount)} · {formatImportColumnCount(preview.columns.length)} · {preview.format.toUpperCase()}</span>
                         </div>
                         <button type="button" onClick={importAnotherFile} disabled={Boolean(busy)} className="import-change-file">Change file</button>
                     </div>
@@ -343,8 +357,8 @@ export function ImportWizard({ onImportQuery, ...controllerProps }: ImportWizard
                         <p className="mt-2 text-xs leading-relaxed text-[var(--text-soft)]">{browserDemoImport ? 'This adds rows to the Vercel interview sandbox in this browser. It does not write to ClickHouse.' : browserCloudImport ? creatingTable ? 'This creates a MergeTree table in the connected database, then inserts the file rows.' : 'This writes to the selected Cloud table. ClickHouse checks your account permissions and destination types.' : 'This writes data to the selected ClickHouse table. The mapping and destination schema were checked by the server.'}</p>
                         <dl className="import-review-metrics" aria-label="Import summary">
                             <div><dt>Rows</dt><dd>{formatImportRowCount(mapping.rowCount)}</dd></div>
-                            <div><dt>Mapped</dt><dd>{mappedColumnCount} columns</dd></div>
-                            <div><dt>Skipped</dt><dd>{skippedColumnCount} columns</dd></div>
+                            <div><dt>Mapped</dt><dd>{formatImportColumnCount(mappedColumnCount)}</dd></div>
+                            <div><dt>Skipped</dt><dd>{formatImportColumnCount(skippedColumnCount)}</dd></div>
                         </dl>
                     </div>
                     <div className="import-review-mapping rounded-xl border border-[var(--line)] bg-[var(--page)]">
@@ -373,7 +387,7 @@ export function ImportWizard({ onImportQuery, ...controllerProps }: ImportWizard
                     job={job} pendingImport={pendingImport} browserDemoImport={browserDemoImport} browserCloudImport={browserCloudImport}
                     recoverableJobCount={recoverableJobs.length} busy={busy} retryAttempted={retryAttemptedFor === job?.id}
                     canRetry={canRetryUnknownImport} onReconcile={() => void reconcileJob()} onConfirm={() => void confirmUnknownImport()}
-                    onRetry={() => void (canRetryUnknownImport ? retryUnknownImport() : reviewUnknownImport())} onForget={forgetImport}
+                    onRetry={() => void retryUnknownImport()} onForget={forgetImport}
                 />}
 
                 {error && recoveryState !== 'failed' && <p role="alert" className="mt-4 rounded-lg border border-[var(--red)]/30 bg-[var(--red)]/5 px-3 py-2.5 text-xs leading-relaxed text-[var(--red)]">{error}</p>}
@@ -381,12 +395,12 @@ export function ImportWizard({ onImportQuery, ...controllerProps }: ImportWizard
             </main>
 
             <footer className="import-wizard-footer flex flex-wrap items-center justify-between gap-3 border-t border-[var(--line)] bg-[var(--page)] px-5 py-3 sm:px-7">
-                <span className="import-wizard-footer-note text-[10px] text-[var(--muted)]">{importKind === 'query' ? 'SQL opens as a draft and does not run automatically' : browserDemoImport ? 'Browser demo · nothing is written to ClickHouse' : browserCloudImport ? 'CSV, JSON, or NDJSON · up to 2 MB and 10,000 rows' : step === 'file' ? 'CSV, JSON, or NDJSON · up to 2 MB and 10,000 rows' : step === 'mapping' ? target ? `${Object.keys(selectedFields).length} columns mapped · review before writing` : 'Choose a table and match its columns' : step === 'review' ? 'Review the destination and row count before writing' : 'Import status is checked with ClickHouse'}</span>
+                <span className="import-wizard-footer-note text-[10px] text-[var(--muted)]">{importKind === 'query' ? 'SQL opens as a draft and does not run automatically' : browserDemoImport ? 'Browser demo · nothing is written to ClickHouse' : browserCloudImport ? 'CSV, JSON, or NDJSON · up to 2 MB and 10,000 rows' : step === 'file' ? 'CSV, JSON, or NDJSON · up to 2 MB and 10,000 rows' : step === 'mapping' ? target ? `${formatImportColumnCount(Object.keys(selectedFields).length)} mapped · review before writing` : 'Choose a table and match its columns' : step === 'review' ? 'Review the destination and row count before writing' : 'Import status is checked with ClickHouse'}</span>
                 <div className="flex items-center gap-2">
                     {importKind === 'query' && <button type="button" onClick={() => void openQueryFile()} disabled={!queryFile || Boolean(queryFileError) || openingQuery} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40">{openingQuery ? 'Opening…' : 'Open query'}</button>}
                     {importKind === 'rows' && <>
                     {recoveryState === 'ready' && step === 'review' && <button type="button" onClick={() => { setStep('mapping'); setError(''); }} disabled={Boolean(busy)} className="rounded-lg border border-[var(--line)] px-3 py-2 text-xs text-[var(--text-soft)] hover:bg-[var(--panel-hover)] disabled:opacity-50">Back</button>}
-                    {recoveryState === 'ready' && !importUnavailable && step === 'file' && <button type="button" onClick={() => void previewFile()} disabled={!file || !format || file.size > MAX_FILE_BYTES || Boolean(busy) || (!availableTargets.length && !browserCloudImport)} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40">{busy === 'preview' ? 'Reading file…' : 'Read file and continue'}</button>}
+                    {recoveryState === 'ready' && !importUnavailable && step === 'file' && <button type="button" onClick={() => void previewFile()} disabled={!file || !format || file.size > MAX_FILE_BYTES || Boolean(busy) || retryChoiceRequired || (!availableTargets.length && !browserCloudImport)} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40">{busy === 'preview' ? 'Reading file…' : 'Read file and continue'}</button>}
                     {recoveryState === 'ready' && !importUnavailable && step === 'mapping' && <button type="button" onClick={() => void previewMapping()} disabled={!target || !destinationNames.length || duplicateDestinations || !destinationColumns.length || Boolean(busy)} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40">{busy === 'mapping' ? 'Checking mapping…' : !target ? browserCloudImport && selectedDestinationChoice === 'existing' ? 'Choose a table' : 'Choose a destination' : !destinationNames.length && destinationColumns.length > 0 ? 'Map a column first' : duplicateDestinations ? 'Fix duplicate columns' : !destinationColumns.length ? 'No writable columns' : 'Review import'}</button>}
                     {recoveryState === 'ready' && !importUnavailable && step === 'review' && <button type="button" onClick={() => void commitImport()} disabled={Boolean(busy)} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40">{busy === 'commit' ? browserDemoImport ? 'Saving…' : 'Starting…' : creatingTable ? 'Create table and import' : browserDemoImport ? 'Save demo rows' : 'Import rows'}</button>}
                     {recoveryState === 'ready' && step === 'status' && job?.status === 'succeeded' && <>

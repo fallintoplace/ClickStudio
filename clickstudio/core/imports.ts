@@ -113,6 +113,7 @@ export interface ImportJob {
     connectionId: string;
     table: string;
     queryId: string;
+    deduplicationToken?: string;
     rows: number;
     createdAt: string;
     status: 'running' | 'succeeded' | 'unknown';
@@ -123,7 +124,7 @@ export interface ImportJob {
 export interface ImportDriver {
     schema(connectionId: string): Promise<Schema>;
     allowed(connectionId: string, table: string): boolean;
-    insert(connectionId: string, table: string, rows: Record<string, Json>[], queryId: string): Promise<void>;
+    insert(connectionId: string, table: string, rows: Record<string, Json>[], queryId: string, deduplicationToken?: string): Promise<void>;
     inspectInsert(connectionId: string, queryId: string): Promise<'running' | 'succeeded' | 'unknown'>;
 }
 interface Mapping {
@@ -132,6 +133,7 @@ interface Mapping {
     inputId: string;
     connectionId: string;
     table: string;
+    deduplicationToken?: string;
     fields: Record<string, string>;
     schemaHash: string;
     rows: Record<string, Json>[];
@@ -178,8 +180,9 @@ export class ImportService {
             (job.status === 'running' || (job.status === 'unknown' && !job.reviewedAt)))
             .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     }
-    async map(principal: Principal, inputId: string, connectionId: string, table: string, fields: Record<string, string>): Promise<Mapping> {
+    async map(principal: Principal, inputId: string, connectionId: string, table: string, fields: Record<string, string>, deduplicationToken?: string | null): Promise<Mapping> {
         canWrite(principal);
+        requireThat(deduplicationToken === undefined || deduplicationToken === null || isImportDeduplicationToken(deduplicationToken), 400, 'IMPORT_DEDUPLICATION_TOKEN', 'The import retry token is invalid');
         const input = this.get(principal, inputId);
         requireThat(this.trusted(principal, connectionId), 403, 'WORKSPACE_UNTRUSTED', 'Trust the destination connection first');
         requireThat(this.driver.allowed(connectionId, table), 403, 'IMPORT_NOT_ALLOWED', 'Choose a valid table in a visible non-system database');
@@ -201,7 +204,7 @@ export class ImportService {
             }
             return mapped;
         });
-        const mapping: Mapping = { id: randomUUID(), owner: principal.id, inputId, connectionId, table, fields,
+        const mapping: Mapping = { id: randomUUID(), owner: principal.id, inputId, connectionId, table, ...(deduplicationToken === null ? {} : { deduplicationToken: deduplicationToken ?? randomUUID() }), fields,
             schemaHash: hash(columns), rows, expiresAt: input.expiresAt };
         this.store.put('mappings', mapping.id, mapping);
         return mapping;
@@ -230,12 +233,13 @@ export class ImportService {
             job.connectionId === mapping.connectionId && job.table === mapping.table &&
             (job.status === 'running' || (job.status === 'unknown' && !job.reviewedAt)));
         requireThat(!stillUnresolved, 409, 'IMPORT_UNRESOLVED', 'Review or reconcile the previous import to this table before starting another write');
+        const deduplicationToken = isImportDeduplicationToken(mapping.deduplicationToken) ? mapping.deduplicationToken : undefined;
         const job: ImportJob = { id: mappingId, owner: principal.id, inputId: mapping.inputId, connectionId: mapping.connectionId,
-            table: mapping.table, queryId: `clickstudio-import-${randomUUID()}`, rows: mapping.rows.length, status: 'running', createdAt: new Date().toISOString() };
+            table: mapping.table, queryId: `clickstudio-import-${randomUUID()}`, ...(deduplicationToken ? { deduplicationToken } : {}), rows: mapping.rows.length, status: 'running', createdAt: new Date().toISOString() };
         this.store.put('imports', job.id, job);
         audit(this.store, principal, 'import.commit', job.id);
         try {
-            await this.driver.insert(mapping.connectionId, mapping.table, mapping.rows, job.queryId);
+            await this.driver.insert(mapping.connectionId, mapping.table, mapping.rows, job.queryId, deduplicationToken);
             job.status = 'succeeded';
         }
         catch (error) {
@@ -323,6 +327,9 @@ export class ImportService {
                 if (Date.parse(item.expiresAt) <= Date.now())
                     this.store.delete(bucket, item.id);
     }
+}
+function isImportDeduplicationToken(value: unknown): value is string {
+    return typeof value === 'string' && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(value);
 }
 function targetColumns(schema: Schema, table: string): SchemaColumn[] {
     const matches = schema.columns.filter(c => `${c.database}.${c.table}` === table);

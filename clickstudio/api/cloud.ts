@@ -40,7 +40,7 @@ const clickhouseRunSettings = {
     output_format_json_quote_decimals: 1 as const,
 };
 
-type CloudImportJob = { id: string; connectionId: 'clickhouse-cloud'; table: string; queryId: string; rows: number; createdAt: string; status: 'running' | 'succeeded' | 'unknown'; error?: string; reviewedAt?: string; reconciliationRequired?: boolean; tableCreated?: boolean; tableExists?: boolean };
+type CloudImportJob = { id: string; connectionId: 'clickhouse-cloud'; table: string; queryId: string; deduplicationToken?: string; rows: number; createdAt: string; status: 'running' | 'succeeded' | 'unknown'; error?: string; reviewedAt?: string; reconciliationRequired?: boolean; tableCreated?: boolean; tableExists?: boolean };
 
 function isSameOrigin(request: Request) {
     const origin = request.headers.get('origin');
@@ -49,6 +49,10 @@ function isSameOrigin(request: Request) {
 
 function validImportQueryId(value: unknown): value is string {
     return typeof value === 'string' && /^clickstudio-import-[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(value);
+}
+
+function validImportDeduplicationToken(value: unknown): value is string {
+    return typeof value === 'string' && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(value);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -564,8 +568,8 @@ function parseImportTarget(value: unknown): { database: string; table: string } 
     return { database, table };
 }
 
-async function inspectCloudImport(credentials: CloudCredentials, url: string, queryId: string, table: string, rows: number): Promise<CloudImportJob> {
-    const job: CloudImportJob = { id: queryId.slice('clickstudio-import-'.length), connectionId: 'clickhouse-cloud', table, queryId, rows, createdAt: new Date().toISOString(), status: 'unknown', error: 'ClickHouse could not confirm the insert. The rows may already be there.' };
+async function inspectCloudImport(credentials: CloudCredentials, url: string, queryId: string, table: string, rows: number, deduplicationToken?: string): Promise<CloudImportJob> {
+    const job: CloudImportJob = { id: queryId.slice('clickstudio-import-'.length), connectionId: 'clickhouse-cloud', table, queryId, ...(deduplicationToken ? { deduplicationToken } : {}), rows, createdAt: new Date().toISOString(), status: 'unknown', error: 'ClickHouse could not confirm the insert. The rows may already be there.' };
     const client = makeClient(credentials, url);
     const createQueryId = `clickstudio-create-${job.id}`;
     const target = parseImportTarget(table);
@@ -615,6 +619,9 @@ async function commitCloudImport(form: FormData, credentials: CloudCredentials, 
     const queryIdValue = form.get('queryId');
     if (!validImportQueryId(queryIdValue)) throw new AppError(400, 'IMPORT_QUERY_ID', 'The import request id is invalid.');
     const queryId = queryIdValue;
+    const deduplicationTokenValue = form.get('deduplicationToken');
+    if (deduplicationTokenValue !== null && !validImportDeduplicationToken(deduplicationTokenValue)) throw new AppError(400, 'IMPORT_DEDUPLICATION_TOKEN', 'The import retry token is invalid.');
+    const deduplicationToken = deduplicationTokenValue === null ? undefined : deduplicationTokenValue;
     const target = form.get('target');
     const fields = parseFormJson<Record<string, unknown>>(form, 'fields');
     if (!fields || typeof fields !== 'object' || Array.isArray(fields)) throw new AppError(400, 'IMPORT_MAPPING', 'Choose at least one destination column.');
@@ -715,12 +722,12 @@ async function commitCloudImport(form: FormData, credentials: CloudCredentials, 
             format: 'JSONEachRow',
             query_id: queryId,
             abort_signal: AbortSignal.timeout(48_000),
-            clickhouse_settings: clickhouseSettings,
+            clickhouse_settings: { ...clickhouseSettings, ...(deduplicationToken ? { insert_deduplication_token: deduplicationToken } : {}) },
         });
     } finally {
         await client.close();
     }
-    return { id: queryId.slice('clickstudio-import-'.length), connectionId: 'clickhouse-cloud', table: `${tableDatabase}.${tableName}`, queryId, rows: parsed.rows.length, createdAt: new Date().toISOString(), status: 'succeeded', tableExists: true, ...(creating ? { tableCreated: true } : {}) };
+    return { id: queryId.slice('clickstudio-import-'.length), connectionId: 'clickhouse-cloud', table: `${tableDatabase}.${tableName}`, queryId, ...(deduplicationToken ? { deduplicationToken } : {}), rows: parsed.rows.length, createdAt: new Date().toISOString(), status: 'succeeded', tableExists: true, ...(creating ? { tableCreated: true } : {}) };
 }
 
 async function postCloudImport(request: Request): Promise<Response> {
@@ -875,9 +882,10 @@ async function post(request: Request): Promise<Response> {
         if (body.action === 'import-status') {
             const targetTable = typeof body.table === 'string' ? body.table : '';
             if (!validImportQueryId(body.queryId) || !parseImportTarget(targetTable) ||
-                typeof body.rows !== 'number' || !Number.isSafeInteger(body.rows) || body.rows < 1 || body.rows > 10_000)
+                typeof body.rows !== 'number' || !Number.isSafeInteger(body.rows) || body.rows < 1 || body.rows > 10_000 ||
+                (body.deduplicationToken !== undefined && !validImportDeduplicationToken(body.deduplicationToken)))
                 return fail('IMPORT_STATUS', 'The saved import details are invalid.');
-            return json(await inspectCloudImport(credentials, url, body.queryId, targetTable, body.rows));
+            return json(await inspectCloudImport(credentials, url, body.queryId, targetTable, body.rows, body.deduplicationToken as string | undefined));
         }
         return fail('CLOUD_ACTION', 'Choose a supported ClickHouse Cloud workspace action.');
     } catch (error) {

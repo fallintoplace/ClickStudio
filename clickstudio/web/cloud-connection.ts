@@ -12,13 +12,14 @@ export const CLICKHOUSE_CLOUD_CONNECTION_ID = 'clickhouse-cloud';
 export type CloudCredentials = { host: string; database: string; username: string; password: string };
 export type SavedCloudConnectionProfile = Pick<CloudCredentials, 'host' | 'database' | 'username'>;
 export type CloudQueryResult = { queryId: string; columns: Column[]; rows: Row[]; elapsedMs: number; bytes: number; truncated: boolean; writtenRows?: number };
-export type CloudImportJob = { id: string; connectionId: string; table: string; queryId: string; rows: number; createdAt: string; status: 'running' | 'succeeded' | 'unknown'; error?: string; reviewedAt?: string; reconciliationRequired?: boolean; tableCreated?: boolean; tableExists?: boolean };
+export type CloudImportJob = { id: string; connectionId: string; table: string; queryId: string; deduplicationToken?: string; rows: number; createdAt: string; status: 'running' | 'succeeded' | 'unknown'; error?: string; reviewedAt?: string; reconciliationRequired?: boolean; tableCreated?: boolean; tableExists?: boolean };
 export type CloudImportInput = {
     file: File;
     format: 'csv' | 'json' | 'ndjson';
     target: string;
     fields: Record<string, string>;
     queryId: string;
+    deduplicationToken?: string;
     expectedColumns?: Pick<SchemaColumn, 'name' | 'type' | 'defaultKind'>[];
     createTable?: { database: string; name: string; columns: CloudImportColumn[]; generateId?: boolean };
 };
@@ -294,6 +295,7 @@ export async function importClickHouseCloudFile(input: CloudImportInput): Promis
     form.set('target', input.target);
     form.set('fields', JSON.stringify(input.fields));
     form.set('queryId', input.queryId);
+    if (input.deduplicationToken) form.set('deduplicationToken', input.deduplicationToken);
     if (input.expectedColumns) form.set('expectedColumns', JSON.stringify(input.expectedColumns));
     if (input.createTable) form.set('createTable', JSON.stringify(input.createTable));
     return await requestCloudImport<CloudImportJob>(form);
@@ -304,6 +306,7 @@ export async function insertClickHouseCloudRow(input: {
     columns: readonly Pick<SchemaColumn, 'name' | 'type' | 'defaultKind'>[];
     row: Record<string, unknown>;
     queryId: string;
+    deduplicationToken?: string;
 }): Promise<CloudImportJob> {
     const file = new File([JSON.stringify([input.row])], 'insert-row.json', { type: 'application/json' });
     return importClickHouseCloudFile({
@@ -312,13 +315,14 @@ export async function insertClickHouseCloudRow(input: {
         target: input.table,
         fields: Object.fromEntries(Object.keys(input.row).map(column => [column, column])),
         queryId: input.queryId,
+        deduplicationToken: input.deduplicationToken,
         expectedColumns: input.columns.map(({ name, type, defaultKind }) => ({ name, type, defaultKind })),
     });
 }
 
-export async function checkClickHouseCloudImport(queryId: string, table: string, rows: number): Promise<CloudImportJob> {
+export async function checkClickHouseCloudImport(queryId: string, table: string, rows: number, deduplicationToken?: string): Promise<CloudImportJob> {
     if (!activeCloud) throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before checking import status.', 401);
-    return await requestCloud<CloudImportJob>({ action: 'import-status', credentials: activeCloud.credentials, queryId, table, rows });
+    return await requestCloud<CloudImportJob>({ action: 'import-status', credentials: activeCloud.credentials, queryId, table, rows, ...(deduplicationToken ? { deduplicationToken } : {}) });
 }
 
 export async function loadClickHouseCloudWorkload(minutes: WorkloadWindow, signal: AbortSignal): Promise<WorkloadSnapshot> {

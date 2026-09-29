@@ -12,8 +12,8 @@ type Props = {
 };
 
 type Preview = { id: string; rowCount: number };
-type Mapping = { id: string; table: string; rowCount: number; fields: Record<string, string> };
-type ImportJob = { id: string; table: string; rows: number; status: 'running' | 'succeeded' | 'unknown'; error?: string; reconciliationRequired?: boolean; reviewedAt?: string; queryId?: string; connectionId?: string };
+type Mapping = { id: string; table: string; rowCount: number; fields: Record<string, string>; deduplicationToken?: string | null };
+type ImportJob = { id: string; table: string; rows: number; status: 'running' | 'succeeded' | 'unknown'; error?: string; reconciliationRequired?: boolean; reviewedAt?: string; queryId?: string; deduplicationToken?: string; connectionId?: string };
 type Step = 'edit' | 'review' | 'status';
 function optionalColumn(column: SchemaColumn) {
     return Boolean(column.defaultKind) || /^Nullable\(/.test(column.type);
@@ -74,7 +74,7 @@ export function InsertRowDialog({ connectionId, table, columns, onClose, onInser
         let active = true;
         const timer = window.setTimeout(() => {
             const status = job.queryId
-                ? checkClickHouseCloudImport(job.queryId, job.table, job.rows)
+                ? checkClickHouseCloudImport(job.queryId, job.table, job.rows, job.deduplicationToken)
                 : api<ImportJob>(`/imports/${encodeURIComponent(job.id)}`);
             void status.then(next => {
                 if (!active) return;
@@ -97,7 +97,7 @@ export function InsertRowDialog({ connectionId, table, columns, onClose, onInser
         let nextPreview: Preview | undefined;
         try {
             if (cloudConnection) {
-                setMapping({ id: crypto.randomUUID(), table: name, rowCount: 1, fields: Object.fromEntries(Object.keys(row).map(column => [column, column])) });
+                setMapping({ id: crypto.randomUUID(), deduplicationToken: crypto.randomUUID(), table: name, rowCount: 1, fields: Object.fromEntries(Object.keys(row).map(column => [column, column])) });
                 setStep('review');
                 return;
             }
@@ -122,12 +122,14 @@ export function InsertRowDialog({ connectionId, table, columns, onClose, onInser
         if (!mapping || busy) return;
         setBusy(true);
         setError('');
+        const deduplicationToken = mapping.deduplicationToken ?? crypto.randomUUID();
         const queryId = cloudConnection ? `clickstudio-import-${crypto.randomUUID()}` : undefined;
-        setJob({ id: mapping.id, table: name, rows: 1, status: 'running', ...(queryId ? { queryId, connectionId } : {}) });
+        setMapping({ ...mapping, deduplicationToken });
+        setJob({ id: mapping.id, table: name, rows: 1, deduplicationToken, status: 'running', ...(queryId ? { queryId, connectionId } : {}) });
         setStep('status');
         try {
             const next = cloudConnection && queryId
-                ? await insertClickHouseCloudRow({ table: name, columns, row, queryId })
+                ? await insertClickHouseCloudRow({ table: name, columns, row, queryId, deduplicationToken })
                 : await post<ImportJob>(`/imports/${encodeURIComponent(mapping.id)}/commit`);
             setJob(next);
             if (next.status === 'succeeded') reportSuccess();
@@ -138,11 +140,11 @@ export function InsertRowDialog({ connectionId, table, columns, onClose, onInser
                 setError(message(caught));
             } else if (cloudConnection && queryId) {
                 try {
-                    const recovered = await checkClickHouseCloudImport(queryId, name, 1);
+                    const recovered = await checkClickHouseCloudImport(queryId, name, 1, deduplicationToken);
                     setJob(recovered);
                     if (recovered.status === 'succeeded') reportSuccess();
                 } catch {
-                    setJob({ id: mapping.id, table: name, rows: 1, queryId, connectionId, status: 'unknown', error: `Could not confirm whether the row reached ${name}. Inspect the table before trying again.` });
+                    setJob({ id: mapping.id, table: name, rows: 1, queryId, deduplicationToken, connectionId, status: 'unknown', error: `Could not confirm whether the row reached ${name}. Inspect the table before trying again.` });
                 }
             } else {
                 try {
@@ -166,7 +168,7 @@ export function InsertRowDialog({ connectionId, table, columns, onClose, onInser
         setError('');
         try {
             const next = job.queryId
-                ? await checkClickHouseCloudImport(job.queryId, job.table, job.rows)
+                ? await checkClickHouseCloudImport(job.queryId, job.table, job.rows, job.deduplicationToken)
                 : await post<ImportJob>(`/imports/${encodeURIComponent(job.id)}/reconcile`);
             setJob(next);
             if (next.status === 'succeeded') reportSuccess();
@@ -205,10 +207,11 @@ export function InsertRowDialog({ connectionId, table, columns, onClose, onInser
         setError('');
         let retryMapping = mapping;
         let retryQueryId: string | undefined;
+        let retryDeduplicationToken: string | undefined;
         let writeStarted = false;
         try {
             const checked = job.queryId
-                ? await checkClickHouseCloudImport(job.queryId, job.table, job.rows)
+                ? await checkClickHouseCloudImport(job.queryId, job.table, job.rows, job.deduplicationToken)
                 : await post<ImportJob>(`/imports/${encodeURIComponent(job.id)}/reconcile`);
             if (checked.status !== 'unknown') {
                 setJob(checked);
@@ -217,7 +220,7 @@ export function InsertRowDialog({ connectionId, table, columns, onClose, onInser
             }
 
             if (job.queryId) {
-                retryMapping = { ...mapping, id: crypto.randomUUID() };
+                retryMapping = { ...mapping, id: crypto.randomUUID(), deduplicationToken: job.deduplicationToken ?? mapping.deduplicationToken };
             } else {
                 if (!preview) throw new Error('The row preview expired. Close this dialog and prepare the row again.');
                 const reviewed = await post<ImportJob>(`/imports/${encodeURIComponent(job.id)}/review`, { inspected: true, noActiveInsert: true });
@@ -234,17 +237,20 @@ export function InsertRowDialog({ connectionId, table, columns, onClose, onInser
                     connectionId,
                     table: name,
                     fields: mapping.fields,
+                    deduplicationToken: job.deduplicationToken ?? null,
                 });
             }
 
             setMapping(retryMapping);
             retryQueryId = cloudConnection ? `clickstudio-import-${crypto.randomUUID()}` : undefined;
-            const retryJob: ImportJob = { id: retryMapping.id, table: name, rows: 1, status: 'running', ...(retryQueryId ? { queryId: retryQueryId, connectionId } : {}) };
+            retryDeduplicationToken = job.deduplicationToken ?? retryMapping.deduplicationToken ?? undefined;
+            retryMapping = { ...retryMapping, deduplicationToken: retryDeduplicationToken };
+            const retryJob: ImportJob = { id: retryMapping.id, table: name, rows: 1, deduplicationToken: retryDeduplicationToken, status: 'running', ...(retryQueryId ? { queryId: retryQueryId, connectionId } : {}) };
             setJob(retryJob);
             setRetryAttempted(true);
             writeStarted = true;
             const next = retryQueryId
-                ? await insertClickHouseCloudRow({ table: name, columns, row, queryId: retryQueryId })
+                ? await insertClickHouseCloudRow({ table: name, columns, row, queryId: retryQueryId, deduplicationToken: retryDeduplicationToken })
                 : await post<ImportJob>(`/imports/${encodeURIComponent(retryMapping.id)}/commit`);
             setJob(next);
             if (next.status === 'succeeded') reportSuccess();
@@ -259,11 +265,11 @@ export function InsertRowDialog({ connectionId, table, columns, onClose, onInser
                 setError(message(caught));
             } else if (writeStarted && retryQueryId) {
                 try {
-                    const recovered = await checkClickHouseCloudImport(retryQueryId, name, 1);
+                    const recovered = await checkClickHouseCloudImport(retryQueryId, name, 1, retryDeduplicationToken);
                     setJob(recovered);
                     if (recovered.status === 'succeeded') reportSuccess();
                 } catch {
-                    setJob({ id: retryMapping.id, table: name, rows: 1, queryId: retryQueryId, connectionId, status: 'unknown' });
+                    setJob({ id: retryMapping.id, table: name, rows: 1, queryId: retryQueryId, deduplicationToken: retryDeduplicationToken, connectionId, status: 'unknown' });
                 }
             } else if (writeStarted) {
                 try {
@@ -311,7 +317,7 @@ export function InsertRowDialog({ connectionId, table, columns, onClose, onInser
                     {!writableColumns.length && <p role="status" className="rounded-lg border border-[var(--line)] p-3 text-xs text-[var(--muted)]">This table has no writable columns.</p>}
                 </form>}
                 {step === 'review' && <section aria-label="Review row" className="space-y-4"><p className="text-xs text-[var(--text-soft)]">Review the exact values before inserting.</p><pre className="max-h-64 overflow-auto rounded-lg border border-[var(--line)] bg-[var(--page)] p-4 font-mono text-xs">{JSON.stringify(row, null, 2)}</pre></section>}
-                {step === 'status' && job && <section aria-label="Insert status" className="space-y-3"><p role="status" className="rounded-xl border border-[var(--line)] bg-[var(--page)] p-4 text-sm">{job.status === 'succeeded' ? `Inserted one row into ${name}.` : job.status === 'running' ? 'ClickHouse still reports this insert as active. Wait for it to finish before sending another row.' : 'ClickHouse couldn’t confirm the insert. The row may already be there.'}</p>{job.status === 'unknown' && <><p className="text-xs leading-relaxed text-[var(--text-soft)]">{retryAttempted ? 'A retry was sent, but its result is also unclear. Check the table before sending another insert.' : 'Check the table before choosing. If you do not see the row, you can retry once. A late first insert may create a duplicate.'}</p><div className="flex flex-wrap gap-2"><button type="button" disabled={busy} onClick={() => void reconcile()} className="rounded-lg border border-[var(--line)] px-3 py-2 text-xs disabled:opacity-40">{busy ? 'Checking…' : 'Check status'}</button><button type="button" disabled={busy} onClick={() => void confirmInserted()} className="rounded-lg border border-[var(--line)] px-3 py-2 text-xs disabled:opacity-40">I see the row</button>{!retryAttempted && <button type="button" disabled={busy} onClick={() => void retryUnknown()} className="rounded-lg border border-[var(--amber)]/40 px-3 py-2 text-xs disabled:opacity-40">{busy ? 'Checking…' : 'Row absent; retry once'}</button>}</div></>}</section>}
+                {step === 'status' && job && <section aria-label="Insert status" className="space-y-3"><p role="status" className="rounded-xl border border-[var(--line)] bg-[var(--page)] p-4 text-sm">{job.status === 'succeeded' ? job.reviewedAt ? `You confirmed the row is in ${name}.` : `ClickHouse acknowledged an insert request containing one row for ${name}.` : job.status === 'running' ? 'ClickHouse still reports this insert as active. Wait for it to finish before sending another row.' : 'ClickHouse couldn’t confirm the insert. The row may already be there.'}</p>{job.status === 'unknown' && <><p className="text-xs leading-relaxed text-[var(--text-soft)]">{retryAttempted ? 'A retry was sent, but its result is also unclear. Check the table before sending another insert.' : 'Check the table before choosing. If you do not see the row, you can retry once. A late first insert may create a duplicate.'}</p><div className="flex flex-wrap gap-2"><button type="button" disabled={busy} onClick={() => void reconcile()} className="rounded-lg border border-[var(--line)] px-3 py-2 text-xs disabled:opacity-40">{busy ? 'Checking…' : 'Check status'}</button><button type="button" disabled={busy} onClick={() => void confirmInserted()} className="rounded-lg border border-[var(--line)] px-3 py-2 text-xs disabled:opacity-40">I see the row</button>{!retryAttempted && <button type="button" disabled={busy} onClick={() => void retryUnknown()} className="rounded-lg border border-[var(--amber)]/40 px-3 py-2 text-xs disabled:opacity-40">{busy ? 'Checking…' : 'Row absent; retry once'}</button>}</div></>}</section>}
                 {error && <p role="alert" className="rounded-lg border border-[var(--red)]/30 bg-[var(--red)]/5 px-3 py-2.5 text-xs text-[var(--red)]">{error}</p>}
             </main>
             <footer className="flex justify-end gap-2 border-t border-[var(--line)] bg-[var(--page)] px-5 py-3 sm:px-7">

@@ -453,10 +453,10 @@ export class ClickHouseDriver implements QueryDriver, ImportDriver, CreateTableD
             throw this.safeError(error);
         }
     }
-    async insert(id: string, table: string, rows: Record<string, Json>[], queryId: string) {
+    async insert(id: string, table: string, rows: Record<string, Json>[], queryId: string, deduplicationToken?: string) {
         requireThat(this.allowed(id, table), 403, 'IMPORT_NOT_ALLOWED', 'Choose a valid table in a non-system database');
         try {
-            await this.client(id, true).insert({ table: quotedTable(table), values: rows, format: 'JSONEachRow', query_id: queryId, abort_signal: AbortSignal.timeout(60000), clickhouse_settings: { max_execution_time: 55, max_memory_usage: '536870912' } });
+            await this.client(id, true).insert({ table: quotedTable(table), values: rows, format: 'JSONEachRow', query_id: queryId, abort_signal: AbortSignal.timeout(60000), clickhouse_settings: { max_execution_time: 55, max_memory_usage: '536870912', ...(deduplicationToken ? { insert_deduplication_token: deduplicationToken } : {}) } });
         }
         catch (error) {
             throw this.safeError(error);
