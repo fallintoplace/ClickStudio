@@ -32,6 +32,8 @@
     .connection-menu-note.is-sample { border-color: color-mix(in srgb, var(--accent) 24%, var(--line)); border-left-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, var(--panel)); }
     .connection-menu-action { width: 100%; min-height: 32px; font-size: 10px; }
     .connection-menu-disconnect { justify-self: start; width: auto; min-height: 28px; padding-inline: 8px; }
+    .connection-menu-disconnect.button-danger { border-color: color-mix(in srgb, var(--red) 42%, var(--line)); background: color-mix(in srgb, var(--red) 17%, var(--panel)); color: var(--red); }
+    .connection-menu-disconnect.button-danger:hover:not(:disabled) { border-color: color-mix(in srgb, var(--red) 65%, var(--line-bright)); background: color-mix(in srgb, var(--red) 25%, var(--panel)); color: var(--text); }
     .connection-switch-list { display: grid; gap: 2px; margin-top: 3px; padding-top: 7px; border-top: 1px solid color-mix(in srgb, var(--violet) 35%, var(--line)); }
     .connection-switch-list > .connection-menu-heading { padding: 0 8px 2px; }
     .connection-switch-list > button { display: flex; width: 100%; min-width: 0; min-height: 46px; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 8px; border: 1px solid transparent; border-radius: 8px; background: transparent; text-align: left; cursor: pointer; transition: background .16s ease, border-color .16s ease; }
