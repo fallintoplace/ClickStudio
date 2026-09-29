@@ -174,11 +174,11 @@ export function WorkspaceResultsPanel({
             <div className="results-title">
                 <span className="results-mark"><Icon name={visibleResultsView === 'sqlmap' || visibleResultsView === 'pipeline' || visibleResultsView === 'indexes' || visibleResultsView === 'runtime' ? 'pipeline' : 'chart'}/></span>
                 <div><span className="eyebrow">{resultsEyebrow}</span><h2>{resultsTitle}</h2></div>
-                {panels.resultsCollapsed && failureError && visibleResultsView !== 'sqlmap'
+                {detached && panels.resultsCollapsed && failureError && visibleResultsView !== 'sqlmap'
                     ? <span className="result-execution-header" data-run-status="failed" role="status"><span className="status-light is-error"/>{copy.common.statusFailed}</span>
-                    : panels.resultsCollapsed && execution && visibleResultsView !== 'sqlmap'
+                    : detached && panels.resultsCollapsed && execution && visibleResultsView !== 'sqlmap'
                     ? <span className="result-execution-header"><span className="loading-orbit" aria-hidden="true"/>{copy.common.statusRunning}</span>
-                    : !failureError && !execution && run && visibleResultsView !== 'sqlmap' && <Status run={run} copy={copy.common}/>}
+                    : detached && !failureError && !execution && run && visibleResultsView !== 'sqlmap' && <Status run={run} copy={copy.common}/>}
                 {resultProvenance && <span
                     className={cx('result-provenance-header', resultProvenance.sourceDeleted && 'is-source-deleted')}
                     role="status"

@@ -1394,11 +1394,20 @@ test('Scripts show each statement outcome and open that statement’s retained r
     await expect(results.getByRole('button', { name: 'Statement 3: skipped', exact: true })).toBeVisible();
 
     await first.click();
+    await expect(results.locator('.results-title [data-run-status]')).toHaveCount(0);
+    await expect(page.locator('.execution-bar')).toHaveAttribute('data-run-status', 'succeeded');
     await expect(results.getByRole('table', { name: 'Retained query rows' })).toBeVisible();
     await expect(results.locator('.result-provenance-header')).toHaveCount(0);
+
     await second.click();
     await expect(results.getByTestId('query-failure')).toContainText('FIXTURE_ERROR');
     await expect(page.locator('.cm-content')).toContainText('SELECT 1; SELECT fixture_error; SELECT 3;');
+    await first.click();
+
+    const detachedResultsPromise = page.waitForEvent('popup');
+    await results.getByRole('button', { name: 'Open results in a separate window', exact: true }).click();
+    const detachedResults = await detachedResultsPromise;
+    await expect(detachedResults.locator('.results-title [data-run-status]')).toHaveAttribute('data-run-status', 'succeeded');
 });
 
 test('Script polling persists every statement run ID, including fast intermediate results', async ({ page }) => {
