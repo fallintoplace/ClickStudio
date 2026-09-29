@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { english } from '../../.workspace-build/web/i18n-english.js';
-import { helpSections } from '../../.workspace-build/web/components/workspace-help-model.js';
+import { categoryLabel, chartLabel, exampleText, helpSections } from '../../.workspace-build/web/components/workspace-help-model.js';
+
+const copy = english.common;
 
 test('experimental help topics stay grouped after the standard help topics', () => {
-    const sections = helpSections(english.common);
+    const sections = helpSections(copy);
     const experimental = sections.filter(section => section.experimental).map(section => section.id);
     const firstExperimentalIndex = sections.findIndex(section => section.experimental);
 
@@ -13,4 +15,69 @@ test('experimental help topics stay grouped after the standard help topics', () 
     assert.ok(sections.slice(0, firstExperimentalIndex).every(section => !section.experimental));
     assert.ok(sections.slice(firstExperimentalIndex).every(section => section.experimental));
     assert.ok(sections.findIndex(section => section.id === 'reference') < firstExperimentalIndex);
+});
+
+test('example category labels use localized and custom labels', () => {
+    const labels = [
+        ['all', copy.allExamples],
+        ['featured', 'Featured'],
+        ['business', 'Business'],
+        ['observability', 'Observability'],
+        ['operations', 'Operations'],
+        ['engineering', 'Engineering'],
+        ['markets', 'Markets'],
+        ['cities', 'Cities'],
+        ['openSource', 'Open source'],
+        ['internet', 'Internet'],
+        ['datasets', 'Datasets'],
+        ['writeOperations', copy.exampleWriteOperations],
+        ['basics', copy.exampleBasics],
+        ['aggregation', copy.exampleAggregation],
+        ['timeSeries', copy.exampleTimeSeries],
+        ['charts', copy.exampleCharts],
+        ['clickhouse', copy.exampleClickHouse],
+        ['schema', copy.exampleSchema],
+    ];
+
+    for (const [category, expected] of labels) {
+        assert.equal(categoryLabel(category, copy, 'en'), expected, category);
+    }
+    assert.equal(categoryLabel('featured', copy, 'de'), 'Highlights');
+    assert.equal(categoryLabel('openSource', copy, 'zh'), '开源');
+});
+
+test('chart labels cover every chart kind and unknown kinds', () => {
+    const labels = [
+        ['table', copy.exampleChartTable],
+        ['number', copy.exampleChartNumber],
+        ['line', copy.exampleChartLine],
+        ['bar', copy.exampleChartBar],
+        ['scatter', copy.exampleChartScatter],
+        ['heatmap', copy.exampleChartHeatmap],
+        ['candlestick', copy.exampleChartCandlestick],
+        ['unknown', copy.chart],
+    ];
+
+    for (const [kind, expected] of labels) {
+        assert.equal(chartLabel({ chart: { kind } }, copy), expected, kind);
+    }
+});
+
+test('schema examples use table copy while other examples preserve or localize their text', () => {
+    assert.deepEqual(exampleText({ id: 'events', name: 'Preview events', description: 'ignored', category: 'schema' }, 'en', copy), {
+        name: 'Preview events',
+        description: copy.exampleReadRows,
+    });
+    assert.deepEqual(exampleText({ id: 'events', name: 'events', description: 'ignored', category: 'schema' }, 'en', copy), {
+        name: 'Preview events',
+        description: copy.exampleReadRows,
+    });
+    assert.deepEqual(exampleText({ id: 'clickhouse-server-version', name: 'Server version', description: 'Read the version', category: 'clickhouse' }, 'ru', copy), {
+        name: 'Версия ClickHouse',
+        description: 'Узнать версию ClickHouse для этого подключения.',
+    });
+    assert.deepEqual(exampleText({ id: 'unknown-example', name: 'Unknown example', description: 'No translation', category: 'basics' }, 'de', copy), {
+        name: 'Unknown example',
+        description: 'No translation',
+    });
 });
