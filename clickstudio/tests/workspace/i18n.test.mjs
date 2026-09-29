@@ -7,15 +7,16 @@ const { getCopy, localeOptions, resolveLocale, supportedLocales, themeOptions } 
 const nonEnglishLocales = supportedLocales.filter(locale => locale !== 'en');
 
 test('Supported locales and selector options stay synchronized', () => {
+    assert.deepEqual(supportedLocales, ['en', 'zh']);
     assert.deepEqual(localeOptions.map(option => option.value), supportedLocales);
     assert.equal(new Set(localeOptions.map(option => option.value)).size, supportedLocales.length);
 });
 
 test('Browser locale resolution accepts regional tags and safe fallbacks', () => {
-    assert.equal(resolveLocale('de-DE'), 'de');
+    assert.equal(resolveLocale('de-DE'), 'en');
     assert.equal(resolveLocale('zh_Hant_TW'), 'zh');
-    assert.equal(resolveLocale('fr-FR', 'es-MX'), 'es');
-    assert.equal(resolveLocale('ru'), 'ru');
+    assert.equal(resolveLocale('fr-FR', 'es-MX'), 'en');
+    assert.equal(resolveLocale('ru'), 'en');
     assert.equal(resolveLocale('', null, undefined, 'pt-BR'), 'en');
 });
 

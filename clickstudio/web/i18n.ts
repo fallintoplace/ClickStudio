@@ -12,8 +12,8 @@ import {
     workspaceCommonTranslations,
 } from './i18n-translations.js';
 
-export const supportedLocales = ['en', 'de', 'es', 'nl', 'zh', 'ru'] as const;
-export type Locale = (typeof supportedLocales)[number];
+export const supportedLocales = ['en', 'zh'] as const;
+export type Locale = 'en' | 'de' | 'es' | 'nl' | 'zh' | 'ru';
 export type Theme = 'click-dark' | 'click-light';
 export type ExperienceLevel = 'beginner' | 'expert';
 
