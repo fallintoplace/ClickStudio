@@ -1,5 +1,13 @@
 import { spawn } from 'node:child_process';
-const children = [spawn(process.execPath, ['--import', 'tsx', '--env-file-if-exists=.env', 'server/index.ts'], { stdio: 'inherit' }), spawn(process.execPath, ['node_modules/vite/bin/vite.js', '--host', '127.0.0.1'], { stdio: 'inherit' })];
+import { createViteDevEnvironment } from './dev-env.mjs';
+
+const children = [
+    spawn(process.execPath, ['--import', 'tsx', '--env-file-if-exists=.env', 'server/index.ts'], { stdio: 'inherit' }),
+    spawn(process.execPath, ['node_modules/vite/bin/vite.js', '--host', '127.0.0.1'], {
+        stdio: 'inherit',
+        env: createViteDevEnvironment(),
+    }),
+];
 let closing = false;
 function stop(code = 0) { if (closing)
     return; closing = true; process.exitCode = code; for (const child of children)
