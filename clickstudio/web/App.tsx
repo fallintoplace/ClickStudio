@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api, message, post } from './api';
+import { api, disableCloudWorkspaceApi, enableCloudWorkspaceApi, message, post } from './api';
 import { Button, cx, Icon, SelectControl } from './components/ui';
 import { CloudConnectionDialog } from './components/CloudConnectionDialog';
 import { CLICKHOUSE_CLOUD_CONNECTION_ID, disconnectClickHouseCloud, type SavedCloudConnectionProfile } from './cloud-connection';
@@ -75,6 +75,7 @@ function App() {
     }, []);
 
     const disconnectCloud = () => {
+        disableCloudWorkspaceApi();
         disconnectClickHouseCloud();
         setConnections(current => current.filter(item => item.id !== CLICKHOUSE_CLOUD_CONNECTION_ID));
         if (isCloudConnection) {
@@ -85,6 +86,7 @@ function App() {
     };
 
     const connectCloud = (connected: Connected) => {
+        enableCloudWorkspaceApi();
         setConnections(current => [...current.filter(item => item.id !== connected.id), connected]);
         selectConnection(connected.id);
         setConnectionPicker(false);

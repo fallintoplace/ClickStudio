@@ -24,10 +24,28 @@ export class RequestError extends Error {
 
 export const isFrontendDemoPreview = import.meta.env.VITE_DEMO_MODE === 'true';
 const demoPreview = isFrontendDemoPreview ? new DemoPreviewApi() : undefined;
+let cloudWorkspacePreview: DemoPreviewApi | undefined;
+
+function usesCloudWorkspacePreview(path: string) {
+    const pathname = path.split(/[?#]/, 1)[0] ?? path;
+    return pathname === '/runs' || pathname.startsWith('/runs/') ||
+        pathname === '/scripts' || pathname.startsWith('/scripts/') ||
+        pathname.startsWith('/connections/clickhouse-cloud/');
+}
+
+export function enableCloudWorkspaceApi() {
+    if (!isFrontendDemoPreview) cloudWorkspacePreview ??= new DemoPreviewApi();
+}
+
+export function disableCloudWorkspaceApi() {
+    cloudWorkspacePreview = undefined;
+}
 
 export async function api<T>(path: string, options: ApiOptions = {}): Promise<T> {
     if (demoPreview && path !== '/assistant/sql')
         return await demoPreview.request(path, options) as T;
+    if (cloudWorkspacePreview && usesCloudWorkspacePreview(path))
+        return await cloudWorkspacePreview.request(path, options) as T;
 
     const response = await fetch(`/api${path}`, { method: options.method ?? 'GET', credentials: 'same-origin', signal: options.signal,
         headers: { 'X-ClickStudio-Intent': '1', ...(options.body === undefined ? {} : { 'Content-Type': 'application/json' }) }, body: options.body === undefined ? undefined : JSON.stringify(options.body) });

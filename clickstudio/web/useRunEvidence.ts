@@ -3,6 +3,7 @@ import type { ProfilePipeline, QueryProfile, Result, ResultPage, Run } from '../
 import type { FlamegraphSnapshot } from '../shared/flamegraph';
 import { parseRunEvent } from '../shared/run-wire';
 import { api, isFrontendDemoPreview, message } from './api';
+import { CLICKHOUSE_CLOUD_CONNECTION_ID } from './cloud-connection';
 import { terminal } from './components/ui';
 import { useScopedValue } from './useScopedValue';
 import type { RunEventState } from './workspace-types';
@@ -52,7 +53,7 @@ export function useRunEvidence({ activeRunId, connectionId, loadHistory, setErro
 
     useEffect(() => {
         if (!activeRunId || !running) { setEventState('idle'); return; }
-        if (isFrontendDemoPreview) { setEventState('idle'); return; }
+        if (isFrontendDemoPreview || connectionId === CLICKHOUSE_CLOUD_CONNECTION_ID) { setEventState('idle'); return; }
         setEventState('reconnecting');
         const stream = new EventSource(`/api/runs/${encodeURIComponent(activeRunId)}/events`);
         stream.onopen = () => setEventState('live');
