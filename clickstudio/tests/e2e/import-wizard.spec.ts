@@ -36,8 +36,10 @@ async function previewCsv(page: Page) {
         mimeType: 'text/csv',
         buffer: Buffer.from('day,events\n2026-01-01,10\n2026-01-02,20\n'),
     });
-    await dialog.getByRole('button', { name: 'Preview file', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Read file and continue', exact: true }).click();
     await expect(dialog).toContainText(/\d+ rows? · 2 columns · CSV/);
+    await expect(dialog.getByRole('region', { name: 'Map source columns' })).toBeVisible();
+    await expect(dialog.getByRole('heading', { name: 'Preview your rows' })).toBeVisible();
     return dialog;
 }
 
@@ -57,10 +59,9 @@ test('File import requires an explicit destination before review', async ({ page
 
     await page.getByRole('button', { name: 'Import', exact: true }).click();
     const dialog = await previewCsv(page);
-    await dialog.getByRole('button', { name: 'Map columns', exact: true }).click();
 
     await expect(dialog.getByLabel('Import target table')).toHaveValue('');
-    await expect(dialog.locator('.import-mapping-empty-state')).toContainText('Choose a destination first');
+    await expect(dialog.locator('.import-mapping-empty-state')).toContainText('Choose a table');
     await expect(dialog.getByRole('button', { name: 'Choose a destination', exact: true })).toBeDisabled();
     expect(mappingRequests).toBe(0);
 
@@ -88,7 +89,6 @@ test('File import previews, maps, and reports a successful insert without typed 
 
     await page.getByRole('button', { name: 'Import', exact: true }).click();
     const dialog = await previewCsv(page);
-    await dialog.getByRole('button', { name: 'Map columns', exact: true }).click();
     await chooseExistingTable(dialog);
     const mappingColumnWidths = await dialog.locator('.import-column-map thead th').evaluateAll(headers => headers.map(header => header.getBoundingClientRect().width));
     expect(mappingColumnWidths[1]).toBeGreaterThan(mappingColumnWidths[0]!);
@@ -136,8 +136,7 @@ test('File import review lists skipped columns and success can start another imp
     const dialog = page.getByRole('dialog', { name: 'Import data', exact: true });
     const input = dialog.getByLabel('Choose a CSV, JSON, or NDJSON file');
     await input.setInputFiles({ name: 'events.csv', mimeType: 'text/csv', buffer: Buffer.from('day,events,unused\n2026-01-01,10,not imported\n') });
-    await dialog.getByRole('button', { name: 'Preview file', exact: true }).click();
-    await dialog.getByRole('button', { name: 'Map columns', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Read file and continue', exact: true }).click();
     await chooseExistingTable(dialog);
     const mappingCounts = dialog.locator('.import-mapping-counts');
     await expect(mappingCounts).toContainText('2 mapped');
@@ -163,8 +162,8 @@ test('File import review lists skipped columns and success can start another imp
     await expect(dialog.getByLabel('Choose a CSV, JSON, or NDJSON file')).toBeVisible();
     await expect(dialog.getByRole('button', { name: 'Done' })).toHaveCount(0);
     await dialog.getByLabel('Choose a CSV, JSON, or NDJSON file').setInputFiles({ name: 'events.csv', mimeType: 'text/csv', buffer: Buffer.from('day,events,unused\n2026-01-01,10,not imported\n') });
-    await expect(dialog.getByRole('button', { name: 'Preview file', exact: true })).toBeEnabled();
-    await dialog.getByRole('button', { name: 'Preview file', exact: true }).click();
+    await expect(dialog.getByRole('button', { name: 'Read file and continue', exact: true })).toBeEnabled();
+    await dialog.getByRole('button', { name: 'Read file and continue', exact: true }).click();
     await expect(dialog).toContainText('1 row · 3 columns · CSV');
     expect(previewRequests).toBe(2);
 });
@@ -178,7 +177,7 @@ test('File import rejects oversized files in the browser before upload', async (
     const dialog = page.getByRole('dialog', { name: 'Import data', exact: true });
     await dialog.getByLabel('Choose a CSV, JSON, or NDJSON file').setInputFiles({ name: 'large.csv', mimeType: 'text/csv', buffer: Buffer.alloc(2_000_001) });
     await expect(dialog.getByRole('alert')).toContainText('larger than the 2 MB import limit');
-    await expect(dialog.getByRole('button', { name: 'Preview file' })).toBeDisabled();
+    await expect(dialog.getByRole('button', { name: 'Read file and continue' })).toBeDisabled();
     expect(previewRequests).toBe(0);
 });
 
@@ -191,7 +190,7 @@ test('File import rejects unsupported file types before upload', async ({ page }
     const dialog = page.getByRole('dialog', { name: 'Import data', exact: true });
     await dialog.getByLabel('Choose a CSV, JSON, or NDJSON file').setInputFiles({ name: 'events.txt', mimeType: 'text/plain', buffer: Buffer.from('not csv') });
     await expect(dialog.getByRole('alert')).toContainText('Choose a .csv, .json, .ndjson, or .jsonl file');
-    await expect(dialog.getByRole('button', { name: 'Preview file' })).toBeDisabled();
+    await expect(dialog.getByRole('button', { name: 'Read file and continue' })).toBeDisabled();
     expect(previewRequests).toBe(0);
 });
 
@@ -206,7 +205,6 @@ test('File import shows server mapping errors without attempting a write', async
 
     await page.getByRole('button', { name: 'Import', exact: true }).click();
     const dialog = await previewCsv(page);
-    await dialog.getByRole('button', { name: 'Map columns', exact: true }).click();
     await chooseExistingTable(dialog);
     await dialog.getByRole('button', { name: 'Review import', exact: true }).click();
     await expect(dialog.getByRole('alert')).toContainText('IMPORT_MISSING_FIELD: An input row is missing events');
@@ -235,7 +233,6 @@ test('File import reports an unknown insert without retrying automatically', asy
 
     await page.getByRole('button', { name: 'Import', exact: true }).click();
     const dialog = await previewCsv(page);
-    await dialog.getByRole('button', { name: 'Map columns', exact: true }).click();
     await chooseExistingTable(dialog);
     await dialog.getByRole('button', { name: 'Review import', exact: true }).click();
     await dialog.getByRole('button', { name: 'Import rows', exact: true }).click();
@@ -261,7 +258,6 @@ test('File import reloads the destination mapping when the server detects a sche
 
     await page.getByRole('button', { name: 'Import', exact: true }).click();
     const dialog = await previewCsv(page);
-    await dialog.getByRole('button', { name: 'Map columns', exact: true }).click();
     await chooseExistingTable(dialog);
     await dialog.getByRole('button', { name: 'Review import', exact: true }).click();
     await dialog.getByRole('button', { name: 'Import rows', exact: true }).click();
@@ -324,7 +320,7 @@ test('Fixture workspace explains that imports never write sample data', async ({
     await expect(dialog.getByLabel('Choose a CSV, JSON, or NDJSON file')).toHaveCount(0);
 });
 
-test('Import wizard resets scroll when entering the mapping step', async ({ page }) => {
+test('Import setup opens at the top after reading a file', async ({ page }) => {
     await mockWritableWorkspace(page);
     await page.route('**/api/imports/preview', route => route.fulfill({ status: 201, json: {
         id: 'input-1', name: 'events.csv', format: 'csv', columns: ['day', 'events'], rows: [{ day: '2026-01-01', events: '10' }, { day: '2026-01-02', events: '20' }], rowCount: 2,
@@ -334,10 +330,6 @@ test('Import wizard resets scroll when entering the mapping step', async ({ page
     await page.setViewportSize({ width: 600, height: 450 });
     const dialog = await previewCsv(page);
     const main = dialog.locator('.import-wizard-main');
-    await main.evaluate(element => { element.scrollTop = element.scrollHeight; });
-    expect(await main.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
-
-    await dialog.getByRole('button', { name: 'Map columns', exact: true }).click();
     await expect(dialog.getByRole('region', { name: 'Map source columns' })).toBeVisible();
     expect(await main.evaluate(element => element.scrollTop)).toBe(0);
 });

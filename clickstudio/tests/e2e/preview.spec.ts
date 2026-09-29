@@ -113,7 +113,7 @@ async function connectPreviewCloud(page: Page) {
 }
 
 async function chooseExistingCloudTable(dialog: Locator) {
-    await dialog.getByRole('radio', { name: /Use an existing table/ }).check();
+    await dialog.getByRole('radio', { name: /Add to a table/ }).check();
     await dialog.getByLabel('Import target table').selectOption('default.events');
 }
 
@@ -336,13 +336,12 @@ test('ClickHouse Cloud import maps and inserts into an existing table without ty
         mimeType: 'text/csv',
         buffer: Buffer.from('day,events\n2026-09-27,10\n2026-09-28,20\n'),
     });
-    await dialog.getByRole('button', { name: 'Preview file' }).click();
+    await dialog.getByRole('button', { name: 'Read file and continue' }).click();
     await expect(dialog).toContainText('2 rows · 2 columns · CSV');
-    await dialog.getByRole('button', { name: 'Map columns' }).click();
     const mappingStep = dialog.getByRole('region', { name: 'Map source columns' });
     await expect(mappingStep).toHaveCSS('row-gap', '15px');
     await chooseExistingCloudTable(dialog);
-    await expect(dialog.getByRole('radio', { name: /Use an existing table/ })).toBeChecked();
+    await expect(dialog.getByRole('radio', { name: /Add to a table/ })).toBeChecked();
     await expect(dialog.getByLabel('Map day to destination')).toHaveValue('day');
     await dialog.getByRole('button', { name: 'Review import' }).click();
     await dialog.getByRole('button', { name: 'Import rows', exact: true }).click();
@@ -354,7 +353,7 @@ test('ClickHouse Cloud import maps and inserts into an existing table without ty
     expect(imports[0]).toContain('name="fields"\r\n\r\n{"day":"day","events":"events"}');
 });
 
-test('ClickHouse Cloud import starts without a selected destination', async ({ page }) => {
+test('ClickHouse Cloud import requires an exact table before review', async ({ page }) => {
     const imports = await mockCloudEndpoint(page);
     await connectPreviewCloud(page);
     await page.getByRole('button', { name: 'Import', exact: true }).last().click();
@@ -365,16 +364,15 @@ test('ClickHouse Cloud import starts without a selected destination', async ({ p
         mimeType: 'text/csv',
         buffer: Buffer.from('day,events\n2026-09-28,20\n'),
     });
-    await dialog.getByRole('button', { name: 'Preview file' }).click();
-    await dialog.getByRole('button', { name: 'Map columns' }).click();
+    await dialog.getByRole('button', { name: 'Read file and continue' }).click();
 
-    const existing = dialog.getByRole('radio', { name: /Use an existing table/ });
-    const create = dialog.getByRole('radio', { name: /Create a new table from this file/ });
-    await expect(existing).not.toBeChecked();
+    const existing = dialog.getByRole('radio', { name: /Add to a table/ });
+    const create = dialog.getByRole('radio', { name: /Create a table/ });
+    await expect(existing).toBeChecked();
     await expect(create).not.toBeChecked();
     await expect(dialog.getByLabel('Import target table')).toHaveValue('');
-    await expect(dialog.locator('.import-mapping-empty-state')).toContainText('Choose a destination first');
-    await expect(dialog.getByRole('button', { name: 'Choose a destination', exact: true })).toBeDisabled();
+    await expect(dialog.locator('.import-mapping-empty-state')).toContainText('Choose a table');
+    await expect(dialog.getByRole('button', { name: 'Choose a table', exact: true })).toBeDisabled();
 
     await existing.check();
     await expect(dialog.getByLabel('Import target table')).toHaveValue('');
@@ -395,8 +393,7 @@ test('ClickHouse Cloud import explains when no source columns are mapped', async
         mimeType: 'text/csv',
         buffer: Buffer.from('event_id,message,active,id\n1,hello,true,42\n'),
     });
-    await dialog.getByRole('button', { name: 'Preview file' }).click();
-    await dialog.getByRole('button', { name: 'Map columns' }).click();
+    await dialog.getByRole('button', { name: 'Read file and continue' }).click();
     await chooseExistingCloudTable(dialog);
 
     const mappingStep = dialog.getByRole('region', { name: 'Map source columns' });
@@ -406,7 +403,7 @@ test('ClickHouse Cloud import explains when no source columns are mapped', async
     await expect(mappingCounts).toContainText('4 skipped');
     await expect(emptyState).toContainText('No columns mapped yet');
     await expect(emptyState).toContainText('Skipped columns will not be imported.');
-    await expect(emptyState).toContainText('Create a new table from this file');
+    await expect(emptyState).toContainText('Create a table');
     for (const source of ['event_id', 'message', 'active', 'id']) {
         await expect(dialog.getByLabel(`Map ${source} to destination`)).toHaveValue('');
     }
@@ -430,9 +427,8 @@ test('ClickHouse Cloud import creates a table with editable inferred columns', a
         mimeType: 'text/csv',
         buffer: Buffer.from('day,events\n2026-09-27,10\n2026-09-28,20\n'),
     });
-    await dialog.getByRole('button', { name: 'Preview file' }).click();
-    await dialog.getByRole('button', { name: 'Map columns' }).click();
-    await dialog.getByRole('radio', { name: /Create a new table from this file/ }).check();
+    await dialog.getByRole('button', { name: 'Read file and continue' }).click();
+    await dialog.getByRole('radio', { name: /Create a table/ }).check();
     await expect(dialog.getByLabel('New table name')).toHaveValue('interview_events');
     await expect(dialog.getByLabel('Type for day')).toHaveValue('Date');
     await expect(dialog.getByLabel('Type for events')).toHaveValue('UInt64');
@@ -468,9 +464,8 @@ test('ClickHouse Cloud import refreshes and reveals the created table', async ({
         mimeType: 'text/csv',
         buffer: Buffer.from('day,events\n2026-09-27,10\n'),
     });
-    await dialog.getByRole('button', { name: 'Preview file' }).click();
-    await dialog.getByRole('button', { name: 'Map columns' }).click();
-    await dialog.getByRole('radio', { name: /Create a new table from this file/ }).check();
+    await dialog.getByRole('button', { name: 'Read file and continue' }).click();
+    await dialog.getByRole('radio', { name: /Create a table/ }).check();
     await dialog.getByRole('button', { name: 'Review import' }).click();
     await dialog.getByRole('button', { name: 'Create table and import' }).click();
     await expect(dialog).toContainText('Inserted 1 row into default.interview_events');
@@ -520,12 +515,11 @@ test('ClickHouse Cloud can create a table from a file when no tables exist', asy
         mimeType: 'text/csv',
         buffer: Buffer.from('event,count\npurchase,2\n'),
     });
-    await expect(dialog.getByRole('button', { name: 'Preview file' })).toBeEnabled();
-    await dialog.getByRole('button', { name: 'Preview file' }).click();
-    await dialog.getByRole('button', { name: 'Map columns' }).click();
+    await expect(dialog.getByRole('button', { name: 'Read file and continue' })).toBeEnabled();
+    await dialog.getByRole('button', { name: 'Read file and continue' }).click();
 
-    await expect(dialog.getByRole('radio', { name: /Use an existing table/ })).toBeDisabled();
-    const create = dialog.getByRole('radio', { name: /Create a new table from this file/ });
+    await expect(dialog.getByRole('radio', { name: /Add to a table/ })).toBeDisabled();
+    const create = dialog.getByRole('radio', { name: /Create a table/ });
     await expect(create).not.toBeChecked();
     await create.check();
     await expect(create).toBeChecked();
@@ -550,8 +544,7 @@ test('ClickHouse Cloud import shows clear choices after an interrupted write', a
         mimeType: 'text/csv',
         buffer: Buffer.from('day,events\n2026-09-28,20\n'),
     });
-    await dialog.getByRole('button', { name: 'Preview file' }).click();
-    await dialog.getByRole('button', { name: 'Map columns' }).click();
+    await dialog.getByRole('button', { name: 'Read file and continue' }).click();
     await chooseExistingCloudTable(dialog);
     await dialog.getByRole('button', { name: 'Review import' }).click();
     await dialog.getByRole('button', { name: 'Import rows', exact: true }).click();
@@ -576,8 +569,7 @@ test('ClickHouse Cloud import can be closed and forgotten so another file can be
         mimeType: 'text/csv',
         buffer: Buffer.from('day,events\n2026-09-27,10\n2026-09-28,20\n'),
     });
-    await dialog.getByRole('button', { name: 'Preview file' }).click();
-    await dialog.getByRole('button', { name: 'Map columns' }).click();
+    await dialog.getByRole('button', { name: 'Read file and continue' }).click();
     await chooseExistingCloudTable(dialog);
     await dialog.getByRole('button', { name: 'Review import' }).click();
     await dialog.getByRole('button', { name: 'Import rows', exact: true }).click();
@@ -596,8 +588,7 @@ test('ClickHouse Cloud import can be closed and forgotten so another file can be
         mimeType: 'text/csv',
         buffer: Buffer.from('day,events\n2026-09-29,30\n'),
     });
-    await dialog.getByRole('button', { name: 'Preview file' }).click();
-    await dialog.getByRole('button', { name: 'Map columns' }).click();
+    await dialog.getByRole('button', { name: 'Read file and continue' }).click();
     await chooseExistingCloudTable(dialog);
     await dialog.getByRole('button', { name: 'Review import' }).click();
     await dialog.getByRole('button', { name: 'Import rows', exact: true }).click();

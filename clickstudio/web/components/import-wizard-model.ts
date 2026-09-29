@@ -5,7 +5,7 @@ export type ImportFormat = 'csv' | 'json' | 'ndjson';
 export type Step = 'file' | 'mapping' | 'review' | 'status';
 export const importSteps = [
     { id: 'file', label: 'File' },
-    { id: 'mapping', label: 'Map' },
+    { id: 'mapping', label: 'Set up' },
     { id: 'review', label: 'Review' },
     { id: 'status', label: 'Import' },
 ] as const satisfies readonly { id: Step; label: string }[];

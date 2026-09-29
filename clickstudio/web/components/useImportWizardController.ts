@@ -337,6 +337,7 @@ type ImportWizardFileActionContext = {
     setFormat: Dispatch<SetStateAction<ImportFormat | undefined>>;
     setPreview: Dispatch<SetStateAction<ImportPreview | undefined>>;
     setMapping: Dispatch<SetStateAction<ImportMapping | undefined>>;
+    setFields: Dispatch<SetStateAction<Record<string, string>>>;
     setCloudRows: Dispatch<SetStateAction<Record<string, Json>[]>>;
     setCreateColumns: Dispatch<SetStateAction<CloudImportColumn[]>>;
     setCreateTableName: Dispatch<SetStateAction<string>>;
@@ -351,7 +352,7 @@ type ImportWizardFileActionContext = {
 
 function createImportWizardFileActions(context: ImportWizardFileActionContext) {
     const { browserDemoImport, browserCloudImport, target, file, format, busy,
-        setFile, setFormat, setPreview, setMapping, setCloudRows, setCreateColumns, setCreateTableName,
+        setFile, setFormat, setPreview, setMapping, setFields, setCloudRows, setCreateColumns, setCreateTableName,
         setJob, setError, setGenerateId, setStep, setBusy, setTarget, setLastExistingTarget } = context;
 
     function chooseFile(next?: File) {
@@ -360,6 +361,7 @@ function createImportWizardFileActions(context: ImportWizardFileActionContext) {
         setLastExistingTarget('');
         setPreview(undefined);
         setMapping(undefined);
+        setFields({});
         setCloudRows([]);
         setCreateColumns([]);
         if (browserCloudImport && target === CREATE_CLOUD_TABLE_TARGET) setCreateTableName('');
@@ -390,7 +392,7 @@ function createImportWizardFileActions(context: ImportWizardFileActionContext) {
                 next = await post<ImportPreview>('/imports/preview', { name: nextFile.name, source, format: nextFormat });
             }
             setPreview(next);
-            setStep('file');
+            setStep('mapping');
             setError('');
         } catch (caught) {
             setError(message(caught));
@@ -408,6 +410,7 @@ function createImportWizardFileActions(context: ImportWizardFileActionContext) {
         setFile(sample);
         setTarget('');
         setLastExistingTarget('');
+        setFields({});
         setFormat('csv');
         setError('');
         await previewSelectedFile(sample, 'csv');
@@ -643,7 +646,7 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
     const sampleColumns = preview?.columns.slice(0, 6) ?? [];
     const { chooseFile, previewFile, previewSampleFile } = createImportWizardFileActions({
         browserDemoImport, browserCloudImport, target, file, format, busy,
-        setFile, setFormat, setPreview, setMapping, setCloudRows, setCreateColumns, setCreateTableName,
+        setFile, setFormat, setPreview, setMapping, setFields, setCloudRows, setCreateColumns, setCreateTableName,
         setJob, setError, setGenerateId, setStep, setBusy, setTarget, setLastExistingTarget,
     });
 
@@ -845,22 +848,6 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
         onClose();
     }
 
-    function startMapping() {
-        if (!preview) return;
-        if (browserCloudImport && target === CREATE_CLOUD_TABLE_TARGET) {
-            const columns = inferCloudImportColumns(cloudRows.length ? cloudRows : preview.rows, preview.columns);
-            setCreateColumns(columns);
-            setCreateTableName(createTableName || suggestCloudTableName(preview.name));
-            setFields(Object.fromEntries(columns.map(column => [column.source, column.name])));
-            setGenerateId(!columns.some(column => column.name.toLowerCase() === 'id'));
-        } else {
-            setFields(initialFields(preview.columns, writableColumns(schema, target)));
-        }
-        setMapping(undefined);
-        setError('');
-        setStep('mapping');
-    }
-
     function changeTarget(next: string) {
         if (next !== CREATE_CLOUD_TABLE_TARGET) setLastExistingTarget(next);
         setTarget(next);
@@ -1009,7 +996,6 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
         chooseFile,
         previewFile,
         previewSampleFile,
-        startMapping,
         changeTarget,
         previewMapping,
         commitImport,

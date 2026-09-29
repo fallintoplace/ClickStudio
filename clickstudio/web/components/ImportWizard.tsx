@@ -61,7 +61,6 @@ export function ImportWizard({ onImportQuery, ...controllerProps }: ImportWizard
         chooseFile,
         previewFile,
         previewSampleFile,
-        startMapping,
         changeTarget,
         previewMapping,
         commitImport,
@@ -82,7 +81,7 @@ export function ImportWizard({ onImportQuery, ...controllerProps }: ImportWizard
     const [queryFileError, setQueryFileError] = useState('');
     const [openingQuery, setOpeningQuery] = useState(false);
     const [destinationChoice, setDestinationChoice] = useState<'existing' | 'create'>();
-    const selectedDestinationChoice = destinationChoice ?? (creatingTable ? 'create' : target ? 'existing' : undefined);
+    const selectedDestinationChoice = destinationChoice ?? (creatingTable ? 'create' : target ? 'existing' : browserCloudImport && availableTargets.length ? 'existing' : undefined);
 
     useEffect(() => {
         if (!controllerProps.open) { setDestinationChoice(undefined); return; }
@@ -163,13 +162,11 @@ export function ImportWizard({ onImportQuery, ...controllerProps }: ImportWizard
             <div role="group" aria-label="Import type" className="import-kind-choice">
                 <button type="button" aria-pressed={importKind === 'rows'} disabled={openingQuery} className={`import-kind-button is-rows${importKind === 'rows' ? ' is-selected' : ''}`} onClick={() => setImportKind('rows')}>
                     <span className="import-kind-icon" aria-hidden="true"><Icon name="importFile"/></span>
-                    <span className="import-kind-copy"><strong>Import rows</strong><small>Add file rows to an existing or new table.</small></span>
-                    <span className="import-kind-tag" aria-hidden="true">DATA</span>
+                    <span className="import-kind-copy"><strong>Rows</strong><small>CSV · JSON · NDJSON</small></span>
                 </button>
                 <button type="button" aria-pressed={importKind === 'query'} disabled={openingQuery} className={`import-kind-button is-query${importKind === 'query' ? ' is-selected' : ''}`} onClick={() => setImportKind('query')}>
                     <span className="import-kind-icon" aria-hidden="true"><Icon name="parser"/></span>
-                    <span className="import-kind-copy"><strong>Import query</strong><small>Open a .sql file in a new query tab.</small></span>
-                    <span className="import-kind-tag" aria-hidden="true">SQL</span>
+                    <span className="import-kind-copy"><strong>Open SQL file</strong><small>Start a new query draft.</small></span>
                 </button>
             </div>
 
@@ -223,92 +220,118 @@ export function ImportWizard({ onImportQuery, ...controllerProps }: ImportWizard
                     {preview && availableTargets.length === 0 && !browserCloudImport && <div role="status" className="rounded-lg border border-[var(--line)] p-3 text-xs text-[var(--muted)]">No configured import destination is available for this connection.</div>}
                 </section>}
 
-                {recoveryState === 'ready' && !importUnavailable && step === 'mapping' && preview && <section aria-label="Map source columns" className="import-mapping-step">
+                {recoveryState === 'ready' && !importUnavailable && step === 'mapping' && preview && <section aria-label="Map source columns" className="import-mapping-step import-setup">
+                    <div className="import-setup-source">
+                        <span className="import-setup-source-icon" aria-hidden="true"><Icon name="importFile"/></span>
+                        <div className="import-setup-source-copy">
+                            <span className="import-setup-kicker">SOURCE FILE</span>
+                            <strong title={preview.name}>{preview.name}</strong>
+                            <span>{formatImportRowCount(preview.rowCount)} · {preview.columns.length} columns · {preview.format.toUpperCase()}</span>
+                        </div>
+                        <button type="button" onClick={importAnotherFile} disabled={Boolean(busy)} className="import-change-file">Change file</button>
+                    </div>
+
                     {browserCloudImport && <fieldset className="import-destination-choice">
                         <legend>Where should the rows go?</legend>
-                        <label className={`import-destination-option${selectedDestinationChoice === 'existing' ? ' is-selected' : ''}${!availableTargets.length ? ' is-disabled' : ''}`}>
-                            <input type="radio" name="import-destination" value="existing" checked={selectedDestinationChoice === 'existing'} disabled={!availableTargets.length} onChange={() => { setDestinationChoice('existing'); changeTarget(availableTargets.includes(lastExistingTarget) ? lastExistingTarget : ''); }}/>
-                            <span className="import-destination-option-copy"><strong className="import-destination-option-title">Use an existing table</strong><small className="import-destination-option-description">Add rows to a table that is already there.</small></span>
-                        </label>
-                        <label className={`import-destination-option${selectedDestinationChoice === 'create' ? ' is-selected' : ''}`}>
-                            <input type="radio" name="import-destination" value="create" checked={selectedDestinationChoice === 'create'} onChange={() => { setDestinationChoice('create'); changeTarget(CREATE_CLOUD_TABLE_TARGET); }}/>
-                            <span className="import-destination-option-copy"><strong className="import-destination-option-title">Create a new table from this file</strong><small className="import-destination-option-description">Choose a name and import the file into it.</small></span>
-                        </label>
+                        <div className="import-destination-options">
+                            <label className={`import-destination-option${selectedDestinationChoice === 'existing' ? ' is-selected' : ''}${!availableTargets.length ? ' is-disabled' : ''}`}>
+                                <input type="radio" name="import-destination" value="existing" checked={selectedDestinationChoice === 'existing'} disabled={!availableTargets.length} onChange={() => { setDestinationChoice('existing'); changeTarget(availableTargets.includes(lastExistingTarget) ? lastExistingTarget : ''); }}/>
+                                <span className="import-destination-option-index" aria-hidden="true">01</span>
+                                <span className="import-destination-option-copy"><strong className="import-destination-option-title">Add to a table</strong><small className="import-destination-option-description">Choose a table that already exists.</small></span>
+                            </label>
+                            <label className={`import-destination-option${selectedDestinationChoice === 'create' ? ' is-selected' : ''}`}>
+                                <input type="radio" name="import-destination" value="create" checked={selectedDestinationChoice === 'create'} onChange={() => { setDestinationChoice('create'); changeTarget(CREATE_CLOUD_TABLE_TARGET); }}/>
+                                <span className="import-destination-option-index" aria-hidden="true">02</span>
+                                <span className="import-destination-option-copy"><strong className="import-destination-option-title">Create a table</strong><small className="import-destination-option-description">Build a new table from this file.</small></span>
+                            </label>
+                        </div>
+                        {selectedDestinationChoice === 'existing' && <div className="import-destination-select-shell">
+                            <label className="import-destination-select">DESTINATION TABLE
+                                <select aria-label="Import target table" value={target} onChange={event => changeTarget(event.target.value)}>
+                                    <option value="">Choose a table…</option>
+                                    {availableTargets.map(table => <option key={table} value={table}>{table}</option>)}
+                                </select>
+                            </label>
+                            <span className="import-destination-helper">You can only add rows to a table with compatible columns.</span>
+                        </div>}
                     </fieldset>}
-                    <div className={`import-mapping-workspace${creatingTable ? ' is-create' : ''}`}>
-                        <aside className="import-mapping-sidebar" aria-label="Destination and source file">
-                            <div className="import-map-overview">
-                                {!creatingTable && <label className="import-destination-select grid gap-1.5 text-xs font-medium text-[var(--text-soft)]">Destination table
-                                    <select aria-label="Import target table" value={target} onChange={event => changeTarget(event.target.value)} className="min-h-10 rounded-lg border border-[var(--line)] bg-[var(--page)] px-3 text-xs text-[var(--text)]">
-                                        <option value="">Choose a destination table…</option>
-                                        {availableTargets.map(table => <option key={table} value={table}>{table}</option>)}
-                                    </select>
-                                </label>}
-                                <div className="import-source-summary">
-                                    <span className="import-source-summary-label">Source file</span>
-                                    <strong>{formatImportRowCount(preview.rowCount)}</strong>
-                                    <span className="import-source-file-name" title={preview.name}>{preview.name}</span>
-                                    <span className="import-source-summary-meta">{preview.columns.length} columns · {preview.format.toUpperCase()}</span>
-                                </div>
-                            </div>
-                        </aside>
-                        {creatingTable && <div className="import-new-table-card rounded-xl border border-[var(--line)] bg-[var(--page)] p-4">
-                            <div className="import-new-table-heading"><strong>New table</strong><span>Set the table name and column types before importing.</span></div>
-                            <label className="mb-3 grid max-w-sm gap-1.5 text-xs font-medium text-[var(--text-soft)]">Database
-                                <select aria-label="New table database" value={createTableDatabase} onChange={event => setCreateTableDatabase(event.target.value)} className="min-h-10 rounded-lg border border-[var(--line)] bg-[var(--panel)] px-3 font-mono text-xs text-[var(--text)]">
+
+                    {!browserCloudImport && <div className="import-destination-panel">
+                        <div className="import-section-heading"><span className="import-setup-kicker">DESTINATION</span><h3>Choose a table</h3></div>
+                        <label className="import-destination-select">CLICKHOUSE TABLE
+                            <select aria-label="Import target table" value={target} onChange={event => changeTarget(event.target.value)}>
+                                <option value="">Choose a table…</option>
+                                {availableTargets.map(table => <option key={table} value={table}>{table}</option>)}
+                            </select>
+                        </label>
+                    </div>}
+
+                    {browserCloudImport && selectedDestinationChoice === 'create' && <div className="import-new-table-card">
+                        <div className="import-new-table-heading"><span className="import-setup-kicker">NEW TABLE</span><strong>Confirm the table structure</strong><small>Names and types are guessed from your file. You can edit them below.</small></div>
+                        <div className="import-new-table-fields">
+                            <label>DATABASE
+                                <select aria-label="New table database" value={createTableDatabase} onChange={event => setCreateTableDatabase(event.target.value)}>
                                     {importableDatabases.map(database => <option key={database} value={database}>{database}</option>)}
                                 </select>
                             </label>
-                            {!importableDatabases.length && <p role="status" className="text-[11px] text-[var(--muted)]">No supported database is available. Databases with a period in the name cannot be selected for row import.</p>}
-                            <label className="grid max-w-sm gap-1.5 text-xs font-medium text-[var(--text-soft)]">New table name
-                                <input aria-label="New table name" value={createTableName} onChange={event => setCreateTableName(event.target.value)} maxLength={128} className="min-h-10 rounded-lg border border-[var(--line)] bg-[var(--panel)] px-3 font-mono text-xs text-[var(--text)]" />
+                            <label>TABLE NAME
+                                <input aria-label="New table name" value={createTableName} onChange={event => setCreateTableName(event.target.value)} maxLength={128} />
                             </label>
-                            {!hasCreateIdColumn ? <label className="import-generated-id-option mt-4"><input type="checkbox" checked={generateId} onChange={event => setGenerateId(event.target.checked)}/><span><strong>Add a generated id</strong><small>ClickHouse assigns a UInt64 ID to each row. You can leave it out later when inserting rows.</small></span></label> : <p className="import-id-source-note mt-3">The file has an <code>id</code> column. Its values will be imported.</p>}
-                            <div className="mt-3 grid gap-2">
-                                {createColumns.map(column => <div key={column.source} className="import-create-column-row grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(150px,0.8fr)]">
-                                    <span className="self-center truncate text-[11px] text-[var(--muted)]" title={column.source}>{column.source}</span>
-                                    <input aria-label={`New column name for ${column.source}`} value={column.name} onChange={event => updateCreateColumn(column.source, 'name', event.target.value)} maxLength={128} className="min-h-9 rounded-lg border border-[var(--line)] bg-[var(--panel)] px-2.5 font-mono text-xs text-[var(--text)]" />
-                                    <select aria-label={`Type for ${column.source}`} value={column.type} onChange={event => updateCreateColumn(column.source, 'type', event.target.value)} className="min-h-9 rounded-lg border border-[var(--line)] bg-[var(--panel)] px-2.5 font-mono text-xs text-[var(--text)]">
-                                        {createColumnTypes.map(type => <option key={type} value={type}>{type}</option>)}
-                                    </select>
-                                </div>)}
-                            </div>
-                        </div>}
+                        </div>
+                        {!importableDatabases.length && <p role="status" className="import-table-hint">No supported database is available. Databases with a period in the name cannot be selected for row import.</p>}
+                        {!hasCreateIdColumn ? <label className="import-generated-id-option"><input type="checkbox" checked={generateId} onChange={event => setGenerateId(event.target.checked)}/><span><strong>Add a generated id</strong><small>ClickHouse assigns a UInt64 ID to each row.</small></span></label> : <p className="import-id-source-note">Your file already has an <code>id</code> column.</p>}
+                        <div className="import-create-columns">
+                            <div className="import-create-columns-heading"><span>FILE COLUMN</span><span>TABLE COLUMN</span><span>TYPE</span></div>
+                            {createColumns.map(column => <div key={column.source} className="import-create-column-row">
+                                <span title={column.source}>{column.source}</span>
+                                <input aria-label={`New column name for ${column.source}`} value={column.name} onChange={event => updateCreateColumn(column.source, 'name', event.target.value)} maxLength={128} />
+                                <select aria-label={`Type for ${column.source}`} value={column.type} onChange={event => updateCreateColumn(column.source, 'type', event.target.value)}>
+                                    {createColumnTypes.map(type => <option key={type} value={type}>{type}</option>)}
+                                </select>
+                            </div>)}
+                        </div>
+                    </div>}
+
+                    <div className="import-setup-columns">
                         <div className="import-mapping-content">
                             <div className="import-mapping-heading">
-                                <div><h3>Match columns</h3><p>Choose where each source column should go.</p></div>
-                                <div className="import-mapping-counts" aria-live="polite">
+                                <div><span className="import-setup-kicker">COLUMN ROUTING</span><h3>Match columns</h3><p>We matched columns with the same name. Change any match below.</p></div>
+                                {(target || creatingTable) && <div className="import-mapping-counts" aria-live="polite">
                                     <span><strong>{mappedColumnCount}</strong> mapped</span>
                                     <span><strong>{skippedColumnCount}</strong> skipped</span>
-                                </div>
+                                </div>}
                             </div>
                             {!target && !creatingTable && <div role="status" className="import-mapping-empty-state">
                                 <span className="import-mapping-empty-state-marker" aria-hidden="true" />
                                 <div>
-                                    <strong>Choose a destination first</strong>
-                                    <p>{browserCloudImport ? 'Choose an existing table above or create a new table. Nothing is written until you review the import.' : 'Choose a table above to map these columns. Nothing is written until you review the import.'}</p>
+                                    <strong>{browserCloudImport ? selectedDestinationChoice === 'existing' ? 'Choose a table' : 'Choose where the rows go' : 'Choose a table'}</strong>
+                                    <p>{browserCloudImport ? selectedDestinationChoice === 'existing' ? 'Select a table above. Matching columns will be filled in for you.' : 'Choose “Add to a table” or “Create a table” to continue.' : 'Select a destination above. Matching columns will be filled in for you.'}</p>
                                 </div>
                             </div>}
                             {destinationColumns.length > 0 && destinationNames.length === 0 && <div role="status" className="import-mapping-empty-state">
                                 <span className="import-mapping-empty-state-marker" aria-hidden="true" />
                                 <div>
                                     <strong>No columns mapped yet</strong>
-                                    <p>Select a destination for at least one source column. Skipped columns will not be imported.</p>
-                                    {browserCloudImport && !creatingTable && <p className="import-mapping-empty-state-hint">If this file should define the table schema, select “Create a new table from this file” above.</p>}
+                                    <p>Map at least one source column. Skipped columns will not be imported.</p>
+                                    {browserCloudImport && !creatingTable && <p className="import-mapping-empty-state-hint">If this file should define the schema, choose “Create a table” above.</p>}
                                 </div>
                             </div>}
-                            {(target || creatingTable) && <div className="import-column-map overflow-x-auto rounded-xl border border-[var(--line)]">
+                            {(target || creatingTable) && <div className="import-column-map">
                                 <table className="w-full min-w-[540px] border-collapse text-left text-xs">
-                                    <thead className="bg-[var(--page)] text-[10px] uppercase tracking-wider text-[var(--muted)]"><tr><th className="px-3 py-2.5">Source column</th><th className="px-3 py-2.5">Destination column</th><th className="px-3 py-2.5">Type</th></tr></thead>
-                                    <tbody>{preview.columns.map(source => <tr key={source} className="border-t border-[var(--line)]">
-                                        <th scope="row" className="max-w-[220px] truncate px-3 py-2.5 font-medium text-[var(--text-soft)]" title={source}><code className="import-source-column-name">{source}</code></th>
-                                        <td className="px-3 py-2"><select aria-label={`Map ${source} to destination`} value={fields[source] ?? ''} onChange={event => { setFields(current => ({ ...current, [source]: event.target.value })); setMapping(undefined); setError(''); }} className="min-h-9 w-full rounded-lg border border-[var(--line)] bg-[var(--page)] px-2.5 text-xs text-[var(--text)]"><option value="">Skip column</option>{destinationColumns.map(column => <option key={column.name} value={column.name}>{column.name}</option>)}</select></td>
-                                        <td className="import-column-type-cell px-3 py-2.5"><span className="import-column-type">{destinationColumns.find(column => column.name === fields[source])?.type ?? '—'}</span></td>
+                                    <thead><tr><th>FROM FILE</th><th>TO TABLE</th><th>TYPE</th></tr></thead>
+                                    <tbody>{preview.columns.map(source => <tr key={source}>
+                                        <th scope="row" title={source}><code className="import-source-column-name">{source}</code></th>
+                                        <td><select aria-label={`Map ${source} to destination`} value={fields[source] ?? ''} onChange={event => { setFields(current => ({ ...current, [source]: event.target.value })); setMapping(undefined); setError(''); }}><option value="">Skip column</option>{destinationColumns.map(column => <option key={column.name} value={column.name}>{column.name}</option>)}</select></td>
+                                        <td className="import-column-type-cell"><span className="import-column-type">{destinationColumns.find(column => column.name === fields[source])?.type ?? '—'}</span></td>
                                     </tr>)}</tbody>
                                 </table>
                             </div>}
-                            {duplicateDestinations && <p role="alert" className="text-xs text-[var(--red)]">Each destination column can be used only once.</p>}
-                            {target && !creatingTable && !destinationColumns.length && <p role="alert" className="text-xs text-[var(--red)]">The selected table has no writable columns in the loaded schema.</p>}
+                            {duplicateDestinations && <p role="alert" className="import-inline-error">Each destination column can be used only once.</p>}
+                            {target && !creatingTable && !destinationColumns.length && <p role="alert" className="import-inline-error">The selected table has no writable columns in the loaded schema.</p>}
+                        </div>
+                        <div className="import-setup-preview">
+                            <div className="import-section-heading"><span className="import-setup-kicker">DATA SAMPLE</span><h3>Preview your rows</h3></div>
+                            <ImportPreviewTable preview={preview} columns={sampleColumns}/>
                         </div>
                     </div>
                 </section>}
@@ -358,15 +381,13 @@ export function ImportWizard({ onImportQuery, ...controllerProps }: ImportWizard
             </main>
 
             <footer className="import-wizard-footer flex flex-wrap items-center justify-between gap-3 border-t border-[var(--line)] bg-[var(--page)] px-5 py-3 sm:px-7">
-                <span className="import-wizard-footer-note text-[10px] text-[var(--muted)]">{importKind === 'query' ? 'SQL file · opens as a draft only' : browserDemoImport ? 'Browser demo · nothing is written to ClickHouse' : browserCloudImport ? 'Up to 2 MB · maximum 10,000 rows · ClickHouse Cloud permissions apply' : step === 'file' ? 'Up to 2 MB · maximum 10,000 rows' : step === 'mapping' ? `${Object.keys(selectedFields).length} columns mapped` : step === 'review' ? 'Review before writing' : 'Server-owned import status'}</span>
+                <span className="import-wizard-footer-note text-[10px] text-[var(--muted)]">{importKind === 'query' ? 'SQL opens as a draft and does not run automatically' : browserDemoImport ? 'Browser demo · nothing is written to ClickHouse' : browserCloudImport ? 'CSV, JSON, or NDJSON · up to 2 MB and 10,000 rows' : step === 'file' ? 'CSV, JSON, or NDJSON · up to 2 MB and 10,000 rows' : step === 'mapping' ? target ? `${Object.keys(selectedFields).length} columns mapped · review before writing` : 'Choose a table and match its columns' : step === 'review' ? 'Review the destination and row count before writing' : 'Import status is checked with ClickHouse'}</span>
                 <div className="flex items-center gap-2">
                     {importKind === 'query' && <button type="button" onClick={() => void openQueryFile()} disabled={!queryFile || Boolean(queryFileError) || openingQuery} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40">{openingQuery ? 'Opening…' : 'Open query'}</button>}
                     {importKind === 'rows' && <>
-                    {recoveryState === 'ready' && step === 'mapping' && <button type="button" onClick={() => { setStep('file'); setError(''); }} disabled={Boolean(busy)} className="rounded-lg border border-[var(--line)] px-3 py-2 text-xs text-[var(--text-soft)] hover:bg-[var(--panel-hover)] disabled:opacity-50">Back</button>}
                     {recoveryState === 'ready' && step === 'review' && <button type="button" onClick={() => { setStep('mapping'); setError(''); }} disabled={Boolean(busy)} className="rounded-lg border border-[var(--line)] px-3 py-2 text-xs text-[var(--text-soft)] hover:bg-[var(--panel-hover)] disabled:opacity-50">Back</button>}
-                    {recoveryState === 'ready' && !importUnavailable && step === 'file' && !preview && <button type="button" onClick={() => void previewFile()} disabled={!file || !format || file.size > MAX_FILE_BYTES || Boolean(busy) || (!availableTargets.length && !browserCloudImport)} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40">{busy === 'preview' ? 'Reading file…' : 'Preview file'}</button>}
-                    {recoveryState === 'ready' && !importUnavailable && step === 'file' && preview && <button type="button" onClick={startMapping} disabled={availableTargets.length === 0 && !browserCloudImport} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40">Map columns</button>}
-                    {recoveryState === 'ready' && !importUnavailable && step === 'mapping' && <button type="button" onClick={() => void previewMapping()} disabled={!target || !destinationNames.length || duplicateDestinations || !destinationColumns.length || Boolean(busy)} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40">{busy === 'mapping' ? 'Checking mapping…' : !target ? 'Choose a destination' : !destinationNames.length && destinationColumns.length > 0 ? 'Map a column first' : 'Review import'}</button>}
+                    {recoveryState === 'ready' && !importUnavailable && step === 'file' && <button type="button" onClick={() => void previewFile()} disabled={!file || !format || file.size > MAX_FILE_BYTES || Boolean(busy) || (!availableTargets.length && !browserCloudImport)} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40">{busy === 'preview' ? 'Reading file…' : 'Read file and continue'}</button>}
+                    {recoveryState === 'ready' && !importUnavailable && step === 'mapping' && <button type="button" onClick={() => void previewMapping()} disabled={!target || !destinationNames.length || duplicateDestinations || !destinationColumns.length || Boolean(busy)} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40">{busy === 'mapping' ? 'Checking mapping…' : !target ? browserCloudImport && selectedDestinationChoice === 'existing' ? 'Choose a table' : 'Choose a destination' : !destinationNames.length && destinationColumns.length > 0 ? 'Map a column first' : duplicateDestinations ? 'Fix duplicate columns' : !destinationColumns.length ? 'No writable columns' : 'Review import'}</button>}
                     {recoveryState === 'ready' && !importUnavailable && step === 'review' && <button type="button" onClick={() => void commitImport()} disabled={Boolean(busy)} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40">{busy === 'commit' ? browserDemoImport ? 'Saving…' : 'Starting…' : creatingTable ? 'Create table and import' : browserDemoImport ? 'Save demo rows' : 'Import rows'}</button>}
                     {recoveryState === 'ready' && step === 'status' && job?.status === 'succeeded' && <>
                         <button type="button" onClick={importAnotherFile} disabled={Boolean(busy)} className="rounded-lg border border-[var(--line)] px-3 py-2 text-xs text-[var(--text-soft)] transition hover:bg-[var(--panel-hover)] disabled:opacity-40">Import another file</button>
