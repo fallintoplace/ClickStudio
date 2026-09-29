@@ -77,7 +77,7 @@ test('Standard exposes assignment actions and can run a query without opening AI
         page.getByRole('dialog', { name: 'Export' }).getByRole('button', { name: /Export rows/ }).click(),
     ]);
     expect(download.suggestedFilename()).toMatch(/\.csv$/);
-    await expect(page.getByRole('status').filter({ hasText: 'Sample results were generated. Query SQL was not sent to ClickHouse.' })).toBeVisible();
+    await expect(page.getByRole('banner').getByRole('button', { name: /SAMPLE DATA/ })).toBeVisible();
     expect(contextRequests).toBe(0);
     await expect(results.getByRole('tab', { name: 'Insights', exact: true })).toHaveCount(0);
 

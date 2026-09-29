@@ -71,7 +71,10 @@ test('File import previews, maps, and reports a successful insert without typed 
     expect(mappingScroll.scrollWidth).toBeGreaterThan(mappingScroll.clientWidth);
     await expect(dialog.getByLabel('Map day to destination')).toHaveValue('day');
     await dialog.getByRole('button', { name: 'Review import', exact: true }).click();
-    await expect(dialog).toContainText('2 rows into demo.events');
+    const review = dialog.getByRole('region', { name: 'Review import', exact: true });
+    await expect(review.getByRole('heading', { name: 'Ready to import into demo.events', exact: true })).toBeVisible();
+    await expect(review.getByRole('definition').filter({ hasText: /^2 rows$/ })).toBeVisible();
+    expect(commitBody).toBeUndefined();
 
     const commit = dialog.getByRole('button', { name: 'Import rows', exact: true });
     await expect(commit).toBeEnabled();

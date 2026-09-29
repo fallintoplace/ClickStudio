@@ -98,7 +98,8 @@ test('Table creation needs trust and a valid table name', async (t) => {
 });
 
 test('Local API exposes the public Playground as ready and read only', async (t) => {
-    const config = loadConfig(), service = createApp(config, { store: new MemoryStore() });
+    // Do not inherit the login token or connection settings from the live-test .env.
+    const config = loadConfig({}), service = createApp(config, { store: new MemoryStore() });
     const server = service.app.listen(0, '127.0.0.1');
     await new Promise<void>((resolve, reject) => { server.once('listening', resolve); server.once('error', reject); });
     config.origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
