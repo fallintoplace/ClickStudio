@@ -1,122 +1,151 @@
 # ClickStudio
 
-ClickStudio is a SQL editor for ClickHouse that you can run on your own computer. Use it to write queries, inspect results, build charts, and understand query performance.
+ClickStudio is a SQL editor for ClickHouse. Use it to write queries, view results, build charts, and inspect query performance.
 
-Each query run keeps its SQL, parameters, limits, results, and run details together. You can return to a saved run and see how it produced its result.
+Each saved run keeps its SQL, parameters, limits, results, and run details together. Reopen it to see how ClickHouse returned the result.
 
-The interface uses React, Click UI, and CodeMirror. A server API runs queries with limits on time, memory, and result size.
+The app uses React, Click UI, and CodeMirror. The server limits query time, memory use, and result size.
 
-## Reviewer tour
+## Review ClickStudio
 
-To review the project:
+The fastest way to try the app is sample mode. It needs no database.
 
-1. Start the **sample workspace** below. Try the editor, results, charts, and EXPLAIN views.
-2. Read [Engineering choices](docs/ENGINEERING-NOTES.md) to understand how the app works and why it was built this way.
-3. Read [Project highlights](docs/PROJECT-STATUS.md) to see the implemented features.
-4. Use the [setup and implementation reference](docs/CLICKSTUDIO.md) for detailed instructions.
+1. Follow the [sample setup](#sample-workspace) below.
+2. Try the editor, results, charts, and query plan views.
+3. Read [Engineering choices](docs/ENGINEERING-NOTES.md) to learn how the app works.
+4. Read [Project highlights](docs/PROJECT-STATUS.md) to see what is included.
 
-The main goal is to make each query easy to inspect. SQL, database behavior, execution limits, and saved run details stay visible.
+You can also run SQL on a real data source:
+
+- **ClickHouse Playground** uses public data. It is read-only and needs no account.
+- **ClickHouse Cloud** uses your own service. Choose **Connect ClickHouse Cloud** in the data source menu and enter the HTTPS host, database, username, and password from your Cloud service.
+
+The Cloud password stays in this browser tab’s memory. ClickStudio sends it to the ClickStudio server, which connects to Cloud over HTTPS. The password is cleared when you reload the page or disconnect. Your ClickHouse user’s permissions control what you can read or change.
+
+![Data source menu with ClickHouse Cloud and ClickHouse Playground](docs/images/reviewer-data-sources.png)
+
+*Choose the public Playground or connect your own ClickHouse Cloud service.*
 
 ## Quick start
 
-You need **Node.js 22.12 or newer** and npm. You also need Docker to use the bundled local ClickHouse server.
+You need **Node.js 22.12 or newer** and npm. You need Docker only if you want to run the local ClickHouse server.
 
-Start each shell command block below from the repository root: the folder that contains this README. Commands such as `cd clickstudio` then move into the application folder.
+Run the commands from the repository folder that contains this README, unless a step says to enter the clickstudio folder.
 
 ### Sample workspace
 
-Use sample mode to try the interface without setting up a database:
+Use sample mode to try the app without a database:
 
-```sh
-npm run setup
-cd clickstudio
-DEMO_MODE=true npm run dev
-```
+    npm run setup
+    cd clickstudio
+    DEMO_MODE=true npm run dev
 
-Open `http://localhost:5173` and choose **Start exploring**.
+Open http://localhost:5173 and choose **Start exploring**.
 
-Sample mode uses fixed example responses. It is useful for product tours and repeatable browser tests. It does not run your SQL against a real database.
+Sample mode shows fixed example results. It does not run your SQL on a database. To run real SQL, choose **ClickHouse Playground** or connect to **ClickHouse Cloud** in the data source menu.
+
+### AI assistant
+
+The AI assistant needs an OpenAI API key. Sample mode does not enable AI. Use the normal server mode for this section.
+
+Create the local settings file:
+
+If you already ran npm run setup above, skip that command. If clickstudio/.env already exists, skip npm run init:env.
+
+    npm run setup
+    cd clickstudio
+    npm run init:env
+
+Open the .env file in the clickstudio folder and add your key:
+
+    OPENAI_API_KEY=your-openai-api-key
+
+You can leave OPENAI_MODEL empty to use the default model. Or set a model that your OpenAI account can use.
+
+Start the app:
+
+    npm run dev
+
+When ClickStudio asks you to sign in, use the CLICKSTUDIO_TOKEN value from clickstudio/.env. Then choose **ClickHouse Playground** or connect to your Cloud service. Open the **AI** tab and follow the prompts to load the schema.
+
+The key stays on the server. Do not put it in a variable that starts with VITE_; those values are sent to the browser. Do not commit the .env file. Git ignores it.
+
+The AI panel explains what it sends and saves. This can include your message, chat history, SQL, table and column names, and recent query results. SQL suggestions do not run until you choose to run them.
+
+![AI panel in the workspace](docs/images/reviewer-ai-panel.png)
+
+*The AI panel is available after you set an OpenAI key and connect to a data source.*
 
 ### Local ClickHouse
 
-The bundled Docker Compose setup uses ClickHouse 24.6 for compatibility testing:
+Use these steps if you want to run a local ClickHouse server with Docker:
 
-```sh
-npm run setup
-cd clickstudio
-npm run init:env
-docker compose up -d --wait clickhouse
-npm run db:setup
-npm run dev
-```
+Skip npm run setup if you already ran it above. Skip npm run init:env if clickstudio/.env already exists.
+
+    npm run setup
+    cd clickstudio
+    npm run init:env
+    docker compose up -d --wait clickhouse
+    npm run db:setup
+    npm run dev
 
 Then:
 
-1. Open `http://localhost:5173`.
-2. Sign in with the `CLICKSTUDIO_TOKEN` value from `clickstudio/.env`.
+1. Open http://localhost:5173.
+2. Sign in with the CLICKSTUDIO_TOKEN value from clickstudio/.env.
 3. Choose **Test connection**.
-4. Choose **Trust connection** and enter `local`.
+4. Choose **Trust connection**. Enter local when asked.
 
-The setup adds sample data to `default.events`. Try this query:
+The setup adds sample data to default.events. Try this query:
 
-```sql
-SELECT day, events
-FROM default.events
-ORDER BY day;
-```
+    SELECT day, events
+    FROM default.events
+    ORDER BY day;
 
-The Run actions beside **Run statement** include **EXPLAIN INDEXES**, **EXPLAIN PLAN**, **EXPLAIN PIPELINE**, and **EXPLAIN ANALYZE**. These views help explain how ClickHouse processes a query.
+The menu beside **Run statement** has **EXPLAIN INDEXES**, **EXPLAIN PLAN**, **EXPLAIN PIPELINE**, and **EXPLAIN ANALYZE**.
 
-**EXPLAIN ANALYZE runs the selected query.** It requires ClickHouse 26.7 or newer, so it is not available on the bundled 24.6 server.
+**EXPLAIN ANALYZE runs the selected query.** It needs ClickHouse 26.7 or newer. The bundled server is version 24.6, so this option is not available with that server.
 
-Database credentials and optional AI model credentials stay on the server.
+### Example files
 
-## Examples
+These files are used by the local setup:
 
-These files match the bundled local setup:
+- [analysis.sql](clickstudio/examples/analysis.sql): example queries, parameters, and query plans.
+- [import.csv](clickstudio/examples/import.csv): sample rows for default.import_events.
+- [connections.json](clickstudio/examples/connections.json): settings for more than one connection.
 
-- [`clickstudio/examples/analysis.sql`](clickstudio/examples/analysis.sql): queries without a table, seeded data, exact numeric values, schema inspection, parameters, and query plans.
-- [`clickstudio/examples/import.csv`](clickstudio/examples/import.csv): sample rows for `default.import_events`.
-- [`clickstudio/examples/connections.json`](clickstudio/examples/connections.json): configuration for more than one connection.
+## Main features
 
-## Highlights
+- **Write SQL.** Format and check queries. Run one query or a script with results for each statement.
+- **Explore data.** Browse databases, tables, columns, system docs, and MergeTree data parts.
+- **View results.** See column types and result pages. Build charts and save query documents.
+- **Import files.** Preview CSV, JSON, and NDJSON files. Map columns and check the row count before import.
+- **Inspect query runs.** Track progress, cancel queries, reopen run details, and view query plans and runtime charts.
+- **Use the AI assistant.** Review the information sent to AI and its SQL suggestion before you apply or run it.
 
-- **Write and run SQL.** Format and validate queries. Run read-only SQL or a script with separate results for each statement.
-- **Explore the database.** Browse databases, tables, columns, and system-table documentation. Inspect active and inactive MergeTree data parts.
-- **Work with results.** View column types, move between result pages, build charts, and save query documents.
-- **Import data.** Preview CSV, JSON, or NDJSON files, map their columns, and confirm the row count before importing.
-- **Understand a run.** Track progress, cancel queries, reopen saved run details, and inspect interactive query-plan and runtime graphs.
-- **Use the assistant.** Review the information sent to the model and its SQL suggestion before applying or running it.
-
-## Validation
+## Checks
 
 Run the main project checks:
 
-```sh
-npm run check
-```
+    npm run check
 
-This checks syntax, TypeScript types, ESLint rules, test coverage requirements, and the production build.
+This checks the code, runs tests, and builds the app.
 
-To test the main browser workflows:
+To run the main browser checks:
 
-```sh
-cd clickstudio
-npm run test:e2e:core
-```
+    cd clickstudio
+    npm run test:e2e:core
 
-For live ClickHouse integration checks, first start and set up the local database as shown above. Then run:
+For ClickHouse integration checks, start the local database first. Then run:
 
-```sh
-cd clickstudio
-CLICKHOUSE_INTEGRATION=1 npm run test:integration
-npm run eval
-```
+    cd clickstudio
+    CLICKHOUSE_INTEGRATION=1 npm run test:integration
+    npm run eval
 
-## Documentation
+## More guides
 
-- [Documentation index](docs/README.md): all guides and a glossary of common terms.
-- [Engineering choices](docs/ENGINEERING-NOTES.md): how the app is built and why.
-- [Project highlights](docs/PROJECT-STATUS.md): implemented features and current scope.
-- [Setup and implementation reference](docs/CLICKSTUDIO.md): setup, configuration, and detailed behavior.
-- [Product exploration](docs/product-roadmap/): ideas for future development, not a list of available features.
+- [Docs index](docs/README.md): all guides and a glossary.
+- [Engineering choices](docs/ENGINEERING-NOTES.md): how the app is built.
+- [Project highlights](docs/PROJECT-STATUS.md): current features and scope.
+- [Setup and implementation guide](docs/CLICKSTUDIO.md): setup, settings, and details.
+- [Product ideas](docs/product-roadmap/): possible future work.
