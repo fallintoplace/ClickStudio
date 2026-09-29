@@ -139,6 +139,15 @@ test('File import review lists skipped columns and success can start another imp
     await dialog.getByRole('button', { name: 'Preview file', exact: true }).click();
     await dialog.getByRole('button', { name: 'Map columns', exact: true }).click();
     await chooseExistingTable(dialog);
+    const mappingCounts = dialog.locator('.import-mapping-counts');
+    await expect(mappingCounts).toContainText('2 mapped');
+    await expect(mappingCounts).toContainText('1 skipped');
+    await dialog.getByLabel('Map events to destination').selectOption('');
+    await expect(mappingCounts).toContainText('1 mapped');
+    await expect(mappingCounts).toContainText('2 skipped');
+    await dialog.getByLabel('Map events to destination').selectOption('events');
+    await expect(mappingCounts).toContainText('2 mapped');
+    await expect(mappingCounts).toContainText('1 skipped');
     await dialog.getByRole('button', { name: 'Review import', exact: true }).click();
 
     const mapping = dialog.getByRole('table', { name: 'Import column mapping' });

@@ -74,7 +74,8 @@ export function ImportWizard({ onImportQuery, ...controllerProps }: ImportWizard
     const canRetryUnknownImport = Boolean(job && job.status === 'unknown' && preview && mapping && (!browserCloudImport || (file && format)) && retryAttemptedFor !== job.id);
     const hasCreateIdColumn = createColumns.some(column => column.name.toLowerCase() === 'id');
     const importableDatabases = cloudImportDatabases(schema);
-    const mappedColumnCount = preview?.columns.filter(source => Boolean(mapping?.fields[source])).length ?? 0;
+    const mappedFields = mapping?.fields ?? selectedFields;
+    const mappedColumnCount = preview?.columns.filter(source => Boolean(mappedFields[source])).length ?? 0;
     const skippedColumnCount = (preview?.columns.length ?? 0) - mappedColumnCount;
     const [importKind, setImportKind] = useState<'rows' | 'query'>('rows');
     const [queryFile, setQueryFile] = useState<File>();

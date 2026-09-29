@@ -364,7 +364,10 @@ test('ClickHouse Cloud import explains when no source columns are mapped', async
     await chooseExistingCloudTable(dialog);
 
     const mappingStep = dialog.getByRole('region', { name: 'Map source columns' });
+    const mappingCounts = mappingStep.locator('.import-mapping-counts');
     const emptyState = mappingStep.getByRole('status');
+    await expect(mappingCounts).toContainText('0 mapped');
+    await expect(mappingCounts).toContainText('4 skipped');
     await expect(emptyState).toContainText('No columns mapped yet');
     await expect(emptyState).toContainText('Skipped columns will not be imported.');
     await expect(emptyState).toContainText('Create a new table from this file');
@@ -374,6 +377,8 @@ test('ClickHouse Cloud import explains when no source columns are mapped', async
     await expect(dialog.getByRole('button', { name: 'Map a column first', exact: true })).toBeDisabled();
 
     await dialog.getByLabel('Map message to destination').selectOption('day');
+    await expect(mappingCounts).toContainText('1 mapped');
+    await expect(mappingCounts).toContainText('3 skipped');
     await expect(emptyState).toHaveCount(0);
     await expect(dialog.getByRole('button', { name: 'Review import', exact: true })).toBeEnabled();
 });
@@ -397,6 +402,9 @@ test('ClickHouse Cloud import creates a table with editable inferred columns', a
     await expect(dialog.getByLabel('Type for events')).toHaveValue('UInt64');
     await expect(dialog.getByRole('checkbox', { name: /Add a generated id/ })).toBeChecked();
     await dialog.getByLabel('New table name').fill('interview_events');
+    const mappingCounts = dialog.locator('.import-mapping-counts');
+    await expect(mappingCounts).toContainText('2 mapped');
+    await expect(mappingCounts).toContainText('0 skipped');
     await dialog.getByLabel('New column name for day').fill('event_day');
     await dialog.getByRole('button', { name: 'Review import' }).click();
     await expect(dialog.getByRole('heading', { name: 'Ready to import into default.interview_events' })).toBeVisible();
