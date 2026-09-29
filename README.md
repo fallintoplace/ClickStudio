@@ -10,6 +10,13 @@ The app uses React, Click UI, and CodeMirror. The server sets limits for query t
 
 ## How ClickStudio meets the assignment
 
+### Fastest way to review
+
+1. Open the [live app](https://clickstudio-eight.vercel.app/) and choose **Start exploring**.
+2. In **Examples**, click **Chart** on a chart example. The sample workspace opens a chart with example results; select **Results** to see the table.
+3. In **Import**, choose **Import query**. Select [`analysis.sql`](clickstudio/examples/analysis.sql) and click **Open query**, then **Run** in the editor. Sample mode shows example results. The [local setup](#local-clickhouse) creates `default.events` for a live run.
+4. In **Import**, choose **Import rows**. Select [`import.csv`](clickstudio/examples/import.csv), then click **Preview file** and **Map columns**. Choose `demo.interview_imports`, map the fields, then click **Review import** and **Save demo rows**.
+
 ### 1. Run a query and display its results
 
 Choose a data source, write a query, and click **Run**. Results appear in a table with column names and types. Reopen a saved run to see its query and results.
@@ -25,6 +32,14 @@ On a supported connection, put up to 50 SQL statements in the editor and click *
 ### Bonus: Insert rows from a file
 
 Choose **Import** and select a CSV, JSON, NDJSON, or JSONL file (up to 2 MB and 10,000 rows). Preview the rows, choose a table, map the columns, and confirm the import. In ClickHouse Cloud, you can also create a MergeTree table. Sample workspace imports stay in your browser.
+
+## Architecture
+
+- **Browser:** React, CodeMirror, and Click UI. Drafts, tabs, chats, and settings stay in browser storage. The Cloud password stays in tab memory.
+- **ClickStudio API:** Express handles Cloud and local queries and applies server query limits. A local server saves runs, scripts, and query documents in `.data`.
+- **ClickHouse:** In the hosted sample, the browser sends read-only Playground queries over HTTPS. Cloud and local queries go through the API. Playground runs one statement at a time; Cloud and local connections support scripts.
+- **AI and credentials:** The API sends requests to OpenAI with `OPENAI_API_KEY` from the server environment. Local ClickHouse secrets also come from the server environment. The Cloud password goes from the browser to the API over HTTPS.
+- **Sample workspace:** Shows fixed example results; it does not run SQL. Demo state and imports stay in browser storage.
 
 ## Explore ClickStudio
 
