@@ -1,14 +1,14 @@
 # ClickStudio
 
-ClickStudio is a SQL editor for ClickHouse. Write queries, explore results, build charts, and see how queries run.
+ClickStudio is a SQL editor for ClickHouse. Write queries, explore results, build charts, and inspect query runs.
 
-Each saved run keeps its SQL, parameters, limits, results, and details together. Reopen a run to see how ClickHouse returned its result.
+Each saved run keeps its SQL, parameters, limits, and results together. Reopen a run to review its details.
 
 The app uses React, Click UI, and CodeMirror. The server sets limits for query time, memory, and result size.
 
 ## Explore ClickStudio
 
-Start with the sample workspace for a quick tour. When you are ready, choose a live data source:
+Start with the sample workspace, then choose a live data source when you are ready:
 
 - **ClickHouse Playground** runs SQL on public data with read-only access.
 - **ClickHouse Cloud** connects to your own service.
@@ -19,7 +19,7 @@ Start with the sample workspace for a quick tour. When you are ready, choose a l
 
 ## Quick start
 
-You need **Node.js 22.12 or newer** and npm. Docker is needed for the optional local ClickHouse server.
+Install **Node.js 22.12 or newer** and npm. Docker runs the optional local ClickHouse server.
 
 From the repository folder, install the app and create your local settings file:
 
@@ -27,7 +27,7 @@ From the repository folder, install the app and create your local settings file:
     cd clickstudio
     npm run init:env
 
-This creates a local sign-in token. Keep the settings file for the steps below.
+This creates a local sign-in token in the settings file.
 
 ### Sample workspace
 
@@ -35,7 +35,7 @@ From the clickstudio folder, start the sample workspace:
 
     DEMO_MODE=true npm run dev
 
-Open http://localhost:5173 and choose **Start exploring**. The workspace includes fixed example results, charts, and query plans.
+Open http://localhost:5173 and choose **Start exploring**. Explore example results, charts, and query plans.
 
 ### ClickHouse Playground or Cloud
 
@@ -43,9 +43,9 @@ From the clickstudio folder, start the standard workspace:
 
     npm run dev
 
-Sign in with the CLICKSTUDIO_TOKEN value from the .env file. Open the data source menu and choose **ClickHouse Playground** to run SQL on public read-only data.
+Sign in with `CLICKSTUDIO_TOKEN` from `.env`. Open the data source menu and choose **ClickHouse Playground** to query public, read-only data.
 
-To connect your Cloud service, choose **Connect ClickHouse Cloud** and enter the HTTPS host, database, username, and password. The password stays in this browser tab’s memory and clears when you reload or disconnect. ClickStudio sends it to its server, which connects to Cloud over HTTPS. Your ClickHouse user’s permissions control what you can read or change.
+To connect your Cloud service, choose **Connect ClickHouse Cloud** and enter the HTTPS host, database, username, and password. The password stays in this browser tab’s memory and clears when you reload or disconnect. ClickStudio sends it to its server, which connects to Cloud over HTTPS. Your ClickHouse user’s permissions control available actions.
 
 ### AI assistant
 
@@ -53,15 +53,15 @@ The AI assistant uses an OpenAI API key. Add your key to the .env file:
 
     OPENAI_API_KEY=your-openai-api-key
 
-Replace the example value with your key.
+Replace `your-openai-api-key` with your key.
 
-You can leave OPENAI_MODEL empty to use the default model, or set a model your OpenAI account supports. Restart the standard workspace after you update the key:
+Leave `OPENAI_MODEL` empty to use the default model, or set a model supported by your OpenAI account. Restart the workspace after updating the key:
 
     npm run dev
 
-Open the **AI** tab and follow the prompts to load the schema. The server reads the key from .env. Git ignores this file, so the key stays out of browser settings.
+Open the **AI** tab and follow the prompts to load the schema. The server reads the key from `.env`, keeping it out of browser settings.
 
-Open **What gets sent and saved?** in the AI panel to review the information used for a request. It can include your message, chat history, SQL, table and column names, and recent query results. Review each SQL suggestion and choose whether to apply or run it.
+Open **What gets sent and saved?** in the AI panel to review the information used for a request. It can include your message, chat history, SQL, table and column names, and recent query results. Review each SQL suggestion before applying or running it.
 
 ![AI panel in the workspace](docs/images/reviewer-ai-panel.png)
 
@@ -75,15 +75,15 @@ From the clickstudio folder, start the optional local database:
     npm run db:setup
     npm run dev
 
-Open http://localhost:5173, sign in with the CLICKSTUDIO_TOKEN value from .env, then choose **Test connection** and **Trust connection**. Enter local when asked.
+Open http://localhost:5173, sign in with `CLICKSTUDIO_TOKEN` from `.env`, then choose **Test connection** and **Trust connection**. Enter `local` when asked.
 
-The setup adds sample data to default.events. Try this query:
+The setup adds sample data to `default.events`. Try this query:
 
     SELECT day, events
     FROM default.events
     ORDER BY day;
 
-The menu beside **Run statement** has **EXPLAIN INDEXES**, **EXPLAIN PLAN**, **EXPLAIN PIPELINE**, and **EXPLAIN ANALYZE**. Use ClickHouse 26.7 or newer for **EXPLAIN ANALYZE**. The bundled server is version 24.6 and supports the other query plan views.
+The menu beside **Run statement** has **EXPLAIN INDEXES**, **EXPLAIN PLAN**, **EXPLAIN PIPELINE**, and **EXPLAIN ANALYZE**. ClickHouse 26.7 or newer supports **EXPLAIN ANALYZE**. The bundled ClickHouse 24.6 server supports the other query plan views.
 
 ### Example files
 

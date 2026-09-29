@@ -1,6 +1,6 @@
 # Project highlights
 
-ClickStudio is a ClickHouse SQL editor built as an interview project. It is designed to run locally. It focuses on useful SQL workflows, ClickHouse-specific tools, and clear records of query execution.
+ClickStudio is a local ClickHouse SQL editor built as an interview project. It brings SQL workflows, ClickHouse tools, and clear query records together.
 
 ## Implemented capabilities
 
@@ -32,7 +32,7 @@ Sample mode uses fixed example responses for a repeatable tour of the interface.
 
 The main areas to review are:
 
-1. Queries go through the server rather than directly from the browser to the database.
+1. The server runs queries and applies resource limits.
 2. Saved results belong to a specific query run.
 3. Exact ClickHouse numbers keep their precision when passed to JavaScript.
 4. ClickHouse permissions enforce database access.
@@ -45,11 +45,11 @@ See [Engineering choices](ENGINEERING-NOTES.md) for the reasons behind these dec
 
 ## Product shape
 
-The current app is designed for one owner and local use. It uses lightweight storage and explicitly configured connections.
+The app is designed for one owner and local use. It uses lightweight storage and explicit connection settings.
 
-This keeps setup simple and makes the main SQL workflow easy to review. Shared storage, organization-level permissions, managed connections, and larger-result workflows are possible future extensions.
+This keeps setup simple and makes the SQL workflow easy to review. Future work could add shared storage, organization permissions, managed connections, and larger-result workflows.
 
-The [product exploration notes](product-roadmap/) describe ideas for future work. They are separate from the implemented features above.
+The [product exploration notes](product-roadmap/) describe future ideas alongside the features available today.
 
 ## Running and validating
 

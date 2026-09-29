@@ -1,6 +1,6 @@
 # Voice and image input
 
-This is a product direction note. See [Project highlights](../PROJECT-STATUS.md) for implemented features.
+This guide explores future ideas for ClickStudio. See [Project highlights](../PROJECT-STATUS.md) for features available today.
 
 ## Goal
 
@@ -24,4 +24,4 @@ This keeps the workflow consistent regardless of how the user provides input.
 
 ## Product direction
 
-Voice and images could be another way to start the same inspectable SQL workflow. They should not require a separate workspace.
+Voice and images can start the same inspectable SQL workflow in the existing workspace.

@@ -1,6 +1,6 @@
 # Engineering choices
 
-This guide explains the main technical decisions in ClickStudio and the reasons for them.
+This guide explains ClickStudio's main technical decisions.
 
 ## 1. Server-mediated ClickHouse access
 
@@ -8,13 +8,13 @@ The browser sends requests to a small server API. The server then runs the queri
 
 This keeps database credentials on the server and query limits in one place. Users can review a connection profile before running SQL. Imports use a separate database user with permission to write to configured tables.
 
-This separation also leaves room for more connection rules later.
+The server can also add connection rules as the product grows.
 
 ## 2. Execution-scoped evidence
 
 Each query run has its own ID and saved details: SQL, parameters, limits, timestamps, result state, and result data.
 
-Charts, history, saved revisions, EXPLAIN views, and assistant proposals can refer to that exact run. Editing the SQL draft does not change the details of an earlier run.
+Charts, history, saved revisions, EXPLAIN views, and assistant proposals can refer to that exact run. Each run keeps the SQL and details from the moment it ran.
 
 ## 3. Database-native permissions
 
@@ -24,21 +24,21 @@ The bundled setup uses three types of database user:
 - A user with `INSERT` permission for imports into configured tables.
 - An administrator for local setup.
 
-The app checks SQL to give useful error messages. ClickHouse permissions enforce access at the database itself. The app's checks do not replace database permissions.
+SQL checks give useful feedback. ClickHouse grants enforce access directly in the database.
 
 ## 4. ClickHouse type fidelity
 
 Results keep each column's ClickHouse type together with its values.
 
-Large `UInt64` and `Decimal` values are sent as strings. This prevents JavaScript number conversion from losing precision.
+Large `UInt64` and `Decimal` values use strings to preserve exact precision in JavaScript.
 
 Charts use numeric coordinates where appropriate. Table and JSON views keep exact values for inspection.
 
 ## 5. Deterministic sample mode
 
-Sample mode returns fixed example responses rather than running SQL. This gives reviewers and browser tests the same data each time.
+Sample mode returns fixed example responses, so reviewers and browser tests see the same data each time.
 
-The examples cover editing, progress, cancellation, charts, EXPLAIN views, history, and saved results. Live mode uses the same interface but runs queries against a real ClickHouse database.
+The examples cover editing, progress, cancellation, charts, EXPLAIN views, history, and saved results. Live mode runs queries against a ClickHouse database in the same interface.
 
 ## 6. Structured EXPLAIN experiences
 
@@ -46,9 +46,9 @@ ClickStudio has separate views for **EXPLAIN INDEXES**, **EXPLAIN PLAN**, **EXPL
 
 The app turns ClickHouse output into interactive graphs with size limits. It also keeps the raw output available. The views explain which data ClickHouse can skip, the steps in a plan, how processors connect, and measured execution details.
 
-Runtime analysis runs the selected query. The app enables it only when the connected server supports it.
+Runtime analysis runs the selected query. ClickStudio enables it when the connected server supports it.
 
-The MergeTree storage view is separate from query-run history. It reads `system.parts` through a read-only query with a result limit. An inactive part is not described as an active merge.
+The MergeTree storage view reads `system.parts` through a limited, read-only query. It shows whether each part is active.
 
 ## 7. Lightweight local persistence
 
@@ -65,7 +65,7 @@ The interface separates actions that have different effects:
 - Review an assistant suggestion, apply it, and run it as separate steps.
 - Publish a snapshot before creating a share link.
 
-Saved results keep their original SQL and parameters. These steps make it clear what the user is approving.
+Saved results keep their original SQL and parameters, so each user action stays clear and reviewable.
 
 ## 9. Layered testing
 
@@ -89,4 +89,4 @@ The architecture leaves room for future work in:
 5. Large results, with only visible rows rendered and data delivered in streams.
 6. Tests across more ClickHouse versions.
 
-These are extension points, not claims that all of these features are already implemented.
+The architecture can grow to support these areas over time.

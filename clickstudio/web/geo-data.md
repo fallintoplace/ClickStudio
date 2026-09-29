@@ -1,6 +1,6 @@
 # Map data
 
-The map background uses country boundaries from Natural Earth's **1:50m Admin 0 countries** dataset. Here, `1:50m` means a scale of 1:50 million, and `Admin 0` means country-level boundaries.
+The map background uses Natural Earth's **1:50m Admin 0 countries** dataset. `1:50m` means a scale of 1:50 million; `Admin 0` means country-level boundaries.
 
 ## Source
 
@@ -9,6 +9,6 @@ The map background uses country boundaries from Natural Earth's **1:50m Admin 0 
 
 ## Local file
 
-The repository includes a copy at [`clickstudio/web/public/geo/countries-50m.geojson`](public/geo/countries-50m.geojson). The app serves this local file.
+The repository includes [`clickstudio/web/public/geo/countries-50m.geojson`](public/geo/countries-50m.geojson), which the app serves locally.
 
-GeoJSON is a JSON format for geographic data. This copy keeps each country's English name and shape. Coordinates are rounded to four decimal places.
+GeoJSON is a JSON format for geographic data. This file keeps each country's English name and shape, with coordinates rounded to four decimal places.

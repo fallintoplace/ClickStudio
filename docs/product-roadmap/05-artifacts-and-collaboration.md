@@ -1,6 +1,6 @@
 # Saved analysis and collaboration
 
-This is a product direction note. See [Project highlights](../PROJECT-STATUS.md) for implemented features.
+This guide explores future ideas for ClickStudio. See [Project highlights](../PROJECT-STATUS.md) for features available today.
 
 ## Goal
 
@@ -22,7 +22,7 @@ A document can move through these stages:
 4. Publish a snapshot of the result.
 5. Share a view of that snapshot.
 
-A snapshot is a saved copy, not a live draft. These separate stages make it clear what another person will see.
+A snapshot preserves a saved result while the draft can continue to change. These stages show reviewers what they will see.
 
 ## Collaboration direction
 

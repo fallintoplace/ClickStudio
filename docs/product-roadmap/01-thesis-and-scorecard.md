@@ -1,6 +1,6 @@
 # Product goal and success measures
 
-This is a product direction note. See [Project highlights](../PROJECT-STATUS.md) for implemented features.
+This guide explores future ideas for ClickStudio. See [Project highlights](../PROJECT-STATUS.md) for features available today.
 
 ## Vision
 

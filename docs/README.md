@@ -1,6 +1,6 @@
 # ClickStudio docs
 
-Find guides to start ClickStudio, explore its features, and understand how it works.
+Use these guides to start ClickStudio, explore its features, and learn how it works.
 
 ## Start here
 
@@ -12,7 +12,7 @@ Find guides to start ClickStudio, explore its features, and understand how it wo
 
 | Guide | Topics |
 | --- | --- |
-| [Setup and implementation](CLICKSTUDIO.md) | Setup, settings, query runs, saved data, imports, AI, and checks. |
+| [Setup and implementation](CLICKSTUDIO.md) | Setup, query runs, saved data, imports, AI, and checks. |
 | [SQL editing tools](EDITOR-TOOLS.md) | Statements, snippets, and autocomplete. |
 | [Explore ClickHouse](../clickstudio/docs/native-explorers.md) | Materialized views, data parts, merges, mutations, and query comparisons. |
 | [Map data](../clickstudio/web/geo-data.md) | Map background source and local file. |
@@ -21,7 +21,7 @@ Find guides to start ClickStudio, explore its features, and understand how it wo
 
 ## Product ideas
 
-[Explore product ideas](product-roadmap/) for collaboration, AI support, and team settings. [Project highlights](PROJECT-STATUS.md) describes features available today.
+[Explore product ideas](product-roadmap/) for collaboration, AI, and team settings. [Project highlights](PROJECT-STATUS.md) lists features available today.
 
 ## Common terms
 
@@ -31,7 +31,7 @@ Find guides to start ClickStudio, explore its features, and understand how it wo
 | Schema | A database’s tables, columns, and data types. |
 | Parameter | A named value used by a query. |
 | Run | One query execution with saved details and results. |
-| Execution evidence | SQL, settings, results, and measurements saved for a run. |
+| Execution evidence | SQL, settings, results, and measurements for a run. |
 | Snapshot | A saved copy of data from one point in time. |
 | Lineage | Shows which query created a result or chart. |
 | Fixed sample data | Example data that gives the same results each time. |

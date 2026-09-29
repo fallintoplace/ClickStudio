@@ -1,6 +1,6 @@
 # AI assistant direction
 
-This is a product direction note. See [Project highlights](../PROJECT-STATUS.md) for implemented features.
+This guide explores future ideas for ClickStudio. See [Project highlights](../PROJECT-STATUS.md) for features available today.
 
 ## Goal
 
@@ -32,7 +32,7 @@ This keeps the user in control of the final query.
 
 Quality checks can look at whether the proposal uses known tables and columns, stays read-only, and follows the expected output for its task.
 
-Reusable task instructions are called playbooks. Checks can also use rules that estimate whether SQL matches the request, fixed test cases, and saved records of earlier decisions. These checks are useful signals, not proof that an answer is correct.
+Reusable task instructions are called playbooks. Checks can also use rules that estimate whether SQL matches the request, fixed test cases, and saved records of earlier decisions. Use these checks as review signals alongside the SQL and results.
 
 ## Product direction
 

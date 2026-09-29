@@ -1,6 +1,6 @@
 # Product growth direction
 
-This is a product direction note. See [Project highlights](../PROJECT-STATUS.md) for implemented features.
+This guide explores future ideas for ClickStudio. See [Project highlights](../PROJECT-STATUS.md) for features available today.
 
 ## Memorable workflow
 
@@ -32,7 +32,7 @@ Keep local setup simple. Add convenient connection options for ClickHouse Cloud 
 
 ## Release path
 
-This is a possible order for development, not a dated release commitment:
+One possible development sequence:
 
 1. **Core workspace:** SQL, results, charts, scripts, and imports.
 2. **ClickHouse tools:** schema tools, EXPLAIN views, history, and run details.

@@ -1,6 +1,6 @@
 # Native exploration workflows
 
-Use the existing Objects, MergeTree parts, History, and Insights views to inspect database objects, storage activity, and query runs. These tools do not add a separate workspace mode.
+Use the Objects, MergeTree parts, History, and Insights views to explore database objects, storage activity, and query runs.
 
 ## Materialized views
 
@@ -17,15 +17,15 @@ The graph distinguishes:
 - **Refresh order:** explicit `DEPENDS ON` relationships.
 - **Catalog-loading dependencies:** relationships used when loading database object definitions.
 
-Catalog dependencies do not show every path that data takes through SQL. Objects outside the database snapshot remain identifiable even when their full metadata is unavailable.
+The graph shows catalog relationships from the selected database snapshot. It identifies objects outside the snapshot and displays their available metadata.
 
-ClickStudio reads refresh modes from the actual `CREATE` statement header and refresh measurements. It does not guess the mode from the server version or enable experimental settings.
+ClickStudio reads refresh modes from the `CREATE` statement header and available refresh measurements.
 
 ### Available metadata and limits
 
-The reader checks which optional `system.tables` columns are available. It also reads `system.view_refreshes` when it has access.
+The reader detects available optional `system.tables` columns and reads `system.view_refreshes` when permitted.
 
-An older server or missing permissions may limit refresh information. The app keeps the metadata it can read and explains what is missing.
+Refresh information depends on the server version and reader permissions. The app labels the metadata available to the connected user.
 
 | Item | Limit |
 | --- | --- |
@@ -34,7 +34,7 @@ An older server or missing permissions may limit refresh information. The app ke
 | Relationships retained | 1,500 |
 | Objects shown in the interactive graph at once | 120 |
 
-When these limits exclude metadata, the app marks the result as incomplete.
+When a limit applies, the app marks the result as incomplete.
 
 ## Parts, merges, and mutations
 
@@ -42,9 +42,9 @@ For a MergeTree table, choose **Visualize parts**, or open the **MergeTree parts
 
 A merge combines data parts. The Merges tab shows source parts, the resulting part, ClickHouse's reported progress, elapsed time, average uncompressed read rate, and memory use.
 
-A mutation changes existing data. The Mutations tab shows commands, creation time, remaining parts, completion state, and the latest failure details.
+A mutation changes existing data. The Mutations tab shows commands, creation time, remaining parts, completion state, and the latest error details.
 
-**Zero remaining parts does not mean a mutation is complete.** The `is_done` field determines completion. The app does not estimate a progress percentage.
+The `is_done` field shows mutation completion. The panel shows progress reported by ClickHouse.
 
 ### Refresh behavior
 
@@ -52,9 +52,9 @@ Live activity refresh is optional. When enabled, it waits five seconds between r
 
 Refresh pauses when the browser tab is hidden or the panel is inactive. Closing the view or changing it cancels its active request.
 
-The merge and mutation views each have a 50-record limit. They use fixed, parameterized, read-only queries. They do not issue commands to merge data, mutate data, or refresh a materialized view.
+The merge and mutation views each show up to 50 records through fixed, parameterized, read-only queries. They display server activity for inspection.
 
-Metadata comes from the connected server. ClickStudio does not issue its own query to combine activity across a cluster.
+Each view shows metadata from the connected server.
 
 ## Query-run comparison
 
@@ -64,23 +64,23 @@ Open **History → Compare runs** or **Insights → Compare runs**. Choose two c
 
 The comparison prefers matching final query-log records. It uses client duration or run progress only when both sides use the same source.
 
-Missing counters stay unavailable rather than becoming zero. Integer values keep their exact precision. Percentage changes account for a zero starting value.
+The view labels counter availability, keeps integer precision, and handles percentage changes from a zero starting value.
 
 The view also shows SQL, parameters, configured limits, and any pipelines already loaded for those runs in the current workspace session.
 
 ### What a comparison can tell you
 
-Pipeline operator changes and side-by-side graphs help you inspect differences. They do not prove that two queries return the same result or show the runtime plans used historically.
+Pipeline operator changes and side-by-side graphs help you compare the pipeline data loaded for each run.
 
-Comparison does not run SQL or EXPLAIN again. **Load query-log metrics** only reads records for the selected query IDs.
+Comparisons use saved run details. **Load query-log metrics** reads records for the selected query IDs.
 
-Equal saved row counts do not prove that results are equal. Two individual runs are also not a controlled benchmark: cached data, table data, and other server work may differ.
+For a complete comparison, review result values and SQL as well as row counts. Treat individual runs as observations because cache state, table data, and server activity can vary.
 
 ## Hosted preview
 
 The hosted preview uses the browser Playground reader to read live metadata. It reports permission errors and empty system tables directly.
 
-Sample mode has clearly labelled, fixed examples of materialized views, merges, and mutations. A failed live request is never replaced with sample data.
+Sample mode shows clearly labeled, fixed examples of materialized views, merges, and mutations. Live metadata and permissions come from the connected server.
 
 Run comparison uses the saved history available for the selected connection.
 
@@ -92,4 +92,4 @@ Only the operator runs setup. The web app continues to use its reader credential
 
 For an existing connection, ask the database administrator to grant access to the specific metadata tables needed by each view. Query-log access is a separate choice because it can expose SQL from other users.
 
-ClickStudio never changes grants on a connected server.
+Manage grants in ClickHouse. Each view uses the connected user's existing access.

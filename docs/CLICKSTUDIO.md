@@ -44,14 +44,14 @@ The setup creates `default.events` with seven fixed sample rows and `default.imp
 
 ## Sample workspace
 
-Use sample mode to try the interface without a live database:
+Use sample mode to explore the interface:
 
 ```sh
 cd clickstudio
 DEMO_MODE=true npm run dev
 ```
 
-It returns fixed example responses for editing, results, charts, progress, cancellation, history, and EXPLAIN views. It does not evaluate your SQL.
+Sample mode returns fixed examples for editing, results, charts, progress, cancellation, history, and EXPLAIN views. Live mode runs SQL against ClickHouse.
 
 Live mode uses the same interface but runs queries against a real ClickHouse database.
 
@@ -102,7 +102,7 @@ More runnable examples are in [`clickstudio/examples/analysis.sql`](../clickstud
 
 ### Table-free smoke test
 
-This query does not need an existing table:
+Use this table-free query to check the connection:
 
 ```sql
 SELECT
@@ -168,17 +168,17 @@ Shows the logical steps in the query plan as a graph or tree. Select a step to i
 
 ### EXPLAIN PIPELINE
 
-Shows how processing stages connect and which stages can run in parallel. This is the planned execution structure, not measured runtime performance.
+Shows the planned processor stages and which stages can run in parallel.
 
 ### EXPLAIN ANALYZE
 
 **This action runs the selected query.** ClickHouse discards the query's result rows and returns execution analysis, which ClickStudio saves.
 
-It requires a connection that supports native `EXPLAIN ANALYZE`, introduced in ClickHouse 26.7. The bundled local ClickHouse 24.6 server does not support it.
+Use a connection with ClickHouse 26.7 or newer for native `EXPLAIN ANALYZE`. The bundled local server uses ClickHouse 24.6.
 
 The runtime graph shows measured time, data flow, and parallel work. It follows data from reads toward the result and highlights slower stages. Raw output remains in the Results tab.
 
-In sample mode, the view shows fixed example measurements. It does not evaluate the SQL.
+Sample mode shows fixed example measurements. Live mode measures the selected query.
 
 The SQL Structure view also includes a server-resolved **Analyzer** tree, a local abstract syntax tree (AST), and logical flow. An AST represents the structure of parsed SQL.
 
@@ -188,7 +188,7 @@ Execution evidence means the saved details of a query run. Each run gets a query
 
 ClickStudio keeps the SQL, supplied parameters, execution identity, limits, timestamps, result state, and typed result data together. A chart, profile, plan, or saved result can then refer to the exact run that produced it.
 
-Editing a draft does not change an earlier run's saved details.
+Each run preserves its SQL and details from the time it ran.
 
 ## Result fidelity
 
@@ -212,7 +212,7 @@ These are separate actions:
 2. **Publish** connects a saved revision to a completed run. It freezes the selected chart and a result snapshot with size limits.
 3. **Share** creates a read link for the published snapshot.
 
-A snapshot is a saved copy. Later draft edits do not change that copy.
+A snapshot preserves a saved result while the draft can continue to change.
 
 ## Connection configuration
 
@@ -220,7 +220,7 @@ The browser selects a connection by its profile ID. The server stores the connec
 
 For multiple profiles, set `CONNECTIONS_FILE` to a JSON configuration file. See [`clickstudio/examples/connections.json`](../clickstudio/examples/connections.json) for the format.
 
-The configuration refers to passwords by their environment variable names. It does not need to send passwords to the browser.
+Connection profiles refer to password environment-variable names, so secrets stay on the server.
 
 ## ClickHouse permissions
 
@@ -230,7 +230,7 @@ The bundled local setup uses separate database users:
 - `clickstudio_writer`: writes to configured import tables.
 - `clickstudio_admin`: setup tasks.
 
-SQL checks in the app give useful feedback. ClickHouse grants enforce database permissions. The app's checks do not replace those grants.
+SQL checks give useful feedback. ClickHouse grants enforce database permissions.
 
 The reader profile also sets operational settings for queries with execution limits.
 
@@ -258,7 +258,7 @@ The assistant can generate, explain, repair, and review SQL. It can also analyze
 
 Before you give consent, the app shows the information prepared for the model. This can include the current SQL, selected schema, up to four relevant ClickHouse reference entries, and selected result evidence. The preview names the reference entries.
 
-The app prefers documentation from the selected server. When that is unavailable, it uses the bundled offline reference.
+The app uses documentation from the selected server and falls back to the bundled offline reference when needed.
 
 The workflow has separate steps:
 
@@ -268,7 +268,7 @@ The workflow has separate steps:
 4. Apply it to the editor.
 5. Run the SQL.
 
-Each proposal includes quality information. The checks cover the playbook's expected output, read-only SQL safety, use of known schema objects, and a static estimate of whether the proposal fits the task. This estimate does not prove that the SQL answers the question correctly.
+Each proposal includes quality information. Checks cover the playbook's expected output, read-only SQL safety, known schema objects, and a static estimate of how well the proposal fits the task. Use the estimate as a review signal alongside the SQL and results.
 
 The local `eval:assistant` command runs fixed benchmark cases for the main assistant behaviors.
 
@@ -304,7 +304,7 @@ These limits help control query resource use and the size of saved results.
 
 ## Retention
 
-Saved data is not kept without limits. ClickStudio limits stored run results, published snapshots, import previews, histories, documents, uploads, proposals, queues, sessions, and audit metadata.
+ClickStudio keeps run results, published snapshots, import previews, histories, documents, uploads, proposals, queues, sessions, and audit metadata within configured limits.
 
 This keeps local storage use predictable while preserving recent work.
 

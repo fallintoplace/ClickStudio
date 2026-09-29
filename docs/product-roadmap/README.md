@@ -2,7 +2,7 @@
 
 These notes describe ideas considered while building ClickStudio. They cover the SQL workspace, charts, saved analysis, collaboration, AI assistance, and future growth.
 
-They are not a list of available features or a release schedule. See [Project highlights](../PROJECT-STATUS.md) for implemented features and [Engineering choices](../ENGINEERING-NOTES.md) for current design decisions.
+Explore future ideas in these notes. See [Project highlights](../PROJECT-STATUS.md) for current features and [Engineering choices](../ENGINEERING-NOTES.md) for today's design decisions.
 
 ## Notes
 

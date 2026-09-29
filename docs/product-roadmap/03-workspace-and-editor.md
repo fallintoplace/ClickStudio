@@ -1,6 +1,6 @@
 # Workspace and editor direction
 
-This is a product direction note. See [Project highlights](../PROJECT-STATUS.md) for implemented features.
+This guide explores future ideas for ClickStudio. See [Project highlights](../PROJECT-STATUS.md) for features available today.
 
 ## Goal
 
@@ -10,7 +10,7 @@ Give users a focused place to write ClickHouse SQL and understand what it does.
 
 The workspace should bring SQL tabs, saved files, schema browsing, results, history, charts, EXPLAIN views, assistant context, and documentation together.
 
-Users should be able to move between these views without losing the connection to their current SQL or saved run details.
+Users should be able to move between these views while keeping their current SQL and saved run details in reach.
 
 ## Editor experience
 
