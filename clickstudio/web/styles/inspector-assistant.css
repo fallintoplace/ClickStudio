@@ -163,6 +163,23 @@
     .revision-preview-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 8px; font-weight: 650; letter-spacing: .08em; }
     .revision-preview pre { max-height: min(34vh, 280px); margin: 0; overflow: auto; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-raised); color: var(--text-soft); font-family: var(--font-mono); font-size: 8px; line-height: 1.6; tab-size: 4; white-space: pre; }
     .revision-unsaved-note { color: var(--amber); font-size: 8px; line-height: 1.5; }
+    .restore-revision-dialog { width: min(460px, calc(100vw - 32px)); max-width: none; max-height: min(90dvh, 560px); overflow: auto; margin: auto; padding: 0; border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line-bright)); border-radius: 16px; background: radial-gradient(ellipse at 0 0, color-mix(in srgb, var(--accent) 12%, transparent), transparent 54%), linear-gradient(150deg, var(--panel-raised), var(--panel)); color: var(--text); box-shadow: var(--shadow), 0 24px 80px #0009; }
+    .restore-revision-dialog::backdrop { background: rgb(3 8 13 / 78%); backdrop-filter: blur(5px); }
+    .restore-revision-content { display: grid; gap: 17px; padding: 21px; }
+    .restore-revision-topline { display: flex; align-items: center; justify-content: space-between; color: var(--accent); font-size: 8px; font-weight: 760; letter-spacing: .16em; }
+    .restore-revision-close { display: grid; width: 30px; min-height: 30px; place-items: center; padding: 0; color: var(--muted); }
+    .restore-revision-close svg { width: 15px; height: 15px; }
+    .restore-revision-title-row { display: grid; grid-template-columns: 40px minmax(0, 1fr); align-items: start; gap: 12px; }
+    .restore-revision-icon { display: grid; width: 40px; height: 40px; place-items: center; border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line)); border-radius: 12px; background: color-mix(in srgb, var(--accent) 9%, var(--panel)); color: var(--accent); }
+    .restore-revision-icon svg { width: 19px; height: 19px; }
+    .restore-revision-title-row h2 { margin: 0; color: var(--text); font-family: var(--font-display); font-size: 17px; font-weight: 700; letter-spacing: -.025em; line-height: 1.3; }
+    .restore-revision-title-row p { margin: 7px 0 0; color: var(--text-soft); font-size: 11px; line-height: 1.55; }
+    .restore-revision-summary { display: grid; gap: 4px; padding: 11px 13px; border: 1px solid var(--line); border-radius: 10px; background: color-mix(in srgb, var(--page-raised) 80%, transparent); }
+    .restore-revision-summary span { color: var(--muted); font-size: 8px; font-weight: 720; letter-spacing: .1em; text-transform: uppercase; }
+    .restore-revision-summary strong { color: var(--text); font-size: 12px; font-weight: 650; }
+    .restore-revision-history-note { margin: -7px 0 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
+    .restore-revision-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 2px; }
+    .restore-revision-actions .button-base { min-height: 36px; padding-inline: 12px; font-size: 10px; }
     .run-detail-hero { display: grid; gap: 7px; padding: 11px; border: 1px solid var(--line); border-radius: 10px; background: radial-gradient(ellipse at 100% 0, color-mix(in srgb, var(--accent) 7%, transparent), transparent 60%), var(--panel-raised); }
     .run-detail-hero > strong { overflow: hidden; color: var(--text-soft); font-family: var(--font-mono); font-size: 9px; text-overflow: ellipsis; }
     .run-detail-hero > small { color: var(--muted); font-size: 8px; }

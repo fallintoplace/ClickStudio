@@ -13,6 +13,7 @@ import { ExportDialog } from './components/ExportDialog';
 import { WorkspaceHelpPanel, type HelpPanelSection } from './components/WorkspaceHelpPanel';
 import { HelpButton } from './components/HelpButton';
 import { RestoreSqlMenu } from './components/RestoreSqlMenu';
+import { RestoreRevisionDialog } from './components/RestoreRevisionDialog';
 import { OverlayPortal } from './components/OverlayPortal';
 import { ObservabilityExplorer } from './components/ObservabilityExplorer';
 import { InspectorPane, type InspectorPaneProps } from './components/InspectorPane';
@@ -215,8 +216,8 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
     inspectorRef.current = inspector;
     const [compactViewport, setCompactViewport] = useState(() => window.matchMedia('(max-width: 850px)').matches);
     const [drawerOpen, setDrawerOpen] = useState(() => experience === 'expert' && !window.matchMedia('(max-width: 850px)').matches);
-    const [importOpen, setImportOpen] = useState(false);
-    const [exportOpen, setExportOpen] = useState(false);
+    const [importOpen, setImportOpen] = useState(false), [exportOpen, setExportOpen] = useState(false);
+    const [restoreRevisionConfirmation, setRestoreRevisionConfirmation] = useState<QueryDocument>();
     const [helpPanelOpen, setHelpPanelOpen] = useState(false);
     const [observabilityOpen, setObservabilityOpen] = useState(false);
     const [helpPanelSection, setHelpPanelSection] = useState<HelpPanelSection>('tour');
@@ -551,13 +552,13 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         if (saveAfterRename && renamedDraft) void saveDraft(renamedDraft);
     };
 
-    const restoreDocumentRevision = (revision: QueryDocument) => void perform(async () => {
+    const restoreDocumentRevision = (revision: QueryDocument, confirmed = false) => void perform(async () => {
         const draft = workspaceRef.current.tabs.find(item => item.id === workspaceRef.current.activeId);
         if (!draft?.serverId || draft.serverId !== revision.id) throw new Error('Open the saved query before restoring one of its versions.');
         const latestSaved = revisionsDocumentId === draft.serverId ? documentRevisions[0] : documents.find(document => document.id === draft.serverId);
         if (!latestSaved || latestSaved.deletedAt) throw new Error('The latest saved version could not be checked. Refresh saved queries and try again.');
         const hasUnsavedChanges = draft.baseRevision !== latestSaved.revision || !sameSavedContent(draft, latestSaved);
-        if (hasUnsavedChanges && !window.confirm(`Restore Version ${revision.revision}? This will replace the current unsaved draft. The restored SQL will be saved as a new version.`)) return;
+        if (hasUnsavedChanges && !confirmed) { setRestoreRevisionConfirmation(revision); return; }
         const restoreBase: QueryDocument = {
             ...latestSaved,
             name: draft.name,
@@ -1065,6 +1066,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         {observabilityOpen && <OverlayPortal><ObservabilityExplorer connectionId={connection.id} connectionLabel={connectionLabel} trusted={trusted} queryLog={connection.manifest?.queryLog} replication={connection.manifest?.replication} onClose={() => setObservabilityOpen(false)}/></OverlayPortal>}
         <ImportWizard open={importOpen} connectionId={connection.id} trusted={trusted} demoMode={demoMode} onImportQuery={(name, sql) => openImportedSqlQuery(name, sql, openNewDraft, importedReveal.markImportedSqlDraft, setNotice)} onClose={() => setImportOpen(false)} onImported={importedReveal.onImported} onTableNeedsInspection={importedReveal.onUnconfirmedDestination}/>
         <ExportDialog open={exportOpen} queryAvailable={Boolean(active.sql.trim())} rowsAvailable={run?.resultState === 'reopenable'} onClose={() => setExportOpen(false)} onExportQuery={() => { setExportOpen(false); exportCurrentQuery(); }} onExportRows={() => { setExportOpen(false); void exportCurrentCsv(); }}/>
+        <RestoreRevisionDialog revision={restoreRevisionConfirmation?.revision} locale={locale} onClose={() => setRestoreRevisionConfirmation(undefined)} onConfirm={() => { const revision = restoreRevisionConfirmation; if (!revision) return; setRestoreRevisionConfirmation(undefined); restoreDocumentRevision(revision, true); }}/>
         <ExecutionBar run={run} failedAttempt={Boolean(failedQueryError)} eventState={eventState} onCancel={() => void cancel()} onOpenDetails={() => showInspector('details')} cancelling={cancelling} scriptRunning={script?.status === 'running'} copy={copy.common} helpButton={<HelpButton copy={copy.common} open={helpPanelOpen} onOpen={openHelp}/>}/>
         {detachedEditor.detached && createPortal(queryPanel, detachedEditor.detached.container)}
         {detachedResults.detached && createPortal(resultsPanel, detachedResults.detached.container)}
