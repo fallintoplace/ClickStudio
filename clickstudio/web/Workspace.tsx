@@ -469,10 +469,11 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
                 if (options.trackChartRun) setExampleChartRunId(options.view === 'chart' ? created.id : undefined);
             }
             if (options.expandResults) panels.revealPanelTemporarily('results', draft.id);
-            if (!isFrontendDemoPreview)
-                setNotice(demoMode
-                    ? isScript ? 'Sample results were generated. Script SQL was not sent to ClickHouse.' : options.preview ? 'Sample preview generated. SQL was not sent to ClickHouse.' : 'Sample results were generated. Query SQL was not sent to ClickHouse.'
-                    : isScript ? 'Script submitted to the selected ClickHouse connection.' : options.preview ? 'Table preview submitted to the selected ClickHouse connection.' : 'Query submitted to the selected ClickHouse connection.');
+            const successNotice = isScript
+                ? demoMode ? 'Sample results were generated. Script SQL was not sent to ClickHouse.' : 'Script submitted to the selected ClickHouse connection.'
+                : options.preview ? demoMode ? 'Sample preview generated. SQL was not sent to ClickHouse.' : 'Table preview submitted to the selected ClickHouse connection.'
+                    : undefined;
+            if (!isFrontendDemoPreview && successNotice) setNotice(successNotice);
             void loadHistory().catch(() => undefined);
         }, isScript ? 'script' : 'run');
     };
