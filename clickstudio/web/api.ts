@@ -1,4 +1,5 @@
 import type { ApiError } from '../shared/types';
+import { CLICKHOUSE_CLOUD_CONNECTION_ID, getClickHouseCloudConnection } from './cloud-connection';
 import { DemoPreviewApi } from './demo-preview';
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -33,19 +34,19 @@ function usesCloudWorkspacePreview(path: string) {
         pathname.startsWith('/connections/clickhouse-cloud/');
 }
 
-export function enableCloudWorkspaceApi() {
-    if (!isFrontendDemoPreview) cloudWorkspacePreview ??= new DemoPreviewApi();
-}
-
-export function disableCloudWorkspaceApi() {
-    cloudWorkspacePreview = undefined;
+function isCloudWorkspaceSelected() {
+    return typeof window !== 'undefined' &&
+        new URLSearchParams(window.location.search).get('connection') === CLICKHOUSE_CLOUD_CONNECTION_ID &&
+        Boolean(getClickHouseCloudConnection());
 }
 
 export async function api<T>(path: string, options: ApiOptions = {}): Promise<T> {
     if (demoPreview && path !== '/assistant/sql')
         return await demoPreview.request(path, options) as T;
-    if (cloudWorkspacePreview && usesCloudWorkspacePreview(path))
+    if (!demoPreview && isCloudWorkspaceSelected() && usesCloudWorkspacePreview(path)) {
+        cloudWorkspacePreview ??= new DemoPreviewApi();
         return await cloudWorkspacePreview.request(path, options) as T;
+    }
 
     const response = await fetch(`/api${path}`, { method: options.method ?? 'GET', credentials: 'same-origin', signal: options.signal,
         headers: { 'X-ClickStudio-Intent': '1', ...(options.body === undefined ? {} : { 'Content-Type': 'application/json' }) }, body: options.body === undefined ? undefined : JSON.stringify(options.body) });
