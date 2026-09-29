@@ -4,11 +4,12 @@ import { parseCsv, parseInput, ImportService } from '../../.core-build/core/impo
 import { AssistantService, buildContext, MAX_ASSISTANT_CONVERSATION_MESSAGES, validateAssistantConversation, validateProposal } from '../../.core-build/core/assistant.js';
 import { evaluateProposal, runAssistantBenchmarks } from '../../.core-build/core/assistant-evaluation.js';
 import { selectAssistantReferenceDocs } from '../../.core-build/shared/reference-data.js';
-import { MemoryStore } from '../../.core-build/core/store.js';
+import { MemoryStore, hash } from '../../.core-build/core/store.js';
 import { exportCsv, chartNumber, filterRows, sampleChartRows, MAX_CHART_RENDER_POINTS } from '../../.core-build/shared/results.js';
 import { owner, other, schema } from './helpers.mjs';
 const proposal = { sql: 'SELECT 1', summary: 'A proposal', assumptions: [], tables: [], caveats: [], clarification: null, findings: [] };
 function aiFixture(content = proposal) { const store = new MemoryStore(); let calls = 0; const driver = { available: true, model: 'fixture', async propose() { calls++; return { content, responseId: 'fixture-response' }; } }; const ai = new AssistantService(store, driver, () => true); return { store, ai, get calls() { return calls; }, input: { connectionId: 'local', sql: 'SELECT 2', action: 'generate', question: 'Count events', schema } }; }
+function imageDataUri(size = 1_900_000) { const data = Buffer.alloc(size); Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]).copy(data); return `data:image/png;base64,${data.toString('base64')}`; }
 test('CSV handles BOM, quoted commas, CRLF and multiline cells', () => { const p = parseCsv('\ufeffn,label\r\n1,"a,b"\r\n2,"two\nlines"\r\n'); assert.equal(p.rows[0].label, 'a,b'); assert.equal(p.rows[1].label, 'two\nlines'); });
 test('CSV handles escaped quotes', () => assert.equal(parseCsv('n\n"say ""hi"""').rows[0].n, 'say "hi"'));
 for (const csv of ['a,a\n1,2', 'a,b\n1', 'a\n"oops', 'a\n"quoted"tail'])
@@ -121,6 +122,23 @@ test('Reviewed inserts do not require a typed confirmation', async () => {
 });
 test('Preview refuses empty CSV rather than a zero-row mutation', () => { const imports = new ImportService(new MemoryStore(), {}, () => true); assert.throws(() => imports.preview(owner, 'a.csv', 'n\n', 'csv'), { code: 'IMPORT_EMPTY' }); });
 test('AI context preview does not call a model', () => { const f = aiFixture(); f.ai.prepare(owner, f.input); assert.equal(f.calls, 0); });
+test('Assistant status reports provider availability without daily usage quotas', () => {
+    const f = aiFixture(), status = f.ai.status(owner);
+
+    assert.equal(status.available, true);
+    assert.equal(status.model, 'fixture');
+    assert.ok(status.promptVersion);
+    assert.equal(Object.hasOwn(status, 'callsRemaining'), false);
+    assert.equal(Object.hasOwn(status, 'inputBytesRemaining'), false);
+});
+test('Assistant reports provider unavailability separately from usage quotas', async () => {
+    const ai = new AssistantService(new MemoryStore(), { available: false, model: 'fixture', async propose() { throw new Error('Unexpected provider call'); } }, () => true);
+    const status = ai.status(owner), context = ai.prepare(owner, aiFixture().input);
+
+    assert.equal(status.available, false);
+    assert.match(status.reason, /OPENAI_API_KEY/);
+    await assert.rejects(ai.propose(owner, context.id, true), { code: 'AI_UNAVAILABLE' });
+});
 test('Assistant context carries prior user and assistant messages into the prepared request', () => {
     const conversation = [
         { role: 'user', content: 'Show delayed flights' },
@@ -191,6 +209,42 @@ test('A late model response after cancellation cannot create a proposal', async 
     assert.equal(store.count('proposals'), 0);
 });
 test('Sending twice returns the same proposal and makes one model request', async () => { const f = aiFixture(), c = f.ai.prepare(owner, f.input); const a = await f.ai.propose(owner, c.id, true), b = await f.ai.propose(owner, c.id, true); assert.equal(a.id, b.id); assert.equal(f.calls, 1); });
+test('Assistant accepts more than twenty proposals for one user', async () => {
+    const f = aiFixture();
+
+    for (let index = 0; index < 21; index++) {
+        const context = f.ai.prepare(owner, { ...f.input, question: `Request ${index}` });
+        await f.ai.propose(owner, context.id, true);
+    }
+
+    assert.equal(f.calls, 21);
+    assert.equal(f.store.list('ai-usage').length, 0);
+});
+test('Assistant ignores legacy daily usage records when preparing a proposal', async () => {
+    const f = aiFixture();
+    f.store.put('ai-usage', hash(owner.id), { day: new Date().toISOString().slice(0, 10), calls: 20, inputBytes: 5_000_000 });
+    const context = f.ai.prepare(owner, f.input);
+
+    await f.ai.propose(owner, context.id, true);
+
+    assert.equal(f.calls, 1);
+    assert.equal(f.store.get('ai-usage', hash(owner.id)).calls, 20);
+});
+test('Assistant accepts multiple valid image requests beyond five MB total', async () => {
+    const f = aiFixture(), image = imageDataUri();
+
+    for (let index = 0; index < 2; index++) {
+        const context = f.ai.prepare(owner, { ...f.input, question: `Inspect image ${index}`, image });
+        await f.ai.propose(owner, context.id, true);
+    }
+
+    assert.equal(f.calls, 2);
+});
+test('Assistant keeps the per-image size limit without a daily total limit', () => {
+    const f = aiFixture();
+
+    assert.throws(() => f.ai.prepare(owner, { ...f.input, image: imageDataUri(2_000_001) }), { code: 'IMAGE_SIZE' });
+});
 test('Review lane cannot return applicable SQL even if model proposes it', async () => { const f = aiFixture(), c = f.ai.prepare(owner, { ...f.input, action: 'review' }), p = await f.ai.propose(owner, c.id, true); assert.equal(p.sql, null); assert.throws(() => f.ai.decide(owner, p.id, 'accepted', 'local', 'SELECT 2'), { code: 'REVIEW_ONLY' }); });
 test('Proposal cannot be applied to changed SQL or another connection', async () => { const f = aiFixture(), c = f.ai.prepare(owner, f.input), p = await f.ai.propose(owner, c.id, true); assert.throws(() => f.ai.decide(owner, p.id, 'accepted', 'second', 'SELECT 2'), { code: 'CONNECTION_MISMATCH' }); assert.throws(() => f.ai.decide(owner, p.id, 'accepted', 'local', 'SELECT 3'), { code: 'DRAFT_CHANGED' }); });
 test('Accepting proposal records a decision, never creates a run', async () => { const f = aiFixture(), c = f.ai.prepare(owner, f.input), p = await f.ai.propose(owner, c.id, true); f.ai.decide(owner, p.id, 'accepted', 'local', 'SELECT 2'); assert.equal(f.store.list('runs').length, 0); });

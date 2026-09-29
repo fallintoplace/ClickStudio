@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { AssistantAction, AssistantConversationMessage, AssistantEvaluationReport, ClickHouseDocumentationEntry, Principal, Proposal, ProposalContent, Result, Schema } from '../shared/types.js';
 import { AppError, requireThat } from './errors.js';
 import { canWrite, mustOwn } from './guards.js';
-import { audit, hash, type Store } from './store.js';
+import { audit, type Store } from './store.js';
 import { choice, record, text } from './validation.js';
 import { buildEvaluationReport, evaluateProposal, referencedTables } from './assistant-evaluation.js';
 export const PROMPT_VERSION = 'clickstudio-assistant-v12';
@@ -68,11 +68,6 @@ export interface AssistantDriver {
         content: ProposalContent;
         responseId: string;
     }>;
-}
-interface Usage {
-    day: string;
-    calls: number;
-    inputBytes: number;
 }
 interface AssistantContextData {
     dialect: 'ClickHouse';
@@ -281,15 +276,9 @@ export class AssistantService {
                 store.put('ai-contexts', c.id, c);
             }
     }
-    status(p: Principal) {
-        const usage = this.usage(p);
-        return { available: this.driver.available, model: this.driver.model, callsRemaining: Math.max(0, 20 - usage.calls),
-            inputBytesRemaining: Math.max(0, 5000000 - usage.inputBytes), promptVersion: PROMPT_VERSION,
+    status(_p: Principal) {
+        return { available: this.driver.available, model: this.driver.model, promptVersion: PROMPT_VERSION,
             reason: this.driver.available ? undefined : 'Configure OPENAI_API_KEY on the server. OPENAI_MODEL is optional.' };
-    }
-    private usage(p: Principal): Usage {
-        const day = new Date().toISOString().slice(0, 10), existing = this.store.get<Usage>('ai-usage', hash(p.id));
-        return existing?.day === day ? existing : { day, calls: 0, inputBytes: 0 };
     }
     prepare(p: Principal, input: ContextInput): PreparedContext {
         canWrite(p);
@@ -317,11 +306,6 @@ export class AssistantService {
         requireThat(Date.parse(context.expiresAt) > Date.now(), 410, 'AI_CONTEXT_EXPIRED', 'Preview a fresh context before sending');
         requireThat(this.driver.available, 503, 'AI_UNAVAILABLE', 'OpenAI is not configured');
         requireThat(this.store.count('proposals') < 200, 507, 'PROPOSAL_CAPACITY', 'Delete older proposals before creating another');
-        const usage = this.usage(p), size = Buffer.byteLength(JSON.stringify(context.payload));
-        requireThat(usage.calls < 20 && usage.inputBytes + size <= 5000000, 429, 'AI_BUDGET', 'The workspace daily AI request or context budget has been reached');
-        usage.calls++;
-        usage.inputBytes += size;
-        this.store.put('ai-usage', hash(p.id), usage);
         context.state = 'running';
         this.store.put('ai-contexts', contextId, context);
         audit(this.store, p, 'ai.send-context', contextId);
