@@ -40,6 +40,7 @@ type ImportActionSetters = {
     setTargets: Dispatch<SetStateAction<string[]>>;
     setSchema: Dispatch<SetStateAction<Schema | undefined>>;
     setTarget: Dispatch<SetStateAction<string>>;
+    setLastExistingTarget: Dispatch<SetStateAction<string>>;
     setFields: Dispatch<SetStateAction<Record<string, string>>>;
     setRecoveryState: Dispatch<SetStateAction<'checking' | 'ready' | 'failed'>>;
     setRecoverableJobs: Dispatch<SetStateAction<ImportJob[]>>;
@@ -47,24 +48,47 @@ type ImportActionSetters = {
     setImportUnavailable: Dispatch<SetStateAction<string>>;
 };
 
-type ForgetCloudImportContext = Pick<ImportActionSetters, 'setStep' | 'setFields' | 'setRecoverableJobs'> & {
+type ForgetCloudImportContext = Pick<ImportActionSetters,
+    'setStep' | 'setFields' | 'setRecoverableJobs' | 'setJob' | 'setPendingImport' | 'setBusy' | 'setError'
+    | 'setTargets' | 'setSchema' | 'setTarget' | 'setLastExistingTarget' | 'setImportUnavailable'> & {
     job?: ImportJob;
     busy: BusyAction;
     browserCloudImport: boolean;
+    importConnectionId: string;
     clearPendingImport: () => void;
     chooseFile: (file?: File) => void;
     setRetryAttemptedFor: Dispatch<SetStateAction<string | undefined>>;
 };
 
-function forgetCloudImport(context: ForgetCloudImportContext) {
-    const { job, busy, browserCloudImport, clearPendingImport, chooseFile, setRecoverableJobs, setFields, setRetryAttemptedFor, setStep } = context;
+async function forgetCloudImport(context: ForgetCloudImportContext) {
+    const {
+        job, busy, browserCloudImport, importConnectionId, clearPendingImport, chooseFile,
+        setRecoverableJobs, setFields, setRetryAttemptedFor, setStep, setJob, setPendingImport,
+        setBusy, setError, setTargets, setSchema, setTarget, setLastExistingTarget, setImportUnavailable,
+    } = context;
     if (!browserCloudImport || !job || busy || (job.status !== 'running' && job.status !== 'unknown')) return;
     clearPendingImport();
+    setPendingImport(undefined);
+    setJob(undefined);
     setRecoverableJobs(items => items.filter(item => item.id !== job.id));
     chooseFile(undefined);
     setFields({});
     setRetryAttemptedFor(undefined);
     setStep('file');
+    setBusy('setup');
+    setError('');
+    setImportUnavailable('');
+    try {
+        const [nextTargets, nextSchema] = await loadConnectionImportSetup(importConnectionId, true);
+        setTargets(nextTargets);
+        setSchema(nextSchema);
+        setTarget('');
+        setLastExistingTarget('');
+    } catch (caught) {
+        setError(`Could not load ClickHouse Cloud tables: ${message(caught)}`);
+    } finally {
+        setBusy('');
+    }
 }
 
 async function runCommitImport(context: ImportActionSetters & {
@@ -87,7 +111,7 @@ async function runCommitImport(context: ImportActionSetters & {
     rememberJob: (job: ImportJob) => void;
 }) {
     const { mapping, busy, browserDemoImport, browserCloudImport, file, format, creatingTable, schema, createTableDatabase, createTableName, createColumns, generateId, importConnectionId, preview,
-        setJob, setStep, setBusy, setError, setMapping, setTargets, setSchema, setTarget, setFields, setRecoveryState, setRecoverableJobs, setPendingImport, savePendingImport, clearPendingImport, rememberJob } = context;
+        setJob, setStep, setBusy, setError, setMapping, setTargets, setSchema, setTarget, setLastExistingTarget, setFields, setRecoveryState, setRecoverableJobs, setPendingImport, savePendingImport, clearPendingImport, rememberJob } = context;
     if (!mapping || busy) return;
     const queryId = browserCloudImport ? `clickstudio-import-${mapping.id}` : undefined;
     const record: PendingImport = { id: mapping.id, table: mapping.table, rows: mapping.rowCount, name: preview?.name ?? 'Selected file', ...(queryId ? { queryId } : {}) };
@@ -129,8 +153,11 @@ async function runCommitImport(context: ImportActionSetters & {
                         const [nextTargets, nextSchema] = await loadConnectionImportSetup(importConnectionId, true);
                         setTargets(nextTargets);
                         setSchema(nextSchema);
-                        setTarget(nextTargets.includes(mapping.table) ? mapping.table : nextTargets[0] ?? CREATE_CLOUD_TABLE_TARGET);
-                        setFields(initialFields(preview?.columns ?? [], writableColumns(nextSchema, mapping.table)));
+                        const nextTarget = nextTargets.includes(mapping.table) ? mapping.table : creatingTable ? CREATE_CLOUD_TABLE_TARGET : '';
+                        setTarget(nextTarget);
+                        setLastExistingTarget(nextTarget && nextTarget !== CREATE_CLOUD_TABLE_TARGET ? nextTarget : '');
+                        if (nextTarget !== CREATE_CLOUD_TABLE_TARGET)
+                            setFields(initialFields(preview?.columns ?? [], writableColumns(nextSchema, nextTarget)));
                         setError('The destination schema changed. Review the updated mapping before importing.');
                     } catch (refreshError) { setError(`The destination schema changed. Refresh failed: ${message(refreshError)}`); }
                 } else setError(message(caught));
@@ -163,10 +190,9 @@ async function runCommitImport(context: ImportActionSetters & {
                 ]);
                 setTargets(nextTargets);
                 setSchema(nextSchema);
-                const nextTarget = nextTargets.find(table => table === mapping.table && nextSchema.tables.some(item => `${item.database}.${item.name}` === table))
-                    ?? nextTargets.find(table => nextSchema.tables.some(item => `${item.database}.${item.name}` === table))
-                    ?? '';
+                const nextTarget = nextTargets.find(table => table === mapping.table && nextSchema.tables.some(item => `${item.database}.${item.name}` === table)) ?? '';
                 setTarget(nextTarget);
+                setLastExistingTarget(nextTarget);
                 setFields(initialFields(preview?.columns ?? [], writableColumns(nextSchema, nextTarget)));
                 setError('The destination schema changed. Review the updated mapping before importing.');
             } catch (refreshError) {
@@ -223,7 +249,7 @@ async function runReviewUnknownImport(context: ImportActionSetters & {
     rememberJob: (job: ImportJob) => void;
 }) {
     const { job, busy, browserCloudImport, importConnectionId, recoverableJobs, clearPendingImport, rememberJob,
-        setJob, setStep, setBusy, setError, setTargets, setSchema, setTarget, setRecoverableJobs, setPendingImport, setImportUnavailable } = context;
+        setJob, setStep, setBusy, setError, setTargets, setSchema, setTarget, setLastExistingTarget, setRecoverableJobs, setPendingImport, setImportUnavailable } = context;
     if (!job || job.status !== 'unknown' || busy) return;
     setBusy('review');
     setError('');
@@ -244,7 +270,8 @@ async function runReviewUnknownImport(context: ImportActionSetters & {
                 const [nextTargets, nextSchema] = await loadConnectionImportSetup(importConnectionId, true);
                 setTargets(nextTargets);
                 setSchema(nextSchema);
-                setTarget(nextTargets.includes(job.table) ? job.table : nextTargets[0] ?? CREATE_CLOUD_TABLE_TARGET);
+                setTarget('');
+                setLastExistingTarget('');
                 setError('');
             } catch (caught) { setError(message(caught)); }
             finally { setBusy(''); }
@@ -272,11 +299,10 @@ async function runReviewUnknownImport(context: ImportActionSetters & {
                 const [nextTargets, nextSchema] = await loadConnectionImportSetup(importConnectionId, false);
                 setTargets(nextTargets);
                 setSchema(nextSchema);
-                const first = nextTargets.includes(job.table) && nextSchema.tables.some(item => `${item.database}.${item.name}` === job.table)
-                    ? job.table
-                    : nextTargets.find(table => nextSchema.tables.some(item => `${item.database}.${item.name}` === table)) ?? '';
-                setTarget(first);
-                setImportUnavailable(first ? '' : 'No import targets are configured for this connection. Ask the workspace owner to allow a destination table.');
+                const hasTarget = nextTargets.some(table => nextSchema.tables.some(item => `${item.database}.${item.name}` === table));
+                setTarget('');
+                setLastExistingTarget('');
+                setImportUnavailable(hasTarget ? '' : 'No import targets are configured for this connection. Ask the workspace owner to allow a destination table.');
             } catch (caught) { setError(message(caught)); }
             finally { setBusy(''); }
         }
@@ -319,15 +345,19 @@ type ImportWizardFileActionContext = {
     setGenerateId: Dispatch<SetStateAction<boolean>>;
     setStep: Dispatch<SetStateAction<Step>>;
     setBusy: Dispatch<SetStateAction<BusyAction>>;
+    setTarget: Dispatch<SetStateAction<string>>;
+    setLastExistingTarget: Dispatch<SetStateAction<string>>;
 };
 
 function createImportWizardFileActions(context: ImportWizardFileActionContext) {
     const { browserDemoImport, browserCloudImport, target, file, format, busy,
         setFile, setFormat, setPreview, setMapping, setCloudRows, setCreateColumns, setCreateTableName,
-        setJob, setError, setGenerateId, setStep, setBusy } = context;
+        setJob, setError, setGenerateId, setStep, setBusy, setTarget, setLastExistingTarget } = context;
 
     function chooseFile(next?: File) {
         setFile(next);
+        setTarget('');
+        setLastExistingTarget('');
         setPreview(undefined);
         setMapping(undefined);
         setCloudRows([]);
@@ -376,6 +406,8 @@ function createImportWizardFileActions(context: ImportWizardFileActionContext) {
         if (!browserDemoImport || busy) return;
         const sample = new File([DEMO_IMPORT_SAMPLE_CSV], 'interview-marketing-snapshot.csv', { type: 'text/csv' });
         setFile(sample);
+        setTarget('');
+        setLastExistingTarget('');
         setFormat('csv');
         setError('');
         await previewSelectedFile(sample, 'csv');
@@ -452,7 +484,7 @@ async function runRetryUnknownImport(context: RetryUnknownImportContext) {
         cloudRows, createTableDatabase, createTableName, createColumns, generateId, setCreateTableName, setCreateColumns, setCreateTableDatabase, importConnectionId,
         browserDemoImport, setRetryAttemptedFor,
         savePendingImport, clearPendingImport, rememberJob,
-        setJob, setStep, setBusy, setError, setMapping, setTargets, setSchema, setTarget, setFields, setRecoveryState,
+        setJob, setStep, setBusy, setError, setMapping, setTargets, setSchema, setTarget, setLastExistingTarget, setFields, setRecoveryState,
         setRecoverableJobs, setPendingImport, setImportUnavailable } = context;
     if (!job || job.status !== 'unknown' || busy) return;
     if (!preview || !mapping || (browserCloudImport && (!file || !format))) {
@@ -553,7 +585,7 @@ async function runRetryUnknownImport(context: RetryUnknownImportContext) {
             mapping: retryMapping, busy: '',
             browserDemoImport, browserCloudImport, file, format, creatingTable: retryCreatingTable, schema: retrySchema,
             createTableDatabase: retryCreateTableDatabase, createTableName: retryCreateTableName, createColumns, generateId, importConnectionId, preview,
-            setJob, setStep, setBusy, setError, setMapping, setTargets, setSchema, setTarget, setFields,
+            setJob, setStep, setBusy, setError, setMapping, setTargets, setSchema, setTarget, setLastExistingTarget, setFields,
             setRecoveryState, setRecoverableJobs, setPendingImport, setImportUnavailable,
             savePendingImport, clearPendingImport, rememberJob,
         });
@@ -612,7 +644,7 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
     const { chooseFile, previewFile, previewSampleFile } = createImportWizardFileActions({
         browserDemoImport, browserCloudImport, target, file, format, busy,
         setFile, setFormat, setPreview, setMapping, setCloudRows, setCreateColumns, setCreateTableName,
-        setJob, setError, setGenerateId, setStep, setBusy,
+        setJob, setError, setGenerateId, setStep, setBusy, setTarget, setLastExistingTarget,
     });
 
     useEffect(() => {
@@ -700,8 +732,8 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
                     setTargets(nextTargets);
                     setSchema(nextSchema);
                     setCreateTableDatabase(preferredCloudImportDatabase(nextSchema, getClickHouseCloudConnection()?.database ?? ''));
-                    setLastExistingTarget(nextTargets[0] ?? '');
-                    setTarget(nextTargets[0] ?? CREATE_CLOUD_TABLE_TARGET);
+                    setLastExistingTarget('');
+                    setTarget('');
                     setRecoveryState('ready');
                 } catch (caught) {
                     if (!current) return;
@@ -738,10 +770,8 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
                 if (!current) return;
                 setTargets(nextTargets);
                 setSchema(nextSchema);
-                const first = nextTargets.find(table => nextSchema.tables.some(item => `${item.database}.${item.name}` === table)) ?? '';
-                setLastExistingTarget(first);
-                setTarget(first);
-                if (!first) setImportUnavailable('No import targets are configured for this connection. Ask the workspace owner to allow a destination table.');
+                const hasTarget = nextTargets.some(table => nextSchema.tables.some(item => `${item.database}.${item.name}` === table));
+                if (!hasTarget) setImportUnavailable('No import targets are configured for this connection. Ask the workspace owner to allow a destination table.');
             } catch (caught) {
                 if (current) setError(message(caught));
             }
@@ -802,7 +832,7 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
     }
 
     const actionSetters: ImportActionSetters = {
-        setJob, setStep, setBusy, setError, setMapping, setTargets, setSchema, setTarget, setFields,
+        setJob, setStep, setBusy, setError, setMapping, setTargets, setSchema, setTarget, setLastExistingTarget, setFields,
         setRecoveryState, setRecoverableJobs, setPendingImport, setImportUnavailable,
     };
 
@@ -816,7 +846,7 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
     }
 
     function startMapping() {
-        if (!preview || (!target && !browserCloudImport)) return;
+        if (!preview) return;
         if (browserCloudImport && target === CREATE_CLOUD_TABLE_TARGET) {
             const columns = inferCloudImportColumns(cloudRows.length ? cloudRows : preview.rows, preview.columns);
             setCreateColumns(columns);
@@ -975,7 +1005,7 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
         createColumnTypes: CREATE_TABLE_COLUMN_TYPES,
         updateCreateColumn,
         closeWizard,
-        forgetImport: () => forgetCloudImport({ job, busy, browserCloudImport, clearPendingImport, chooseFile, setRecoverableJobs, setFields, setRetryAttemptedFor, setStep }),
+        forgetImport: () => forgetCloudImport({ job, busy, browserCloudImport, importConnectionId, clearPendingImport, chooseFile, setRetryAttemptedFor, ...actionSetters }),
         chooseFile,
         previewFile,
         previewSampleFile,

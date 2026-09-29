@@ -80,13 +80,16 @@ export function ImportWizard({ onImportQuery, ...controllerProps }: ImportWizard
     const [queryFile, setQueryFile] = useState<File>();
     const [queryFileError, setQueryFileError] = useState('');
     const [openingQuery, setOpeningQuery] = useState(false);
+    const [destinationChoice, setDestinationChoice] = useState<'existing' | 'create'>();
+    const selectedDestinationChoice = destinationChoice ?? (creatingTable ? 'create' : target ? 'existing' : undefined);
 
     useEffect(() => {
-        if (!controllerProps.open) return;
+        if (!controllerProps.open) { setDestinationChoice(undefined); return; }
         setImportKind('rows');
         setQueryFile(undefined);
         setQueryFileError('');
         setOpeningQuery(false);
+        setDestinationChoice(undefined);
     }, [controllerProps.open]);
 
     function chooseQueryFile(next?: File) {
@@ -105,7 +108,18 @@ export function ImportWizard({ onImportQuery, ...controllerProps }: ImportWizard
     function importAnotherFile() {
         if (preview?.id && !browserCloudImport) void api(`/imports/${encodeURIComponent(preview.id)}`, { method: 'DELETE' }).catch(() => undefined);
         chooseFile(undefined);
+        setDestinationChoice(undefined);
         setStep('file');
+    }
+
+    function chooseRowsFile(next?: File) {
+        setDestinationChoice(undefined);
+        chooseFile(next);
+    }
+
+    function loadSampleFile() {
+        setDestinationChoice(undefined);
+        void previewSampleFile();
     }
 
     async function openQueryFile() {
@@ -191,11 +205,11 @@ export function ImportWizard({ onImportQuery, ...controllerProps }: ImportWizard
 
                 {recoveryState === 'ready' && !importUnavailable && step === 'file' && <section aria-label="Choose and preview a file" className="space-y-4">
                     {!preview ? <>
-                        {browserDemoImport && <div className="import-sample-card flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--line-bright)] bg-[var(--page)] p-4"><div><strong className="block text-sm">Try a sample import</strong><span className="mt-1 block text-xs text-[var(--muted)]">Six rows of marketing data, ready to preview.</span></div><button type="button" onClick={() => void previewSampleFile()} disabled={Boolean(busy)} className="rounded-lg border border-[var(--line-bright)] px-3 py-2 text-xs font-semibold text-[var(--text)] transition hover:bg-[var(--panel-hover)] disabled:opacity-50">{busy === 'preview' ? 'Loading sample…' : 'Load sample file'}</button></div>}
+                        {browserDemoImport && <div className="import-sample-card flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--line-bright)] bg-[var(--page)] p-4"><div><strong className="block text-sm">Try a sample import</strong><span className="mt-1 block text-xs text-[var(--muted)]">Six rows of marketing data, ready to preview.</span></div><button type="button" onClick={loadSampleFile} disabled={Boolean(busy)} className="rounded-lg border border-[var(--line-bright)] px-3 py-2 text-xs font-semibold text-[var(--text)] transition hover:bg-[var(--panel-hover)] disabled:opacity-50">{busy === 'preview' ? 'Loading sample…' : 'Load sample file'}</button></div>}
                         <label className="import-file-picker import-file-picker-rows">
                             <span className="import-file-icon" aria-hidden="true"><Icon name="importFile"/></span>
                             <span className="import-file-copy"><strong>Choose a data file</strong><small>CSV, JSON, NDJSON, or JSONL · up to 2 MB</small></span>
-                            <input aria-label="Choose a CSV, JSON, or NDJSON file" type="file" accept=".csv,.json,.ndjson,.jsonl,text/csv,application/json" onChange={event => chooseFile(event.target.files?.[0])} className="import-file-input" />
+                            <input aria-label="Choose a CSV, JSON, or NDJSON file" type="file" accept=".csv,.json,.ndjson,.jsonl,text/csv,application/json" onChange={event => chooseRowsFile(event.target.files?.[0])} className="import-file-input" />
                         </label>
                         {file && <div className="import-selected-file flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--line)] bg-[var(--page)] px-4 py-3 text-xs"><span className="min-w-0 truncate font-medium">{file.name}</span><span className="text-[var(--muted)]">{format ? format.toUpperCase() : 'Unsupported'} · {(file.size / 1024).toFixed(1)} KB</span></div>}
                     </> : <>
@@ -211,12 +225,12 @@ export function ImportWizard({ onImportQuery, ...controllerProps }: ImportWizard
                 {recoveryState === 'ready' && !importUnavailable && step === 'mapping' && preview && <section aria-label="Map source columns" className="import-mapping-step">
                     {browserCloudImport && <fieldset className="import-destination-choice">
                         <legend>Where should the rows go?</legend>
-                        <label className={`import-destination-option${!creatingTable ? ' is-selected' : ''}${!availableTargets.length ? ' is-disabled' : ''}`}>
-                            <input type="radio" name="import-destination" value="existing" checked={!creatingTable} disabled={!availableTargets.length} onChange={() => changeTarget(availableTargets.includes(lastExistingTarget) ? lastExistingTarget : availableTargets[0] ?? '')}/>
+                        <label className={`import-destination-option${selectedDestinationChoice === 'existing' ? ' is-selected' : ''}${!availableTargets.length ? ' is-disabled' : ''}`}>
+                            <input type="radio" name="import-destination" value="existing" checked={selectedDestinationChoice === 'existing'} disabled={!availableTargets.length} onChange={() => { setDestinationChoice('existing'); changeTarget(availableTargets.includes(lastExistingTarget) ? lastExistingTarget : ''); }}/>
                             <span className="import-destination-option-copy"><strong className="import-destination-option-title">Use an existing table</strong><small className="import-destination-option-description">Add rows to a table that is already there.</small></span>
                         </label>
-                        <label className={`import-destination-option${creatingTable ? ' is-selected' : ''}`}>
-                            <input type="radio" name="import-destination" value="create" checked={creatingTable} onChange={() => changeTarget(CREATE_CLOUD_TABLE_TARGET)}/>
+                        <label className={`import-destination-option${selectedDestinationChoice === 'create' ? ' is-selected' : ''}`}>
+                            <input type="radio" name="import-destination" value="create" checked={selectedDestinationChoice === 'create'} onChange={() => { setDestinationChoice('create'); changeTarget(CREATE_CLOUD_TABLE_TARGET); }}/>
                             <span className="import-destination-option-copy"><strong className="import-destination-option-title">Create a new table from this file</strong><small className="import-destination-option-description">Choose a name and import the file into it.</small></span>
                         </label>
                     </fieldset>}
@@ -225,6 +239,7 @@ export function ImportWizard({ onImportQuery, ...controllerProps }: ImportWizard
                             <div className="import-map-overview">
                                 {!creatingTable && <label className="import-destination-select grid gap-1.5 text-xs font-medium text-[var(--text-soft)]">Destination table
                                     <select aria-label="Import target table" value={target} onChange={event => changeTarget(event.target.value)} className="min-h-10 rounded-lg border border-[var(--line)] bg-[var(--page)] px-3 text-xs text-[var(--text)]">
+                                        <option value="">Choose a destination table…</option>
                                         {availableTargets.map(table => <option key={table} value={table}>{table}</option>)}
                                     </select>
                                 </label>}
@@ -266,6 +281,13 @@ export function ImportWizard({ onImportQuery, ...controllerProps }: ImportWizard
                                     <span><strong>{skippedColumnCount}</strong> skipped</span>
                                 </div>
                             </div>
+                            {!target && !creatingTable && <div role="status" className="import-mapping-empty-state">
+                                <span className="import-mapping-empty-state-marker" aria-hidden="true" />
+                                <div>
+                                    <strong>Choose a destination first</strong>
+                                    <p>{browserCloudImport ? 'Choose an existing table above or create a new table. Nothing is written until you review the import.' : 'Choose a table above to map these columns. Nothing is written until you review the import.'}</p>
+                                </div>
+                            </div>}
                             {destinationColumns.length > 0 && destinationNames.length === 0 && <div role="status" className="import-mapping-empty-state">
                                 <span className="import-mapping-empty-state-marker" aria-hidden="true" />
                                 <div>
@@ -274,7 +296,7 @@ export function ImportWizard({ onImportQuery, ...controllerProps }: ImportWizard
                                     {browserCloudImport && !creatingTable && <p className="import-mapping-empty-state-hint">If this file should define the table schema, select “Create a new table from this file” above.</p>}
                                 </div>
                             </div>}
-                            <div className="import-column-map overflow-x-auto rounded-xl border border-[var(--line)]">
+                            {(target || creatingTable) && <div className="import-column-map overflow-x-auto rounded-xl border border-[var(--line)]">
                                 <table className="w-full min-w-[540px] border-collapse text-left text-xs">
                                     <thead className="bg-[var(--page)] text-[10px] uppercase tracking-wider text-[var(--muted)]"><tr><th className="px-3 py-2.5">Source column</th><th className="px-3 py-2.5">Destination column</th><th className="px-3 py-2.5">Type</th></tr></thead>
                                     <tbody>{preview.columns.map(source => <tr key={source} className="border-t border-[var(--line)]">
@@ -283,9 +305,9 @@ export function ImportWizard({ onImportQuery, ...controllerProps }: ImportWizard
                                         <td className="import-column-type-cell px-3 py-2.5"><span className="import-column-type">{destinationColumns.find(column => column.name === fields[source])?.type ?? '—'}</span></td>
                                     </tr>)}</tbody>
                                 </table>
-                            </div>
+                            </div>}
                             {duplicateDestinations && <p role="alert" className="text-xs text-[var(--red)]">Each destination column can be used only once.</p>}
-                            {!destinationColumns.length && <p role="alert" className="text-xs text-[var(--red)]">The selected table has no writable columns in the loaded schema.</p>}
+                            {target && !creatingTable && !destinationColumns.length && <p role="alert" className="text-xs text-[var(--red)]">The selected table has no writable columns in the loaded schema.</p>}
                         </div>
                     </div>
                 </section>}
@@ -343,7 +365,7 @@ export function ImportWizard({ onImportQuery, ...controllerProps }: ImportWizard
                     {recoveryState === 'ready' && step === 'review' && <button type="button" onClick={() => { setStep('mapping'); setError(''); }} disabled={Boolean(busy)} className="rounded-lg border border-[var(--line)] px-3 py-2 text-xs text-[var(--text-soft)] hover:bg-[var(--panel-hover)] disabled:opacity-50">Back</button>}
                     {recoveryState === 'ready' && !importUnavailable && step === 'file' && !preview && <button type="button" onClick={() => void previewFile()} disabled={!file || !format || file.size > MAX_FILE_BYTES || Boolean(busy) || (!availableTargets.length && !browserCloudImport)} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40">{busy === 'preview' ? 'Reading file…' : 'Preview file'}</button>}
                     {recoveryState === 'ready' && !importUnavailable && step === 'file' && preview && <button type="button" onClick={startMapping} disabled={availableTargets.length === 0 && !browserCloudImport} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40">Map columns</button>}
-                    {recoveryState === 'ready' && !importUnavailable && step === 'mapping' && <button type="button" onClick={() => void previewMapping()} disabled={!target || !destinationNames.length || duplicateDestinations || !destinationColumns.length || Boolean(busy)} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40">{busy === 'mapping' ? 'Checking mapping…' : !destinationNames.length && destinationColumns.length > 0 ? 'Map a column first' : 'Review import'}</button>}
+                    {recoveryState === 'ready' && !importUnavailable && step === 'mapping' && <button type="button" onClick={() => void previewMapping()} disabled={!target || !destinationNames.length || duplicateDestinations || !destinationColumns.length || Boolean(busy)} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40">{busy === 'mapping' ? 'Checking mapping…' : !target ? 'Choose a destination' : !destinationNames.length && destinationColumns.length > 0 ? 'Map a column first' : 'Review import'}</button>}
                     {recoveryState === 'ready' && !importUnavailable && step === 'review' && <button type="button" onClick={() => void commitImport()} disabled={Boolean(busy)} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40">{busy === 'commit' ? browserDemoImport ? 'Saving…' : 'Starting…' : creatingTable ? 'Create table and import' : browserDemoImport ? 'Save demo rows' : 'Import rows'}</button>}
                     {recoveryState === 'ready' && step === 'status' && job?.status === 'succeeded' && <>
                         <button type="button" onClick={importAnotherFile} disabled={Boolean(busy)} className="rounded-lg border border-[var(--line)] px-3 py-2 text-xs text-[var(--text-soft)] transition hover:bg-[var(--panel-hover)] disabled:opacity-40">Import another file</button>

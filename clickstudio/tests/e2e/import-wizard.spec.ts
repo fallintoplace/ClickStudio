@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 import { trust } from './helpers.js';
 
 const schema = {
@@ -41,6 +41,34 @@ async function previewCsv(page: Page) {
     return dialog;
 }
 
+async function chooseExistingTable(dialog: Locator) {
+    const target = dialog.getByLabel('Import target table');
+    await expect(target).toHaveValue('');
+    await target.selectOption('demo.events');
+}
+
+test('File import requires an explicit destination before review', async ({ page }) => {
+    await mockWritableWorkspace(page);
+    let mappingRequests = 0;
+    await page.route('**/api/imports/preview', route => route.fulfill({ status: 201, json: {
+        id: 'input-1', name: 'events.csv', format: 'csv', columns: ['day', 'events'], rows: [{ day: '2026-01-01', events: '10' }], rowCount: 1,
+    } }));
+    await page.route('**/api/imports/input-1/mapping', route => { mappingRequests++; return route.fulfill({ json: {} }); });
+
+    await page.getByRole('button', { name: 'Import', exact: true }).click();
+    const dialog = await previewCsv(page);
+    await dialog.getByRole('button', { name: 'Map columns', exact: true }).click();
+
+    await expect(dialog.getByLabel('Import target table')).toHaveValue('');
+    await expect(dialog.locator('.import-mapping-empty-state')).toContainText('Choose a destination first');
+    await expect(dialog.getByRole('button', { name: 'Choose a destination', exact: true })).toBeDisabled();
+    expect(mappingRequests).toBe(0);
+
+    await chooseExistingTable(dialog);
+    await expect(dialog.getByLabel('Map day to destination')).toHaveValue('day');
+    await expect(dialog.getByRole('button', { name: 'Review import', exact: true })).toBeEnabled();
+});
+
 test('File import previews, maps, and reports a successful insert without typed confirmation', async ({ page }) => {
     await mockWritableWorkspace(page);
     let mappingBody: Record<string, unknown> | undefined;
@@ -61,6 +89,7 @@ test('File import previews, maps, and reports a successful insert without typed 
     await page.getByRole('button', { name: 'Import', exact: true }).click();
     const dialog = await previewCsv(page);
     await dialog.getByRole('button', { name: 'Map columns', exact: true }).click();
+    await chooseExistingTable(dialog);
     const mappingColumnWidths = await dialog.locator('.import-column-map thead th').evaluateAll(headers => headers.map(header => header.getBoundingClientRect().width));
     expect(mappingColumnWidths[1]).toBeGreaterThan(mappingColumnWidths[0]!);
     expect(mappingColumnWidths[2]).toBeLessThan(mappingColumnWidths[0]!);
@@ -109,6 +138,7 @@ test('File import review lists skipped columns and success can start another imp
     await input.setInputFiles({ name: 'events.csv', mimeType: 'text/csv', buffer: Buffer.from('day,events,unused\n2026-01-01,10,not imported\n') });
     await dialog.getByRole('button', { name: 'Preview file', exact: true }).click();
     await dialog.getByRole('button', { name: 'Map columns', exact: true }).click();
+    await chooseExistingTable(dialog);
     await dialog.getByRole('button', { name: 'Review import', exact: true }).click();
 
     const mapping = dialog.getByRole('table', { name: 'Import column mapping' });
@@ -168,6 +198,7 @@ test('File import shows server mapping errors without attempting a write', async
     await page.getByRole('button', { name: 'Import', exact: true }).click();
     const dialog = await previewCsv(page);
     await dialog.getByRole('button', { name: 'Map columns', exact: true }).click();
+    await chooseExistingTable(dialog);
     await dialog.getByRole('button', { name: 'Review import', exact: true }).click();
     await expect(dialog.getByRole('alert')).toContainText('IMPORT_MISSING_FIELD: An input row is missing events');
     expect(commitRequests).toBe(0);
@@ -196,6 +227,7 @@ test('File import reports an unknown insert without retrying automatically', asy
     await page.getByRole('button', { name: 'Import', exact: true }).click();
     const dialog = await previewCsv(page);
     await dialog.getByRole('button', { name: 'Map columns', exact: true }).click();
+    await chooseExistingTable(dialog);
     await dialog.getByRole('button', { name: 'Review import', exact: true }).click();
     await dialog.getByRole('button', { name: 'Import rows', exact: true }).click();
 
@@ -221,6 +253,7 @@ test('File import reloads the destination mapping when the server detects a sche
     await page.getByRole('button', { name: 'Import', exact: true }).click();
     const dialog = await previewCsv(page);
     await dialog.getByRole('button', { name: 'Map columns', exact: true }).click();
+    await chooseExistingTable(dialog);
     await dialog.getByRole('button', { name: 'Review import', exact: true }).click();
     await dialog.getByRole('button', { name: 'Import rows', exact: true }).click();
 
