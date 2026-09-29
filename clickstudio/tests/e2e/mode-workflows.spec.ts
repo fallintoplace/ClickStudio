@@ -242,7 +242,7 @@ test('Switching to Experimental keeps the AI chat, query and run evidence', asyn
     await page.getByTestId('run-button').click();
 
     const results = page.getByRole('region', { name: 'Query results', exact: true });
-    await expect(results.locator('[data-run-status="succeeded"]')).toBeVisible();
+    await expect(page.locator('.execution-bar')).toHaveAttribute('data-run-status', 'succeeded');
     await expect(results.getByRole('cell', { name: '2026-01-01', exact: true })).toBeVisible();
     const queryId = await currentQueryId(page);
     await results.getByRole('tab', { name: 'Chart', exact: true }).click();
@@ -437,7 +437,7 @@ test('Experimental insights and AI requests do not execute SQL', async ({ page }
     await page.getByTestId('run-button').click();
     const activeRunId = runIdentity(await (await startedRun).json()).id;
     const results = page.getByRole('region', { name: 'Query results', exact: true });
-    await expect(results.locator('[data-run-status="succeeded"]')).toBeVisible();
+    await expect(page.locator('.execution-bar')).toHaveAttribute('data-run-status', 'succeeded');
     const queryId = await currentQueryId(page);
 
     await results.getByRole('tab', { name: 'Insights', exact: true }).click();
