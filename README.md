@@ -121,8 +121,6 @@ For ClickHouse integration checks, start the local database first. Then run thes
 
 ## More guides
 
-- [Docs index](docs/README.md): all guides and a glossary.
-- [Engineering choices](docs/ENGINEERING-NOTES.md): how the app is built.
-- [Project highlights](docs/PROJECT-STATUS.md): features available in the app.
 - [Setup and implementation guide](docs/CLICKSTUDIO.md): setup, settings, and details.
-- [Product ideas](docs/product-roadmap/): ideas for future ClickStudio.
+- [SQL editing tools](docs/EDITOR-TOOLS.md): navigation, snippets, and autocomplete.
+- [ClickHouse exploration workflows](clickstudio/docs/native-explorers.md): objects, MergeTree activity, and query comparisons.

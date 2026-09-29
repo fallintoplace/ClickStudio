@@ -2,7 +2,7 @@
 
 This guide explains how to set up ClickStudio and use its main workflows. It also describes storage, execution limits, and tests.
 
-For a shorter introduction, read the [README](../README.md). For design decisions, read [Engineering choices](ENGINEERING-NOTES.md). The [documentation index](README.md) includes a glossary.
+For a quick start and feature overview, read the [repository README](../README.md).
 
 ## Architecture at a glance
 
