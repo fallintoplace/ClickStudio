@@ -9,6 +9,7 @@ import { RadioGroup } from '@clickhouse/click-ui/RadioGroup';
 import clickhouseLogomarkDark from './assets/clickhouse-logomark-dark.svg';
 import clickhouseLogomarkLight from './assets/clickhouse-logomark-light.svg';
 import type { Connected, Session } from './workspace-types';
+import { resolveConnectionSelection } from '../shared/connection-selection';
 
 type ParserMode = 'wasm' | 'basic';
 type AccentChoice = 'cyan' | 'clickhouse-yellow';
@@ -112,9 +113,7 @@ function App() {
         if (next.principal) {
             const profiles = await api<Connected[]>('/connections');
             setConnections(profiles);
-            setConnectionId(current => profiles.some(item => item.id === current)
-                ? current
-                : profiles.find(item => next.demo && item.id === 'playground')?.id ?? profiles[0]?.id ?? '');
+            setConnectionId(current => resolveConnectionSelection(profiles, current));
         }
     }, []);
 
