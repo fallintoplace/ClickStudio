@@ -12,7 +12,7 @@
     "build": "npm run typecheck && npm run build:app",
     "build:app": "vite build && tsc -p tsconfig.server.json && node scripts/copy-parser-vendor.mjs",
     "start:production": "node --env-file-if-exists=.env dist/server/index.js",
-    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.server.json && tsc --noEmit -p tsconfig.e2e.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.server.json && tsc --noEmit -p tsconfig.e2e.json && tsc --noEmit -p tsconfig.root.json",
     "test": "npm run test:core && npm run test:workspace",
     "test:core": "tsc -p tsconfig.core.json && node --test tests/core/*.test.mjs",
     "test:integration": "tsx --env-file-if-exists=.env --test tests/integration/*.test.ts",
