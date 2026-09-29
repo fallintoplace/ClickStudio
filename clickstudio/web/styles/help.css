@@ -392,8 +392,8 @@
     .sql-example-option-meta { display: flex; min-width: 0; grid-column: 1 / -1; align-items: center; gap: 6px; }
     .sql-example-option-category,
     .sql-example-chart-kind { padding: 3px 7px; border-radius: 999px; font-size: var(--help-text-meta); white-space: nowrap; }
-    .sql-example-option-category { border: 1px solid var(--help-border); color: var(--muted); }
-    .sql-example-chart-kind { border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--help-border)); background: color-mix(in srgb, var(--accent) 5%, transparent); color: var(--text-soft); }
+    .sql-example-option-category { min-width: 0; overflow: hidden; border: 1px solid var(--help-border); color: var(--muted); text-overflow: ellipsis; }
+    .sql-example-chart-kind { flex: none; border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--help-border)); background: color-mix(in srgb, var(--accent) 5%, transparent); color: var(--text-soft); }
 
     .sql-example-preview { display: flex; min-width: 0; min-height: 0; flex-direction: column; gap: 11px; padding: 18px; overflow: auto; }
     .sql-example-preview-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
