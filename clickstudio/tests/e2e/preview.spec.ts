@@ -312,6 +312,35 @@ test('ClickHouse Cloud import maps and inserts into an existing table without ty
     expect(imports[0]).toContain('name="fields"\r\n\r\n{"day":"day","events":"events"}');
 });
 
+test('ClickHouse Cloud import explains when no source columns are mapped', async ({ page }) => {
+    await mockCloudEndpoint(page);
+    await connectPreviewCloud(page);
+    await page.getByRole('button', { name: 'Import', exact: true }).last().click();
+
+    const dialog = page.getByRole('dialog', { name: 'Import data', exact: true });
+    await dialog.getByLabel('Choose a CSV, JSON, or NDJSON file').setInputFiles({
+        name: 'clickstudio-json-export.csv',
+        mimeType: 'text/csv',
+        buffer: Buffer.from('event_id,message,active,id\n1,hello,true,42\n'),
+    });
+    await dialog.getByRole('button', { name: 'Preview file' }).click();
+    await dialog.getByRole('button', { name: 'Map columns' }).click();
+
+    const mappingStep = dialog.getByRole('region', { name: 'Map source columns' });
+    const emptyState = mappingStep.getByRole('status');
+    await expect(emptyState).toContainText('No columns mapped yet');
+    await expect(emptyState).toContainText('Skipped columns will not be imported.');
+    await expect(emptyState).toContainText('Create a new table from this file');
+    for (const source of ['event_id', 'message', 'active', 'id']) {
+        await expect(dialog.getByLabel(`Map ${source} to destination`)).toHaveValue('');
+    }
+    await expect(dialog.getByRole('button', { name: 'Map a column first', exact: true })).toBeDisabled();
+
+    await dialog.getByLabel('Map message to destination').selectOption('day');
+    await expect(emptyState).toHaveCount(0);
+    await expect(dialog.getByRole('button', { name: 'Review import', exact: true })).toBeEnabled();
+});
+
 test('ClickHouse Cloud import creates a table with editable inferred columns', async ({ page }) => {
     const imports = await mockCloudEndpoint(page);
     await connectPreviewCloud(page);

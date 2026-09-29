@@ -42,6 +42,12 @@
 .import-source-summary > span:last-child { min-width: 0; overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 
 .import-new-table-card { border-color: color-mix(in srgb, var(--accent) 23%, var(--line)); }
+.import-mapping-empty-state { display: flex; min-width: 0; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line)); border-radius: 10px; background: color-mix(in srgb, var(--accent) 5%, var(--page)); color: var(--text-soft); }
+.import-mapping-empty-state-marker { width: 7px; height: 7px; flex: none; margin-top: 5px; border-radius: 50%; background: var(--accent); }
+.import-mapping-empty-state > div { display: grid; min-width: 0; gap: 3px; }
+.import-mapping-empty-state strong { color: var(--text); font-size: 11px; font-weight: 650; }
+.import-mapping-empty-state p { color: var(--muted); font-size: 10px; line-height: 1.5; }
+.import-mapping-empty-state .import-mapping-empty-state-hint { color: var(--text-soft); }
 .import-generated-id-option { display: flex; max-width: 540px; align-items: flex-start; gap: 10px; padding: 11px 12px; border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--line)); border-radius: 9px; background: color-mix(in srgb, var(--accent) 5%, var(--page)); color: var(--text-soft); cursor: pointer; }
 .import-generated-id-option > input { width: 15px; height: 15px; flex: none; margin: 1px 0 0; accent-color: var(--accent); }
 .import-generated-id-option > span { display: grid; gap: 3px; }
