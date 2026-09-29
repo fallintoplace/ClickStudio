@@ -6,7 +6,7 @@ import { mergeTreePartsQuery, parseMergeTreeParts, type MergeTreePartsSnapshot }
 import { flamegraphQuery, parseFlamegraphRows, type FlamegraphSource } from '../shared/flamegraph.js';
 import { parseReplicationSnapshot, replicationQueueQuery, replicationReplicasQuery, type ReplicationCapabilities } from '../shared/replication.js';
 import { parseWorkloadSnapshot, workloadFamiliesQuery, workloadPointsQuery, type QueryLogSource, type WorkloadWindow } from '../shared/workload.js';
-import { enrichSchemaTables, type SchemaTableMetadata, type SchemaTableSkipIndex } from '../shared/schema.js';
+import { collectSchemaMetadataWarnings, enrichSchemaTables, type OptionalSchemaMetadataWarning, type SchemaTableMetadata, type SchemaTableSkipIndex } from '../shared/schema.js';
 import { buildReferenceEntryQuery, buildReferenceSearchQuery } from '../shared/reference.js';
 import { AppError, requireThat } from '../core/errors.js';
 import { collectCompactStream } from '../core/compact-stream.js';
@@ -115,13 +115,16 @@ export class ClickHouseDriver implements QueryDriver, ImportDriver, CreateTableD
         return this.connection({ id: 'local-owner', role: 'owner' }, id);
     }
     async schema(id: string): Promise<Schema> {
-        const database = this.profile(id).database;
-        const optionalRows = async <T>(label: string, sql: string, parameters: Record<string, string> = { database }): Promise<{ rows?: T[]; warning?: string }> => {
+        const profile = this.profile(id), database = profile.database, isPublicPlayground = profile.publicPlayground === true;
+        const optionalRows = async <T>(label: string, sql: string, parameters: Record<string, string> = { database }): Promise<{ rows?: T[]; warning?: string; permissionDenied?: boolean }> => {
             try {
                 return { rows: await this.rows<T>(id, sql, parameters) };
             }
-            catch {
-                return { warning: `${label} metadata is unavailable to this reader or ClickHouse version.` };
+            catch (error) {
+                return {
+                    warning: `${label} metadata is unavailable to this reader or ClickHouse version.`,
+                    permissionDenied: error instanceof AppError && error.code === 'CLICKHOUSE_PERMISSION',
+                };
             }
         };
         const [databases, columns, tables, systemColumns, systemTables, tableDetails, projections, skipIndexes, dictionaries] = await Promise.all([
@@ -201,7 +204,16 @@ export class ClickHouseDriver implements QueryDriver, ImportDriver, CreateTableD
         ]);
         const allColumns = [...columns, ...(systemColumns.rows ?? [])], allTables = [...tables, ...(systemTables.rows ?? [])];
         const tableTruncated = allColumns.length > 10000 || allTables.length > 2000 || columns.length > 5000 || tables.length > 1000 || (systemColumns.rows?.length ?? 0) > 5000 || (systemTables.rows?.length ?? 0) > 1000;
-        const metadataWarnings = [databases.warning, systemColumns.warning, systemTables.warning, tableDetails.warning, projections.warning, skipIndexes.warning, dictionaries.warning].filter((warning): warning is string => Boolean(warning));
+        const optionalObjectMetadata: OptionalSchemaMetadataWarning[] = [
+            { kind: 'projection', warning: projections.warning, permissionDenied: projections.permissionDenied },
+            { kind: 'skip index', warning: skipIndexes.warning, permissionDenied: skipIndexes.permissionDenied },
+            { kind: 'dictionary', warning: dictionaries.warning, permissionDenied: dictionaries.permissionDenied },
+        ];
+        const metadataWarnings = collectSchemaMetadataWarnings(
+            [databases.warning, systemColumns.warning, systemTables.warning, tableDetails.warning],
+            optionalObjectMetadata,
+            isPublicPlayground,
+        );
         if ((tableDetails.rows?.length ?? 0) > 1000)
             metadataWarnings.push('Table metadata preview truncated.');
         if ((projections.rows?.length ?? 0) > 5000)

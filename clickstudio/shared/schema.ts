@@ -9,6 +9,34 @@ export type SchemaTableMetadata = Pick<SchemaTable,
 
 export type SchemaTableProjection = SchemaProjection & { database: string; table: string };
 export type SchemaTableSkipIndex = SchemaSkipIndex & { database: string; table: string };
+export type PlaygroundMetadataKind = 'projection' | 'skip index' | 'dictionary';
+export type OptionalSchemaMetadataWarning = { kind: PlaygroundMetadataKind; warning?: string; permissionDenied?: boolean };
+
+export function formatPlaygroundMetadataWarning(unavailable: readonly PlaygroundMetadataKind[]): string | undefined {
+    const unique = [...new Set(unavailable)];
+    if (!unique.length)
+        return undefined;
+    const list = unique.length === 1 ? unique[0]
+        : unique.length === 2 ? `${unique[0]} or ${unique[1]}`
+            : `${unique.slice(0, -1).join(', ')}, or ${unique.at(-1)}`;
+    return `The public Playground account cannot read ${list} metadata.`;
+}
+
+export function collectSchemaMetadataWarnings(
+    generalWarnings: readonly (string | undefined)[],
+    optionalWarnings: readonly OptionalSchemaMetadataWarning[],
+    isPublicPlayground: boolean,
+): string[] {
+    const restrictedKinds = isPublicPlayground
+        ? optionalWarnings.filter(item => item.permissionDenied).map(item => item.kind)
+        : [];
+    const playgroundWarning = formatPlaygroundMetadataWarning(restrictedKinds);
+    return [
+        ...generalWarnings,
+        ...(playgroundWarning ? [playgroundWarning] : []),
+        ...optionalWarnings.filter(item => !(isPublicPlayground && item.permissionDenied)).map(item => item.warning),
+    ].filter((warning): warning is string => Boolean(warning));
+}
 
 export function enrichSchemaTables(
     tables: SchemaTable[],

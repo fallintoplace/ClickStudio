@@ -259,7 +259,12 @@ export function ObjectExplorer({ copy, connection, expert, schema, schemaLoading
         <div className="inspector-search object-search"><Icon name="search"/><input data-testid="schema-search" value={search} onChange={event => changeSearch(event.target.value)} placeholder={copy.objectSearch} aria-label={copy.objectSearch}/>{search && <button type="button" className="object-search-clear" aria-label="Clear object search" onClick={() => changeSearch('')}>×</button>}</div>
         <div className={cx('schema-heading object-heading', !expert && 'is-standard-object-heading')}>{expert && <Button variant="ghost" className="toolbar-small" disabled={!trusted} onClick={() => setLineageOpen(true)}>View dependencies</Button>}<span>{copy.objectCount.replace('{count}', (model.query ? model.visibleObjects : model.totalObjects).toLocaleString())}</span><Button variant="ghost" className={cx('toolbar-small', 'object-refresh-action', schemaLoading && 'is-loading')} aria-label={schemaLoading ? copy.loading : copy.refresh} aria-busy={schemaLoading} title={schemaLoading ? copy.loading : copy.refresh} onClick={onRefreshSchema} disabled={schemaLoading || !trusted}><Icon name="refresh"/></Button></div>
         {schemaError && <div className="callout callout-error">{schemaError}</div>}
-        {schema?.metadataWarnings?.map(warning => <div className="schema-metadata-warning" key={warning}>{warning}</div>)}
+        {schema?.metadataWarnings?.length ? <div className="schema-metadata-warning" role="note">
+            <span className="schema-metadata-warning-icon" aria-hidden="true">i</span>
+            <div className="schema-metadata-warning-content">
+                {schema.metadataWarnings.map(warning => <p key={warning}>{warning}</p>)}
+            </div>
+        </div> : null}
         {!trusted && <div className="inspector-empty"><Icon name="lock"/><strong>{copy.schemaPrivate}</strong><p>{copy.trustToInspect}</p></div>}
         {schemaLoading && <div className="inspector-empty"><span className="loading-orbit"/><p>{copy.readingSchema}</p></div>}
         {trusted && schema && !schemaLoading && <>
