@@ -29,7 +29,8 @@ let cloudWorkspacePreview: DemoPreviewApi | undefined;
 
 function usesCloudWorkspacePreview(path: string) {
     const pathname = path.split(/[?#]/, 1)[0] ?? path;
-    return pathname === '/runs' || pathname.startsWith('/runs/') ||
+    return pathname === '/documents' || pathname.startsWith('/documents/') ||
+        pathname === '/runs' || pathname.startsWith('/runs/') ||
         pathname === '/scripts' || pathname.startsWith('/scripts/') ||
         pathname.startsWith('/connections/clickhouse-cloud/');
 }
