@@ -1,63 +1,31 @@
-# ClickHouse connection experience
+# ClickHouse connections
+
+This is a product direction note. See [Project highlights](../PROJECT-STATUS.md) for implemented features.
 
 ## Goal
 
-Make connecting to ClickHouse feel simple while preserving rich execution context.
+Make ClickHouse connections easy to set up while keeping the details needed to understand each query run.
 
 ## Connection profiles
 
-A profile can carry:
+A connection profile is a named group of connection settings. It can include the server URL, database, reader user, import writer user, execution limits, and information about supported features.
 
-- URL;
-- database;
-- reader identity;
-- import writer identity;
-- execution limits;
-- capability metadata.
+The browser selects a profile ID. The server owns the credentials and connection details.
 
-The browser selects a profile ID while the server owns credentials and connection details.
+## Details for each run
 
-## Execution envelope
+Each run can keep its query ID, SQL, parameters, row and byte limits, timeout, memory limit, and thread settings.
 
-Every run can carry:
+It can also keep the connection identity, links to the source document, and query tags. Keeping these details in one model helps execution, history, plans, results, and cancellation work together.
 
-- query ID;
-- SQL;
-- parameters;
-- row and byte limits;
-- timeout;
-- memory and thread settings;
-- connection identity;
-- document lineage;
-- query tags.
+## Discovering supported features
 
-This gives the UI one consistent model for query execution, history, plans, results, and cancellation.
+A connection can report which features are available. This feature list can cover schema browsing, scripts, parameters, progress, cancellation, query-log records, imports, EXPLAIN views, and native documentation.
 
-## Capability discovery
-
-A connection can expose its supported features through a manifest covering:
-
-- schema browsing;
-- scripts;
-- parameters;
-- progress;
-- cancellation;
-- query-log evidence;
-- imports;
-- EXPLAIN views;
-- native documentation.
-
-The UI can then present the richest experience supported by the connected server.
+The interface can then show the features supported by that connection.
 
 ## Product direction
 
-Connection management can grow naturally into:
+Future work could include saved profiles, ClickHouse Cloud presets, profiles managed by a team, integration with a secret manager, environment labels, and more detailed rules for query execution.
 
-- saved profiles;
-- ClickHouse Cloud presets;
-- team-managed profiles;
-- secret-manager integration;
-- environment labels;
-- richer execution-policy controls.
-
-The core abstraction remains the same: a clear server-owned connection profile feeding a consistent execution model.
+The main design stays the same: the server manages the profile, and each run uses a consistent set of saved details.

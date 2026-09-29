@@ -1,22 +1,26 @@
 # ClickStudio: setup and implementation reference
 
-This reference covers the ClickStudio setup, architecture, workflows, and validation. For a shorter review path, start with the [README](../README.md) and [Engineering choices](ENGINEERING-NOTES.md).
+This guide explains how to set up ClickStudio and use its main workflows. It also describes storage, execution limits, and tests.
+
+For a shorter introduction, read the [README](../README.md). For design decisions, read [Engineering choices](ENGINEERING-NOTES.md). The [documentation index](README.md) includes a glossary.
 
 ## Architecture at a glance
 
-ClickStudio is a local-first ClickHouse SQL workspace with:
+ClickStudio is a ClickHouse SQL workspace designed to run locally. It has:
 
-- a React interface built with Click UI and CodeMirror;
-- an Express server API for execution and retained evidence;
-- server-managed ClickHouse connection profiles;
-- deterministic sample data for fast product exploration;
-- live ClickHouse integration through the bundled Docker setup.
+- A React interface built with Click UI and CodeMirror.
+- An Express server API that runs queries and saves run details.
+- Connection profiles managed by the server.
+- Fixed sample responses for product tours and browser tests.
+- A bundled Docker setup for running a real ClickHouse database.
 
-The application lives in `clickstudio/`; root npm scripts delegate there.
+The app is in `clickstudio/`. npm scripts at the repository root call the scripts in that folder.
+
+Start each shell command block in this guide from the repository root unless stated otherwise. Run `npm run setup` once before using the app locally.
 
 ## First run with local ClickHouse
 
-Use Node 22.12 or newer:
+You need Node.js 22.12 or newer, npm, and Docker.
 
 ```sh
 npm run setup
@@ -27,33 +31,33 @@ npm run db:setup
 npm run dev
 ```
 
-Open `http://localhost:5173`, sign in with `CLICKSTUDIO_TOKEN` from `clickstudio/.env`, choose **Test connection**, then **Trust connection** and enter `local`.
+After the server starts:
 
-The setup creates:
+1. Open `http://localhost:5173`.
+2. Sign in with the `CLICKSTUDIO_TOKEN` value from `clickstudio/.env`.
+3. Choose **Test connection**.
+4. Choose **Trust connection** and enter `local`.
 
-- `default.events` with seven deterministic rows;
-- `default.import_events` as an import destination;
-- `clickstudio_reader` for query execution;
-- `clickstudio_writer` for configured imports.
+The setup creates `default.events` with seven fixed sample rows and `default.import_events` as an import destination. It also creates `clickstudio_reader` for queries and `clickstudio_writer` for configured imports.
 
-`npm run init:env` generates local credentials and an owner token. Store `.env` privately.
+`npm run init:env` generates local credentials and an owner token. Keep `.env` private.
 
 ## Sample workspace
 
-For the fastest UI tour:
+Use sample mode to try the interface without a live database:
 
 ```sh
 cd clickstudio
 DEMO_MODE=true npm run dev
 ```
 
-Sample mode provides deterministic responses for editor workflows, results, charts, progress, cancellation, history, and EXPLAIN views.
+It returns fixed example responses for editing, results, charts, progress, cancellation, history, and EXPLAIN views. It does not evaluate your SQL.
 
-Live ClickHouse mode uses the same interface with real database execution.
+Live mode uses the same interface but runs queries against a real ClickHouse database.
 
 ## Containerized application
 
-The full application can run through Docker Compose:
+After generating local credentials as described above, you can run the full app with Docker Compose:
 
 ```sh
 cd clickstudio
@@ -62,9 +66,9 @@ docker compose --profile app up --build
 
 Open `http://localhost:8080`.
 
-The setup service initializes ClickHouse, and the application service starts with the reader, writer, owner token, and optional model credentials.
+The setup service initializes ClickHouse. The app service starts with the reader and writer credentials, owner token, and any configured model credentials.
 
-For a local production build:
+To build and run the production app locally instead:
 
 ```sh
 cd clickstudio
@@ -74,32 +78,31 @@ NODE_ENV=production npm run start:production
 
 ## Editor workflow
 
-The editor supports:
+The editor keeps tabs and drafts separate for each connection. You can run the current statement, run selected SQL, or run a multi-statement script.
 
-- connection-scoped tabs and drafts;
-- current-statement and selection execution;
-- multi-statement scripts;
-- named ClickHouse parameters;
-- SQL formatting and validation;
-- query history;
-- saved revisions;
-- retained execution evidence.
+It also supports named ClickHouse parameters, formatting, validation, query history, saved revisions, and saved run details. See [SQL editing tools](EDITOR-TOOLS.md) for navigation, snippets, and autocomplete.
 
 ## Schema and object exploration
 
-The schema explorer presents the selected database alongside ClickHouse system tables.
+The schema explorer shows the selected database and ClickHouse system tables. A schema describes tables, columns, and their types.
 
-For system tables, **Read ClickHouse documentation** loads native documentation from the connected server and displays the associated server version.
+For a system table, choose **Read ClickHouse documentation** to load documentation from the connected server. The view also shows the server version.
 
-For MergeTree-family tables, select **Visualize parts** to inspect active and inactive `system.parts` rows grouped by partition. The horizontal map uses compressed bytes by default; switch its bar scale to rows or marks, or choose the Treemap and Galaxy layouts. Part details include rows, marks, compressed and uncompressed bytes, compression ratio, level, block range, disk, and modification time. The preview shows up to 500 parts per state while the total and state counts remain exact.
+For a MergeTree-family table, choose **Visualize parts**. A part is a stored piece of table data. The view groups active and inactive `system.parts` rows by partition.
 
-The object explorer also provides a unified way to inspect database objects and move directly into relevant SQL workflows.
+The horizontal map sizes bars by compressed bytes by default. You can switch to rows or marks, or choose the Treemap or Galaxy layout. Part details include rows, marks, compressed and uncompressed bytes, compression ratio, level, block range, disk, and modification time.
+
+The preview shows at most 500 parts per state. Total counts and state counts remain exact even when the preview is limited.
+
+The object explorer helps you inspect database objects and open related SQL workflows. See [Native exploration workflows](../clickstudio/docs/native-explorers.md) for materialized views, merges, mutations, and run comparisons.
 
 ## Example workflows
 
-Runnable examples live in [`clickstudio/examples/analysis.sql`](../clickstudio/examples/analysis.sql).
+More runnable examples are in [`clickstudio/examples/analysis.sql`](../clickstudio/examples/analysis.sql).
 
 ### Table-free smoke test
+
+This query does not need an existing table:
 
 ```sql
 SELECT
@@ -109,11 +112,11 @@ FROM numbers(7)
 ORDER BY day;
 ```
 
-This is useful for checking result typing, charts, export, and retained evidence.
+Use it to check column types, charts, export, and saved run details.
 
 ### Seeded local data
 
-After `npm run db:setup`:
+After running `npm run db:setup`, try:
 
 ```sql
 SELECT
@@ -124,9 +127,11 @@ FROM default.events
 ORDER BY day;
 ```
 
-This produces multiple numeric series for table and chart exploration.
+The result contains multiple numeric columns that you can compare in a table or chart.
 
 ### Named parameters
+
+A parameter is a named value supplied separately from the SQL:
 
 ```sql
 SELECT day, events
@@ -135,9 +140,11 @@ WHERE events >= {minimum:UInt64}
 ORDER BY day;
 ```
 
-Set `minimum=30` in the editor parameter control before running.
+Before running the query, set `minimum=30` in the editor's parameter control.
 
 ### Scripts
+
+A script can contain more than one statement:
 
 ```sql
 SELECT count() AS days FROM default.events;
@@ -145,189 +152,167 @@ SELECT count() AS days FROM default.events;
 SELECT sum(events) AS total_events FROM default.events;
 ```
 
-Choose **Run script** to retain a result for each statement.
+Choose **Run script** to keep a separate result for each statement.
 
 ## EXPLAIN experiences
 
-ClickStudio provides four ClickHouse-specific execution analysis paths.
+These four views explain how ClickHouse plans or runs a query. They show different information.
 
 ### EXPLAIN INDEXES
 
-Shows ClickHouse-reported index checks and pruning counts, including parts and granules. The graph makes the pruning path easy to scan while the raw output remains available.
+Shows index checks and counts of parts and granules that ClickHouse can skip. Granules are groups of rows used when reading data. The graph shows this filtering path, and the raw output stays available.
 
 ### EXPLAIN PLAN
 
-Shows the logical query plan with graph and tree presentations. Selecting a step reveals its properties.
+Shows the logical steps in the query plan as a graph or tree. Select a step to inspect its properties.
 
 ### EXPLAIN PIPELINE
 
-Shows the planned processor topology and parallel lanes. This is useful for understanding how ClickHouse intends to execute the query.
+Shows how processing stages connect and which stages can run in parallel. This is the planned execution structure, not measured runtime performance.
 
 ### EXPLAIN ANALYZE
 
-Runs the selected query and displays measured time, data flow, and parallelism in an interactive runtime graph. The query runs on ClickHouse; the result rows are discarded and the explain output is retained. This action is available when the selected connection supports native `EXPLAIN ANALYZE` (introduced in ClickHouse 26.7).
+**This action runs the selected query.** ClickHouse discards the query's result rows and returns execution analysis, which ClickStudio saves.
 
-The runtime graph follows data from reads toward the result, emphasizes slower stages, and retains raw output in the Results tab. Sample mode displays deterministic fixture metrics and does not evaluate the SQL.
+It requires a connection that supports native `EXPLAIN ANALYZE`, introduced in ClickHouse 26.7. The bundled local ClickHouse 24.6 server does not support it.
 
-The SQL Structure view also includes a server-resolved **Analyzer** tree alongside the local AST and logical flow.
+The runtime graph shows measured time, data flow, and parallel work. It follows data from reads toward the result and highlights slower stages. Raw output remains in the Results tab.
 
-Together these views turn ClickHouse planning and runtime output into an interactive part of the SQL workflow.
+In sample mode, the view shows fixed example measurements. It does not evaluate the SQL.
+
+The SQL Structure view also includes a server-resolved **Analyzer** tree, a local abstract syntax tree (AST), and logical flow. An AST represents the structure of parsed SQL.
 
 ## Execution evidence
 
-Every run receives a server-generated query ID.
+Execution evidence means the saved details of a query run. Each run gets a query ID generated by the server.
 
-ClickStudio retains:
+ClickStudio keeps the SQL, supplied parameters, execution identity, limits, timestamps, result state, and typed result data together. A chart, profile, plan, or saved result can then refer to the exact run that produced it.
 
-- SQL;
-- bound parameters;
-- execution identity;
-- limits;
-- timestamps;
-- result state;
-- typed result data.
-
-This allows a saved result, chart, profile, or plan to stay connected to the exact execution that produced it.
-
-Editing a draft creates a new analysis state while retained runs continue to describe their original execution.
+Editing a draft does not change an earlier run's saved details.
 
 ## Result fidelity
 
-Result data keeps column names and ClickHouse type metadata alongside row values.
+Results keep column names and ClickHouse types together with the row values.
 
-`UInt64` and `Decimal` values use string transport where exact representation matters. This preserves database precision across the JavaScript boundary.
+`UInt64` and `Decimal` values are sent as strings where needed to preserve exact values. This avoids losing precision when the data reaches JavaScript.
 
-Tables render results in pages, while charts use numeric coordinates suitable for visualization. Table and JSON views preserve exact values for inspection and export.
+Tables show results in pages. Charts use numeric coordinates for drawing. Table and JSON views keep exact values for inspection and export.
 
 ## Child analysis
 
-A chart click or cell interaction can create a child SQL draft with a bound filter parameter.
+Clicking a chart or interacting with a cell can create a follow-up SQL draft with a filter parameter.
 
-This makes it easy to move from a result into a more focused query while preserving lineage back to the source analysis.
+This is called a child query. It keeps a link to the source analysis so you can see where the follow-up began.
 
 ## Saving, publishing, and sharing
 
-Saving creates a server revision with optimistic concurrency.
+These are separate actions:
 
-Publishing connects a saved revision to completed execution evidence and freezes the selected chart plus a bounded result snapshot.
+1. **Save** creates a server revision. It checks whether the saved version changed before accepting an update. This is called optimistic concurrency.
+2. **Publish** connects a saved revision to a completed run. It freezes the selected chart and a result snapshot with size limits.
+3. **Share** creates a read link for the published snapshot.
 
-Sharing creates a dedicated read link for the published snapshot.
-
-These stages make the lifecycle from working SQL to shareable analysis explicit and easy to inspect.
+A snapshot is a saved copy. Later draft edits do not change that copy.
 
 ## Connection configuration
 
-The browser selects connection profile IDs, while the server owns connection details.
+The browser selects a connection by its profile ID. The server stores the connection details and credentials.
 
-For multiple profiles, set `CONNECTIONS_FILE` to a JSON configuration. [`clickstudio/examples/connections.json`](../clickstudio/examples/connections.json) shows the format.
+For multiple profiles, set `CONNECTIONS_FILE` to a JSON configuration file. See [`clickstudio/examples/connections.json`](../clickstudio/examples/connections.json) for the format.
 
-Passwords are referenced through environment variable names.
-
-This keeps connection configuration centralized and credentials server-side.
+The configuration refers to passwords by their environment variable names. It does not need to send passwords to the browser.
 
 ## ClickHouse permissions
 
-The bundled local setup uses separate identities:
+The bundled local setup uses separate database users:
 
-- `clickstudio_reader` for read-only query execution;
-- `clickstudio_writer` for configured import tables;
-- `clickstudio_admin` for setup.
+- `clickstudio_reader`: read-only query execution.
+- `clickstudio_writer`: writes to configured import tables.
+- `clickstudio_admin`: setup tasks.
 
-Application SQL checks provide clear product feedback, while ClickHouse grants provide the database authorization layer.
+SQL checks in the app give useful feedback. ClickHouse grants enforce database permissions. The app's checks do not replace those grants.
 
-The reader profile also configures the operational settings used by bounded execution.
+The reader profile also sets operational settings for queries with execution limits.
 
 ## Imports
 
-Choose **Import** and upload CSV, JSON, or NDJSON.
+Choose **Import** and upload CSV, JSON, or NDJSON. NDJSON means newline-delimited JSON: each line contains a JSON record.
 
-The workflow is:
+Then:
 
-1. preview the source;
-2. choose the configured destination;
-3. review column mapping;
-4. confirm the exact row count;
-5. execute the import through the writer identity.
+1. Preview the file.
+2. Choose a configured destination table.
+3. Review how file columns map to table columns.
+4. Confirm the exact number of rows.
+5. Run the import through the writer user.
 
 [`clickstudio/examples/import.csv`](../clickstudio/examples/import.csv) matches `default.import_events(day Date, events UInt64)`.
 
-The mapping is checked against the destination schema immediately before insertion, and each mapping identifies a single import operation.
+Immediately before insertion, the app checks the mapping against the destination schema. Each mapping identifies one import operation.
 
 ## Assistant workflow
 
 Set `OPENAI_API_KEY` and `OPENAI_MODEL` on the server to enable model actions.
 
-The assistant supports:
+The assistant can generate, explain, repair, and review SQL. It can also analyze results and performance.
 
-- generate;
-- explain;
-- repair;
-- result analysis;
-- performance analysis;
-- review.
+Before you give consent, the app shows the information prepared for the model. This can include the current SQL, selected schema, up to four relevant ClickHouse reference entries, and selected result evidence. The preview names the reference entries.
 
-The product presents the context prepared for the model, including current SQL, selected schema, up to four relevant ClickHouse reference entries, and chosen result evidence. Native documentation from the selected server is preferred; the bundled offline reference is used when native docs are unavailable. The preview names the entries before consent.
+The app prefers documentation from the selected server. When that is unavailable, it uses the bundled offline reference.
 
-The workflow is:
+The workflow has separate steps:
 
-**inspect context → generate proposal → review → apply → run**
+1. Inspect the prepared context.
+2. Generate a proposal.
+3. Review the proposal.
+4. Apply it to the editor.
+5. Run the SQL.
 
-Each proposal receives quality metadata covering the playbook contract, read-only SQL safety, schema grounding, and a static semantic proxy.
+Each proposal includes quality information. The checks cover the playbook's expected output, read-only SQL safety, use of known schema objects, and a static estimate of whether the proposal fits the task. This estimate does not prove that the SQL answers the question correctly.
 
-The local `eval:assistant` command runs deterministic benchmark cases for core assistant behaviors.
+The local `eval:assistant` command runs fixed benchmark cases for the main assistant behaviors.
 
 ## Observability
 
-Optional OpenTelemetry configuration can emit API trace metadata through `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`.
+Observability means using traces and other diagnostic records to understand what the app did.
 
-`TRACE_URL_TEMPLATE` can turn a retained trace ID into a link to an existing observability system.
+Optional OpenTelemetry configuration can send API trace metadata through `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`. A trace connects the steps in a request.
 
-Query IDs remain visible throughout the execution workflow, which makes ClickHouse-side diagnostics easy to correlate with application activity.
+`TRACE_URL_TEMPLATE` can turn a saved trace ID into a link to your existing monitoring system.
+
+Query IDs stay visible in the app. Use them to match a ClickStudio run with ClickHouse diagnostic records.
 
 ## Persistence
 
-Server data is stored under `DATA_DIR` using atomic JSON-file replacement. Browser drafts use separate local workspace storage.
+The server saves data under `DATA_DIR` in JSON files. It replaces files atomically, so each new file replaces the old version as one operation. Browser drafts use separate local workspace storage.
 
-This keeps the project lightweight to run while preserving clear models for:
+The stored models include query documents, executions, results, publications, imports, proposals, sessions, and workspace state.
 
-- query documents;
-- executions;
-- retained results;
-- publications;
-- imports;
-- proposals;
-- sessions;
-- workspace state.
-
-The structure provides a straightforward path to shared transactional storage as the product grows.
+This keeps local setup small. The separate models also leave room for shared storage with transactions in the future.
 
 ## Execution limits
 
-Default run settings:
+| Setting | Default | Application maximum |
+| --- | --- | --- |
+| Result rows | 5,000 | 20,000 |
+| Result size | 2 MB | 5 MB |
+| Run time | 30 seconds | 120 seconds |
+| Memory | 512 MiB | 1 GiB |
+| Threads | 4 | 8 |
 
-- 5,000 rows;
-- 2 MB result size;
-- 30 seconds;
-- 512 MiB memory;
-- four threads.
-
-Application maxima:
-
-- 20,000 rows;
-- 5 MB result size;
-- 120 seconds;
-- 1 GiB memory;
-- eight threads.
-
-These limits make query behavior predictable and keep retained evidence compact.
+These limits help control query resource use and the size of saved results.
 
 ## Retention
 
-ClickStudio applies bounded retention to run results, published snapshots, import previews, histories, documents, uploads, proposals, queues, sessions, and audit metadata.
+Saved data is not kept without limits. ClickStudio limits stored run results, published snapshots, import previews, histories, documents, uploads, proposals, queues, sessions, and audit metadata.
 
-This keeps local storage predictable while preserving recent analysis context.
+This keeps local storage use predictable while preserving recent work.
 
 ## Validation commands
+
+For live integration checks, start the bundled database and set `CLICKHOUSE_INTEGRATION=1` before running `test:integration`. The [README](../README.md#validation) shows the complete live-test command.
+
+From the repository root:
 
 ```sh
 cd clickstudio
@@ -340,9 +325,9 @@ npm run test:integration
 npm run test:e2e:core
 ```
 
-The deterministic browser suite covers the main product workflows. The integration suite exercises the application against the bundled ClickHouse instance.
+Browser tests use fixed sample responses for the main workflows. Live integration tests check the app against the bundled ClickHouse server.
 
-The root quality gate is:
+To run the main project checks from the repository root:
 
 ```sh
 npm run check

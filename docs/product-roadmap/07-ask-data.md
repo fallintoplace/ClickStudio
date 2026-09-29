@@ -1,49 +1,37 @@
 # Ask Data direction
 
+This is a product direction note. See [Project highlights](../PROJECT-STATUS.md) for implemented features.
+
 ## Goal
 
-Turn a natural-language question into a transparent SQL analysis workflow.
+Turn a question written in everyday language into a SQL analysis that the user can inspect.
 
 ## Answer flow
 
-A useful Ask Data experience can:
+An Ask Data workflow could:
 
-1. understand the question;
-2. choose relevant schema context;
-3. show key assumptions;
-4. generate SQL;
-5. run with normal ClickStudio limits;
-6. show the table;
-7. recommend a chart;
-8. explain the result;
-9. offer follow-up actions.
+1. Understand the question.
+2. Choose relevant tables and columns.
+3. Show important assumptions.
+4. Generate SQL.
+5. Run it with normal ClickStudio limits.
+6. Show the result table.
+7. Recommend a chart.
+8. Explain the result.
+9. Suggest follow-up actions.
 
 ## Transparency
 
-Each answer can keep:
+Each answer can keep the generated SQL, parameters, source tables, query ID, result data, chart settings, and links to follow-up queries.
 
-- generated SQL;
-- parameters;
-- source tables;
-- query ID;
-- result evidence;
-- chart configuration;
-- follow-up lineage.
-
-The user can move into the SQL editor at any point.
+The user should be able to open the SQL editor at any point.
 
 ## Follow-up actions
 
-Follow-ups can create clear analysis operations such as:
+A follow-up could change a time range, add a filter, change how rows are grouped, or choose another metric.
 
-- changing a time range;
-- adding a filter;
-- changing grouping;
-- selecting another metric;
-- opening the generated SQL;
-- saving the answer;
-- publishing a result.
+It could also open the generated SQL, save the answer, or publish the result. Each action should make the change clear.
 
 ## Product direction
 
-Ask Data becomes especially powerful when paired with reusable metric definitions, schema descriptions, saved examples, and ClickHouse execution evidence.
+Reusable metric definitions, schema descriptions, saved examples, and query-run details can give Ask Data better context for answering questions.

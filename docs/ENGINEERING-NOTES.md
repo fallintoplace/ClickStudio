@@ -1,117 +1,92 @@
 # Engineering choices
 
-This document highlights the technical decisions that shape ClickStudio and the reasoning behind them.
+This guide explains the main technical decisions in ClickStudio and the reasons for them.
 
 ## 1. Server-mediated ClickHouse access
 
-The browser talks to a small server API for ClickHouse execution.
+The browser sends requests to a small server API. The server then runs the queries in ClickHouse.
 
-This keeps:
+This keeps database credentials on the server and query limits in one place. Users can review a connection profile before running SQL. Imports use a separate database user with permission to write to configured tables.
 
-- database credentials on the server;
-- query limits centralized;
-- connection profiles reviewable before execution;
-- imports on a dedicated writer identity.
-
-The result is a clear execution boundary with room for richer connection policy as the product grows.
+This separation also leaves room for more connection rules later.
 
 ## 2. Execution-scoped evidence
 
-Every run gets its own query ID, SQL, parameters, limits, timestamps, result state, and retained result.
+Each query run has its own ID and saved details: SQL, parameters, limits, timestamps, result state, and result data.
 
-This lets ClickStudio keep charts, history, saved revisions, EXPLAIN views, and assistant proposals connected to the exact execution that produced them.
-
-The editor remains flexible while historical evidence stays stable and easy to inspect.
+Charts, history, saved revisions, EXPLAIN views, and assistant proposals can refer to that exact run. Editing the SQL draft does not change the details of an earlier run.
 
 ## 3. Database-native permissions
 
-The bundled setup uses:
+The bundled setup uses three types of database user:
 
-- a read-only identity for normal SQL;
-- a dedicated INSERT identity for configured import tables;
-- an administrator identity for local setup.
+- A read-only user for normal queries.
+- A user with `INSERT` permission for imports into configured tables.
+- An administrator for local setup.
 
-Application-level SQL checks provide clear feedback, while ClickHouse permissions remain the strongest authorization layer.
-
-This keeps database policy close to the database and makes the security model easy to reason about.
+The app checks SQL to give useful error messages. ClickHouse permissions enforce access at the database itself. The app's checks do not replace database permissions.
 
 ## 4. ClickHouse type fidelity
 
-Results preserve ClickHouse column types alongside row values.
+Results keep each column's ClickHouse type together with its values.
 
-Large `UInt64` and `Decimal` values are transported as strings so exact database values survive the JavaScript boundary.
+Large `UInt64` and `Decimal` values are sent as strings. This prevents JavaScript number conversion from losing precision.
 
-Charts use numeric coordinates where representation is safe, while table and JSON views retain exact values.
+Charts use numeric coordinates where appropriate. Table and JSON views keep exact values for inspection.
 
 ## 5. Deterministic sample mode
 
-The sample workspace uses a deterministic fixture driver.
+Sample mode returns fixed example responses rather than running SQL. This gives reviewers and browser tests the same data each time.
 
-That gives reviewers and browser tests stable data for:
-
-- editor workflows;
-- progress states;
-- cancellation;
-- charts;
-- EXPLAIN views;
-- history and retained results.
-
-Live ClickHouse mode exercises the same product flow with real database execution.
+The examples cover editing, progress, cancellation, charts, EXPLAIN views, history, and saved results. Live mode uses the same interface but runs queries against a real ClickHouse database.
 
 ## 6. Structured EXPLAIN experiences
 
-ClickStudio includes dedicated views for:
+ClickStudio has separate views for **EXPLAIN INDEXES**, **EXPLAIN PLAN**, **EXPLAIN PIPELINE**, and **EXPLAIN ANALYZE**.
 
-- **EXPLAIN INDEXES**
-- **EXPLAIN PLAN**
-- **EXPLAIN PIPELINE**
-- **EXPLAIN ANALYZE**
+The app turns ClickHouse output into interactive graphs with size limits. It also keeps the raw output available. The views explain which data ClickHouse can skip, the steps in a plan, how processors connect, and measured execution details.
 
-The UI turns ClickHouse output into bounded interactive graph structures while also retaining the raw result. Runtime analysis executes the selected query and is capability-gated by the connected server. MergeTree storage uses a capped, read-only `system.parts` query, separate from run history; inactive parts are not described as active merges.
+Runtime analysis runs the selected query. The app enables it only when the connected server supports it.
 
-This makes pruning, logical plan shape, processor topology, and measured execution easier to understand at a glance.
+The MergeTree storage view is separate from query-run history. It reads `system.parts` through a read-only query with a result limit. An inactive part is not described as an active merge.
 
 ## 7. Lightweight local persistence
 
-Server state uses bounded JSON storage with atomic file replacement, while browser drafts use local workspace storage.
+The server saves data in JSON files and limits how much it retains. It replaces each file atomically: the new version replaces the old file as one operation. Browser drafts use separate local workspace storage.
 
-This keeps the project easy to run and inspect with very little infrastructure.
-
-The data model already separates runs, documents, publications, imports, and workspace state, which provides a clean path toward transactional shared storage when needed.
+This keeps local setup simple. Runs, documents, publications, imports, and workspace state have separate data models. Those models could later use shared storage with transactions.
 
 ## 8. Explicit user actions
 
-Important transitions are visible in the interface:
+The interface separates actions that have different effects:
 
-- connections are reviewed and trusted before execution;
-- imports move through preview, mapping, and confirmation;
-- assistant suggestions move through review, apply, and run;
-- sharing is a separate action from publishing;
-- retained results remain connected to their original SQL and parameters.
+- Review and trust a connection before running queries.
+- Preview an import, map its columns, and confirm it before writing data.
+- Review an assistant suggestion, apply it, and run it as separate steps.
+- Publish a snapshot before creating a share link.
 
-This makes powerful workflows feel predictable and keeps user intent visible.
+Saved results keep their original SQL and parameters. These steps make it clear what the user is approving.
 
 ## 9. Layered testing
 
-The repository uses several layers of validation:
+Different tests check different parts of the app:
 
-- unit tests for parsing, guards, storage, results, and derived views;
-- workspace tests for editor state and recovery;
-- deterministic Playwright workflows;
-- integration tests against the bundled ClickHouse instance;
-- TypeScript, ESLint, coverage gates, and production build checks.
+- Unit tests check parsing, validation rules, storage, results, and derived views.
+- Workspace tests check editor state and recovery.
+- Playwright browser tests check workflows with fixed sample data.
+- Integration tests check the app against the bundled ClickHouse server.
 
-Together these cover both product behavior and ClickHouse integration.
+TypeScript, ESLint, coverage requirements, and production build checks provide additional checks.
 
 ## 10. Growth path
 
-The architecture has clear extension points for:
+The architecture leaves room for future work in:
 
-1. multi-user authentication and authorization;
-2. transactional shared persistence;
-3. managed connection secrets and organization policies;
-4. richer observability;
-5. larger-result virtualization and streaming;
-6. broader ClickHouse-version compatibility coverage.
+1. Multi-user sign-in and permissions.
+2. Shared storage with transactions.
+3. Managed connection secrets and organization policies.
+4. More detailed tracing and diagnostics.
+5. Large results, with only visible rows rendered and data delivered in streams.
+6. Tests across more ClickHouse versions.
 
-The current implementation already exposes the core abstractions those capabilities can build on.
+These are extension points, not claims that all of these features are already implemented.

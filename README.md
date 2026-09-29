@@ -1,25 +1,31 @@
 # ClickStudio
 
-A local-first ClickHouse SQL workbench built with React, Click UI, CodeMirror, and a bounded server API. ClickStudio keeps SQL, parameters, execution limits, results, and query evidence tied to each run so every analysis step stays easy to inspect and revisit.
+ClickStudio is a SQL editor for ClickHouse that you can run on your own computer. Use it to write queries, inspect results, build charts, and understand query performance.
+
+Each query run keeps its SQL, parameters, limits, results, and run details together. You can return to a saved run and see how it produced its result.
+
+The interface uses React, Click UI, and CodeMirror. A server API runs queries with limits on time, memory, and result size.
 
 ## Reviewer tour
 
-For a fast review:
+To review the project:
 
-1. Start the **sample workspace** and explore the editor, results, charts, and EXPLAIN views.
-2. Read [Engineering choices](docs/ENGINEERING-NOTES.md) for the architecture and product reasoning.
-3. Open [Project highlights](docs/PROJECT-STATUS.md) for the implemented feature set and technical focus.
-4. Use the [setup and implementation reference](docs/CLICKSTUDIO.md) for deeper details.
+1. Start the **sample workspace** below. Try the editor, results, charts, and EXPLAIN views.
+2. Read [Engineering choices](docs/ENGINEERING-NOTES.md) to understand how the app works and why it was built this way.
+3. Read [Project highlights](docs/PROJECT-STATUS.md) to see the implemented features.
+4. Use the [setup and implementation reference](docs/CLICKSTUDIO.md) for detailed instructions.
 
-The core idea is simple: make ClickHouse query execution **inspectable, bounded, and connected to durable evidence** while keeping the SQL and database behavior visible.
+The main goal is to make each query easy to inspect. SQL, database behavior, execution limits, and saved run details stay visible.
 
 ## Quick start
 
-Requires **Node.js 22.12+** and npm. Docker powers the live ClickHouse path.
+You need **Node.js 22.12 or newer** and npm. You also need Docker to use the bundled local ClickHouse server.
+
+Start each shell command block below from the repository root: the folder that contains this README. Commands such as `cd clickstudio` then move into the application folder.
 
 ### Sample workspace
 
-Use the deterministic sample workspace for the fastest product tour:
+Use sample mode to try the interface without setting up a database:
 
 ```sh
 npm run setup
@@ -29,11 +35,11 @@ DEMO_MODE=true npm run dev
 
 Open `http://localhost:5173` and choose **Start exploring**.
 
-Sample mode provides stable fixture responses for repeatable UI exploration and browser testing.
+Sample mode uses fixed example responses. It is useful for product tours and repeatable browser tests. It does not run your SQL against a real database.
 
 ### Local ClickHouse
 
-The bundled Docker Compose setup starts the ClickHouse 24.6 compatibility fixture used by this project:
+The bundled Docker Compose setup uses ClickHouse 24.6 for compatibility testing:
 
 ```sh
 npm run setup
@@ -44,9 +50,14 @@ npm run db:setup
 npm run dev
 ```
 
-Open `http://localhost:5173`, sign in with `CLICKSTUDIO_TOKEN` from `clickstudio/.env`, choose **Test connection**, then **Trust connection** and enter `local`.
+Then:
 
-The setup seeds `default.events`. A first live query is:
+1. Open `http://localhost:5173`.
+2. Sign in with the `CLICKSTUDIO_TOKEN` value from `clickstudio/.env`.
+3. Choose **Test connection**.
+4. Choose **Trust connection** and enter `local`.
+
+The setup adds sample data to `default.events`. Try this query:
 
 ```sql
 SELECT day, events
@@ -54,48 +65,47 @@ FROM default.events
 ORDER BY day;
 ```
 
-Use the Run actions beside **Run statement** to inspect **EXPLAIN INDEXES**, **EXPLAIN PLAN**, **EXPLAIN PIPELINE**, or **EXPLAIN ANALYZE**. EXPLAIN ANALYZE executes the selected query and is available on ClickHouse 26.7 or newer.
+The Run actions beside **Run statement** include **EXPLAIN INDEXES**, **EXPLAIN PLAN**, **EXPLAIN PIPELINE**, and **EXPLAIN ANALYZE**. These views help explain how ClickHouse processes a query.
 
-Database and optional model-provider credentials stay on the server.
+**EXPLAIN ANALYZE runs the selected query.** It requires ClickHouse 26.7 or newer, so it is not available on the bundled 24.6 server.
+
+Database credentials and optional AI model credentials stay on the server.
 
 ## Examples
 
-The repository includes copy-pasteable examples that match the bundled local setup:
+These files match the bundled local setup:
 
-- [`clickstudio/examples/analysis.sql`](clickstudio/examples/analysis.sql) covers a table-free query, the seeded dataset, exact ClickHouse numeric values, schema inspection, parameters, and plan/pipeline workflows.
-- [`clickstudio/examples/import.csv`](clickstudio/examples/import.csv) can be imported into `default.import_events`.
-- [`clickstudio/examples/connections.json`](clickstudio/examples/connections.json) shows the multi-connection configuration format.
+- [`clickstudio/examples/analysis.sql`](clickstudio/examples/analysis.sql): queries without a table, seeded data, exact numeric values, schema inspection, parameters, and query plans.
+- [`clickstudio/examples/import.csv`](clickstudio/examples/import.csv): sample rows for `default.import_events`.
+- [`clickstudio/examples/connections.json`](clickstudio/examples/connections.json): configuration for more than one connection.
 
 ## Highlights
 
-- Run read-only SQL and inspect typed, paginated results.
-- Format and validate ClickHouse SQL in the editor.
-- Run scripts and inspect each statement separately.
-- Explore databases, tables, columns, native system-table documentation, and active/inactive MergeTree part storage.
-- Import CSV, JSON, or NDJSON through preview, mapping, and explicit row-count confirmation.
-- Track execution progress, cancel queries, and reopen retained evidence.
-- Save query documents, build charts, and inspect query history.
-- Explore index pruning, logical plans, execution pipelines, and measured runtime through interactive graph views.
-- Review assistant context and SQL proposals before applying and running them.
+- **Write and run SQL.** Format and validate queries. Run read-only SQL or a script with separate results for each statement.
+- **Explore the database.** Browse databases, tables, columns, and system-table documentation. Inspect active and inactive MergeTree data parts.
+- **Work with results.** View column types, move between result pages, build charts, and save query documents.
+- **Import data.** Preview CSV, JSON, or NDJSON files, map their columns, and confirm the row count before importing.
+- **Understand a run.** Track progress, cancel queries, reopen saved run details, and inspect interactive query-plan and runtime graphs.
+- **Use the assistant.** Review the information sent to the model and its SQL suggestion before applying or running it.
 
 ## Validation
 
-Run the main local quality gate:
+Run the main project checks:
 
 ```sh
 npm run check
 ```
 
-It covers syntax checks, TypeScript, ESLint, coverage gates, and the production build.
+This checks syntax, TypeScript types, ESLint rules, test coverage requirements, and the production build.
 
-For focused browser coverage:
+To test the main browser workflows:
 
 ```sh
 cd clickstudio
 npm run test:e2e:core
 ```
 
-For live ClickHouse integration checks:
+For live ClickHouse integration checks, first start and set up the local database as shown above. Then run:
 
 ```sh
 cd clickstudio
@@ -105,8 +115,8 @@ npm run eval
 
 ## Documentation
 
-- [Documentation index](docs/README.md) - reviewer-oriented map of the repository docs.
-- [Engineering choices](docs/ENGINEERING-NOTES.md) - architecture and implementation reasoning.
-- [Project highlights](docs/PROJECT-STATUS.md) - implemented capabilities and technical focus.
-- [Setup and implementation reference](docs/CLICKSTUDIO.md) - detailed setup and behavior.
-- [Product exploration](docs/product-roadmap/) - broader product ideas and future directions.
+- [Documentation index](docs/README.md): all guides and a glossary of common terms.
+- [Engineering choices](docs/ENGINEERING-NOTES.md): how the app is built and why.
+- [Project highlights](docs/PROJECT-STATUS.md): implemented features and current scope.
+- [Setup and implementation reference](docs/CLICKSTUDIO.md): setup, configuration, and detailed behavior.
+- [Product exploration](docs/product-roadmap/): ideas for future development, not a list of available features.

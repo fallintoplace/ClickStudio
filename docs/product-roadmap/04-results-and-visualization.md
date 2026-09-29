@@ -1,61 +1,35 @@
-# Results and visualization direction
+# Results and charts
+
+This is a product direction note. See [Project highlights](../PROJECT-STATUS.md) for implemented features.
 
 ## Goal
 
-Turn each query result into an inspectable analysis object.
+Make each query result easy to inspect, save, and use in further analysis.
 
-## Result experience
+## Result details
 
-A result can carry:
+A result can keep its column types, exact values, row and byte counts, execution identity, query ID, source SQL, and parameters.
 
-- ClickHouse column types;
-- exact values;
-- row and byte metadata;
-- execution identity;
-- query ID;
-- freshness;
-- source SQL;
-- parameters;
-- retention information.
+It can also show when the data was produced and how long it will be kept. These details help users judge whether the result is still useful.
 
 ## Table workflow
 
-The table experience supports:
+Useful table tools include pages, filters, sorting where appropriate, statistics, CSV export, and a JSON view.
 
-- pagination;
-- filtering;
-- sorting where appropriate;
-- statistics;
-- CSV export;
-- JSON inspection;
-- column-aware interactions;
-- child-query creation.
+Actions on columns or cells can create a follow-up query. The new query should keep a link to the result that started it.
 
 ## Visualization workflow
 
-Charts can build directly from retained result data.
+Charts can use saved result data directly. Useful options include automatic chart suggestions and line, bar, area, scatter, and other chart types.
 
-Useful capabilities include:
-
-- automatic chart suggestions;
-- line, bar, area, scatter, and other chart types;
-- click-to-filter child queries;
-- saved chart configuration;
-- published snapshots;
-- source lineage.
+Clicking a chart can create a filtered follow-up query. Saved chart settings and published snapshots should keep links to the original SQL and run.
 
 ## Performance insight
 
-Result views can connect naturally to:
+A result view can connect to query profiles, `EXPLAIN INDEXES`, `EXPLAIN PLAN`, `EXPLAIN PIPELINE`, and comparisons with earlier runs.
 
-- query profile information;
-- EXPLAIN INDEXES;
-- EXPLAIN PLAN;
-- EXPLAIN PIPELINE;
-- query history comparisons.
-
-This keeps the answer and the execution story together.
+This lets users inspect both the answer and how ClickHouse produced it.
 
 ## Product direction
 
-A mature result object can become a reusable building block for dashboards, reports, monitors, and collaborative analysis while preserving its source SQL and execution evidence.
+Saved results could support dashboards, reports, monitors, and shared analysis. Each use should preserve the source SQL and run details.

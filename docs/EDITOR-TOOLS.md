@@ -1,54 +1,43 @@
 # SQL editing tools
 
-ClickStudio includes focused editing tools that make multi-statement ClickHouse work fast and predictable.
+Use these tools to move through a SQL script, insert common query patterns, and complete names while typing.
 
 ## Query navigation
 
-The numbered query navigator previews each SQL statement.
+The numbered query navigator shows a preview of each SQL statement.
 
-- **Previous / next** moves between statements.
-- **Alt+PageUp / Alt+PageDown** provides keyboard navigation.
-- **Select query** selects the current statement for the existing run-selection workflow.
+- Choose **Previous / next**, or press **Alt+PageUp / Alt+PageDown**, to move between statements.
+- Choose **Select query** to select the current statement. You can then use the run-selection action.
 
-Statement boundaries use the same lexer as execution, including comments, escaped quotes, and heredocs. The outline updates with document edits so navigation stays aligned with the current SQL.
+Navigation and query execution use the same lexer: the code that recognizes SQL text and statement boundaries. It handles comments, escaped quotes, and heredocs, which are strings written between matching delimiter markers.
+
+The outline updates when you edit the document, so its statement locations stay aligned with the SQL.
 
 ## ClickHouse snippets
 
-Choose a snippet and press **Add query** to append a ready-to-edit ClickHouse pattern.
+A snippet is a query template that you can edit. Choose a snippet and press **Add query** to add it to the end of the document.
 
-The included templates cover:
+The templates include hourly counts, top values, P50/P95/P99 percentiles, the latest value per key with `argMax`, conditional counts, and `EXPLAIN indexes = 1`. A percentile describes a value's position in a distribution; for example, P50 is the median.
 
-- hourly counts;
-- top values;
-- P50/P95/P99;
-- latest value per key with `argMax`;
-- conditional counts;
-- `EXPLAIN indexes = 1`.
+Press **Tab / Shift+Tab** to move between placeholder fields. When a placeholder appears more than once, changing one copy updates the linked copies. The editor's normal undo action also works with snippet insertion.
 
-Placeholder fields support **Tab / Shift+Tab**, repeated placeholders stay linked, and standard editor undo integrates naturally with snippet insertion.
-
-The same templates appear in autocomplete under their `ch_` prefixes.
+The same templates appear in autocomplete with names that start with `ch_`.
 
 ## Completion
 
-Autocomplete combines:
+Autocomplete suggests SQL keywords, ClickHouse functions, schema names and types, function descriptions, table aliases, and tables with database-qualified names.
 
-- SQL keywords;
-- ClickHouse functions;
-- typed schema hints;
-- function descriptions;
-- table aliases;
-- database-qualified tables.
+For example, typing `e.` offers columns from the table with alias `e`. Typing `database.` offers tables from that database.
 
-Typing an alias such as `e.` offers columns from the matching table. Typing `database.` offers tables from that database.
-
-Suggestions respect quoted identifiers, comments, strings, and the current statement.
+Suggestions account for quoted names, comments, strings, and the statement you are editing.
 
 ## Sample and live workflows
 
-The deterministic sample workspace is ideal for exploring the editing experience. A live ClickHouse connection adds real query evaluation with the same editor tools.
+Use the sample workspace to try these tools with fixed example responses. Connect to a live ClickHouse server to run real SQL with the same editor tools.
 
 ## Validation
+
+From the repository root, run:
 
 ```sh
 cd clickstudio
@@ -57,4 +46,4 @@ npm run typecheck
 npm run test:e2e -- tests/e2e/editor-tools.spec.ts
 ```
 
-Coverage includes statement boundaries, snippet insertion, placeholder navigation, alias extraction, completion offsets, large-schema matching, keyboard navigation, undo, and keyword completion.
+The tests cover statement boundaries, snippet insertion, placeholder navigation, aliases, completion positions, large schemas, keyboard navigation, undo, and keyword completion.

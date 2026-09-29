@@ -1,45 +1,58 @@
 # Project highlights
 
-ClickStudio is a local-first ClickHouse SQL editor built as an interview project. It focuses on a rich SQL workflow, ClickHouse-specific behavior, and clear execution evidence.
+ClickStudio is a ClickHouse SQL editor built as an interview project. It is designed to run locally. It focuses on useful SQL workflows, ClickHouse-specific tools, and clear records of query execution.
 
 ## Implemented capabilities
 
-- Read-only query execution with server-side limits and query IDs.
-- Multi-statement scripts with statement-level results.
-- CodeMirror SQL editing, formatting, validation, parameters, tabs, and recovery.
-- Schema and object exploration, including ClickHouse system-table documentation.
-- Typed results, filtering, export, charts, and retained query history.
-- ClickHouse-specific EXPLAIN INDEXES, EXPLAIN PLAN, EXPLAIN PIPELINE, and EXPLAIN ANALYZE views.
-- MergeTree active/inactive part explorer with a horizontal partition map, treemap, and circle-pack layouts.
-- CSV, JSON, and NDJSON import with preview, mapping, a dedicated writer, and explicit confirmation.
-- Saved query revisions and bounded published snapshots.
-- Optional assistant proposals with review, apply, and run steps.
-- Deterministic sample mode for fast UI exploration.
-- Unit, workspace, browser, and live ClickHouse integration coverage.
+### Write and run queries
+
+Run read-only queries with server-side limits and query IDs. Run multi-statement scripts and inspect a separate result for each statement.
+
+The CodeMirror editor supports formatting, validation, parameters, tabs, and recovery of workspace state.
+
+### Explore data and performance
+
+Browse schemas and database objects, including ClickHouse system-table documentation. View typed results, filter data, export results, build charts, and revisit saved query history.
+
+Use **EXPLAIN INDEXES**, **EXPLAIN PLAN**, **EXPLAIN PIPELINE**, and **EXPLAIN ANALYZE** views. Runtime analysis requires a server that supports it.
+
+Inspect active and inactive MergeTree parts in a horizontal partition map, treemap, or circle layout.
+
+### Import and save work
+
+Import CSV, JSON, or NDJSON with a preview, column mapping, and explicit confirmation. Imports use a separate database user with write permissions.
+
+Save query revisions and publish result snapshots with size limits. Optional assistant suggestions have separate review, apply, and run steps.
+
+### Try and test the app
+
+Sample mode uses fixed example responses for a repeatable tour of the interface. The project has unit, workspace, browser, and live ClickHouse integration tests.
 
 ## Technical focus
 
-The most interesting areas to inspect are:
+The main areas to review are:
 
-1. server-mediated database execution;
-2. execution-scoped retained results;
-3. exact ClickHouse numeric handling across the JavaScript boundary;
-4. ClickHouse-native permission layering;
-5. deterministic fixture architecture;
-6. structured EXPLAIN graph views;
-7. lightweight local persistence;
-8. layered validation from unit tests through live ClickHouse integration.
+1. Queries go through the server rather than directly from the browser to the database.
+2. Saved results belong to a specific query run.
+3. Exact ClickHouse numbers keep their precision when passed to JavaScript.
+4. ClickHouse permissions enforce database access.
+5. Fixed sample responses support repeatable tests.
+6. EXPLAIN output becomes interactive graphs while raw output remains available.
+7. Local file storage keeps setup simple.
+8. Tests cover individual functions, browser workflows, and live database integration.
 
-See [Engineering choices](ENGINEERING-NOTES.md) for the reasoning behind these areas.
+See [Engineering choices](ENGINEERING-NOTES.md) for the reasons behind these decisions.
 
 ## Product shape
 
-The project currently uses a local-first, single-owner architecture with lightweight persistence and explicit connection configuration.
+The current app is designed for one owner and local use. It uses lightweight storage and explicitly configured connections.
 
-That shape keeps setup simple and makes the core SQL workflow easy to evaluate. The architecture also provides clear extension points for shared persistence, organization-level authorization, managed connections, and larger-result workflows.
+This keeps setup simple and makes the main SQL workflow easy to review. Shared storage, organization-level permissions, managed connections, and larger-result workflows are possible future extensions.
+
+The [product exploration notes](product-roadmap/) describe ideas for future work. They are separate from the implemented features above.
 
 ## Running and validating
 
-Start with the [repository README](../README.md). The [setup and implementation reference](CLICKSTUDIO.md) contains detailed behavior and configuration.
+Start with the [repository README](../README.md). Use the [setup and implementation reference](CLICKSTUDIO.md) for detailed behavior and configuration.
 
-The GitHub Actions workflow at [`.github/workflows/clickstudio.yml`](../.github/workflows/clickstudio.yml) runs the project quality and integration checks.
+The GitHub Actions workflow at [`.github/workflows/clickstudio.yml`](../.github/workflows/clickstudio.yml) runs the project's quality and integration checks.

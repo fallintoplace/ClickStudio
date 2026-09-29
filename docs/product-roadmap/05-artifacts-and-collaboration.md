@@ -1,58 +1,37 @@
-# Artifacts and collaboration direction
+# Saved analysis and collaboration
+
+This is a product direction note. See [Project highlights](../PROJECT-STATUS.md) for implemented features.
 
 ## Goal
 
-Make useful analysis easy to save, revisit, publish, and build upon.
+Make useful analysis easy to save, revisit, publish, and extend.
 
 ## Core artifact model
 
-ClickStudio can treat these as connected artifacts:
+An artifact is a saved item of work. Examples include query documents, revisions, runs, results, charts, publications, shared links, metric definitions, and monitors.
 
-- query documents;
-- revisions;
-- runs;
-- retained results;
-- charts;
-- publications;
-- shared links;
-- metric definitions;
-- monitors.
-
-Each artifact can retain lineage back to its source SQL and execution.
+Each item can keep a link to its source SQL and query run. A revision is a saved version of a document. A metric definition describes how a measure is calculated.
 
 ## Revision workflow
 
-A document can move through:
+A document can move through these stages:
 
-1. local editing;
-2. saved revision;
-3. executed evidence;
-4. published snapshot;
-5. shared view.
+1. Edit a local draft.
+2. Save a revision.
+3. Run the SQL and keep the run details.
+4. Publish a snapshot of the result.
+5. Share a view of that snapshot.
 
-This gives users a clear path from exploration to reusable analysis.
+A snapshot is a saved copy, not a live draft. These separate stages make it clear what another person will see.
 
 ## Collaboration direction
 
-Future collaboration can build on:
-
-- owners and editors;
-- comments;
-- revision history;
-- collections;
-- verification states;
-- shared result views;
-- reusable datasets;
-- schedules and monitors.
+Future collaboration could add owner and editor roles, comments, revision history, collections, review states, shared result views, reusable datasets, schedules, and monitors.
 
 ## Lineage
 
-References between artifacts can remain visible so a reviewer can move from a chart or published answer back to:
+Lineage means the links from a saved item back to the work that produced it.
 
-- the query;
-- the parameters;
-- the run;
-- the result snapshot;
-- the connection context.
+From a chart or published answer, a reviewer should be able to find the query, parameters, run, result snapshot, and connection details.
 
-That lineage makes collaboration feel grounded and reproducible.
+These links make shared analysis easier to check and repeat.

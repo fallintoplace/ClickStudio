@@ -1,8 +1,14 @@
 # Map data
 
-The map background uses Natural Earth 1:50m Admin 0 countries:
+The map background uses country boundaries from Natural Earth's **1:50m Admin 0 countries** dataset. Here, `1:50m` means a scale of 1:50 million, and `Admin 0` means country-level boundaries.
 
-- Source: https://github.com/nvkelso/natural-earth-vector/blob/master/geojson/ne_50m_admin_0_countries.geojson
-- Data terms: https://www.naturalearthdata.com/about/terms-of-use/
+## Source
 
-The checked-in GeoJSON keeps each country's English name and geometry, with coordinates rounded to four decimal places. It is served locally from `public/geo/countries-50m.geojson`.
+- [Original GeoJSON file](https://github.com/nvkelso/natural-earth-vector/blob/master/geojson/ne_50m_admin_0_countries.geojson)
+- [Data terms of use](https://www.naturalearthdata.com/about/terms-of-use/)
+
+## Local file
+
+The repository includes a copy at [`clickstudio/web/public/geo/countries-50m.geojson`](public/geo/countries-50m.geojson). The app serves this local file.
+
+GeoJSON is a JSON format for geographic data. This copy keeps each country's English name and shape. Coordinates are rounded to four decimal places.

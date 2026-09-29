@@ -1,54 +1,39 @@
-# OpenAI copilot direction
+# AI assistant direction
+
+This is a product direction note. See [Project highlights](../PROJECT-STATUS.md) for implemented features.
 
 ## Goal
 
-Add reviewable AI assistance directly to the SQL workflow.
+Add AI help to the SQL workflow while keeping suggestions easy to review.
 
 ## Core actions
 
-The assistant can help with:
-
-- generating SQL;
-- explaining SQL;
-- repairing SQL;
-- reviewing a draft;
-- analyzing a result;
-- suggesting performance improvements;
-- proposing chart ideas.
+The assistant can help users generate, explain, repair, and review SQL. It can also help analyze results, suggest performance improvements, and propose charts.
 
 ## Context
 
-Useful context can include:
+Context is the information sent with the request. Useful context can include current SQL, selected schema objects, ClickHouse metadata, saved results, run details, query plans, and screenshots selected by the user.
 
-- current SQL;
-- selected schema objects;
-- ClickHouse metadata;
-- retained results;
-- execution evidence;
-- query plans;
-- user-selected screenshots.
-
-The UI can show the prepared context so the user sees what shaped the response.
+The interface should show this information so the user can see what the assistant used.
 
 ## Proposal workflow
 
-A strong interaction model is:
+Keep these steps separate:
 
-**inspect context → generate proposal → review → apply → run**
+1. Inspect the prepared context.
+2. Generate a proposal.
+3. Review it.
+4. Apply it to the editor.
+5. Run the SQL.
 
-This keeps the assistant connected to the editor and preserves user control over the final SQL.
+This keeps the user in control of the final query.
 
 ## Quality signals
 
-Proposal quality can use:
+Quality checks can look at whether the proposal uses known tables and columns, stays read-only, and follows the expected output for its task.
 
-- schema grounding;
-- read-only SQL checks;
-- playbook contracts;
-- semantic heuristics;
-- deterministic evaluation cases;
-- retained decision history.
+Reusable task instructions are called playbooks. Checks can also use rules that estimate whether SQL matches the request, fixed test cases, and saved records of earlier decisions. These checks are useful signals, not proof that an answer is correct.
 
 ## Product direction
 
-The same architecture can support richer playbooks for query optimization, import guidance, result explanation, documentation lookup, and investigation workflows.
+More playbooks could help with query optimization, import guidance, result explanations, documentation lookup, and investigations.

@@ -1,44 +1,27 @@
-# Voice and image direction
+# Voice and image input
+
+This is a product direction note. See [Project highlights](../PROJECT-STATUS.md) for implemented features.
 
 ## Goal
 
-Extend the SQL workspace with visual and conversational inputs.
+Let users work with the SQL workspace through images and voice as well as text.
 
 ## Image workflows
 
-Useful image inputs include:
+Useful inputs could include screenshots of queries, ClickHouse errors, charts, or dashboards, plus schema diagrams.
 
-- query screenshots;
-- ClickHouse errors;
-- schema diagrams;
-- existing charts;
-- dashboard screenshots.
-
-The assistant can use the image alongside SQL and schema context to propose an explanation or next step.
+The assistant could use an image together with SQL and schema details to suggest an explanation or a next step.
 
 ## Voice workflows
 
-Voice can provide a fast path for:
-
-- asking a data question;
-- changing a filter;
-- explaining a result;
-- navigating an investigation;
-- summarizing execution evidence.
+Voice could help a user ask a data question, change a filter, request a result explanation, move through an investigation, or summarize a query run.
 
 ## Shared workflow
 
-Image, voice, and text can all feed the same product primitives:
+Image, voice, and text should use the same underlying tools: schema context, SQL proposals, saved results, query execution, charts, and saved revisions.
 
-- schema context;
-- SQL proposals;
-- result artifacts;
-- query execution;
-- charts;
-- saved revisions.
-
-This keeps multimodal interaction consistent with the rest of ClickStudio.
+This keeps the workflow consistent regardless of how the user provides input.
 
 ## Product direction
 
-Multimodal input can become a convenient front door to the same transparent SQL workflow rather than a separate product surface.
+Voice and images could be another way to start the same inspectable SQL workflow. They should not require a separate workspace.

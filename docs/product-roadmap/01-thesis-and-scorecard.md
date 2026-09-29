@@ -1,78 +1,58 @@
-# Product thesis
+# Product goal and success measures
+
+This is a product direction note. See [Project highlights](../PROJECT-STATUS.md) for implemented features.
 
 ## Vision
 
-Build a **ClickHouse-aware SQL workspace** where query execution, results, performance insight, and assistance stay connected.
+Build a SQL workspace designed for ClickHouse. Keep queries, results, performance information, and assistant suggestions connected.
 
-The product promise is:
+The product goal is:
 
-> From question to ClickHouse insight, every step is fast, explainable, and reproducible.
+> Go from a question to a useful ClickHouse result. Understand each step and keep enough information to repeat the analysis.
 
 ## Product character
 
-ClickStudio combines:
+The workspace should combine a fast editor with clear query history, interactive plans, performance measurements, and results that users can save and reuse.
 
-- a fast SQL editor;
-- ClickHouse-native execution insight;
-- reusable result artifacts;
-- clear query history;
-- interactive plans and profiles;
-- reviewable AI assistance;
-- strong keyboard-driven workflows.
+Users should be able to review AI suggestions before applying them and use the keyboard for common actions. The interface should start simply and reveal more detailed tools when needed.
 
-The experience starts simply and reveals more depth as the user needs it.
+## Primary user
 
-## Hero user
+The main user is a technical analyst or data engineer who needs to:
 
-The primary user is a technical analyst or data engineer moving between:
-
-1. writing SQL;
-2. running it;
-3. inspecting results;
-4. understanding execution;
-5. improving the query;
-6. saving or sharing the analysis.
+1. Write SQL.
+2. Run it.
+3. Inspect the results.
+4. Understand how the query ran.
+5. Improve the query.
+6. Save or share the analysis.
 
 ## Technology direction
 
-The current stack supports that workflow directly:
+The current technology stack supports this workflow:
 
-- React + TypeScript + Vite;
-- Click UI + Tailwind CSS;
-- CodeMirror 6;
-- Express 5;
-- TanStack Query;
-- ECharts;
-- `@clickhouse/client`;
-- OpenAI SDK;
-- OpenTelemetry;
-- Docker Compose;
-- Playwright and unit tests.
+| Technology | Main role |
+| --- | --- |
+| React, TypeScript, and Vite | Build and develop the web interface. |
+| Click UI and Tailwind CSS | Provide interface components and styling. |
+| CodeMirror 6 | Edit SQL. |
+| Express 5 | Handle server API requests. |
+| TanStack Query | Manage data requests in the interface. |
+| ECharts | Draw charts. |
+| `@clickhouse/client` | Connect the server to ClickHouse. |
+| OpenAI SDK | Call the optional AI model. |
+| OpenTelemetry | Record diagnostic traces. |
+| Docker Compose | Run the local services. |
+| Playwright and unit tests | Check browser workflows and individual parts of the app. |
 
 ## ClickHouse-native advantage
 
-ClickStudio can build directly on ClickHouse capabilities such as:
+ClickStudio can use ClickHouse features directly: `system.databases`, `system.tables`, `system.columns`, query IDs, live progress, cancellation, query history, and server documentation.
 
-- `system.databases`, `system.tables`, and `system.columns`;
-- explicit query IDs;
-- live progress;
-- cancellation;
-- query history;
-- `EXPLAIN INDEXES`;
-- `EXPLAIN PLAN`;
-- `EXPLAIN PIPELINE`;
-- server documentation and metadata.
-
-This keeps the product deeply connected to ClickHouse rather than treating it as a generic SQL endpoint.
+`EXPLAIN INDEXES`, `EXPLAIN PLAN`, and `EXPLAIN PIPELINE` can help users understand how ClickHouse processes a query. This gives the app more useful database detail than a generic SQL connection alone.
 
 ## Success signals
 
-A strong ClickStudio experience makes these moments feel effortless:
+A useful experience should make it easy to write the first query, understand its columns and values, and turn its result into a chart or follow-up query.
 
-- opening a workspace and reaching useful SQL quickly;
-- understanding the result shape immediately;
-- moving from result to chart or follow-up query;
-- understanding why ClickHouse chose a plan;
-- comparing execution evidence across runs;
-- reviewing an assistant proposal with full context;
-- reopening an analysis with its SQL and evidence intact.
+Users should also be able to understand a plan, compare saved run details, review an assistant suggestion with its context, and reopen an analysis with its SQL and run details intact.

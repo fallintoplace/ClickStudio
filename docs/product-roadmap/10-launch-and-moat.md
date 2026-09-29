@@ -1,84 +1,52 @@
 # Product growth direction
 
+This is a product direction note. See [Project highlights](../PROJECT-STATUS.md) for implemented features.
+
 ## Memorable workflow
 
-A strong ClickStudio story is:
+The main workflow is:
 
-> Investigate a ClickHouse result, understand the execution evidence, improve the query, and share the analysis.
+> Inspect a ClickHouse result, understand how the query ran, improve the query, and share the analysis.
 
 ## Differentiators
 
 ### ClickHouse-native performance insight
 
-Bring together:
-
-- EXPLAIN output;
-- index pruning;
-- processor topology;
-- rows and bytes read;
-- query IDs;
-- execution history;
-- before-and-after comparisons.
+Bring EXPLAIN output together with information about skipped data, connected processing stages, rows and bytes read, query IDs, history, and before-and-after comparisons.
 
 ### Excellent SQL workspace
 
-Combine:
-
-- file-like tabs;
-- schema exploration;
-- command palette;
-- completion;
-- snippets;
-- query history;
-- charts;
-- saved revisions;
-- documentation.
+Keep tabs, schema browsing, a searchable command menu, autocomplete, snippets, history, charts, saved revisions, and documentation in one workspace.
 
 ### Reviewable assistance
 
-Keep assistant proposals connected to:
-
-- source SQL;
-- schema context;
-- result evidence;
-- playbooks;
-- quality signals;
-- explicit apply and run actions.
+Connect each assistant proposal to its source SQL, schema details, result data, task instructions, and quality checks. Keep **Apply** and **Run** as explicit user actions.
 
 ### Reusable analysis
 
-Let query documents grow into:
-
-- published snapshots;
-- charts;
-- metric definitions;
-- shared views;
-- reusable datasets;
-- monitors.
+Let query documents support published snapshots, charts, metric definitions, shared views, reusable datasets, and monitors.
 
 ### Local and cloud-friendly operation
 
-Keep local setup excellent while adding smooth connection paths for ClickHouse Cloud and remote servers.
+Keep local setup simple. Add convenient connection options for ClickHouse Cloud and remote servers.
 
 ## Release path
 
-1. **Core workspace** - SQL, results, charts, scripts, imports.
-2. **ClickHouse intelligence** - schema tools, EXPLAIN views, history, evidence.
-3. **Assisted analysis** - reviewable AI proposals and result explanation.
-4. **Reusable artifacts** - publications, sharing, metric definitions, lineage.
-5. **Connected workflows** - monitors, richer observability, collaboration.
-6. **Platform growth** - organization policy, managed connections, shared persistence.
+This is a possible order for development, not a dated release commitment:
+
+1. **Core workspace:** SQL, results, charts, scripts, and imports.
+2. **ClickHouse tools:** schema tools, EXPLAIN views, history, and run details.
+3. **Assisted analysis:** reviewable AI proposals and result explanations.
+4. **Reusable work:** publications, sharing, metric definitions, and links to source runs.
+5. **Connected workflows:** monitors, diagnostic tools, and collaboration.
+6. **Team operation:** organization policies, managed connections, and shared storage.
 
 ## Success signals
 
-Useful measures include:
+Useful measures include the time needed to get a first useful result, understand a query plan, and reopen saved work.
 
-- time to first useful result;
-- time to understand a query plan;
-- speed of reopening saved work;
-- percentage of shared results with source SQL and query ID;
-- quality of accepted assistant proposals;
-- ease of navigating between query, result, chart, and evidence;
-- successful reuse of saved analysis.
+Other measures include the share of shared results with source SQL and a query ID, the quality of accepted assistant proposals, and how easily users move between queries, results, charts, and run details.
 
-The long-term advantage comes from keeping ClickHouse execution truth, workspace ergonomics, and reviewable assistance in one coherent product.
+Repeated use of saved analysis is another useful signal.
+
+The long-term advantage should come from combining accurate ClickHouse execution details, an easy-to-use SQL workspace, and assistant suggestions that users can inspect.

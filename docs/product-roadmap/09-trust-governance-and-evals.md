@@ -1,49 +1,33 @@
-# Trust, governance, and evaluation direction
+# Trust, permissions, and quality checks
+
+This is a product direction note. See [Project highlights](../PROJECT-STATUS.md) for implemented features.
 
 ## Goal
 
-Make execution, assistance, and sharing easy to inspect and govern.
+Make queries, assistant actions, and sharing easy to inspect and manage.
 
 ## Execution trust
 
-Useful signals include:
+Useful run details include query IDs, connection identity, server-side limits, SQL, parameters, the age of a result, links to saved revisions, and query tags.
 
-- explicit query IDs;
-- connection identity;
-- server-side limits;
-- SQL and parameters;
-- result freshness;
-- revision lineage;
-- query tags.
+These details help explain which data and settings produced an answer.
 
 ## Assistant governance
 
-Assistant workflows can expose:
+Governance means rules and records for how the assistant is used. A workflow can show the prepared context, requested model action, proposal details, quality-check results, apply decisions, and playbook version.
 
-- prepared context;
-- model action;
-- proposal metadata;
-- evaluation results;
-- apply decisions;
-- playbook version.
+A playbook is a reusable set of task instructions. Recording its version helps explain which instructions shaped a proposal.
 
-Sensitive-column configuration and server-owned credentials keep data handling easy to reason about.
+Configuration for sensitive columns and credentials kept on the server can make data handling easier to understand and control.
 
 ## Evaluation
 
-A repeatable evaluation suite can cover:
+Evaluation means testing behavior with repeatable cases. A test suite can check whether the assistant uses known tables and columns, generates or repairs SQL, explains results, gives performance guidance, and reviews a draft as expected.
 
-- schema grounding;
-- SQL generation;
-- repair;
-- result explanation;
-- performance guidance;
-- assistant review behavior;
-- ClickHouse-version compatibility;
-- browser workflows.
+It can also test ClickHouse-version compatibility and browser workflows.
 
 ## Product direction
 
-These signals can grow into organization policies, audit views, approval workflows, richer observability, and team-level quality dashboards.
+Future work could add organization policies, audit views, approval steps, more diagnostic information, and team dashboards for quality results.
 
-The core principle is simple: important actions carry enough context to explain what happened and reproduce it.
+Important actions should keep enough context to explain what happened and repeat the work.
