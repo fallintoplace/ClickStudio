@@ -8,6 +8,24 @@ Each saved run keeps its SQL, parameters, limits, and results together. Reopen a
 
 The app uses React, Click UI, and CodeMirror. The server sets limits for query time, memory, and result size.
 
+## How ClickStudio meets the assignment
+
+### 1. Run a query and display its results
+
+Choose a data source, write one SQL statement, and select **Run**. ClickStudio runs it on the selected ClickHouse connection and shows its status. When it finishes, the **Results** table shows the returned rows, column names, and ClickHouse data types. You can move through result pages and reopen a saved run with its SQL, parameters, limits, and results.
+
+### 2. Display a chart from query results
+
+After a query runs, select **Chart** beside **Results**. ClickStudio uses the rows from that run and suggests a chart based on the result columns. You can choose a number, line, bar, scatter, heatmap, or candlestick chart, then adjust its axes, measures, and groups. The chart uses the returned data and does not send another query. Results without numeric measures can show row counts; the table stays available beside the chart.
+
+### 3. Run a SQL script and display each result
+
+Write several SQL statements in the editor and select **Run**. ClickStudio splits the script into statements and runs them in order, up to 50 statements per script. **Results** shows each statement's status. Select a completed statement to view its own query result. By default, the script stops after the first statement fails. Script execution is available when the selected connection supports it.
+
+### Bonus: Insert rows from a file
+
+Choose **Import** and select a CSV, JSON, NDJSON, or JSONL data file, up to 2 MB and 10,000 rows. Preview the rows, choose an existing table, map or skip columns, and review the row and column summary before selecting **Import rows**. For ClickHouse Cloud, you can also create a MergeTree table and set its column types. ClickHouse checks the permissions for the selected operation. In the hosted sample workspace, imported rows stay in the browser's `demo.interview_imports` dataset.
+
 ## Explore ClickStudio
 
 ![ClickStudio workspace with an SQL editor, query results, and AI panel](docs/images/clickstudio-workspace.png)
