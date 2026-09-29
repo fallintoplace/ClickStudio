@@ -58,7 +58,8 @@
     }
 
     /* Unified ClickHouse object explorer */
-    .object-explorer-section { --explorer-signal: var(--signal-accent); position: relative; isolation: isolate; display: flex; height: 100%; min-height: 0; flex-direction: column; gap: 8px; overflow: hidden; padding: 10px; background: var(--panel); }
+    .object-explorer-section { --explorer-signal: var(--signal-accent); --explorer-database: var(--explorer-signal); --explorer-table: #79baff; --explorer-view: #c39aff; --explorer-column: #69dfbd; --explorer-dictionary: #ffbf68; --explorer-projection: #f28dca; --explorer-index: #ff8d80; --explorer-tree-surface-start: #1a3545; --explorer-tree-surface-end: #222d43; --explorer-tree-border: color-mix(in srgb, var(--explorer-table) 30%, var(--line)); --explorer-tree-shadow: inset 0 1px #ffffff10, 0 8px 22px #0000001c; position: relative; isolation: isolate; display: flex; height: 100%; min-height: 0; flex-direction: column; gap: 8px; overflow: hidden; padding: 10px; background: var(--panel); }
+    :root[data-theme="click-light"] .object-explorer-section { --explorer-table: #286da8; --explorer-view: #72459e; --explorer-column: #19785d; --explorer-dictionary: #9b5700; --explorer-projection: #a43875; --explorer-index: #a84238; --explorer-tree-surface-start: #e5f3f8; --explorer-tree-surface-end: #f0ebfa; --explorer-tree-border: #b9cfdb; --explorer-tree-shadow: inset 0 1px #ffffffc2, 0 8px 22px #243c5018; }
     .object-explorer-action-bar { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: 6px; }
     .object-explorer-action-bar .toolbar-small { min-width: 0; flex: 0 0 auto; justify-content: center; gap: 6px; }
     .object-explorer-action-bar .object-create-table-action { flex: 1 1 auto; }
@@ -83,28 +84,35 @@
     .object-heading .object-refresh-action svg { width: 15px; height: 15px; }
     .object-heading .object-refresh-action.is-loading svg { animation: object-refresh-turn .9s linear infinite; }
     @keyframes object-refresh-turn { to { transform: rotate(360deg); } }
-    .object-tree-scroll { min-height: 150px; flex: 1; overflow: auto; padding: 2px 2px 8px; border: 0; border-radius: 0; background: transparent; box-shadow: none; scrollbar-color: var(--scrollbar-thumb) transparent; scrollbar-gutter: stable; }
+    .object-tree-scroll { min-height: 150px; flex: 1; overflow: auto; padding: 6px 6px 10px; border: 1px solid var(--explorer-tree-border); border-radius: 13px; background: radial-gradient(ellipse at 5% 0%, color-mix(in srgb, var(--explorer-table) 15%, transparent), transparent 42%), radial-gradient(ellipse at 98% 22%, color-mix(in srgb, var(--explorer-view) 13%, transparent), transparent 40%), linear-gradient(145deg, var(--explorer-tree-surface-start), var(--explorer-tree-surface-end)); box-shadow: var(--explorer-tree-shadow); scrollbar-color: var(--scrollbar-thumb) transparent; scrollbar-gutter: stable; }
     .object-tree { display: grid; gap: 1px; min-width: 0; }
     .object-tree-branch { min-width: 0; }
-    .object-tree-row { position: relative; display: flex; min-width: 0; min-height: 33px; align-items: center; padding-left: var(--tree-indent, 0px); border: 1px solid transparent; border-radius: 6px; color: var(--text-soft); transition: background .14s ease, color .14s ease; }
-    .object-tree-row:hover, .object-tree-row:focus-within { border-color: transparent; background: color-mix(in srgb, var(--text) 4%, transparent); color: var(--text); }
-    .object-tree-row.is-selected { border-color: transparent; background: color-mix(in srgb, var(--explorer-signal) 8%, var(--panel-raised)); color: var(--text); box-shadow: inset 2px 0 var(--explorer-signal); }
-    .object-tree-row[aria-level]:not([aria-level="1"])::before { position: absolute; z-index: 0; top: -1px; bottom: -1px; left: calc(var(--tree-indent, 0px) + 3px); border-left: 1px solid color-mix(in srgb, var(--line-bright) 54%, transparent); content: ""; pointer-events: none; }
-    .object-tree-row[aria-level]:not([aria-level="1"])::after { position: absolute; z-index: 0; top: 50%; left: calc(var(--tree-indent, 0px) + 3px); width: 6px; height: 1px; background: color-mix(in srgb, var(--line-bright) 54%, transparent); content: ""; pointer-events: none; }
+    .object-tree-row { --tree-kind-color: var(--muted); position: relative; display: flex; min-width: 0; min-height: 33px; align-items: center; padding-left: var(--tree-indent, 0px); border: 1px solid transparent; border-radius: 6px; color: var(--text-soft); transition: background .14s ease, color .14s ease; }
+    .object-tree-row.is-database { --tree-kind-color: var(--explorer-database); }
+    .object-tree-row.is-table { --tree-kind-color: var(--explorer-table); }
+    .object-tree-row.is-view { --tree-kind-color: var(--explorer-view); }
+    .object-tree-row.is-column { --tree-kind-color: var(--explorer-column); }
+    .object-tree-row.is-dictionary { --tree-kind-color: var(--explorer-dictionary); }
+    .object-tree-row.is-projection { --tree-kind-color: var(--explorer-projection); }
+    .object-tree-row.is-index { --tree-kind-color: var(--explorer-index); }
+    .object-tree-row:hover, .object-tree-row:focus-within { border-color: transparent; background: color-mix(in srgb, var(--tree-kind-color) 9%, transparent); color: var(--text); }
+    .object-tree-row.is-selected { border-color: transparent; background: color-mix(in srgb, var(--tree-kind-color) 17%, var(--explorer-tree-surface-start)); color: var(--text); box-shadow: inset 3px 0 var(--tree-kind-color); }
+    .object-tree-row[aria-level]:not([aria-level="1"])::before { position: absolute; z-index: 0; top: -1px; bottom: -1px; left: calc(var(--tree-indent, 0px) + 3px); border-left: 1px solid color-mix(in srgb, var(--tree-kind-color) 26%, transparent); content: ""; pointer-events: none; }
+    .object-tree-row[aria-level]:not([aria-level="1"])::after { position: absolute; z-index: 0; top: 50%; left: calc(var(--tree-indent, 0px) + 3px); width: 6px; height: 1px; background: color-mix(in srgb, var(--tree-kind-color) 30%, transparent); content: ""; pointer-events: none; }
     .object-tree-row > * { position: relative; z-index: 1; }
     .object-tree-row.is-import-highlight { animation: object-import-highlight 2.2s ease-out both; }
     @keyframes object-import-highlight {
-        0% { background: color-mix(in srgb, var(--explorer-signal) 17%, var(--panel-raised)); box-shadow: inset 2px 0 var(--explorer-signal); }
-        42% { background: color-mix(in srgb, var(--explorer-signal) 12%, var(--panel-raised)); box-shadow: inset 2px 0 var(--explorer-signal); }
-        100% { background: color-mix(in srgb, var(--explorer-signal) 8%, var(--panel-raised)); box-shadow: inset 2px 0 var(--explorer-signal); }
+        0% { background: color-mix(in srgb, var(--tree-kind-color) 23%, var(--explorer-tree-surface-start)); box-shadow: inset 3px 0 var(--tree-kind-color); }
+        42% { background: color-mix(in srgb, var(--tree-kind-color) 19%, var(--explorer-tree-surface-start)); box-shadow: inset 3px 0 var(--tree-kind-color); }
+        100% { background: color-mix(in srgb, var(--tree-kind-color) 17%, var(--explorer-tree-surface-start)); box-shadow: inset 3px 0 var(--tree-kind-color); }
     }
     @media (prefers-reduced-motion: reduce) {
-        .object-tree-row.is-import-highlight { animation: none; box-shadow: inset 2px 0 var(--explorer-signal); }
+        .object-tree-row.is-import-highlight { animation: none; box-shadow: inset 3px 0 var(--tree-kind-color); }
     }
     .object-tree-row.is-database { margin-top: 2px; font-weight: 650; }
     .object-tree-toggle { display: grid; width: 25px; height: 30px; flex: none; place-items: center; border: 0; border-radius: 5px; background: transparent; color: var(--muted); cursor: pointer; }
     .object-tree-toggle:disabled { cursor: default; opacity: .35; }
-    .object-tree-toggle:not(:disabled):hover { background: color-mix(in srgb, var(--explorer-signal) 8%, transparent); color: var(--explorer-signal); }
+    .object-tree-toggle:not(:disabled):hover { background: color-mix(in srgb, var(--tree-kind-color) 10%, transparent); color: var(--tree-kind-color); }
     .object-tree-toggle:focus-visible { outline: 2px solid var(--focus-color); outline-offset: -2px; }
     .object-tree-toggle > span { display: grid; place-items: center; line-height: 1; }
     .object-tree-toggle > span > svg { width: 13px; height: 13px; transform: rotate(-90deg); transition: transform .16s ease; }
@@ -112,21 +120,19 @@
     .object-tree-spacer { pointer-events: none; }
     .object-tree-main { display: flex; min-width: 0; min-height: 31px; flex: 1; align-items: center; gap: 7px; padding: 2px 5px 2px 1px; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
     .object-tree-main:focus-visible { border-radius: 6px; outline: 2px solid color-mix(in srgb, var(--explorer-signal) 72%, transparent); outline-offset: -2px; }
-    .object-kind-glyph { display: grid; width: 18px; height: 18px; flex: none; place-items: center; border: 0; border-radius: 0; background: transparent; color: var(--muted); box-shadow: none; }
+    .object-kind-glyph { display: grid; width: 18px; height: 18px; flex: none; place-items: center; border: 0; border-radius: 0; background: transparent; color: var(--tree-kind-color); box-shadow: none; }
     .object-kind-glyph > svg { width: 15px; height: 15px; stroke-width: 1.9; }
-    .object-kind-glyph.is-view { color: var(--muted); }
-    .object-kind-glyph.is-database, .object-tree-row.is-selected .object-kind-glyph { color: var(--explorer-signal); }
-    .object-tree-row.is-group:not(.is-database) .object-kind-glyph { width: 18px; height: 18px; color: var(--muted); }
+    .object-tree-row.is-group:not(.is-database) .object-kind-glyph { width: 18px; height: 18px; }
     .object-tree-label { display: grid; min-width: 0; flex: 1; gap: 2px; }
     .object-tree-label strong { overflow: hidden; color: inherit; font-family: var(--font-mono); font-size: 11.5px; font-weight: 580; letter-spacing: -.015em; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
-    .object-tree-row.is-group:not(.is-database) .object-tree-label strong { color: var(--muted); font-family: var(--font-sans); font-size: 9.5px; font-weight: 720; letter-spacing: .09em; text-transform: uppercase; }
+    .object-tree-row.is-group:not(.is-database) .object-tree-label strong { color: color-mix(in srgb, var(--tree-kind-color) 68%, var(--muted)); font-family: var(--font-sans); font-size: 9.5px; font-weight: 720; letter-spacing: .09em; text-transform: uppercase; }
     .object-tree-row.is-database .object-tree-label strong { font-family: var(--font-sans); font-size: 12px; font-weight: 700; letter-spacing: .01em; }
     .object-tree-label small { overflow: hidden; color: var(--muted); font-family: var(--font-mono); font-size: 9.5px; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
-    .object-tree-count { display: inline-flex; min-width: 24px; height: 18px; flex: none; align-items: center; justify-content: center; padding: 0 6px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel-raised); color: var(--text-soft); font-family: var(--font-mono); font-size: 9px; font-variant-numeric: tabular-nums; }
+    .object-tree-count { display: inline-flex; min-width: 24px; height: 18px; flex: none; align-items: center; justify-content: center; padding: 0 6px; border: 1px solid color-mix(in srgb, var(--tree-kind-color) 36%, transparent); border-radius: 999px; background: color-mix(in srgb, var(--tree-kind-color) 11%, var(--explorer-tree-surface-start)); color: var(--tree-kind-color); font-family: var(--font-mono); font-size: 9px; font-variant-numeric: tabular-nums; }
     .object-tree-inline-action { display: grid; width: 25px; height: 25px; flex: none; place-items: center; margin-right: 3px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--muted); opacity: 0; cursor: pointer; transition: opacity .14s ease, border-color .14s ease, background .14s ease, color .14s ease, box-shadow .14s ease; }
     .object-tree-inline-action svg { width: 13px; height: 13px; }
     .object-tree-row:hover .object-tree-inline-action, .object-tree-row:focus-within .object-tree-inline-action, .object-tree-inline-action:focus-visible { opacity: 1; }
-    .object-tree-inline-action:hover, .object-tree-inline-action:focus-visible { border-color: var(--line-bright); background: var(--panel-hover); color: var(--explorer-signal); box-shadow: none; outline: none; }
+    .object-tree-inline-action:hover, .object-tree-inline-action:focus-visible { border-color: color-mix(in srgb, var(--tree-kind-color) 40%, var(--line-bright)); background: color-mix(in srgb, var(--tree-kind-color) 10%, var(--panel-hover)); color: var(--tree-kind-color); box-shadow: none; outline: none; }
     .object-tree-children { min-width: 0; }
     .object-empty-search { display: grid; min-height: 150px; place-items: center; align-content: center; gap: 5px; padding: 18px; border: 1px dashed var(--line-bright); border-radius: 8px; background: var(--panel-raised); color: var(--muted); text-align: center; }
     .object-empty-search strong { color: var(--text-soft); font-size: 10px; }
