@@ -651,7 +651,7 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
         setRecoveryState('checking');
         reportedJobRef.current = undefined;
 
-        if (demoMode && !browserDemoImport && !browserCloudImport) {
+        if ((demoMode && !browserDemoImport && !browserCloudImport) || (connectionId === CLICKHOUSE_CLOUD_CONNECTION_ID && !browserCloudImport)) {
             setRecoveryState('ready');
             setImportUnavailable(importUnavailableReason(connectionId));
             return () => { current = false; controller.abort(); };
