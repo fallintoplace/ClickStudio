@@ -296,7 +296,7 @@ export type ImportWizardControllerOptions = {
 
 function importUnavailableReason(connectionId: string) {
     if (connectionId === 'playground') return 'File imports are disabled on the public read-only ClickHouse Playground connection.';
-    if (connectionId === CLICKHOUSE_CLOUD_CONNECTION_ID) return 'File import is not available for this Cloud connection yet. Use SQL to create tables and insert data.';
+    if (connectionId === CLICKHOUSE_CLOUD_CONNECTION_ID) return 'Reconnect to ClickHouse Cloud before importing rows.';
     return 'File imports are disabled in sample data. This workspace never writes to a database.';
 }
 
@@ -565,7 +565,7 @@ async function runRetryUnknownImport(context: RetryUnknownImportContext) {
 
 export function useImportWizardController({ open, connectionId, trusted, demoMode, onClose, onImported, onTableNeedsInspection }: ImportWizardControllerOptions) {
     const browserDemoImport = demoMode && isFrontendDemoPreview && connectionId === 'demo';
-    const browserCloudImport = demoMode && isFrontendDemoPreview && connectionId === CLICKHOUSE_CLOUD_CONNECTION_ID;
+    const browserCloudImport = connectionId === CLICKHOUSE_CLOUD_CONNECTION_ID && Boolean(getClickHouseCloudConnection());
     const importConnectionId = browserDemoImport ? 'demo' : connectionId;
     const dialogRef = useRef<HTMLDialogElement>(null);
     const onImportedRef = useRef(onImported);
