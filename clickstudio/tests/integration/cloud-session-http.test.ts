@@ -87,6 +87,34 @@ test('Local Cloud connection restores after refresh without returning its passwo
     assert.equal(app.cloudCalls.at(-1)?.credentials?.password, credentials.password);
 });
 
+test('Local Cloud restore skips a stale duplicate cookie before the active session', async (t) => {
+    const app = await start();
+    t.after(() => app.stop());
+    const secondCredentials = { ...credentials, host: 'other.region.provider.clickhouse.cloud:8443' };
+    const connected = await app.call('/cloud/session', { credentials: secondCredentials });
+    const activeCookie = cookieFrom(connected)!;
+    const staleCookie = `${CLOUD_SESSION_COOKIE}=${'A'.repeat(43)}`;
+
+    const refreshed = await app.call('/cloud/session', undefined, { cookie: `${staleCookie}; ${activeCookie}` });
+    const snapshot = await refreshed.json() as { session: { profile: Record<string, unknown> } | null };
+    assert.equal(refreshed.status, 200);
+    assert.equal(snapshot.session?.profile.host, secondCredentials.host);
+});
+
+test('Disconnect revokes every active session in a duplicate cookie', async (t) => {
+    const app = await start();
+    t.after(() => app.stop());
+    const first = await app.call('/cloud/session', { credentials });
+    const second = await app.call('/cloud/session', { credentials: { ...credentials, host: 'other.region.provider.clickhouse.cloud:8443' } });
+    const firstCookie = cookieFrom(first)!;
+    const secondCookie = cookieFrom(second)!;
+
+    const disconnected = await app.call('/cloud/session', undefined, { cookie: `${firstCookie}; ${secondCookie}` }, 'DELETE');
+    assert.equal(disconnected.status, 204);
+    assert.deepEqual(await (await app.call('/cloud/session', undefined, { cookie: firstCookie })).json(), { session: null });
+    assert.deepEqual(await (await app.call('/cloud/session', undefined, { cookie: secondCookie })).json(), { session: null });
+});
+
 test('Disconnect revokes the local Cloud session and expires its cookie', async (t) => {
     const app = await start();
     t.after(() => app.stop());
@@ -136,6 +164,23 @@ test('A replacement Cloud connection invalidates the previous browser cookie onl
     assert.deepEqual(await (await app.call('/cloud/session', undefined, { cookie: firstCookie })).json(), { session: null });
     const restored = await (await app.call('/cloud/session', undefined, { cookie: secondCookie })).json() as { session: { profile: Record<string, unknown> } };
     assert.equal(restored.session.profile.host, secondCredentials.host);
+});
+
+test('Replacing a Cloud connection revokes every session in a duplicate cookie', async (t) => {
+    const app = await start();
+    t.after(() => app.stop());
+    const first = await app.call('/cloud/session', { credentials });
+    const firstCookie = cookieFrom(first)!;
+    const secondCredentials = { ...credentials, host: 'other.region.provider.clickhouse.cloud:8443' };
+    const second = await app.call('/cloud/session', { credentials: secondCredentials });
+    const secondCookie = cookieFrom(second)!;
+    const replacementCredentials = { ...credentials, host: 'third.region.provider.clickhouse.cloud:8443' };
+
+    const replacement = await app.call('/cloud/session', { credentials: replacementCredentials }, { cookie: `${firstCookie}; ${secondCookie}` });
+    const replacementCookie = cookieFrom(replacement)!;
+    assert.deepEqual(await (await app.call('/cloud/session', undefined, { cookie: `${firstCookie}; ${secondCookie}` })).json(), { session: null });
+    const restored = await (await app.call('/cloud/session', undefined, { cookie: replacementCookie })).json() as { session: { profile: Record<string, unknown> } };
+    assert.equal(restored.session.profile.host, replacementCredentials.host);
 });
 
 test('Local Cloud session creation rejects a cross-origin request before testing credentials', async (t) => {
