@@ -5,6 +5,7 @@ import { ImportJobStatus } from './ImportJobStatus';
 import { ImportPreviewTable } from './ImportPreviewTable';
 import { formatImportRowCount, MAX_FILE_BYTES, importSteps } from './import-wizard-model';
 import { useImportWizardController, type ImportWizardControllerOptions } from './useImportWizardController';
+import { Icon } from './ui';
 
 const MAX_QUERY_FILE_BYTES = 200_000;
 
@@ -145,11 +146,15 @@ export function ImportWizard({ onImportQuery, ...controllerProps }: ImportWizard
             </header>
 
             <div role="group" aria-label="Import type" className="import-kind-choice">
-                <button type="button" aria-pressed={importKind === 'rows'} disabled={openingQuery} className={`import-kind-button${importKind === 'rows' ? ' is-selected' : ''}`} onClick={() => setImportKind('rows')}>
-                    <strong>Import rows</strong><small>Add file rows to an existing or new table.</small>
+                <button type="button" aria-pressed={importKind === 'rows'} disabled={openingQuery} className={`import-kind-button is-rows${importKind === 'rows' ? ' is-selected' : ''}`} onClick={() => setImportKind('rows')}>
+                    <span className="import-kind-icon" aria-hidden="true"><Icon name="importFile"/></span>
+                    <span className="import-kind-copy"><strong>Import rows</strong><small>Add file rows to an existing or new table.</small></span>
+                    <span className="import-kind-tag" aria-hidden="true">DATA</span>
                 </button>
-                <button type="button" aria-pressed={importKind === 'query'} disabled={openingQuery} className={`import-kind-button${importKind === 'query' ? ' is-selected' : ''}`} onClick={() => setImportKind('query')}>
-                    <strong>Import query</strong><small>Open a .sql file in a new query tab.</small>
+                <button type="button" aria-pressed={importKind === 'query'} disabled={openingQuery} className={`import-kind-button is-query${importKind === 'query' ? ' is-selected' : ''}`} onClick={() => setImportKind('query')}>
+                    <span className="import-kind-icon" aria-hidden="true"><Icon name="parser"/></span>
+                    <span className="import-kind-copy"><strong>Import query</strong><small>Open a .sql file in a new query tab.</small></span>
+                    <span className="import-kind-tag" aria-hidden="true">SQL</span>
                 </button>
             </div>
 
@@ -165,15 +170,15 @@ export function ImportWizard({ onImportQuery, ...controllerProps }: ImportWizard
                 })}
             </nav>}
 
-            <main key={importKind === 'query' ? 'query' : step} className="import-wizard-main min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-7">
+            <main key={importKind === 'query' ? 'query' : step} className={`import-wizard-main ${importKind === 'query' ? 'is-query' : `is-${step}`} min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-7`}>
                 {importKind === 'query' ? <section aria-label="Import SQL query" className="space-y-4">
                     <div><h3 className="text-sm font-semibold">Open a SQL query file</h3><p className="mt-1 text-xs leading-relaxed text-[var(--text-soft)]">The file opens as a new draft. It will not run until you choose Run.</p></div>
-                    <label className="import-query-picker block rounded-xl border border-dashed border-[var(--line-bright)] bg-[var(--page)] p-5 transition hover:border-[var(--accent)] sm:p-7">
-                        <span className="block text-sm font-semibold">Choose a query file</span>
-                        <span className="mt-1 block text-xs text-[var(--muted)]">SQL · up to 200 KB</span>
-                        <input aria-label="Choose a SQL query file" type="file" accept=".sql,text/plain,application/sql" onChange={event => chooseQueryFile(event.target.files?.[0])} className="mt-4 block w-full cursor-pointer text-xs text-[var(--text-soft)] file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--panel-raised)] file:px-3 file:py-2 file:text-xs file:font-semibold file:text-[var(--text)] hover:file:bg-[var(--panel-hover)]" />
+                    <label className="import-file-picker import-file-picker-query import-query-picker">
+                        <span className="import-file-icon" aria-hidden="true"><Icon name="parser"/></span>
+                        <span className="import-file-copy"><strong>Choose a query file</strong><small>SQL · up to 200 KB</small></span>
+                        <input aria-label="Choose a SQL query file" type="file" accept=".sql,text/plain,application/sql" onChange={event => chooseQueryFile(event.target.files?.[0])} className="import-file-input" />
                     </label>
-                    {queryFile && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--line)] bg-[var(--page)] px-4 py-3 text-xs"><span className="min-w-0 truncate font-medium">{queryFile.name}</span><span className="text-[var(--muted)]">SQL · {(queryFile.size / 1024).toFixed(1)} KB</span></div>}
+                    {queryFile && <div className="import-selected-file flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--line)] bg-[var(--page)] px-4 py-3 text-xs"><span className="min-w-0 truncate font-medium">{queryFile.name}</span><span className="text-[var(--muted)]">SQL · {(queryFile.size / 1024).toFixed(1)} KB</span></div>}
                     {queryFileError && <p role="alert" className="rounded-lg border border-[var(--red)]/30 bg-[var(--red)]/5 px-3 py-2.5 text-xs leading-relaxed text-[var(--red)]">{queryFileError}</p>}
                 </section> : <>
                 {browserDemoImport && <div role="status" className="mb-4 flex items-start gap-3 rounded-xl border border-[var(--accent)]/25 bg-[var(--accent)]/5 p-3 text-xs leading-relaxed text-[var(--text-soft)]"><span className="mt-1 size-2 shrink-0 rounded-full bg-[var(--accent)]"/><span><strong className="text-[var(--text)]">Vercel demo mode.</strong> Your file stays in this browser and is added to <code className="font-mono">demo.interview_imports</code>. Nothing is written to the public ClickHouse Playground.</span></div>}
@@ -186,13 +191,13 @@ export function ImportWizard({ onImportQuery, ...controllerProps }: ImportWizard
 
                 {recoveryState === 'ready' && !importUnavailable && step === 'file' && <section aria-label="Choose and preview a file" className="space-y-4">
                     {!preview ? <>
-                        {browserDemoImport && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--line-bright)] bg-[var(--page)] p-4"><div><strong className="block text-sm">Try a sample import</strong><span className="mt-1 block text-xs text-[var(--muted)]">Six rows of marketing data, ready to preview.</span></div><button type="button" onClick={() => void previewSampleFile()} disabled={Boolean(busy)} className="rounded-lg border border-[var(--line-bright)] px-3 py-2 text-xs font-semibold text-[var(--text)] transition hover:bg-[var(--panel-hover)] disabled:opacity-50">{busy === 'preview' ? 'Loading sample…' : 'Load sample file'}</button></div>}
-                        <label className="block rounded-xl border border-dashed border-[var(--line-bright)] bg-[var(--page)] p-5 transition hover:border-[var(--accent)] sm:p-7">
-                            <span className="block text-sm font-semibold">Choose a data file</span>
-                            <span className="mt-1 block text-xs text-[var(--muted)]">CSV, JSON, NDJSON, or JSONL · up to 2 MB</span>
-                            <input aria-label="Choose a CSV, JSON, or NDJSON file" type="file" accept=".csv,.json,.ndjson,.jsonl,text/csv,application/json" onChange={event => chooseFile(event.target.files?.[0])} className="mt-4 block w-full cursor-pointer text-xs text-[var(--text-soft)] file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--panel-raised)] file:px-3 file:py-2 file:text-xs file:font-semibold file:text-[var(--text)] hover:file:bg-[var(--panel-hover)]" />
+                        {browserDemoImport && <div className="import-sample-card flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--line-bright)] bg-[var(--page)] p-4"><div><strong className="block text-sm">Try a sample import</strong><span className="mt-1 block text-xs text-[var(--muted)]">Six rows of marketing data, ready to preview.</span></div><button type="button" onClick={() => void previewSampleFile()} disabled={Boolean(busy)} className="rounded-lg border border-[var(--line-bright)] px-3 py-2 text-xs font-semibold text-[var(--text)] transition hover:bg-[var(--panel-hover)] disabled:opacity-50">{busy === 'preview' ? 'Loading sample…' : 'Load sample file'}</button></div>}
+                        <label className="import-file-picker import-file-picker-rows">
+                            <span className="import-file-icon" aria-hidden="true"><Icon name="importFile"/></span>
+                            <span className="import-file-copy"><strong>Choose a data file</strong><small>CSV, JSON, NDJSON, or JSONL · up to 2 MB</small></span>
+                            <input aria-label="Choose a CSV, JSON, or NDJSON file" type="file" accept=".csv,.json,.ndjson,.jsonl,text/csv,application/json" onChange={event => chooseFile(event.target.files?.[0])} className="import-file-input" />
                         </label>
-                        {file && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--line)] bg-[var(--page)] px-4 py-3 text-xs"><span className="min-w-0 truncate font-medium">{file.name}</span><span className="text-[var(--muted)]">{format ? format.toUpperCase() : 'Unsupported'} · {(file.size / 1024).toFixed(1)} KB</span></div>}
+                        {file && <div className="import-selected-file flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--line)] bg-[var(--page)] px-4 py-3 text-xs"><span className="min-w-0 truncate font-medium">{file.name}</span><span className="text-[var(--muted)]">{format ? format.toUpperCase() : 'Unsupported'} · {(file.size / 1024).toFixed(1)} KB</span></div>}
                     </> : <>
                         <div className="flex flex-wrap items-start justify-between gap-3">
                             <div><span className="text-xs font-semibold">{preview.name}</span><p className="mt-1 text-[11px] text-[var(--muted)]">{formatImportRowCount(preview.rowCount)} · {preview.columns.length} columns · {preview.format.toUpperCase()}</p></div>
@@ -288,8 +293,13 @@ export function ImportWizard({ onImportQuery, ...controllerProps }: ImportWizard
                 {recoveryState === 'ready' && !importUnavailable && step === 'review' && mapping && preview && <section aria-label="Review import" className="import-review-step space-y-4">
                     <div className="import-ready-card rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-4 sm:p-5">
                         <span className="import-ready-eyebrow text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--muted)]">{browserDemoImport ? 'Ready to save in browser demo' : creatingTable ? 'Ready to create and import' : 'Ready to insert'}</span>
-                        <h3 className="import-ready-title mt-1 text-base font-semibold">{formatImportRowCount(mapping.rowCount)} into <code className="rounded bg-[var(--page)] px-1.5 py-1 font-mono text-sm">{mapping.table}</code></h3>
+                        <h3 className="import-ready-title mt-1 text-base font-semibold">Ready to import into <code className="rounded bg-[var(--page)] px-1.5 py-1 font-mono text-sm">{mapping.table}</code></h3>
                         <p className="mt-2 text-xs leading-relaxed text-[var(--text-soft)]">{browserDemoImport ? 'This adds rows to the Vercel interview sandbox in this browser. It does not write to ClickHouse.' : browserCloudImport ? creatingTable ? 'This creates a MergeTree table in the connected database, then inserts the file rows.' : 'This writes to the selected Cloud table. ClickHouse checks your account permissions and destination types.' : 'This writes data to the selected ClickHouse table. The mapping and destination schema were checked by the server.'}</p>
+                        <dl className="import-review-metrics" aria-label="Import summary">
+                            <div><dt>Rows</dt><dd>{formatImportRowCount(mapping.rowCount)}</dd></div>
+                            <div><dt>Mapped</dt><dd>{mappedColumnCount} columns</dd></div>
+                            <div><dt>Skipped</dt><dd>{skippedColumnCount} columns</dd></div>
+                        </dl>
                     </div>
                     <div className="import-review-mapping rounded-xl border border-[var(--line)] bg-[var(--page)]">
                         <div className="import-review-mapping-header"><h4 className="text-xs font-semibold">Column mapping</h4><span>{mappedColumnCount} mapped · {skippedColumnCount} skipped</span></div>
@@ -325,7 +335,7 @@ export function ImportWizard({ onImportQuery, ...controllerProps }: ImportWizard
             </main>
 
             <footer className="import-wizard-footer flex flex-wrap items-center justify-between gap-3 border-t border-[var(--line)] bg-[var(--page)] px-5 py-3 sm:px-7">
-                <span className="text-[10px] text-[var(--muted)]">{importKind === 'query' ? 'SQL file · opens as a draft only' : browserDemoImport ? 'Browser demo · nothing is written to ClickHouse' : browserCloudImport ? 'Up to 2 MB · maximum 10,000 rows · ClickHouse Cloud permissions apply' : step === 'file' ? 'Up to 2 MB · maximum 10,000 rows' : step === 'mapping' ? `${Object.keys(selectedFields).length} columns mapped` : step === 'review' ? 'Review before writing' : 'Server-owned import status'}</span>
+                <span className="import-wizard-footer-note text-[10px] text-[var(--muted)]">{importKind === 'query' ? 'SQL file · opens as a draft only' : browserDemoImport ? 'Browser demo · nothing is written to ClickHouse' : browserCloudImport ? 'Up to 2 MB · maximum 10,000 rows · ClickHouse Cloud permissions apply' : step === 'file' ? 'Up to 2 MB · maximum 10,000 rows' : step === 'mapping' ? `${Object.keys(selectedFields).length} columns mapped` : step === 'review' ? 'Review before writing' : 'Server-owned import status'}</span>
                 <div className="flex items-center gap-2">
                     {importKind === 'query' && <button type="button" onClick={() => void openQueryFile()} disabled={!queryFile || Boolean(queryFileError) || openingQuery} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40">{openingQuery ? 'Opening…' : 'Open query'}</button>}
                     {importKind === 'rows' && <>
