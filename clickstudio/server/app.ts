@@ -228,6 +228,8 @@ export function createApp(config: Config, overrides: {
 } = {}) {
     const app = express(), store = overrides.store ?? new FileStore(config.dataDir), driver: Driver = overrides.driver ?? (config.demo ? new DemoDriver() : new ClickHouseDriver(config));
     const runs = new RunService(store, driver, (p, c) => driver.connection(p, c)), artifacts = new ArtifactService(store, runs, (p, c) => driver.connection(p, c));
+    for (const profile of config.profiles)
+        if (profile.publicPlayground) runs.trust({ id: 'local-owner', role: 'owner' }, profile.id, true);
     const authorized = (p: Principal, c: string) => { driver.connection(p, c); return runs.isTrusted(p, c); };
     const ai = new AssistantService(store, overrides.assistant ?? new OpenAIDriver(config.demo ? undefined : config.openaiKey, config.openaiModel), authorized);
     const voice = overrides.voice ?? new OpenAIVoiceService(config.demo ? undefined : config.openaiKey, config.openaiRealtimeModel);

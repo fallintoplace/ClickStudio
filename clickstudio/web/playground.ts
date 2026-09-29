@@ -1,11 +1,12 @@
-import { DEFAULT_LIMITS, type Column, type Connection, type Json, type Row, type Schema } from '../shared/types.js';
+import { type Column, type Json, type Row, type Schema } from '../shared/types.js';
 import { lexSql, splitSql } from '../shared/sql.js';
 import { isSchema } from '../shared/schema.js';
 import { mergeTreePartsQuery, parseMergeTreeParts, type MergeTreePartsSnapshot } from '../shared/parts.js';
 import { decodeClickHouseStringValue } from '../shared/playground-values.js';
 import { ClickHouseError, createClient } from '@clickhouse/client-web';
+import { PLAYGROUND_CONNECTION_ID, PLAYGROUND_URL } from '../shared/playground.js';
+export { PLAYGROUND_CONNECTION, PLAYGROUND_CONNECTION_ID } from '../shared/playground.js';
 
-export const PLAYGROUND_CONNECTION_ID = 'playground';
 export const PLAYGROUND_STARTER_ID = 'playground-starter-github-events';
 export const PLAYGROUND_STARTER_NAME = 'GitHub events.sql';
 export const PLAYGROUND_STARTER_SQL = `SELECT
@@ -15,8 +16,6 @@ export const PLAYGROUND_STARTER_SQL = `SELECT
     created_at
 FROM github.events
 LIMIT 50`;
-
-const PLAYGROUND_URL = 'https://sql-clickhouse.clickhouse.com:8443/';
 const PLAYGROUND_USER = 'demo';
 const PLAYGROUND_FORMAT = 'JSONCompactStringsEachRowWithNamesAndTypes';
 const REQUEST_TIMEOUT_MS = 65_000;
@@ -38,34 +37,6 @@ const playgroundClient = createClient({
 
 let playgroundServerVersion: string | undefined;
 let playgroundServerVersionRequest: Promise<string | undefined> | undefined;
-
-const capability = (available: boolean, reason?: string) => ({ available, ...(reason ? { reason } : {}) });
-
-export const PLAYGROUND_CONNECTION: Connection & { trusted: boolean } = {
-    dataSource: 'clickhouse', id: PLAYGROUND_CONNECTION_ID, name: 'ClickHouse Playground',
-    host: 'sql-clickhouse.clickhouse.com:8443', database: 'github', username: PLAYGROUND_USER,
-    readonly: true, trusted: true,
-    limits: { ...DEFAULT_LIMITS, rows: MAX_RESULT_ROWS, seconds: 60 },
-    manifest: {
-        version: 1, serverVersion: 'ClickHouse SQL Playground', testedAt: new Date(0).toISOString(),
-        schema: capability(true),
-        progress: capability(false, 'The public Playground does not expose query progress to this browser connection.'),
-        cancellation: capability(false, 'Closing the request cannot confirm that ClickHouse stopped the query.'),
-        explain: capability(true),
-        explainPlan: capability(true),
-        explainAnalyze: capability(true),
-        queryTree: capability(true),
-        explainPipeline: capability(true),
-        pipeline: capability(false, 'The public Playground returns pipeline text, but structured pipeline profiling is unavailable in this browser connection.'),
-        queryLog: capability(false, 'Query-log profiling is not enabled in this browser preview.'),
-        traceLog: capability(false, 'Trace-log profiling is not enabled in the public Playground browser connection.'),
-        replication: capability(false, 'Replication system-table access is not enabled in the public Playground browser connection.'),
-        documentation: capability(false, 'System-table documentation is not enabled in this browser preview.'),
-        import: capability(false, 'The public Playground connection is read only.'),
-        scripts: capability(false, 'The public Playground accepts one read-only statement per request. Script execution is unavailable in this browser connection.'),
-        parameters: capability(false, 'Query parameters are not enabled in this browser preview.'),
-    },
-};
 
 export class PlaygroundError extends Error {
     constructor(public readonly code: string, message: string) { super(message); }

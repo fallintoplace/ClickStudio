@@ -89,6 +89,29 @@ test('Table creation needs trust and a valid table name', async (t) => {
     assert.match(driver.createdTables[0].queryId, /^clickstudio-create-table-/);
 });
 
+test('Local API exposes the public Playground as ready and read only', async (t) => {
+    const config = loadConfig(), service = createApp(config, { store: new MemoryStore() });
+    const server = service.app.listen(0, '127.0.0.1');
+    await new Promise<void>((resolve, reject) => { server.once('listening', resolve); server.once('error', reject); });
+    config.origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    t.after(async () => {
+        await service.close();
+        server.closeAllConnections();
+        await new Promise<void>(resolve => server.close(() => resolve()));
+    });
+
+    const response = await fetch(`${config.origin}/api/connections`, { headers: { 'x-clickstudio-intent': '1' } });
+    assert.equal(response.status, 200);
+    const connections = await response.json() as Array<{ id: string; trusted: boolean; readonly: boolean; manifest?: { import: { available: boolean }; scripts: { available: boolean }; parameters: { available: boolean } } }>;
+    const playground = connections.find(connection => connection.id === 'playground');
+    assert.ok(playground);
+    assert.equal(playground.trusted, true);
+    assert.equal(playground.readonly, true);
+    assert.equal(playground.manifest?.import.available, false);
+    assert.equal(playground.manifest?.scripts.available, false);
+    assert.equal(playground.manifest?.parameters.available, false);
+});
+
 test('Write targets accept valid tables in any non-system database', () => {
     const driver = new ClickHouseDriver(loadConfig({ CLICKHOUSE_DATABASE: 'analytics', CLICKHOUSE_USER: 'interview_user' }));
     assert.equal(driver.database('local'), 'analytics');
@@ -130,6 +153,33 @@ test('Writes fall back to the connection identity when no writer is configured',
         const username = captured.headers['x-clickhouse-user'] ?? url.searchParams.get('user') ?? basic.split(':')[0];
         const password = captured.headers['x-clickhouse-key'] ?? url.searchParams.get('password') ?? basic.slice(basic.indexOf(':') + 1);
         assert.ok(username === 'interview_user' && password === 'connection-secret', 'The write request should use the connection identity');
+    } finally {
+        await driver.close();
+        server.closeAllConnections();
+        await new Promise<void>(resolve => server.close(() => resolve()));
+    }
+});
+
+test('Public Playground queries stay within its server result-row limit', async () => {
+    let requestUrl = '';
+    const server = createServer((request, response) => {
+        requestUrl = request.url ?? '/';
+        response.setHeader('content-type', 'text/plain; charset=utf-8');
+        response.end('["answer"]\n["String"]\n["ready"]\n');
+    });
+    server.listen(0, '127.0.0.1');
+    await new Promise<void>((resolve, reject) => { server.once('listening', resolve); server.once('error', reject); });
+    const port = (server.address() as AddressInfo).port;
+    const config = loadConfig({});
+    const playground = config.profiles.find(profile => profile.publicPlayground);
+    assert.ok(playground);
+    playground.url = `http://127.0.0.1:${port}`;
+    const driver = new ClickHouseDriver(config);
+    const run = { connectionId: playground.id, queryId: 'playground-limit-test', sql: "SELECT 'ready' AS answer", kind: 'query', parameters: {}, limits: playground.limits, tags: {} } as Run;
+    try {
+        const result = await driver.execute(run, AbortSignal.timeout(5000), () => undefined);
+        assert.deepEqual(result.rows, [['ready']]);
+        assert.equal(new URL(requestUrl, 'http://127.0.0.1').searchParams.get('max_result_rows'), '10000');
     } finally {
         await driver.close();
         server.closeAllConnections();

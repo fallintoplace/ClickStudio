@@ -29,7 +29,10 @@ export class ClickHouseDriver implements QueryDriver, ImportDriver, CreateTableD
     private readonly redact: (s: string) => string;
     constructor(private readonly config: Config) { this.redact = redactor(config); }
     private profile(id: string): Profile { const p = this.config.profiles.find(p => p.id === id); requireThat(p, 404, 'CONNECTION_NOT_FOUND', 'Connection not found'); return p; }
-    connection(_p: Principal, id: string): Connection { return { ...publicProfile(this.profile(id)), manifest: this.manifests.get(id) }; }
+    connection(_p: Principal, id: string): Connection {
+        const manifest = this.manifests.get(id);
+        return { ...publicProfile(this.profile(id)), ...(manifest ? { manifest } : {}) };
+    }
     connections(p: Principal) { return this.config.profiles.map(c => this.connection(p, c.id)); }
     private client(id: string, write = false): ClickHouseClient {
         const pool = write ? this.writers : this.readers;
@@ -61,6 +64,7 @@ export class ClickHouseDriver implements QueryDriver, ImportDriver, CreateTableD
         }
     }
     async test(id: string): Promise<Connection> {
+        const profile = this.profile(id), isPublicPlayground = profile.publicPlayground === true;
         const version = (await this.rows<{
             version: string;
         }>(id, 'SELECT version() AS version'))[0]?.version ?? 'unknown';
@@ -104,7 +108,9 @@ export class ClickHouseDriver implements QueryDriver, ImportDriver, CreateTableD
             ...(queryLogSource ? { queryLogSource } : {}), traceLog: flamegraphSource ? { available: true } : { available: false, reason: traceLogSymbolized.reason ?? traceLogAddresses.reason ?? 'ClickHouse trace-log symbols are unavailable to this reader.' },
             replication: replication.replicas || replication.queue ? { available: true } : { available: false, reason: replicas.reason ?? replicationQueue.reason ?? 'Replication system tables are unavailable to this reader.' },
             documentation, explain, explainPlan, queryTree, pipeline, explainAnalyze, cancellation,
-            import: { available: true, reason: 'Writes use the connection identity or optional writer credentials; ClickHouse permissions apply' }, scripts: { available: true }, parameters: { available: true } };
+            import: isPublicPlayground ? { available: false, reason: 'The public ClickHouse Playground is read only.' } : { available: true, reason: 'Writes use the connection identity or optional writer credentials; ClickHouse permissions apply' },
+            scripts: isPublicPlayground ? { available: false, reason: 'Run one statement at a time on the public ClickHouse Playground.' } : { available: true },
+            parameters: isPublicPlayground ? { available: false, reason: 'Query parameters are unavailable on the public ClickHouse Playground connection.' } : { available: true } };
         this.manifests.set(id, manifest);
         return this.connection({ id: 'local-owner', role: 'owner' }, id);
     }
@@ -297,9 +303,10 @@ export class ClickHouseDriver implements QueryDriver, ImportDriver, CreateTableD
                     progress({ readRows: p.read_rows, readBytes: p.read_bytes, elapsedMs: p.elapsed * 1000, memory: p.memory_usage }); }).catch(() => undefined).finally(() => { polling = false; });
             }, 750);
         try {
+            const maxResultRows = this.profile(run.connectionId).publicPlayground ? '10000' : '100000';
             const response = await this.client(run.connectionId).exec({ query: `${sql}\nFORMAT JSONCompactEachRowWithNamesAndTypes`, query_id: run.queryId, query_params: run.parameters, abort_signal: signal,
                 clickhouse_settings: { readonly: '1', max_execution_time: run.limits.seconds, max_memory_usage: String(run.limits.memory), max_threads: run.limits.threads,
-                    max_result_rows: '100000', max_result_bytes: '50000000', result_overflow_mode: 'throw', max_rows_to_read: '100000000', max_bytes_to_read: '5000000000',
+                    max_result_rows: maxResultRows, max_result_bytes: '50000000', result_overflow_mode: 'throw', max_rows_to_read: '100000000', max_bytes_to_read: '5000000000',
                     output_format_json_quote_64bit_integers: 1, output_format_json_quote_decimals: 1, log_comment: JSON.stringify(run.tags) } });
             const result = await collectCompactStream(response.stream, run.limits);
             if (result.truncated)

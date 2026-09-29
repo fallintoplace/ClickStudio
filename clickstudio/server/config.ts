@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { isIP } from 'node:net';
 import { resolve } from 'node:path';
 import type { Connection, Limits } from '../shared/types.js';
+import { PLAYGROUND_CONNECTION, PLAYGROUND_CONNECTION_ID, PLAYGROUND_URL } from '../shared/playground.js';
 import { requireThat } from '../core/errors.js';
 import { identifier, integer, limits, record, text } from '../core/validation.js';
 function isLoopbackHost(host: string) {
@@ -19,6 +20,7 @@ export interface Profile {
     username: string;
     password: string;
     limits: Limits;
+    publicPlayground?: boolean;
     writer?: {
         username: string;
         password: string;
@@ -71,13 +73,15 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
         }
         return profile;
     });
+    if (local && env.DEMO_MODE !== 'true' && !profiles.some(profile => profile.id === PLAYGROUND_CONNECTION_ID))
+        profiles.push({ id: PLAYGROUND_CONNECTION_ID, name: PLAYGROUND_CONNECTION.name, url: PLAYGROUND_URL, database: PLAYGROUND_CONNECTION.database, username: PLAYGROUND_CONNECTION.username, password: '', limits: limits(PLAYGROUND_CONNECTION.limits), publicPlayground: true });
     requireThat(new Set(profiles.map(p => p.id)).size === profiles.length, 400, 'CONNECTION_IDS', 'Connection IDs must be unique');
     requireThat(env.DEMO_MODE !== 'true' || local, 400, 'DEMO_LOCAL_ONLY', 'Fixture mode is loopback-only');
     return { host, port, origin, dataDir: resolve(env.DATA_DIR ?? '.data'), token, demo: env.DEMO_MODE === 'true', profiles,
         openaiKey: env.OPENAI_API_KEY, openaiModel: env.OPENAI_MODEL?.trim() || 'gpt-6-luna', openaiRealtimeModel: env.OPENAI_REALTIME_MODEL ?? 'gpt-realtime-2.1', sensitiveColumns: (env.AI_SENSITIVE_COLUMNS ?? 'password,token,secret,api_key').split(',').map(s => s.trim()),
         telemetryUrl: env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, traceUrl: env.TRACE_URL_TEMPLATE, production: env.NODE_ENV === 'production' };
 }
-export function publicProfile(p: Profile): Connection { return { dataSource: 'clickhouse', id: p.id, name: p.name, host: new URL(p.url).origin, database: p.database, username: p.username, readonly: true, limits: p.limits }; }
+export function publicProfile(p: Profile): Connection { return { dataSource: 'clickhouse', id: p.id, name: p.name, host: new URL(p.url).origin, database: p.database, username: p.username, readonly: true, limits: p.limits, ...(p.publicPlayground ? { manifest: PLAYGROUND_CONNECTION.manifest } : {}) }; }
 export function configuredSecrets(config: Config): string[] { return [config.token, config.openaiKey, ...config.profiles.flatMap(p => [p.password, p.writer?.password])].filter((s): s is string => Boolean(s)); }
 export function redactor(config: Config) {
     const secrets = configuredSecrets(config);
