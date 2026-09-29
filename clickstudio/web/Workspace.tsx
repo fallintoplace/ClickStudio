@@ -584,8 +584,6 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
             baseRevision: restored.revision,
             parameters: { ...restored.parameters },
             chart: { ...restored.chart, ys: [...restored.chart.ys] },
-            activeRunId: undefined,
-            scriptId: undefined,
             parentRunId: undefined,
             parentDocumentId: restored.parentDocumentId,
             kind: restored.kind,

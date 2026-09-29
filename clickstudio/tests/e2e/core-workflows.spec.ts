@@ -350,6 +350,77 @@ test('A running query shows its submitted SQL and keeps previous rows until it e
     }
 });
 
+test('Restoring a version keeps run status aligned and marks its result as previous', async ({ page }) => {
+    await trust(page);
+    await useAdvancedMode(page);
+    await replaceSql(page, 'SELECT 1 AS version_value;');
+    const savePath = (url: URL) => url.pathname === '/api/documents';
+    const firstSave = page.waitForResponse(response => response.request().method() === 'POST' && savePath(new URL(response.url())));
+    await page.getByTestId('save-query').click();
+    await firstSave;
+    await replaceSql(page, 'SELECT 2 AS version_value;');
+    const secondSave = page.waitForResponse(response => response.request().method() === 'PUT' && /^\/api\/documents\/[^/]+$/.test(new URL(response.url()).pathname));
+    await page.getByTestId('save-query').click();
+    await secondSave;
+
+    const results = page.getByRole('region', { name: 'Query results', exact: true });
+    const table = results.getByRole('table', { name: 'Retained query rows' });
+    const firstRun = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/runs');
+    await runButton(page).click();
+    await firstRun;
+    await expect(table).toContainText('2');
+
+    let runFinished = false;
+    let releaseRunStatus: () => void = () => {};
+    const runStatusGate = new Promise<void>(resolve => { releaseRunStatus = resolve; });
+    const runCollectionPath = (url: URL) => url.pathname === '/api/runs';
+    const runActivityPath = (url: URL) => /^\/api\/runs\/[^/]+(?:\/events)?$/.test(url.pathname);
+    await page.route(runCollectionPath, async route => {
+        if (route.request().method() !== 'POST') return route.continue();
+        const response = await route.fetch();
+        const run = await response.json() as Record<string, unknown>;
+        await route.fulfill({ response, json: { ...run, status: 'running' } });
+    });
+    await page.route(runActivityPath, async route => {
+        if (!runFinished) await runStatusGate;
+        await route.continue();
+    });
+
+    try {
+        await replaceSql(page, 'SELECT 3 AS version_value;');
+        const pendingRun = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/runs');
+        await runButton(page).click();
+        await pendingRun;
+        await expect(page.locator('.execution-bar')).toHaveAttribute('data-run-status', 'running');
+        await expect(results.locator('.result-execution-progress')).toContainText('Running');
+
+        await page.getByRole('button', { name: 'Version history for Getting started.sql', exact: true }).click();
+        const versionList = page.locator('.revision-list');
+        await expect(versionList.getByRole('button', { name: /Version 1/ })).toBeVisible();
+        await versionList.getByRole('button', { name: /Version 1/ }).click();
+        await page.locator('.revision-preview').getByRole('button', { name: 'Restore', exact: true }).click();
+        const confirmation = page.getByRole('alertdialog', { name: 'Replace your draft with Version 1?', exact: true });
+        const restoreResponse = page.waitForResponse(response => response.request().method() === 'POST' && /\/api\/documents\/[^/]+\/restore-revision$/.test(new URL(response.url()).pathname));
+        await confirmation.getByRole('button', { name: 'Restore Version 1', exact: true }).click();
+        await restoreResponse;
+        await expect(page.locator('.cm-content')).toContainText('SELECT 1 AS version_value;');
+        await expect(page.locator('.execution-bar')).toHaveAttribute('data-run-status', 'running');
+        await expect(results.locator('.result-execution-progress')).toContainText('Previous result');
+        await expect(table).toContainText('2');
+
+        runFinished = true;
+        releaseRunStatus();
+        await expect(page.locator('.execution-bar')).toHaveAttribute('data-run-status', 'succeeded', { timeout: 10000 });
+        await expect(results.locator('.result-provenance-header')).toContainText('Previous result');
+        await expect(results.locator('.result-provenance-header')).toContainText('changed since this run');
+    } finally {
+        runFinished = true;
+        releaseRunStatus();
+        await page.unroute(runCollectionPath);
+        await page.unroute(runActivityPath);
+    }
+});
+
 test('The execution indicator clears when run submission fails', async ({ page }) => {
     await trust(page);
     let releaseFailure: () => void = () => {};
