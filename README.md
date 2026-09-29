@@ -2,7 +2,7 @@
 
 ClickStudio is a SQL editor for ClickHouse. Write queries, explore results, build charts, and inspect query runs.
 
-Try the [live ClickStudio app](https://clickstudio-eight.vercel.app/).
+Try the [live ClickStudio app, hosted on Vercel](https://clickstudio-eight.vercel.app/).
 
 Each saved run keeps its SQL, parameters, limits, and results together. Reopen a run to review its details.
 
