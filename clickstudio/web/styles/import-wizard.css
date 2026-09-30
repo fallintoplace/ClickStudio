@@ -243,6 +243,11 @@
 .import-review-mapping-list .import-review-skipped { display: inline-flex; padding: 3px 7px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-size: 9px; }
 .import-review-mapping-list tr.is-generated { background: color-mix(in srgb, var(--accent) 5%, transparent); }
 .import-review-mapping-list tr.is-generated td:first-of-type { color: var(--accent); }
+.import-review-rows-list { max-height: min(46dvh, 340px); }
+.import-review-rows-list table { width: max-content; min-width: 100%; }
+.import-review-rows-list th:not(:first-child), .import-review-rows-list td { min-width: 140px; }
+.import-review-rows-list tbody td { max-width: 320px; overflow: visible; overflow-wrap: anywhere; text-overflow: clip; white-space: normal; }
+.import-review-rows-pagination { color: var(--muted); }
 
 .import-status-card { position: relative; display: grid; gap: 7px; overflow: hidden; border-radius: 15px !important; background: var(--panel-raised) !important; }
 .import-status-card::before { position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--accent); content: ""; }

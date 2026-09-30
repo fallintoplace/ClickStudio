@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { cloudImportDatabases, CREATE_CLOUD_TABLE_TARGET } from '../cloud-import';
 import { ImportJobStatus } from './ImportJobStatus';
-import { ImportPreviewTable } from './ImportPreviewTable';
+import { ImportPreviewTable, ImportReviewRows } from './ImportPreviewTable';
 import { formatImportColumnCount, formatImportRowCount, MAX_FILE_BYTES, importSteps } from './import-wizard-model';
 import { useImportWizardController, type ImportWizardControllerOptions } from './useImportWizardController';
 import { Icon } from './ui';
@@ -379,6 +379,7 @@ export function ImportWizard({ onImportQuery, importCopy, ...controllerProps }: 
                             return <p key={source}>{fillImportCopy(importCopy.reviewMissingValues, { source, count: count.toLocaleString(), rowLabel, destination })}</p>;
                         })}
                     </div>}
+                    <ImportReviewRows key={mapping.id} rows={mapping.rows} columns={Object.values(mapping.fields)} copy={importCopy}/>
                     <div className="import-review-mapping rounded-xl border border-[var(--line)] bg-[var(--page)]">
                         <div className="import-review-mapping-header"><h4 className="text-xs font-semibold">Column mapping</h4><span>{mappedColumnCount} mapped · {skippedColumnCount} skipped</span></div>
                         <div className="import-review-mapping-list">

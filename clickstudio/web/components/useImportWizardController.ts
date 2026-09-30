@@ -1106,7 +1106,7 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
                 if (creatingTable && !/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(createTableName)) throw new Error('Use letters, numbers, and underscores for the new table name.');
                 const sourceRows = cloudRows.length ? cloudRows : preview.rows;
                 const mapped = mapImportRows(sourceRows, preview.columns, selectedFields, destinationColumns);
-                next = { id: crypto.randomUUID(), deduplicationToken: retryMapping ? pendingImport.retryDeduplicationToken! : crypto.randomUUID(), inputId: preview.id, connectionId: importConnectionId, table, fields: selectedFields, rows: [], rowCount: sourceRows.length, missingFields: mapped.missingFields };
+                next = { id: crypto.randomUUID(), deduplicationToken: retryMapping ? pendingImport.retryDeduplicationToken! : crypto.randomUUID(), inputId: preview.id, connectionId: importConnectionId, table, fields: selectedFields, rows: mapped.rows, rowCount: sourceRows.length, missingFields: mapped.missingFields };
             } else {
                 const retryMapping = retryImportConfirmed && pendingImport?.table === target && pendingImport.retryDeduplicationToken !== undefined;
                 next = await post<ImportMapping>(`/imports/${encodeURIComponent(preview.id)}/mapping`, {
