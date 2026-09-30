@@ -488,7 +488,18 @@ async function runCommitImport(context: ImportActionSetters & {
                 setJob(undefined);
                 preserveRetryForRemap();
                 setStep('review');
-                if (caught.code === 'SCHEMA_CHANGED') {
+                if (caught.code === 'TABLE_EXISTS' && creatingTable) {
+                    setMapping(undefined);
+                    setStep('mapping');
+                    try {
+                        const [nextTargets, nextSchema] = await loadConnectionImportSetup(importConnectionId, true);
+                        setTargets(nextTargets);
+                        setSchema(nextSchema);
+                        setError('');
+                    } catch (refreshError) {
+                        setError(`Table ${mapping.table} already exists. Change the table name or choose Add to a table. Could not refresh the table list: ${message(refreshError)}`);
+                    }
+                } else if (caught.code === 'SCHEMA_CHANGED') {
                     setMapping(undefined);
                     setStep('mapping');
                     try {
@@ -1026,6 +1037,7 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
 
     const availableTargets = useMemo(() => targets.filter(table => schema?.tables.some(item => `${item.database}.${item.name}` === table)), [schema, targets]);
     const creatingTable = browserCloudImport && target === CREATE_CLOUD_TABLE_TARGET;
+    const createTableAlreadyExists = Boolean(creatingTable && schema?.tables.some(table => table.database === createTableDatabase && table.name === createTableName));
     const destinationColumns = useMemo(() => creatingTable
         ? createColumns.map(column => ({ database: createTableDatabase, table: createTableName, name: column.name, type: `Nullable(${column.type})`, defaultKind: '', comment: '' }))
         : writableColumns(schema, target), [creatingTable, createColumns, createTableDatabase, createTableName, schema, target]);
@@ -1156,6 +1168,10 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
 
     async function previewMapping() {
         if (!preview || !target || !destinationNames.length || duplicateDestinations || busy || pendingImport?.retryDeduplicationToken !== undefined && !retryImportConfirmed) return;
+        if (creatingTable && createTableAlreadyExists) {
+            setError(`Table ${createTableDatabase}.${createTableName} already exists. Choose a different name or add rows to the existing table.`);
+            return;
+        }
         const retryTable = creatingTable ? `${createTableDatabase}.${createTableName}` : target;
         if (retryImportConfirmed && pendingImport?.retryDeduplicationToken !== undefined && pendingImport.table !== retryTable) {
             setError(`Choose ${pendingImport.table} to retry this import, or go back and start a new import for another table.`);
@@ -1282,6 +1298,7 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
         sampleColumns,
         browserCloudImport,
         creatingTable,
+        createTableAlreadyExists,
         createTableName,
         setCreateTableName,
         createTableDatabase,

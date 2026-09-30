@@ -52,6 +52,7 @@ export function ImportWizard({ onImportQuery, importCopy, ...controllerProps }: 
         lastExistingTarget,
         destinationColumns,
         creatingTable,
+        createTableAlreadyExists,
         createTableName,
         setCreateTableName,
         createTableDatabase,
@@ -293,14 +294,15 @@ export function ImportWizard({ onImportQuery, importCopy, ...controllerProps }: 
                         <div className="import-new-table-heading"><span className="import-setup-kicker">NEW TABLE</span><strong>Confirm the table structure</strong><small>Names and types are guessed from your file. You can edit them below.</small></div>
                         <div className="import-new-table-fields">
                             <label>DATABASE
-                                <select aria-label="New table database" value={createTableDatabase} onChange={event => setCreateTableDatabase(event.target.value)}>
+                                <select aria-label="New table database" value={createTableDatabase} onChange={event => { setCreateTableDatabase(event.target.value); setError(''); }}>
                                     {importableDatabases.map(database => <option key={database} value={database}>{database}</option>)}
                                 </select>
                             </label>
                             <label>TABLE NAME
-                                <input aria-label="New table name" value={createTableName} onChange={event => setCreateTableName(event.target.value)} maxLength={128} />
+                                <input aria-label="New table name" aria-invalid={createTableAlreadyExists || undefined} aria-describedby={createTableAlreadyExists ? 'import-table-name-error' : undefined} value={createTableName} onChange={event => { setCreateTableName(event.target.value); setError(''); }} maxLength={128} />
                             </label>
                         </div>
+                        {createTableAlreadyExists && <p id="import-table-name-error" role="alert" className="import-inline-error import-table-name-error">Table <code>{createTableDatabase}.{createTableName}</code> already exists. Enter a different name, or choose “Add to a table”.</p>}
                         {!importableDatabases.length && <p role="status" className="import-table-hint">No supported database is available. Databases with a period in the name cannot be selected for row import.</p>}
                         {!hasCreateIdColumn ? <label className="import-generated-id-option"><input type="checkbox" checked={generateId} onChange={event => setGenerateId(event.target.checked)}/><span><strong>Add a generated id</strong><small>ClickHouse assigns a UInt64 ID to each row.</small></span></label> : <p className="import-id-source-note">Your file already has an <code>id</code> column.</p>}
                         <div className="import-create-columns">
@@ -420,7 +422,7 @@ export function ImportWizard({ onImportQuery, importCopy, ...controllerProps }: 
                     {importKind === 'rows' && <>
                     {recoveryState === 'ready' && step === 'review' && <button type="button" onClick={() => { setStep('mapping'); setError(''); }} disabled={Boolean(busy)} className="rounded-lg border border-[var(--line)] px-3 py-2 text-xs text-[var(--text-soft)] hover:bg-[var(--panel-hover)] disabled:opacity-50">Back</button>}
                     {recoveryState === 'ready' && !importUnavailable && step === 'file' && <button type="button" onClick={() => void previewFile()} disabled={!file || !format || file.size > MAX_FILE_BYTES || Boolean(busy) || retryChoiceRequired || (!availableTargets.length && !browserCloudImport)} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40">{busy === 'preview' ? 'Reading file…' : 'Read file and continue'}</button>}
-                    {recoveryState === 'ready' && !importUnavailable && step === 'mapping' && <button type="button" onClick={() => void previewMapping()} disabled={!target || !destinationNames.length || duplicateDestinations || !destinationColumns.length || Boolean(busy)} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40">{busy === 'mapping' ? 'Checking mapping…' : !target ? browserCloudImport && selectedDestinationChoice === 'existing' ? 'Choose a table' : 'Choose a destination' : !destinationNames.length && destinationColumns.length > 0 ? 'Map a column first' : duplicateDestinations ? 'Fix duplicate columns' : !destinationColumns.length ? 'No writable columns' : 'Review import'}</button>}
+                    {recoveryState === 'ready' && !importUnavailable && step === 'mapping' && <button type="button" onClick={() => void previewMapping()} disabled={!target || !destinationNames.length || duplicateDestinations || !destinationColumns.length || createTableAlreadyExists || Boolean(busy)} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40">{busy === 'mapping' ? 'Checking mapping…' : !target ? browserCloudImport && selectedDestinationChoice === 'existing' ? 'Choose a table' : 'Choose a destination' : createTableAlreadyExists ? 'Choose another table name' : !destinationNames.length && destinationColumns.length > 0 ? 'Map a column first' : duplicateDestinations ? 'Fix duplicate columns' : !destinationColumns.length ? 'No writable columns' : 'Review import'}</button>}
                     {recoveryState === 'ready' && !importUnavailable && step === 'review' && <button type="button" onClick={() => void commitImport()} disabled={Boolean(busy)} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40">{busy === 'commit' ? browserDemoImport ? 'Saving…' : 'Starting…' : creatingTable ? 'Create table and import' : browserDemoImport ? 'Save demo rows' : 'Import rows'}</button>}
                     {recoveryState === 'ready' && step === 'status' && job?.status === 'succeeded' && <>
                         <button type="button" onClick={importAnotherFile} disabled={Boolean(busy)} className="rounded-lg border border-[var(--line)] px-3 py-2 text-xs text-[var(--text-soft)] transition hover:bg-[var(--panel-hover)] disabled:opacity-40">Import another file</button>

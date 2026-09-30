@@ -591,6 +591,7 @@
 .import-setup-preview { display: grid; gap: 11px; }
 .import-setup-preview > .import-section-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
 .import-inline-error { margin: 0; color: var(--red); font-size: 10px; }
+.import-table-name-error { grid-column: 1 / -1; }
 
 .import-review-step { gap: 12px; }
 .import-ready-card { background: radial-gradient(ellipse at 90% 0%, color-mix(in srgb, var(--import-cyan) 8%, transparent), transparent 46%), var(--panel-raised) !important; }
