@@ -1,17 +1,33 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api';
 import { cloudImportDatabases, CREATE_CLOUD_TABLE_TARGET } from '../cloud-import';
+import { ImportMappingError, mapImportRows, type ImportMappingColumn } from '../../core/import-mapping';
 import { ImportJobStatus } from './ImportJobStatus';
 import { ImportPreviewTable, ImportReviewRows } from './ImportPreviewTable';
 import { formatImportColumnCount, formatImportRowCount, MAX_FILE_BYTES, importSteps } from './import-wizard-model';
 import { useImportWizardController, type ImportWizardControllerOptions } from './useImportWizardController';
 import { Icon } from './ui';
 import type { Copy } from '../i18n';
+import type { Json } from '../../shared/types';
 
 const MAX_QUERY_FILE_BYTES = 200_000;
 
 function fillImportCopy(template: string, values: Record<string, string>) {
     return template.replace(/\{([A-Za-z][A-Za-z0-9_]*)\}/g, (placeholder, key: string) => values[key] ?? placeholder);
+}
+
+function findLiveMappingIssue(sourceRows: Record<string, Json>[], fields: Record<string, string>, destinationColumns: ImportMappingColumn[]) {
+    for (const [source, destination] of Object.entries(fields)) {
+        const column = destinationColumns.find(candidate => candidate.name === destination);
+        if (!column) continue;
+        try {
+            mapImportRows(sourceRows, [source], { [source]: destination }, [column]);
+        } catch (caught) {
+            if (caught instanceof ImportMappingError && ['IMPORT_NULL_VALUE', 'IMPORT_VALUE_TYPE'].includes(caught.code))
+                return { source, message: caught.message };
+        }
+    }
+    return undefined;
 }
 
 type ImportWizardProps = ImportWizardControllerOptions & {
@@ -88,6 +104,10 @@ export function ImportWizard({ onImportQuery, importCopy, ...controllerProps }: 
     const [openingQuery, setOpeningQuery] = useState(false);
     const [destinationChoice, setDestinationChoice] = useState<'existing' | 'create'>();
     const selectedDestinationChoice = destinationChoice ?? (creatingTable ? 'create' : target ? 'existing' : browserCloudImport && availableTargets.length ? 'existing' : undefined);
+    const liveMappingIssue = useMemo(() => {
+        if (!preview || importKind !== 'rows' || step !== 'mapping' || !target || !destinationColumns.length) return undefined;
+        return findLiveMappingIssue(preview.rows, selectedFields, destinationColumns);
+    }, [destinationColumns, importKind, preview, selectedFields, step, target]);
 
     useEffect(() => {
         if (!controllerProps.open) { setDestinationChoice(undefined); return; }
@@ -335,11 +355,15 @@ export function ImportWizard({ onImportQuery, importCopy, ...controllerProps }: 
                             {(target || creatingTable) && <div className="import-column-map">
                                 <table className="w-full min-w-[540px] border-collapse text-left text-xs">
                                     <thead><tr><th>FROM FILE</th><th>TO TABLE</th><th>TYPE</th></tr></thead>
-                                    <tbody>{preview.columns.map(source => <tr key={source}>
+                                    <tbody>{preview.columns.map((source, sourceIndex) => {
+                                        const sourceIssue = liveMappingIssue?.source === source ? liveMappingIssue : undefined;
+                                        const issueId = sourceIssue ? `import-mapping-error-${sourceIndex}` : undefined;
+                                        return <tr key={source}>
                                         <th scope="row" title={source}><code className="import-source-column-name">{source}</code></th>
-                                        <td><select aria-label={`Map ${source} to destination`} value={fields[source] ?? ''} onChange={event => { setFields(current => ({ ...current, [source]: event.target.value })); setMapping(undefined); setError(''); }}><option value="">Skip column</option>{destinationColumns.map(column => <option key={column.name} value={column.name}>{column.name}</option>)}</select></td>
+                                        <td><select aria-label={`Map ${source} to destination`} aria-invalid={sourceIssue ? true : undefined} aria-describedby={issueId} value={fields[source] ?? ''} onChange={event => { setFields(current => ({ ...current, [source]: event.target.value })); setMapping(undefined); setError(''); }}><option value="">Skip column</option>{destinationColumns.map(column => <option key={column.name} value={column.name}>{column.name}</option>)}</select>{sourceIssue && <p id={issueId} role="alert" className="mt-2 max-w-80 text-[11px] leading-relaxed text-[var(--red)]">{sourceIssue.message}</p>}</td>
                                         <td className="import-column-type-cell"><span className="import-column-type">{destinationColumns.find(column => column.name === fields[source])?.type ?? '—'}</span></td>
-                                    </tr>)}</tbody>
+                                    </tr>;
+                                    })}</tbody>
                                 </table>
                             </div>}
                             {duplicateDestinations && <p role="alert" className="import-inline-error">Each destination column can be used only once.</p>}
@@ -410,7 +434,7 @@ export function ImportWizard({ onImportQuery, importCopy, ...controllerProps }: 
                     {importKind === 'rows' && <>
                     {recoveryState === 'ready' && step === 'review' && <button type="button" onClick={() => { setStep('mapping'); setError(''); }} disabled={Boolean(busy)} className="rounded-lg border border-[var(--line)] px-3 py-2 text-xs text-[var(--text-soft)] hover:bg-[var(--panel-hover)] disabled:opacity-50">Back</button>}
                     {recoveryState === 'ready' && !importUnavailable && step === 'file' && <button type="button" onClick={() => void previewFile()} disabled={!file || !format || file.size > MAX_FILE_BYTES || Boolean(busy) || (!availableTargets.length && !browserCloudImport)} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40">{busy === 'preview' ? 'Reading file…' : 'Read file and continue'}</button>}
-                    {recoveryState === 'ready' && !importUnavailable && step === 'mapping' && <button type="button" onClick={() => void previewMapping()} disabled={!target || !destinationNames.length || duplicateDestinations || !destinationColumns.length || createTableAlreadyExists || Boolean(busy)} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40">{busy === 'mapping' ? 'Checking mapping…' : !target ? browserCloudImport && selectedDestinationChoice === 'existing' ? 'Choose a table' : 'Choose a destination' : createTableAlreadyExists ? 'Choose another table name' : !destinationNames.length && destinationColumns.length > 0 ? 'Map a column first' : duplicateDestinations ? 'Fix duplicate columns' : !destinationColumns.length ? 'No writable columns' : 'Review import'}</button>}
+                    {recoveryState === 'ready' && !importUnavailable && step === 'mapping' && <button type="button" onClick={() => void previewMapping()} disabled={!target || !destinationNames.length || duplicateDestinations || !destinationColumns.length || createTableAlreadyExists || Boolean(liveMappingIssue) || Boolean(busy)} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40">{busy === 'mapping' ? 'Checking mapping…' : liveMappingIssue ? 'Fix column mapping' : !target ? browserCloudImport && selectedDestinationChoice === 'existing' ? 'Choose a table' : 'Choose a destination' : createTableAlreadyExists ? 'Choose another table name' : !destinationNames.length && destinationColumns.length > 0 ? 'Map a column first' : duplicateDestinations ? 'Fix duplicate columns' : !destinationColumns.length ? 'No writable columns' : 'Review import'}</button>}
                     {recoveryState === 'ready' && !importUnavailable && step === 'review' && <button type="button" onClick={() => void commitImport()} disabled={Boolean(busy)} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40">{busy === 'commit' ? browserDemoImport ? 'Saving…' : 'Starting…' : creatingTable ? 'Create table and import' : browserDemoImport ? 'Save demo rows' : 'Import rows'}</button>}
                     {recoveryState === 'ready' && step === 'status' && job?.status === 'succeeded' && <>
                         <button type="button" onClick={importAnotherFile} disabled={Boolean(busy)} className="rounded-lg border border-[var(--line)] px-3 py-2 text-xs text-[var(--text-soft)] transition hover:bg-[var(--panel-hover)] disabled:opacity-40">Import another file</button>

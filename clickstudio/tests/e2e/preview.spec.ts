@@ -541,7 +541,7 @@ test('ClickHouse Cloud can create a table from a file when no tables exist', asy
     expect(JSON.parse(createTable!)).toMatchObject({ name: 'events', generateId: true });
 });
 
-test('ClickHouse Cloud import focuses mapping errors before writing and opens unknown imports for inspection', async ({ page }) => {
+test('ClickHouse Cloud import flags invalid mappings before review and inspects unknown imports', async ({ page }) => {
     const schemaWithId = {
         ...previewCloudSchema,
         columns: [
@@ -561,17 +561,20 @@ test('ClickHouse Cloud import focuses mapping errors before writing and opens un
     });
     await dialog.getByRole('button', { name: 'Read file and continue' }).click();
     await chooseExistingCloudTable(dialog);
-    await dialog.getByLabel('Map day to destination').selectOption('id');
-    await dialog.getByRole('button', { name: 'Review import' }).click();
+    const dayMapping = dialog.getByLabel('Map day to destination');
+    await dayMapping.focus();
+    await dayMapping.selectOption('id');
 
-    const mappingError = dialog.getByRole('alert');
+    const mappingError = dialog.locator('#import-mapping-error-0');
     await expect(mappingError).toContainText('Input row 1: "day" value "2026-01-01" cannot be inserted into "id" (UInt64).');
-    await expect(mappingError).toBeFocused();
-    await expect(dialog.getByRole('button', { name: 'Review import' })).toBeVisible();
+    await expect(dayMapping).toHaveAttribute('aria-invalid', 'true');
+    await expect(dayMapping).toBeFocused();
+    await expect(dialog.getByRole('button', { name: 'Fix column mapping' })).toBeDisabled();
     await expect(dialog.getByRole('button', { name: 'Import rows', exact: true })).toHaveCount(0);
     expect(imports).toHaveLength(0);
 
-    await dialog.getByLabel('Map day to destination').selectOption('day');
+    await dayMapping.selectOption('day');
+    await expect(mappingError).toHaveCount(0);
     await dialog.getByRole('button', { name: 'Review import' }).click();
     await dialog.getByRole('button', { name: 'Import rows', exact: true }).click();
 
