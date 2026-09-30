@@ -214,7 +214,7 @@
 .import-column-map tbody td > select:hover:not(:focus-visible) { border-color: var(--line-bright); background: var(--panel-raised); }
 .import-column-map tbody td > select:focus-visible { border-color: var(--accent); }
 .import-column-type-cell { padding-inline: 10px; }
-.import-column-type { display: inline-flex; max-width: 100%; min-height: 24px; align-items: center; overflow: hidden; padding: 3px 7px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); color: var(--muted); font-family: var(--font-mono); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.import-column-type { display: inline-block; max-width: 100%; min-height: 24px; overflow-wrap: anywhere; padding: 3px 7px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); color: var(--muted); font-family: var(--font-mono); font-size: 9px; vertical-align: middle; white-space: normal; }
 .import-column-type:not(:empty) { color: var(--text-soft); }
 
 .import-review-step { display: grid; gap: 14px; }
