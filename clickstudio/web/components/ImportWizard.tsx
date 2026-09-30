@@ -358,10 +358,11 @@ export function ImportWizard({ onImportQuery, importCopy, ...controllerProps }: 
                                     <tbody>{preview.columns.map((source, sourceIndex) => {
                                         const sourceIssue = liveMappingIssue?.source === source ? liveMappingIssue : undefined;
                                         const issueId = sourceIssue ? `import-mapping-error-${sourceIndex}` : undefined;
+                                        const destinationType = destinationColumns.find(column => column.name === fields[source])?.type;
                                         return <tr key={source}>
                                         <th scope="row" title={source}><code className="import-source-column-name">{source}</code></th>
                                         <td><select aria-label={`Map ${source} to destination`} aria-invalid={sourceIssue ? true : undefined} aria-describedby={issueId} value={fields[source] ?? ''} onChange={event => { setFields(current => ({ ...current, [source]: event.target.value })); setMapping(undefined); setError(''); }}><option value="">Skip column</option>{destinationColumns.map(column => <option key={column.name} value={column.name}>{column.name}</option>)}</select>{sourceIssue && <p id={issueId} role="alert" className="mt-2 max-w-80 text-[11px] leading-relaxed text-[var(--red)]">{sourceIssue.message}</p>}</td>
-                                        <td className="import-column-type-cell"><span className="import-column-type">{destinationColumns.find(column => column.name === fields[source])?.type ?? '—'}</span></td>
+                                        <td className="import-column-type-cell"><span className="import-column-type" title={destinationType} tabIndex={destinationType ? 0 : undefined}>{destinationType ?? '—'}</span></td>
                                     </tr>;
                                     })}</tbody>
                                 </table>
