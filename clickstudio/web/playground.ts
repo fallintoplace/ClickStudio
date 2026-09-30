@@ -1,5 +1,5 @@
 import { type Column, type Json, type Row, type Schema } from '../shared/types.js';
-import { lexSql, splitSql } from '../shared/sql.js';
+import { EXPLORATION_FORMAT_ERROR, hasTopLevelOutputFormat, lexSql, splitSql } from '../shared/sql.js';
 import { isSchema } from '../shared/schema.js';
 import { mergeTreePartsQuery, parseMergeTreeParts, type MergeTreePartsSnapshot } from '../shared/parts.js';
 import { decodeClickHouseStringValue } from '../shared/playground-values.js';
@@ -96,6 +96,7 @@ function parsePlaygroundError(body: string, status?: number) {
 function validateQuery(sql: string) {
     const statements = splitSql(sql);
     if (statements.length !== 1) throw new PlaygroundError('SINGLE_STATEMENT', 'Run one SQL statement at a time on the public Playground.');
+    if (hasTopLevelOutputFormat(statements[0]!.sql)) throw new PlaygroundError('READ_ONLY_SQL', EXPLORATION_FORMAT_ERROR);
     const command = lexSql(statements[0]!.sql).find(token => token.kind === 'word')?.text.toUpperCase();
     if (!command || !['SELECT', 'WITH', 'SHOW', 'DESCRIBE', 'DESC', 'EXPLAIN'].includes(command))
         throw new PlaygroundError('READ_ONLY_SQL', 'The public Playground connection accepts read-only SQL only.');

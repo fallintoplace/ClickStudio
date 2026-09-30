@@ -1,0 +1,13 @@
+diff --git a/node_modules/@clickhouse/client/dist/common/error/error.js b/node_modules/@clickhouse/client/dist/common/error/error.js
+index d0f3e1e..29d0ac2 100644
+--- a/node_modules/@clickhouse/client/dist/common/error/error.js
++++ b/node_modules/@clickhouse/client/dist/common/error/error.js
+@@ -18,7 +18,7 @@ exports.enhanceStackTrace = enhanceStackTrace;
+ // even non-ClickHouse payloads (proxy/HTML errors) when parsing failed requests.
+ // Keep this regex simple to avoid excessive backtracking on large/unexpected input.
+ // (If this ever becomes a concern, consider a non-regex parser or input length limits.)
+-const errorRe = /(Code|Error): (?<code>\d+).*Exception: (?<message>.+?)\((?<type>(?=[A-Z0-9_]*[A-Z]{3})[A-Z0-9_]+)\)/s;
++const errorRe = /(Code|Error): (?<code>\d+).*Exception: (?<message>.+?)\s*\((?<type>(?=[A-Z0-9_]*[A-Z]{3})[A-Z0-9_]+)\)(?: \(version |\s*\.?\s*$)/s;
+ /** An error that is thrown by the ClickHouse server. */
+ class ClickHouseError extends Error {
+     code;

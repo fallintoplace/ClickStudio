@@ -34,7 +34,7 @@ async function runQuery(page: Page) {
     return results;
 }
 
-async function mockFailedScriptWithoutRunId(page: Page, id: string, sql: string) {
+async function mockFailedScriptWithoutRunId(page: Page, id: string, sql: string, message = 'Table default.missing_table does not exist.') {
     const [failedSql, skippedSql] = sql.split(/;\s*/);
     if (!failedSql || !skippedSql) throw new Error('The script fixture must include a statement to skip.');
     const statement = { sql: failedSql, from: 0, to: failedSql.length };
@@ -47,7 +47,7 @@ async function mockFailedScriptWithoutRunId(page: Page, id: string, sql: string)
     const failed = {
         ...created, status: 'failed',
         statements: [{ ...statement, status: 'failed', error: {
-            code: 'CLICKHOUSE_ERROR', message: 'Table default.missing_table does not exist.',
+            code: 'CLICKHOUSE_ERROR', message,
         } }, { ...skippedStatement, status: 'skipped' }],
     };
     const createRoute = (url: URL) => url.pathname === '/api/scripts';
@@ -1441,22 +1441,23 @@ test('Scripts show each statement outcome and open that statement’s retained r
 
 test('Script errors without a statement run ID show the ClickHouse error and failed SQL', async ({ page }) => {
     await trust(page);
-    const sql = 'SELECT * FROM default.missing_table; SELECT 2';
+    const sql = 'SELECT 1 AS value FORMAT JSONEachRow; SELECT 2';
     await replaceSql(page, sql);
-    const cleanup = await mockFailedScriptWithoutRunId(page, 'script-create-table-error', sql);
+    const message = 'Syntax error: failed at position 39 (FORMAT) (line 2, col 1): FORMAT JSONCompactStringsEachRowWithNamesAndTypes. Expected one of: SETTINGS, ParallelWithClause, PARALLEL WITH, end of query. This full server diagnostic is retained below with every parser hint and query context so you can identify the invalid clause and correct the SQL.';
+    const cleanup = await mockFailedScriptWithoutRunId(page, 'script-create-table-error', sql, message);
 
     try {
         await runScript(page);
         const results = page.getByRole('region', { name: 'Query results', exact: true });
         const failure = results.getByTestId('query-failure');
-        const message = 'Table default.missing_table does not exist.';
         await expect(failure).toContainText('CLICKHOUSE_ERROR');
         await expect(failure).toContainText(message);
         await expect(results.getByRole('button', { name: 'Statement 1: failed', exact: true })).toBeVisible();
         await expect(results.getByRole('button', { name: 'Statement 2: skipped', exact: true })).toBeVisible();
         await failure.locator('details summary').click();
         await expect(failure.locator('.result-failure-detail')).toHaveText(message);
-        await expect(failure.locator('.result-execution-sql.is-full')).toHaveText('SELECT * FROM default.missing_table');
+        await expect(failure.locator('.result-failure-heading')).not.toContainText('every parser hint');
+        await expect(failure.locator('.result-execution-sql.is-full')).toHaveText('SELECT 1 AS value FORMAT JSONEachRow');
     } finally {
         await cleanup();
     }

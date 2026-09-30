@@ -6,7 +6,7 @@ import { collectCompactStream } from '../core/compact-stream.js';
 import { parseInput } from '../core/imports.js';
 import { ImportMappingError, mapImportRows } from '../core/import-mapping.js';
 import type { Capability, ClickHouseDocumentationEntry, ClickHouseDocumentationSummary, Column, Json, Row, Schema, SchemaColumn, SchemaTable } from '../shared/types.js';
-import { lexSql, quoteIdentifier, quoteStringLiteral, splitSql } from '../shared/sql.js';
+import { EXPLORATION_FORMAT_ERROR, hasTopLevelOutputFormat, lexSql, quoteIdentifier, quoteStringLiteral, splitSql } from '../shared/sql.js';
 import { buildReferenceEntryQuery, buildReferenceSearchQuery, isMissingDocumentationSourceColumn, isReferenceCategory } from '../shared/reference.js';
 import { flamegraphQuery, parseFlamegraphRows, type FlamegraphSource } from '../shared/flamegraph.js';
 import { CREATE_TABLE_COLUMN_TYPES, isValidTableDatabase, type CreateTableColumn, type CreateTableColumnType } from '../shared/table-creation.js';
@@ -342,6 +342,8 @@ async function runSql(credentials: CloudCredentials, url: string, sql: string, s
     const statements = splitSql(statement);
     if (statements.length !== 1)
         throw new Error('Run one SQL statement at a time on ClickHouse Cloud.');
+    if (isReadQuery(statement) && hasTopLevelOutputFormat(statement))
+        throw new AppError(403, 'READ_ONLY_SQL', EXPLORATION_FORMAT_ERROR);
 
     const client = makeClient(credentials, url, sessionId);
     const queryId = requestedQueryId ?? `clickstudio-run-${randomUUID()}`;

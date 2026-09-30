@@ -1,4 +1,4 @@
-import { lexSql, parameterNames, splitSql, SqlSyntaxError } from '../shared/sql.js';
+import { EXPLORATION_FORMAT_ERROR, hasTopLevelOutputFormat, lexSql, parameterNames, splitSql, SqlSyntaxError } from '../shared/sql.js';
 import type { Principal, RunRequest } from '../shared/types.js';
 import { AppError, requireThat } from './errors.js';
 export function mustOwn(principal: Principal, owner: string) {
@@ -8,7 +8,7 @@ export function canWrite(principal: Principal) {
     requireThat(principal.role === 'owner', 403, 'ROLE_READ_ONLY', 'This identity cannot change or execute workspace objects');
 }
 const forbidden = new Set(['INSERT', 'UPDATE', 'DELETE', 'CREATE', 'ALTER', 'DROP', 'TRUNCATE', 'RENAME',
-    'ATTACH', 'DETACH', 'OPTIMIZE', 'SYSTEM', 'GRANT', 'REVOKE', 'KILL', 'SET', 'SETTINGS', 'FORMAT', 'OUTFILE']);
+    'ATTACH', 'DETACH', 'OPTIMIZE', 'SYSTEM', 'GRANT', 'REVOKE', 'KILL', 'SET', 'SETTINGS', 'OUTFILE']);
 /** Defensive UX guard only. Restricted ClickHouse credentials are the authorization boundary. */
 export function guardSql(sql: string, parameters: Record<string, string> = {}): void {
     try {
@@ -24,6 +24,7 @@ export function guardSql(sql: string, parameters: Record<string, string> = {}): 
         if (showCreate && words[2]?.text.toUpperCase() === 'SETTINGS' && words[3]?.text.toUpperCase() === 'PROFILE')
             showSettings = words[2];
         requireThat(first && ['SELECT', 'WITH', 'SHOW', 'DESCRIBE', 'DESC', 'EXPLAIN'].includes(first), 403, 'READ_ONLY_SQL', 'Only read-only SQL is enabled', 'Use the separately authorized import flow for data insertion.');
+        requireThat(!hasTopLevelOutputFormat(statements[0]!.sql), 403, 'READ_ONLY_SQL', EXPLORATION_FORMAT_ERROR);
         for (let i = 0; i < tokens.length; i++) {
             const token = tokens[i]!;
             if (token.kind !== 'word')

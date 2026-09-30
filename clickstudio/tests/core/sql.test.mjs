@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { splitSql, selectedStatement, parameterNames, quoteIdentifier, insertChildFilter, formatSql, hasSqlComments } from '../../.core-build/shared/sql.js';
+import { splitSql, selectedStatement, parameterNames, quoteIdentifier, insertChildFilter, formatSql, hasSqlComments, hasTopLevelOutputFormat } from '../../.core-build/shared/sql.js';
 import { guardSql } from '../../.core-build/core/guards.js';
 import { limits, runRequest, validateJson } from '../../.core-build/core/validation.js';
 const cases = [
@@ -48,6 +48,27 @@ test('SQL comment detection ignores comment markers inside quoted values', () =>
     assert.equal(hasSqlComments('SELECT 1 /* note */'), true);
     assert.equal(hasSqlComments('SELECT 1 # note'), true);
 });
+test('Top-level output FORMAT detection ignores literals, comments, identifiers, and nested queries', () => {
+    for (const sql of [
+        "SELECT 'FORMAT JSONEachRow' AS note",
+        'SELECT format FROM events',
+        'SELECT (SELECT value FROM nested FORMAT JSONEachRow) AS value',
+        'SELECT 1 -- FORMAT JSONEachRow',
+        'SELECT 1 /* FORMAT JSONEachRow */',
+    ]) assert.equal(hasTopLevelOutputFormat(sql), false, sql);
+    for (const sql of [
+        'SELECT 1 FORMAT JSONEachRow',
+        'SELECT 1 FORMAT JSONEachRow; -- trailing comment',
+        "SELECT * FROM events INTO OUTFILE 'out.json' FORMAT JSONEachRow",
+        'SELECT 1 SETTINGS max_threads = 2 FORMAT JSONEachRow',
+    ]) assert.equal(hasTopLevelOutputFormat(sql), true, sql);
+});
+test('Read-only guard gives the exploration message for output FORMAT', () => {
+    assert.throws(() => guardSql('SELECT 1 FORMAT JSONEachRow'), {
+        code: 'READ_ONLY_SQL', message: 'FORMAT is not allowed in exploration SQL',
+    });
+});
+test('Read-only guard permits a column named format', () => assert.doesNotThrow(() => guardSql('SELECT format FROM events')));
 test('SQL formatter preserves literals and comments while laying out clauses', () => {
     const formatted = formatSql("select 'a  from  b' as value -- keep  spaces\nfrom events where value = 'x;y' and id = 1;");
     assert.ok(formatted.includes("'a  from  b'"));

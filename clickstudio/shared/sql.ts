@@ -12,6 +12,7 @@ export interface Token {
 export class SqlSyntaxError extends Error {
     constructor(message: string, public readonly position: number) { super(message); }
 }
+export const EXPLORATION_FORMAT_ERROR = 'FORMAT is not allowed in exploration SQL';
 /** A boundary lexer, not a SQL parser or an authorization boundary. */
 export function lexSql(sql: string): Token[] {
     const out: Token[] = [];
@@ -93,6 +94,30 @@ export function lexSql(sql: string): Token[] {
     }
     return out;
 }
+
+export function hasTopLevelOutputFormat(sql: string): boolean {
+    const tokens = lexSql(sql);
+    let depth = 0;
+    for (let i = 0; i < tokens.length; i++) {
+        const token = tokens[i]!;
+        if (token.kind === 'symbol') {
+            if (token.text === '(') depth++;
+            else if (token.text === ')') depth = Math.max(0, depth - 1);
+            continue;
+        }
+        if (depth !== 0 || token.kind !== 'word' || token.text.toUpperCase() !== 'FORMAT')
+            continue;
+        if (tokens[i + 1]?.kind !== 'word')
+            continue;
+        let afterFormat = i + 2;
+        if (tokens[afterFormat]?.kind === 'symbol' && tokens[afterFormat]?.text === ';')
+            afterFormat++;
+        if (afterFormat === tokens.length)
+            return true;
+    }
+    return false;
+}
+
 export function splitSql(sql: string): Statement[] {
     const tokens = lexSql(sql), result: Statement[] = [];
     let from = 0, meaningful = false;
