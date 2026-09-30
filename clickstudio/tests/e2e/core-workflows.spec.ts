@@ -34,6 +34,35 @@ async function runQuery(page: Page) {
     return results;
 }
 
+async function mockFailedScriptWithoutRunId(page: Page, id: string, sql: string) {
+    const [failedSql, skippedSql] = sql.split(/;\s*/);
+    if (!failedSql || !skippedSql) throw new Error('The script fixture must include a statement to skip.');
+    const statement = { sql: failedSql, from: 0, to: failedSql.length };
+    const skippedStatement = { sql: skippedSql, from: sql.indexOf(skippedSql), to: sql.length };
+    const created = {
+        id, owner: 'local-owner', connectionId: 'demo', sql, createdAt: '2026-09-23T00:00:00.000Z',
+        status: 'running', stopOnError: true, cancelled: false,
+        statements: [{ ...statement, status: 'running' }, { ...skippedStatement, status: 'pending' }],
+    };
+    const failed = {
+        ...created, status: 'failed',
+        statements: [{ ...statement, status: 'failed', error: {
+            code: 'CLICKHOUSE_ERROR', message: 'Table default.missing_table does not exist.',
+        } }, { ...skippedStatement, status: 'skipped' }],
+    };
+    const createRoute = (url: URL) => url.pathname === '/api/scripts';
+    const pollRoute = (url: URL) => url.pathname === `/api/scripts/${id}`;
+    await page.route(createRoute, async route => {
+        if (route.request().method() !== 'POST') return route.continue();
+        await route.fulfill({ status: 202, json: created });
+    });
+    await page.route(pollRoute, route => route.fulfill({ json: failed }));
+    return async () => {
+        await page.unroute(createRoute);
+        await page.unroute(pollRoute);
+    };
+}
+
 function parserWorkerStub(initialStatus: 'ready' | 'unavailable', initialResult: unknown = {}) {
     return `(() => {
         const NativeWorker = window.Worker;
@@ -1408,6 +1437,46 @@ test('Scripts show each statement outcome and open that statement’s retained r
     await results.getByRole('button', { name: 'Open results in a separate window', exact: true }).click();
     const detachedResults = await detachedResultsPromise;
     await expect(detachedResults.locator('.results-title [data-run-status]')).toHaveAttribute('data-run-status', 'succeeded');
+});
+
+test('Script errors without a statement run ID show the ClickHouse error and failed SQL', async ({ page }) => {
+    await trust(page);
+    const sql = 'SELECT * FROM default.missing_table; SELECT 2';
+    await replaceSql(page, sql);
+    const cleanup = await mockFailedScriptWithoutRunId(page, 'script-create-table-error', sql);
+
+    try {
+        await runScript(page);
+        const results = page.getByRole('region', { name: 'Query results', exact: true });
+        const failure = results.getByTestId('query-failure');
+        const message = 'Table default.missing_table does not exist.';
+        await expect(failure).toContainText('CLICKHOUSE_ERROR');
+        await expect(failure).toContainText(message);
+        await expect(results.getByRole('button', { name: 'Statement 1: failed', exact: true })).toBeVisible();
+        await expect(results.getByRole('button', { name: 'Statement 2: skipped', exact: true })).toBeVisible();
+        await failure.locator('details summary').click();
+        await expect(failure.locator('.result-failure-detail')).toHaveText(message);
+        await expect(failure.locator('.result-execution-sql.is-full')).toHaveText('SELECT * FROM default.missing_table');
+    } finally {
+        await cleanup();
+    }
+});
+
+test('A script error without a run ID keeps the previous result visible', async ({ page }) => {
+    await trust(page);
+    const results = await runQuery(page);
+    const sql = 'SELECT * FROM default.missing_table; SELECT 2';
+    await replaceSql(page, sql);
+    const cleanup = await mockFailedScriptWithoutRunId(page, 'script-create-table-error-with-previous-run', sql);
+
+    try {
+        await runScript(page);
+        await expect(results.getByTestId('query-failure')).toContainText('CLICKHOUSE_ERROR');
+        await expect(results.locator('.result-provenance-header')).toContainText('Previous result');
+        await expect(results.getByRole('table', { name: 'Retained query rows' })).toBeVisible();
+    } finally {
+        await cleanup();
+    }
 });
 
 test('Script polling persists every statement run ID, including fast intermediate results', async ({ page }) => {

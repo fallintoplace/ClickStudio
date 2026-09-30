@@ -144,8 +144,9 @@ export function WorkspaceResultsPanel({
     const resultsPageIndex = showPreviousResult ? retainedExecutionResult!.pageIndex : page;
     const executionSql = execution?.sql.replace(/\s+/g, ' ').trim();
     const executionSqlPreview = executionSql && executionSql.length > 180 ? `${executionSql.slice(0, 177).trimEnd()}…` : executionSql;
-    const failureError = failedAttempt?.error ?? (run?.status === 'failed' ? run.error : undefined);
-    const failureSql = failedAttempt?.statementSql ?? (run?.status === 'failed' ? run.sql : undefined);
+    const failedScriptStatement = script?.statements.find(statement => statement.status === 'failed' && statement.error);
+    const failureError = failedAttempt?.error ?? failedScriptStatement?.error ?? (run?.status === 'failed' ? run.error : undefined);
+    const failureSql = failedAttempt?.statementSql ?? failedScriptStatement?.sql ?? (run?.status === 'failed' ? run.sql : undefined);
     const failurePreview = failureError ? failureMessagePreview(failureError.message) : undefined;
     const resultProvenance = visibleResultsView !== 'sqlmap' && !execution
         ? failedAttempt && run
@@ -155,7 +156,7 @@ export function WorkspaceResultsPanel({
                 : undefined
         : undefined;
 
-    if (!run && !execution && !failedAttempt && visibleResultsView !== 'sqlmap' && !detached) return null;
+    if (!run && !execution && !failedAttempt && !failedScriptStatement && visibleResultsView !== 'sqlmap' && !detached) return null;
 
     return <section
         ref={resultsPanelRef}
