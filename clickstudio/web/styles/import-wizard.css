@@ -215,7 +215,6 @@
 .import-column-map tbody td > select:focus-visible { border-color: var(--accent); }
 .import-column-type-cell { padding-inline: 10px; }
 .import-column-type { display: inline-flex; max-width: 100%; min-height: 24px; align-items: center; overflow: hidden; padding: 3px 7px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); color: var(--muted); font-family: var(--font-mono); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
-.import-column-type:focus-visible { outline: 2px solid var(--focus-color); outline-offset: 2px; }
 .import-column-type:not(:empty) { color: var(--text-soft); }
 
 .import-review-step { display: grid; gap: 14px; }
