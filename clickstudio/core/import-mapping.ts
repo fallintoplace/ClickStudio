@@ -36,6 +36,34 @@ function stringValue(value: Json): string {
     return String(value);
 }
 
+function unwrappedType(type: string) {
+    let current = type.trim();
+    while (true) {
+        const wrapper = current.match(/^(?:Nullable|LowCardinality)\((.*)\)$/);
+        if (!wrapper) return current;
+        current = wrapper[1]!.trim();
+    }
+}
+
+function valueFitsKnownType(value: Json, type: string): boolean | undefined {
+    const baseType = unwrappedType(type);
+    const integerType = baseType.match(/^(UInt|Int)(8|16|32|64|128|256)$/);
+    if (integerType) {
+        if (typeof value !== 'string' && typeof value !== 'number') return false;
+        const text = String(value).trim();
+        if (!/^[+-]?\d+$/.test(text)) return false;
+        const digits = text.replace(/^[+-]/, '').replace(/^0+/, '') || '0';
+        if (digits.length > 78) return false;
+        const integer = BigInt(`${text.startsWith('-') ? '-' : ''}${digits}`);
+        const bits = BigInt(integerType[2]!);
+        const unsigned = integerType[1] === 'UInt';
+        const minimum = unsigned ? 0n : -(1n << (bits - 1n));
+        const maximum = unsigned ? (1n << bits) - 1n : (1n << (bits - 1n)) - 1n;
+        return integer >= minimum && integer <= maximum;
+    }
+    return undefined;
+}
+
 export function mapImportRows(
     sourceRows: Record<string, Json>[],
     sourceColumns: string[],
@@ -72,6 +100,10 @@ export function mapImportRows(
             const value = row[source]!;
             if (value === null && !isNullable(column.type))
                 throw new ImportMappingError('IMPORT_NULL_VALUE', `Input row ${rowIndex + 1} has null for non-nullable destination ${destination}.`);
+            if (value !== null && valueFitsKnownType(value, column.type) === false) {
+                const displayValue = typeof value === 'string' ? value.replace(/\s+/g, ' ').slice(0, 80) : stringValue(value).slice(0, 80);
+                throw new ImportMappingError('IMPORT_VALUE_TYPE', `Input row ${rowIndex + 1}: ${JSON.stringify(source)} value ${JSON.stringify(displayValue)} cannot be inserted into ${JSON.stringify(destination)} (${column.type}). Check the value or choose a matching column.`);
+            }
             mapped[destination] = isStringType(column.type) && value !== null && typeof value !== 'string'
                 ? stringValue(value)
                 : value;
