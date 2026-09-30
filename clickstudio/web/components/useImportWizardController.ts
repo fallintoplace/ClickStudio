@@ -32,8 +32,62 @@ async function loadConnectionImportSetup(connectionId: string, cloudImport: bool
     return await loadImportSetup(connectionId, signal);
 }
 
-function pendingImportForJob(job: ImportJob): PendingImport {
-    return { id: job.id, table: job.table, rows: job.rows, name: 'Previous import', ...(job.queryId ? { queryId: job.queryId } : {}), ...(job.deduplicationToken ? { deduplicationToken: job.deduplicationToken } : {}) };
+const retryPayloadMismatchMessage = 'This file, format, destination, and mapping could not be verified against the previous import. Choose the original file and mapping to retry, or start a new import.';
+
+async function importPayloadFingerprint(file: File | undefined, format: ImportFormat | undefined, connectionId: string, table: string, fields: Record<string, string>): Promise<string | undefined> {
+    const subtle = globalThis.crypto?.subtle;
+    if (!file || !format || !subtle) return undefined;
+    try {
+        const fileDigest = await subtle.digest('SHA-256', await file.arrayBuffer());
+        const fileHash = Array.from(new Uint8Array(fileDigest), byte => byte.toString(16).padStart(2, '0')).join('');
+        const cloudConnection = connectionId === CLICKHOUSE_CLOUD_CONNECTION_ID ? getClickHouseCloudConnection() : undefined;
+        const payload = JSON.stringify({
+            version: 1,
+            connectionId,
+            ...(cloudConnection ? { cloudHost: cloudConnection.host.toLowerCase(), cloudDatabase: cloudConnection.database } : {}),
+            table,
+            format,
+            fileHash,
+            fields: Object.entries(fields).sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0),
+        });
+        const digest = await subtle.digest('SHA-256', new TextEncoder().encode(payload));
+        const hash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+        return `sha256-v1:${hash}`;
+    } catch {
+        return undefined;
+    }
+}
+
+function canReuseImportRetry(pendingImport: PendingImport | undefined, fingerprint: string | undefined): boolean {
+    return pendingImport?.retryDeduplicationToken !== undefined &&
+        fingerprint !== undefined &&
+        pendingImport.payloadFingerprint === fingerprint;
+}
+
+function pendingImportForJob(job: ImportJob, previous?: PendingImport): PendingImport {
+    const sameJob = previous?.id === job.id ? previous : undefined;
+    return {
+        id: job.id,
+        table: job.table,
+        rows: job.rows,
+        name: sameJob?.name ?? 'Previous import',
+        ...(job.queryId ? { queryId: job.queryId } : sameJob?.queryId ? { queryId: sameJob.queryId } : {}),
+        ...(job.deduplicationToken ? { deduplicationToken: job.deduplicationToken } : sameJob?.deduplicationToken ? { deduplicationToken: sameJob.deduplicationToken } : {}),
+        ...(sameJob?.payloadFingerprint ? { payloadFingerprint: sameJob.payloadFingerprint } : {}),
+        ...(sameJob?.retryDeduplicationToken !== undefined ? { retryDeduplicationToken: sameJob.retryDeduplicationToken } : {}),
+        ...(sameJob?.retryOriginId ? { retryOriginId: sameJob.retryOriginId } : {}),
+    };
+}
+
+function retryIntentForJob(job: ImportJob, previous?: PendingImport): PendingImport {
+    const sameJob = previous?.id === job.id ? previous : undefined;
+    const base = pendingImportForJob(job, sameJob);
+    const retryDeduplicationToken = job.deduplicationToken !== undefined
+        ? job.deduplicationToken
+        : sameJob?.retryDeduplicationToken !== undefined
+            ? sameJob.retryDeduplicationToken
+            : sameJob?.deduplicationToken ?? null;
+    return { ...base, retryDeduplicationToken };
 }
 
 function pendingImportForRecoveredJob(stored: PendingImport | undefined, recovered: ImportJob): PendingImport {
@@ -341,6 +395,7 @@ async function forgetCloudImport(context: ForgetCloudImportContext) {
 async function runCommitImport(context: ImportActionSetters & {
     mapping?: ImportMapping;
     deduplicationToken?: string | null;
+    retryPayloadFingerprint?: string;
     busy: BusyAction;
     browserDemoImport: boolean;
     browserCloudImport: boolean;
@@ -360,15 +415,26 @@ async function runCommitImport(context: ImportActionSetters & {
     retryOriginId?: string;
     onSucceeded?: (job: ImportJob, pendingImport: PendingImport) => void;
 }) {
-    const { mapping: initialMapping, deduplicationToken: retryDeduplicationToken, retryOriginId, onSucceeded, busy, browserDemoImport, browserCloudImport, file, format, creatingTable, schema, createTableDatabase, createTableName, createColumns, generateId, importConnectionId, preview,
+    const { mapping: initialMapping, deduplicationToken: retryDeduplicationToken, retryPayloadFingerprint, retryOriginId, onSucceeded, busy, browserDemoImport, browserCloudImport, file, format, creatingTable, schema, createTableDatabase, createTableName, createColumns, generateId, importConnectionId, preview,
         setJob, setStep, setBusy, setError, setMapping, setTargets, setSchema, setTarget, setLastExistingTarget, setFields, setRecoveryState, setRecoverableJobs, setPendingImport, savePendingImport, clearPendingImport, rememberJob } = context;
     if (!initialMapping || busy) return;
+    const currentPayloadFingerprint = await importPayloadFingerprint(file, format ?? preview?.format, initialMapping.connectionId, initialMapping.table, initialMapping.fields);
+    if (retryDeduplicationToken !== undefined && (retryPayloadFingerprint === undefined || currentPayloadFingerprint !== retryPayloadFingerprint)) {
+        setError(retryPayloadMismatchMessage);
+        setStep('file');
+        return;
+    }
+    const payloadFingerprint = currentPayloadFingerprint ?? initialMapping.payloadFingerprint;
     const useAutomaticDeduplication = retryDeduplicationToken === null ||
         (retryDeduplicationToken === undefined && initialMapping.deduplicationToken === null);
     const deduplicationToken = useAutomaticDeduplication
         ? undefined
         : retryDeduplicationToken ?? initialMapping.deduplicationToken ?? crypto.randomUUID();
-    const mapping = initialMapping.deduplicationToken === deduplicationToken ? initialMapping : { ...initialMapping, deduplicationToken };
+    const mapping: ImportMapping = {
+        ...initialMapping,
+        ...(payloadFingerprint ? { payloadFingerprint } : {}),
+        ...(initialMapping.deduplicationToken === deduplicationToken ? {} : { deduplicationToken }),
+    };
     const preserveRetryForRemap = () => {
         if (retryDeduplicationToken === undefined) {
             clearPendingImport();
@@ -380,13 +446,14 @@ async function runCommitImport(context: ImportActionSetters & {
             rows: mapping.rowCount,
             name: preview?.name ?? 'Previous import',
             ...(retryDeduplicationToken ? { deduplicationToken: retryDeduplicationToken } : {}),
+            ...(mapping.payloadFingerprint ? { payloadFingerprint: mapping.payloadFingerprint } : {}),
             retryDeduplicationToken,
             ...(retryOriginId !== undefined ? { retryOriginId } : {}),
         });
     };
     setMapping(mapping);
     const queryId = browserCloudImport ? `clickstudio-import-${mapping.id}` : undefined;
-    const record: PendingImport = { id: mapping.id, table: mapping.table, rows: mapping.rowCount, name: preview?.name ?? 'Selected file', ...(deduplicationToken ? { deduplicationToken } : {}), ...(queryId ? { queryId } : {}), ...(retryOriginId !== undefined ? { retryDeduplicationToken: retryDeduplicationToken ?? null, retryOriginId } : {}) };
+    const record: PendingImport = { id: mapping.id, table: mapping.table, rows: mapping.rowCount, name: preview?.name ?? 'Selected file', ...(deduplicationToken ? { deduplicationToken } : {}), ...(mapping.payloadFingerprint ? { payloadFingerprint: mapping.payloadFingerprint } : {}), ...(queryId ? { queryId } : {}), ...(retryOriginId !== undefined ? { retryDeduplicationToken: retryDeduplicationToken ?? null, retryOriginId } : {}) };
     savePendingImport(record);
     setJob({ id: mapping.id, table: mapping.table, rows: mapping.rowCount, ...(deduplicationToken ? { deduplicationToken } : {}), status: 'running', ...(queryId ? { queryId } : {}) });
     setStep('status');
@@ -540,7 +607,7 @@ async function runReviewUnknownImport(context: ImportActionSetters & {
             if (status.status !== 'unknown') {
                 rememberJob(status);
                 if (status.status === 'succeeded') advanceRecoveredQueue({ resolvedJob: status, retryIntent, ...context });
-                else if (retryIntent?.id === status.id) savePendingImport(pendingImportForJob(status));
+                else if (retryIntent?.id === status.id) savePendingImport(pendingImportForJob(status, retryIntent));
                 return false;
             }
             const reviewed = { ...status, reviewedAt: new Date().toISOString() };
@@ -564,12 +631,12 @@ async function runReviewUnknownImport(context: ImportActionSetters & {
         if (next.status !== 'unknown') {
             rememberJob(next);
             if (next.status === 'succeeded') advanceRecoveredQueue({ resolvedJob: next, retryIntent, ...context });
-            else if (retryIntent?.id === next.id) savePendingImport(pendingImportForJob(next));
+            else if (retryIntent?.id === next.id) savePendingImport(pendingImportForJob(next, retryIntent));
             return false;
         }
         if (!next.reviewedAt) {
             rememberJob(next);
-            if (retryIntent?.id === next.id) savePendingImport(pendingImportForJob(next));
+            if (retryIntent?.id === next.id) savePendingImport(pendingImportForJob(next, retryIntent));
             return false;
         }
         const hasFollowing = advanceRecoveredQueue({ resolvedJob: next, retryIntent, keepRetryForResolved: true, ...context });
@@ -787,15 +854,8 @@ async function runRetryUnknownImport(context: RetryUnknownImportContext) {
         setRecoverableJobs, setPendingImport, setImportUnavailable } = context;
     if (!job || job.status !== 'unknown' || busy) return;
     if (!preview || !mapping || mapping.id !== job.id || (browserCloudImport && (!file || !format))) {
-        const retryIntent = pendingImport?.retryDeduplicationToken !== undefined ? pendingImport : {
-            id: job.id,
-            table: job.table,
-            rows: job.rows,
-            name: 'Previous import',
-            ...(job.deduplicationToken ? { deduplicationToken: job.deduplicationToken } : {}),
-            retryDeduplicationToken: job.deduplicationToken ?? null,
-        };
-        savePendingImport(pendingImport?.retryDeduplicationToken !== undefined ? retryIntent : pendingImportForJob(job));
+        const retryIntent = pendingImport?.retryDeduplicationToken !== undefined ? pendingImport : retryIntentForJob(job, pendingImport);
+        savePendingImport(retryIntent);
         const reviewed = await reviewUnknownImport(retryIntent);
         if (reviewed) {
             savePendingImport(retryIntent);
@@ -831,16 +891,15 @@ async function runRetryUnknownImport(context: RetryUnknownImportContext) {
             }
         }
 
-        const retryIntent: PendingImport = {
-            id: job.id,
-            table: job.table,
-            rows: job.rows,
-            name: 'Previous import',
-            ...(job.deduplicationToken ? { deduplicationToken: job.deduplicationToken } : {}),
-            retryDeduplicationToken: job.deduplicationToken ?? null,
-        };
+        const retryIntent = retryIntentForJob(job, pendingImport);
         savePendingImport(retryIntent);
         setRetryImportConfirmed(true);
+        const retryPayloadFingerprint = await importPayloadFingerprint(file, format ?? preview.format, importConnectionId, mapping.table, mapping.fields);
+        if (!canReuseImportRetry(retryIntent, retryPayloadFingerprint)) {
+            setStep('file');
+            setError(retryPayloadMismatchMessage);
+            return;
+        }
         let retrySchema = schema;
         let retryTarget = target;
         let retryCreatingTable = creatingTable;
@@ -888,7 +947,7 @@ async function runRetryUnknownImport(context: RetryUnknownImportContext) {
                     setCreateTableName(retryCreateTableName);
                 }
             }
-            retryMapping = { ...mapping, id: crypto.randomUUID(), table: job.table, deduplicationToken: job.deduplicationToken ?? mapping.deduplicationToken };
+            retryMapping = { ...mapping, id: crypto.randomUUID(), table: job.table, deduplicationToken: job.deduplicationToken ?? mapping.deduplicationToken, payloadFingerprint: retryPayloadFingerprint };
             setSchema(retrySchema);
             setTarget(retryTarget);
         } else {
@@ -898,6 +957,7 @@ async function runRetryUnknownImport(context: RetryUnknownImportContext) {
                 fields: mapping.fields,
                 deduplicationToken: job.deduplicationToken ?? null,
             });
+            retryMapping = { ...retryMapping, payloadFingerprint: retryPayloadFingerprint };
         }
 
         setRetryAttemptedFor(retryMapping.id);
@@ -910,6 +970,7 @@ async function runRetryUnknownImport(context: RetryUnknownImportContext) {
         await runCommitImport({
             mapping: retryMapping, busy: '',
             deduplicationToken: job.deduplicationToken ?? null,
+            retryPayloadFingerprint: retryIntent.payloadFingerprint,
             retryOriginId: retryIntent.id,
             onSucceeded: (resolvedJob, activeImport) => advanceRecoveredRetry(resolvedJob, remainingRecoverableJobs, activeImport, setJob, setRecoverableJobs, savePendingImport, clearPendingImport),
             browserDemoImport, browserCloudImport, file, format, creatingTable: retryCreatingTable, schema: retrySchema,
@@ -1096,19 +1157,24 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
         setBusy('mapping');
         setError('');
         try {
+            const payloadFingerprint = await importPayloadFingerprint(file, format ?? preview.format, importConnectionId, retryTable, selectedFields);
+            const retrySelected = retryImportConfirmed && pendingImport?.retryDeduplicationToken !== undefined;
+            const retryMapping = retrySelected && canReuseImportRetry(pendingImport, payloadFingerprint);
+            if (retrySelected && !retryMapping) {
+                setStep('file');
+                throw new Error(retryPayloadMismatchMessage);
+            }
             let next: ImportMapping;
             if (browserCloudImport) {
                 const cloud = getClickHouseCloudConnection();
                 if (!cloud) throw new Error('Reconnect to ClickHouse Cloud before reviewing the import.');
                 const table = creatingTable ? `${createTableDatabase}.${createTableName}` : target;
-                const retryMapping = retryImportConfirmed && pendingImport?.table === table && pendingImport.retryDeduplicationToken !== undefined;
                 if (creatingTable && !schema?.databases?.includes(createTableDatabase)) throw new Error('Choose a database visible to this ClickHouse user.');
                 if (creatingTable && !/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(createTableName)) throw new Error('Use letters, numbers, and underscores for the new table name.');
                 const sourceRows = cloudRows.length ? cloudRows : preview.rows;
                 const mapped = mapImportRows(sourceRows, preview.columns, selectedFields, destinationColumns);
                 next = { id: crypto.randomUUID(), deduplicationToken: retryMapping ? pendingImport.retryDeduplicationToken! : crypto.randomUUID(), inputId: preview.id, connectionId: importConnectionId, table, fields: selectedFields, rows: mapped.rows, rowCount: sourceRows.length, missingFields: mapped.missingFields };
             } else {
-                const retryMapping = retryImportConfirmed && pendingImport?.table === target && pendingImport.retryDeduplicationToken !== undefined;
                 next = await post<ImportMapping>(`/imports/${encodeURIComponent(preview.id)}/mapping`, {
                     connectionId: importConnectionId,
                     table: target,
@@ -1116,7 +1182,7 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
                     ...(retryMapping ? { deduplicationToken: pendingImport.retryDeduplicationToken } : {}),
                 });
             }
-            setMapping(next);
+            setMapping({ ...next, ...(payloadFingerprint ? { payloadFingerprint } : {}) });
             setStep('review');
         } catch (caught) {
             setError(message(caught));
@@ -1128,13 +1194,20 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
             setError(`Choose ${pendingImport.table} to retry this import, or go back and start a new import for another table.`);
             return;
         }
-        const retryOriginId = mapping && pendingImport && retryImportConfirmed && pendingImport.table === mapping.table && pendingImport.retryDeduplicationToken !== undefined
+        const retrySelected = Boolean(mapping && pendingImport && retryImportConfirmed && pendingImport.table === mapping.table && pendingImport.retryDeduplicationToken !== undefined);
+        if (retrySelected && !canReuseImportRetry(pendingImport, mapping?.payloadFingerprint)) {
+            setStep('file');
+            setError(retryPayloadMismatchMessage);
+            return;
+        }
+        const retryOriginId = retrySelected && mapping && pendingImport
             ? pendingImport.retryOriginId ?? pendingImport.id : undefined;
         await runCommitImport({
             mapping, busy, browserDemoImport, browserCloudImport, file, format,
-            deduplicationToken: retryImportConfirmed && mapping && pendingImport?.table === mapping.table && pendingImport.retryDeduplicationToken !== undefined
+            deduplicationToken: retrySelected && pendingImport
                 ? pendingImport.retryDeduplicationToken
                 : undefined,
+            retryPayloadFingerprint: retrySelected ? pendingImport?.payloadFingerprint : undefined,
             retryOriginId,
             onSucceeded: retryOriginId === undefined ? undefined : (resolvedJob, activeImport) => advanceRecoveredRetry(resolvedJob, recoverableJobs, activeImport, setJob, setRecoverableJobs, savePendingImport, clearPendingImport),
             creatingTable, schema, createTableDatabase, createTableName, createColumns, generateId, importConnectionId, preview,
