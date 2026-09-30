@@ -21,6 +21,8 @@ import { mergeTreePartsQuery, parseMergeTreeParts, type MergeTreePartsSnapshot }
 type CloudCredentials = { host: string; database: string; username: string; password: string };
 const MAX_SQL_LENGTH = 200_000;
 const MAX_RESULT_ROWS = 1_000;
+const MAX_INSPECTOR_RESULT_ROWS = 2_000;
+const MAX_REFERENCE_RESULT_ROWS = 6_000;
 const MAX_RESULT_BYTES = 2_000_000;
 const MAX_EXECUTION_SECONDS = 45;
 const MAX_IMPORT_FILE_BYTES = 2_000_000;
@@ -117,14 +119,14 @@ function asString(value: unknown): string {
     return value === null || value === undefined ? '' : String(value);
 }
 
-async function queryRows<T>(client: ReturnType<typeof makeClient>, query: string, queryParams: Record<string, string> = {}, timeoutMs = 48_000, maxExecutionSeconds = MAX_EXECUTION_SECONDS): Promise<T[]> {
+export async function queryRows<T>(client: ReturnType<typeof makeClient>, query: string, queryParams: Record<string, string> = {}, timeoutMs = 48_000, maxExecutionSeconds = MAX_EXECUTION_SECONDS, maxResultRows = MAX_INSPECTOR_RESULT_ROWS): Promise<T[]> {
     const result = await client.query({
         query,
         format: 'JSONEachRow',
         query_params: queryParams,
         query_id: `clickstudio-inspect-${randomUUID()}`,
         abort_signal: AbortSignal.timeout(timeoutMs),
-        clickhouse_settings: { ...clickhouseSettings, max_execution_time: maxExecutionSeconds, max_result_rows: '2000', max_result_bytes: String(MAX_RESULT_BYTES), result_overflow_mode: 'throw' },
+        clickhouse_settings: { ...clickhouseSettings, max_execution_time: maxExecutionSeconds, max_result_rows: String(maxResultRows), max_result_bytes: String(MAX_RESULT_BYTES), result_overflow_mode: 'throw' },
     });
     return await result.json<T>();
 }
@@ -454,11 +456,11 @@ async function cloudReferenceSearch(credentials: CloudCredentials, url: string, 
     try {
         const built = buildReferenceSearchQuery(query, category, true);
         let rows: Omit<ClickHouseDocumentationSummary, 'origin'>[];
-        try { rows = await queryRows(client, built.sql, built.parameters, 12_000, 10); }
+        try { rows = await queryRows(client, built.sql, built.parameters, 12_000, 10, MAX_REFERENCE_RESULT_ROWS); }
         catch (error) {
             if (!isMissingDocumentationSourceColumn(error)) throw error;
             const fallback = buildReferenceSearchQuery(query, category, false);
-            rows = await queryRows(client, fallback.sql, fallback.parameters, 12_000, 10);
+            rows = await queryRows(client, fallback.sql, fallback.parameters, 12_000, 10, MAX_REFERENCE_RESULT_ROWS);
         }
         return rows.map(row => ({ ...row, origin: 'native' }));
     } finally { await client.close(); }
