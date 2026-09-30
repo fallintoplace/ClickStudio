@@ -269,9 +269,10 @@ test('File import reports an unknown insert without retrying automatically', asy
     await dialog.getByRole('button', { name: 'Import rows', exact: true }).click();
 
     await expect(dialog).toContainText('We couldn’t confirm the import.');
-    await expect(dialog).toContainText('The rows may already be in demo.events. Check the table before choosing. A late first import may add duplicate rows.');
-    await expect(dialog.getByRole('button', { name: 'I see all rows' })).toBeVisible();
-    await expect(dialog.getByRole('button', { name: 'No rows; retry import' })).toBeVisible();
+    await expect(dialog).toContainText('The rows may already be in demo.events. A late first import may add duplicate rows.');
+    await expect(dialog.getByRole('button', { name: 'I checked; the rows are there' })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Rows missing; retry original file' })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Check status' })).toHaveCount(0);
     await expect(dialog.getByRole('button', { name: 'Import another file' })).toHaveCount(0);
     expect(commitRequests).toBe(1);
 });
@@ -302,12 +303,8 @@ test('File import reloads the destination mapping when the server detects a sche
 test('File import recovers ambiguous writes without local storage and records a manual review', async ({ page }) => {
     await mockWritableWorkspace(page);
     let recoverable: Record<string, unknown>[] = [{ id: 'saved-import', connectionId: 'live', table: 'demo.events', queryId: 'clickstudio-import-test', rows: 2, createdAt: '2026-09-23T00:00:00.000Z', status: 'unknown', reconciliationRequired: true, error: 'The insert may have partially completed.' }];
-    let reconcileRequests = 0, reviewBody: Record<string, unknown> | undefined, previewRequests = 0;
+    let reviewBody: Record<string, unknown> | undefined, previewRequests = 0;
     await page.route(url => url.pathname === '/api/imports' && url.searchParams.get('recoverable') === 'true', route => route.fulfill({ json: recoverable }));
-    await page.route('**/api/imports/saved-import/reconcile', async route => {
-        reconcileRequests++;
-        await route.fulfill({ json: { ...recoverable[0], status: 'unknown', reconciliationRequired: false, error: 'ClickHouse could not confirm the import.' } });
-    });
     await page.route('**/api/imports/saved-import/review', async route => {
         reviewBody = route.request().postDataJSON() as Record<string, unknown>;
         const job = recoverable[0]!;
@@ -320,10 +317,9 @@ test('File import recovers ambiguous writes without local storage and records a 
     const dialog = page.getByRole('dialog', { name: 'Import data', exact: true });
     await expect(dialog.getByRole('region', { name: 'Import status' })).toContainText('We couldn’t confirm the import.');
     await expect(dialog.getByLabel('Choose a CSV, JSON, or NDJSON file')).toHaveCount(0);
-    await dialog.getByRole('button', { name: 'Check status' }).click();
-    await expect(dialog).toContainText('The rows may already be in demo.events. Check the table before choosing. A late first import may add duplicate rows.');
-    expect(reconcileRequests).toBe(1);
-    await dialog.getByRole('button', { name: 'No rows; choose file again' }).click();
+    await expect(dialog).toContainText('The rows may already be in demo.events. A late first import may add duplicate rows.');
+    await expect(dialog.getByRole('button', { name: 'Check status' })).toHaveCount(0);
+    await dialog.getByRole('button', { name: 'Rows missing; choose original file' }).click();
     await expect(dialog.getByLabel('Choose a CSV, JSON, or NDJSON file')).toBeVisible();
     expect(reviewBody).toEqual({ inspected: true, noActiveInsert: true });
     expect(previewRequests).toBe(0);

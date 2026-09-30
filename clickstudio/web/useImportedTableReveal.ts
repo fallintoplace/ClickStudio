@@ -116,7 +116,7 @@ export function useImportedTableReveal({ connectionId, demoMode, canRevealSqlTab
         setSearch('');
         setImportedTableTarget({ id: job.id, table: job.table, source: 'partial' });
         revealInspector();
-        setNotice(`The destination ${job.table} exists, but the imported rows are not confirmed. Showing it in Objects so you can inspect it.`);
+        setNotice(`Opening ${job.table} in Objects. Check whether the imported rows are there.`);
         void loadSchema(true);
     }, [loadSchema, revealInspector, setNotice, setSearch]);
 
@@ -125,7 +125,7 @@ export function useImportedTableReveal({ connectionId, demoMode, canRevealSqlTab
         latestImportIdRef.current = undefined;
         setImportedTableTarget(current => current?.id === target.id ? undefined : current);
         setNotice(target.source === 'partial'
-            ? `Showing ${target.table} in Objects. The imported rows are still unconfirmed.`
+            ? `Selected ${target.table} in Objects. Check whether the imported rows are there.`
             : target.source === 'sql'
             ? `Created ${target.table} from imported SQL. The table is selected in Objects.`
             : `Imported ${(target.rows ?? 0).toLocaleString()} ${target.rows === 1 ? 'row' : 'rows'} into ${target.table}. The table is selected in Objects.`);

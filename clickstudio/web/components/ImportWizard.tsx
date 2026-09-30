@@ -66,6 +66,7 @@ export function ImportWizard({ onImportQuery, importCopy, ...controllerProps }: 
         duplicateDestinations,
         sampleColumns,
         closeWizard,
+        openImportDestination,
         forgetImport,
         chooseFile,
         previewFile,
@@ -73,7 +74,6 @@ export function ImportWizard({ onImportQuery, importCopy, ...controllerProps }: 
         changeTarget,
         previewMapping,
         commitImport,
-        reconcileJob,
         confirmUnknownImport,
         retryUnknownImport,
         retryAttemptedFor,
@@ -405,8 +405,8 @@ export function ImportWizard({ onImportQuery, importCopy, ...controllerProps }: 
                 {recoveryState === 'ready' && !importUnavailable && step === 'status' && <ImportJobStatus
                     job={job} pendingImport={pendingImport} browserDemoImport={browserDemoImport} browserCloudImport={browserCloudImport}
                     recoverableJobCount={recoverableJobs.length} busy={busy} retryAttempted={retryAttemptedFor === job?.id}
-                    canRetry={canRetryUnknownImport} onReconcile={() => void reconcileJob()} onConfirm={() => void confirmUnknownImport()}
-                    onRetry={() => void retryUnknownImport()} onForget={forgetImport}
+                    canRetry={canRetryUnknownImport} onConfirm={() => void confirmUnknownImport()}
+                    onRetry={() => void retryUnknownImport()} onOpenDestination={openImportDestination} onForget={forgetImport}
                 />}
 
                 {error && recoveryState !== 'failed' && <p role="alert" className="mt-4 rounded-lg border border-[var(--red)]/30 bg-[var(--red)]/5 px-3 py-2.5 text-xs leading-relaxed text-[var(--red)]">{error}</p>}

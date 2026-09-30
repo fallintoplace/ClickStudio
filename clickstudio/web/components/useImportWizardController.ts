@@ -76,6 +76,7 @@ function pendingImportForJob(job: ImportJob, previous?: PendingImport): PendingI
         ...(sameJob?.payloadFingerprint ? { payloadFingerprint: sameJob.payloadFingerprint } : {}),
         ...(sameJob?.retryDeduplicationToken !== undefined ? { retryDeduplicationToken: sameJob.retryDeduplicationToken } : {}),
         ...(sameJob?.retryOriginId ? { retryOriginId: sameJob.retryOriginId } : {}),
+        ...(sameJob?.inspectionOpened ? { inspectionOpened: true } : {}),
     };
 }
 
@@ -1102,6 +1103,12 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
         setPendingImport(undefined);
     }
 
+    function openImportDestination() {
+        if (!job || job.status !== 'unknown' || !job.tableExists || !job.table) return;
+        savePendingImport({ ...pendingImportForJob(job, pendingImport), inspectionOpened: true });
+        void closeWizard();
+    }
+
     const actionSetters: ImportActionSetters = {
         setJob, setStep, setBusy, setError, setMapping, setTargets, setSchema, setTarget, setLastExistingTarget, setFields,
         setRecoveryState, setRecoverableJobs, setPendingImport, setImportUnavailable,
@@ -1216,20 +1223,6 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
         });
     }
 
-    async function reconcileJob() {
-        if (!job || busy) return;
-        setBusy('reconcile');
-        setError('');
-        try {
-            const next = browserCloudImport && job.queryId
-            ? await checkClickHouseCloudImport(job.queryId, job.table, job.rows, job.deduplicationToken)
-                : await post<ImportJob>(`/imports/${encodeURIComponent(job.id)}/reconcile`);
-            rememberJob(next);
-            if (next.status === 'succeeded') advanceRecoveredQueue({ resolvedJob: next, recoverableJobs, retryIntent: pendingImport, ...actionSetters, savePendingImport, clearPendingImport });
-        } catch (caught) { setError(`Could not check ClickHouse import status: ${message(caught)}`); }
-        finally { setBusy(''); }
-    }
-
     async function reviewUnknownImport(retryIntent?: PendingImport) {
         return runReviewUnknownImport({
             job, busy, browserCloudImport, importConnectionId, recoverableJobs, retryIntent, savePendingImport,
@@ -1297,6 +1290,7 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
         createColumnTypes: CREATE_TABLE_COLUMN_TYPES,
         updateCreateColumn,
         closeWizard,
+        openImportDestination,
         forgetImport: () => forgetCloudImport({ job, pendingImport, busy, browserCloudImport, importConnectionId, clearPendingImport, chooseFile, setRetryAttemptedFor, ...actionSetters }),
         chooseFile,
         previewFile,
@@ -1304,7 +1298,6 @@ export function useImportWizardController({ open, connectionId, trusted, demoMod
         changeTarget,
         previewMapping,
         commitImport,
-        reconcileJob,
         confirmUnknownImport,
         retryUnknownImport,
         retryAttemptedFor,

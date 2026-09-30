@@ -47,8 +47,8 @@ export type ImportJob = {
     demoRows?: Record<string, Json>[];
     demoPersisted?: boolean;
 };
-export type PendingImport = { id: string; table: string; rows: number; name: string; queryId?: string; deduplicationToken?: string; payloadFingerprint?: string; retryDeduplicationToken?: string | null; retryOriginId?: string };
-export type BusyAction = '' | 'setup' | 'preview' | 'mapping' | 'commit' | 'recover' | 'reconcile' | 'review';
+export type PendingImport = { id: string; table: string; rows: number; name: string; queryId?: string; deduplicationToken?: string; payloadFingerprint?: string; retryDeduplicationToken?: string | null; retryOriginId?: string; inspectionOpened?: boolean };
+export type BusyAction = '' | 'setup' | 'preview' | 'mapping' | 'commit' | 'recover' | 'review';
 
 export function isPendingImport(value: unknown): value is PendingImport {
     return typeof value === 'object' && value !== null && !Array.isArray(value) &&
@@ -59,7 +59,8 @@ export function isPendingImport(value: unknown): value is PendingImport {
         (!('deduplicationToken' in value) || typeof value.deduplicationToken === 'string' && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(value.deduplicationToken)) &&
         (!('payloadFingerprint' in value) || typeof value.payloadFingerprint === 'string' && /^sha256-v1:[0-9a-f]{64}$/i.test(value.payloadFingerprint)) &&
         (!('retryDeduplicationToken' in value) || value.retryDeduplicationToken === null || typeof value.retryDeduplicationToken === 'string' && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(value.retryDeduplicationToken)) &&
-        (!('retryOriginId' in value) || typeof value.retryOriginId === 'string' && value.retryOriginId.length > 0);
+        (!('retryOriginId' in value) || typeof value.retryOriginId === 'string' && value.retryOriginId.length > 0) &&
+        (!('inspectionOpened' in value) || typeof value.inspectionOpened === 'boolean');
 }
 
 export const MAX_FILE_BYTES = 2_000_000;
