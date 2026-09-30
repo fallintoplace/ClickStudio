@@ -33,6 +33,10 @@ export function referenceId(entry: Pick<ClickHouseDocumentationSummary, 'name' |
     return `${entry.type}\u0000${entry.name}`;
 }
 
+export function isMissingDocumentationSourceColumn(error: unknown) {
+    return error instanceof Error && /\bsource\b.{0,80}(?:unknown (?:expression )?identifier|unknown column|not found|doesn't exist|does not exist)|(?:missing columns|unknown (?:expression )?identifier|unknown column|not found|doesn't exist|does not exist).{0,80}\bsource\b/i.test(error.message);
+}
+
 export function buildReferenceSearchQuery(query: string, category: ReferenceCategory, includeSource = true) {
     const search = query.trim().slice(0, 128);
     const typeNames = category === 'all' ? [] : REFERENCE_TYPES_BY_CATEGORY[category];

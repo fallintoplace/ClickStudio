@@ -1,5 +1,5 @@
 import type { ClickHouseDocumentationEntry, ClickHouseDocumentationSummary, ReferenceCategory, Row } from '../shared/types.js';
-import { buildReferenceEntryQuery, buildReferenceSearchQuery } from '../shared/reference.js';
+import { buildReferenceEntryQuery, buildReferenceSearchQuery, isMissingDocumentationSourceColumn } from '../shared/reference.js';
 import { api, isFrontendDemoPreview, RequestError } from './api.js';
 import { PLAYGROUND_CONNECTION_ID, PlaygroundError, queryPlaygroundWithParams, type PlaygroundQueryResult } from './playground.js';
 import type { Connected } from './workspace-types.js';
@@ -18,10 +18,6 @@ function stringColumn(result: PlaygroundQueryResult, row: Row, name: string) {
 
 function playgroundRows<T>(result: PlaygroundQueryResult, convert: (result: PlaygroundQueryResult, row: Row) => T): T[] {
     return result.rows.map(row => convert(result, row));
-}
-
-function missingSourceColumn(error: unknown) {
-    return error instanceof Error && /\bsource\b.{0,80}(?:unknown identifier|unknown column|not found|doesn't exist|does not exist)|(?:missing columns|unknown identifier|unknown column|not found|doesn't exist|does not exist).{0,80}\bsource\b/i.test(error.message);
 }
 
 export function isReferenceUnavailable(error: unknown) {
@@ -63,7 +59,7 @@ function playgroundProvider(): ReferenceProvider {
             const result = await queryPlaygroundWithParams(query, parameters, signal);
             return playgroundRows(result, convert);
         } catch (error) {
-            if (!missingSourceColumn(error)) throw error;
+            if (!isMissingDocumentationSourceColumn(error)) throw error;
             const fallbackQuery = query.replace(', source', '');
             const result = await queryPlaygroundWithParams(fallbackQuery, parameters, signal);
             return playgroundRows(result, convert);

@@ -244,6 +244,42 @@ test('Static production preview searches native Playground docs with bound query
     expect(requests.some(request => request.sql.includes('name = {name:String}') && new URL(request.url).searchParams.get('param_name') === 'MergeTree')).toBe(true);
 });
 
+test('Static production preview retries missing source metadata and uses native entries from offline search', async ({ page }) => {
+    const requests: string[] = [];
+    await page.route('https://sql-clickhouse.clickhouse.com:8443/**', async route => {
+        const sql = route.request().postData() ?? '';
+        if (!sql.includes('system.documentation')) return route.continue();
+        requests.push(sql);
+        if (sql.includes(', source')) {
+            await route.fulfill({
+                status: 500,
+                headers: { 'content-type': 'text/plain; charset=utf-8', 'access-control-allow-origin': '*' },
+                body: "Code: 47. DB::Exception: Unknown expression identifier `source` in scope SELECT name, source FROM system.documentation. (UNKNOWN_IDENTIFIER) (version 26.1.0.0)",
+            });
+            return;
+        }
+        const details = sql.includes('version() AS serverVersion');
+        const columns = details ? ['name', 'type', 'description', 'serverVersion'] : ['name', 'type'];
+        const rows = details ? [['MergeTree', 'Table Engine', 'Live MergeTree documentation.', '26.1-test']] : [];
+        const body = [JSON.stringify(columns), JSON.stringify(columns.map(() => 'String')), ...rows.map(row => JSON.stringify(row)), ''].join('\n');
+        await route.fulfill({ status: 200, headers: { 'content-type': 'text/plain; charset=utf-8', 'access-control-allow-origin': '*' }, body });
+    });
+
+    await page.goto('/');
+    await page.getByRole('navigation', { name: 'Workspace browser' }).getByRole('button', { name: 'Reference' }).click();
+    await page.getByTestId('reference-search').fill('MergeTree');
+    const mergeTree = page.getByRole('option', { name: /MergeTree Table Engine/ }).first();
+    await expect(mergeTree).toBeVisible();
+    await expect(page.getByTestId('reference-source')).toContainText('Offline ClickHouse reference');
+    await mergeTree.click();
+
+    const article = page.getByRole('article', { name: 'Table Engine: MergeTree' });
+    await expect(article).toContainText('Live MergeTree documentation.');
+    await expect(article.locator('.reference-entry-heading small')).toHaveText('ClickHouse 26.1-test');
+    expect(requests.filter(sql => sql.includes(', source')).length).toBeGreaterThanOrEqual(2);
+    expect(requests.some(sql => sql.includes('name = {name:String}') && !sql.includes(', source'))).toBe(true);
+});
+
 test('Playground examples preview real SQL and open a draft without executing it', async ({ page }) => {
     const exampleSqlRequests: string[] = [];
     page.on('request', request => {

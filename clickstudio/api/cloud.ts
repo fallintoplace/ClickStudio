@@ -7,7 +7,7 @@ import { parseInput } from '../core/imports.js';
 import { ImportMappingError, mapImportRows } from '../core/import-mapping.js';
 import type { Capability, ClickHouseDocumentationEntry, ClickHouseDocumentationSummary, Column, Json, Row, Schema, SchemaColumn, SchemaTable } from '../shared/types.js';
 import { lexSql, quoteIdentifier, quoteStringLiteral, splitSql } from '../shared/sql.js';
-import { buildReferenceEntryQuery, buildReferenceSearchQuery, isReferenceCategory } from '../shared/reference.js';
+import { buildReferenceEntryQuery, buildReferenceSearchQuery, isMissingDocumentationSourceColumn, isReferenceCategory } from '../shared/reference.js';
 import { flamegraphQuery, parseFlamegraphRows, type FlamegraphSource } from '../shared/flamegraph.js';
 import { CREATE_TABLE_COLUMN_TYPES, isValidTableDatabase, type CreateTableColumn, type CreateTableColumnType } from '../shared/table-creation.js';
 import { createTableSql } from '../core/table-creation.js';
@@ -448,10 +448,6 @@ async function cloudFlamegraph(credentials: CloudCredentials, url: string, query
     } finally { await client.close(); }
 }
 
-function missingDocumentationSource(error: unknown) {
-    return error instanceof Error && /\bsource\b.{0,80}(?:unknown identifier|unknown column|not found|doesn't exist|does not exist)|(?:missing columns|unknown identifier|unknown column|not found|doesn't exist|does not exist).{0,80}\bsource\b/i.test(error.message);
-}
-
 async function cloudReferenceSearch(credentials: CloudCredentials, url: string, query: string, category: string): Promise<ClickHouseDocumentationSummary[]> {
     if (!isReferenceCategory(category)) throw new AppError(400, 'DOCUMENTATION_CATEGORY', 'Choose a valid ClickHouse reference category.');
     const client = makeClient(credentials, url);
@@ -460,7 +456,7 @@ async function cloudReferenceSearch(credentials: CloudCredentials, url: string, 
         let rows: Omit<ClickHouseDocumentationSummary, 'origin'>[];
         try { rows = await queryRows(client, built.sql, built.parameters, 12_000, 10); }
         catch (error) {
-            if (!missingDocumentationSource(error)) throw error;
+            if (!isMissingDocumentationSourceColumn(error)) throw error;
             const fallback = buildReferenceSearchQuery(query, category, false);
             rows = await queryRows(client, fallback.sql, fallback.parameters, 12_000, 10);
         }
@@ -474,7 +470,7 @@ async function cloudReferenceEntry(credentials: CloudCredentials, url: string, n
         let rows: Omit<ClickHouseDocumentationEntry, 'origin'>[];
         try { rows = await queryRows(client, buildReferenceEntryQuery(true), parameters, 12_000, 10); }
         catch (error) {
-            if (!missingDocumentationSource(error)) throw error;
+            if (!isMissingDocumentationSourceColumn(error)) throw error;
             rows = await queryRows(client, buildReferenceEntryQuery(false), parameters, 12_000, 10);
         }
         const row = rows[0];

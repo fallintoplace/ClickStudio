@@ -7,7 +7,7 @@ import { flamegraphQuery, parseFlamegraphRows, type FlamegraphSource } from '../
 import { parseReplicationSnapshot, replicationQueueQuery, replicationReplicasQuery, type ReplicationCapabilities } from '../shared/replication.js';
 import { parseWorkloadSnapshot, workloadFamiliesQuery, workloadPointsQuery, type QueryLogSource, type WorkloadWindow } from '../shared/workload.js';
 import { collectSchemaMetadataWarnings, enrichSchemaTables, type OptionalSchemaMetadataWarning, type SchemaTableMetadata, type SchemaTableSkipIndex } from '../shared/schema.js';
-import { buildReferenceEntryQuery, buildReferenceSearchQuery } from '../shared/reference.js';
+import { buildReferenceEntryQuery, buildReferenceSearchQuery, isMissingDocumentationSourceColumn } from '../shared/reference.js';
 import { AppError, requireThat } from '../core/errors.js';
 import { collectCompactStream } from '../core/compact-stream.js';
 import type { QueryDriver } from '../core/runs.js';
@@ -269,15 +269,12 @@ export class ClickHouseDriver implements QueryDriver, ImportDriver, CreateTableD
             dictionaries: dictionaryRows, metadataWarnings: metadataWarnings.length ? metadataWarnings : undefined, truncated,
             warnings: [`Schema lists databases and tables visible to this ClickHouse user. ClickHouse permissions apply to writes.`, ...(truncated ? ['Schema preview truncated.'] : [])] };
     }
-    private isMissingDocumentationSource(error: unknown) {
-        return error instanceof Error && /\bsource\b.{0,80}(?:unknown identifier|unknown column|not found|doesn't exist|does not exist)|(?:missing columns|unknown identifier|unknown column|not found|doesn't exist|does not exist).{0,80}\bsource\b/i.test(error.message);
-    }
     async searchDocumentation(id: string, query: string, category: ReferenceCategory): Promise<ClickHouseDocumentationSummary[]> {
         const withSource = buildReferenceSearchQuery(query, category, true);
         try {
             return await this.rows<ClickHouseDocumentationSummary>(id, withSource.sql, withSource.parameters);
         } catch (error) {
-            if (!this.isMissingDocumentationSource(error))
+            if (!isMissingDocumentationSourceColumn(error))
                 throw error;
             const withoutSource = buildReferenceSearchQuery(query, category, false);
             return this.rows<ClickHouseDocumentationSummary>(id, withoutSource.sql, withoutSource.parameters);
@@ -289,7 +286,7 @@ export class ClickHouseDriver implements QueryDriver, ImportDriver, CreateTableD
         try {
             rows = await this.rows<Omit<ClickHouseDocumentationEntry, 'origin'>>(id, buildReferenceEntryQuery(true), parameters);
         } catch (error) {
-            if (!this.isMissingDocumentationSource(error))
+            if (!isMissingDocumentationSourceColumn(error))
                 throw error;
             rows = await this.rows<Omit<ClickHouseDocumentationEntry, 'origin'>>(id, buildReferenceEntryQuery(false), parameters);
         }

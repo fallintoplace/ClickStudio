@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { REFERENCE_CATEGORIES, REFERENCE_TYPES_BY_CATEGORY, buildReferenceEntryQuery, buildReferenceSearchQuery, isReferenceCategory, referenceId } from '../../.workspace-build/shared/reference.js';
+import { REFERENCE_CATEGORIES, REFERENCE_TYPES_BY_CATEGORY, buildReferenceEntryQuery, buildReferenceSearchQuery, isMissingDocumentationSourceColumn, isReferenceCategory, referenceId } from '../../.workspace-build/shared/reference.js';
 import { BUNDLED_REFERENCE, findBundledReference, searchBundledReference } from '../../.workspace-build/web/reference-data.js';
 
 test('Reference categories stay explicit and reject unknown URL values', () => {
@@ -49,6 +49,14 @@ test('Reference entry SQL parameterizes identity and supports servers without so
 
 test('Reference identifiers keep types distinct when names overlap', () => {
     assert.notEqual(referenceId({ name: 'MergeTree', type: 'Table Engine' }), referenceId({ name: 'MergeTree', type: 'Function' }));
+});
+
+test('Missing documentation source detection handles ClickHouse expression identifier errors', () => {
+    assert.equal(isMissingDocumentationSourceColumn(new Error("Unknown expression identifier `source` in scope SELECT name, source FROM system.documentation")), true);
+    assert.equal(isMissingDocumentationSourceColumn(new Error("Unknown identifier: source")), true);
+    assert.equal(isMissingDocumentationSourceColumn(new Error("Missing columns: 'source'")), true);
+    assert.equal(isMissingDocumentationSourceColumn(new Error("Unknown expression identifier `description` in scope SELECT description FROM system.documentation")), false);
+    assert.equal(isMissingDocumentationSourceColumn('Unknown expression identifier `source`'), false);
 });
 
 test('Bundled references cover the offline ClickHouse documentation and examples', () => {

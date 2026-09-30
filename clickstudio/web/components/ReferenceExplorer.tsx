@@ -34,6 +34,7 @@ export function ReferenceExplorer({ copy, connection, trusted, target, onTargetH
     const [query, setQuery] = useState('');
     const [category, setCategory] = useState<ReferenceCategory>('all');
     const [results, setResults] = useState<ClickHouseDocumentationSummary[]>([]);
+    const [resultsAreBundled, setResultsAreBundled] = useState(nativeProvider.kind === 'bundled');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [selected, setSelected] = useState<ClickHouseDocumentationEntry>();
@@ -56,12 +57,14 @@ export function ReferenceExplorer({ copy, connection, trusted, target, onTargetH
         setForceBundled(false);
         setQuery('');
         setCategory('all');
+        setResults([]);
+        setResultsAreBundled(nativeProvider.kind === 'bundled');
         setSelected(undefined);
         setActiveEntry(undefined);
         setEntryLoading(false);
         setError('');
         setEntryError('');
-    }, [connection.id]);
+    }, [connection.id, nativeProvider.kind]);
 
     useEffect(() => {
         searchRequest.current?.abort();
@@ -75,8 +78,24 @@ export function ReferenceExplorer({ copy, connection, trusted, target, onTargetH
         setLoading(true);
         setError('');
         const timer = window.setTimeout(() => {
-            void provider.search(query, category, controller.signal).then(entries => {
-                if (!controller.signal.aborted) setResults(entries);
+            void provider.search(query, category, controller.signal).then(async entries => {
+                if (controller.signal.aborted) return;
+                if (provider.kind === 'native' && entries.length === 0) {
+                    try {
+                        const offlineEntries = await bundledProvider.search(query, category, controller.signal);
+                        if (controller.signal.aborted) return;
+                        if (offlineEntries.length > 0) {
+                            setResults(offlineEntries);
+                            setResultsAreBundled(true);
+                            return;
+                        }
+                    } catch (fallbackError) {
+                        if (!controller.signal.aborted) setError(message(fallbackError));
+                        return;
+                    }
+                }
+                setResults(entries);
+                setResultsAreBundled(provider.kind === 'bundled');
             }).catch(async caught => {
                 if (controller.signal.aborted) return;
                 if (provider.kind === 'native' && isReferenceUnavailable(caught)) {
@@ -85,6 +104,7 @@ export function ReferenceExplorer({ copy, connection, trusted, target, onTargetH
                         if (controller.signal.aborted) return;
                         setForceBundled(true);
                         setResults(entries);
+                        setResultsAreBundled(true);
                     } catch (fallbackError) {
                         if (!controller.signal.aborted) setError(message(fallbackError));
                     }
@@ -142,7 +162,6 @@ export function ReferenceExplorer({ copy, connection, trusted, target, onTargetH
             let entry = await provider.get(summary.name, summary.type, controller.signal);
             if (!entry && provider.kind === 'native' && nativeProvider.kind === 'native') {
                 entry = await bundledProvider.get(summary.name, summary.type, controller.signal);
-                if (entry) setForceBundled(true);
             }
             if (controller.signal.aborted) return;
             if (!entry) setEntryError(copy.referenceEntryUnavailable);
@@ -209,7 +228,7 @@ export function ReferenceExplorer({ copy, connection, trusted, target, onTargetH
         }
     };
 
-    const isBundled = provider.kind === 'bundled';
+    const isBundled = provider.kind === 'bundled' || resultsAreBundled;
     const resultTitle = query ? copy.referenceMatches.replace('{count}', results.length.toLocaleString()) : copy.referenceBrowse;
     const visibleResults = results.slice(0, visibleResultCount);
 
