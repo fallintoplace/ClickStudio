@@ -38,7 +38,7 @@ const previewCloudConnectionTest: CloudConnectionTest = {
     parameters: { available: false, reason: 'Unavailable in this preview test.' },
 };
 
-async function mockCloudEndpoint(page: Page, commitOutcome: 'success' | 'unknown' | 'unknown-then-succeed' | 'running' = 'success', cloudSchema = previewCloudSchema, onSchemaAfterImport?: () => void) {
+async function mockCloudEndpoint(page: Page, commitOutcome: 'success' | 'unknown' | 'running' = 'success', cloudSchema = previewCloudSchema, onSchemaAfterImport?: () => void) {
     const imports: string[] = [];
     let activeSchema = cloudSchema;
     let importSucceeded = false;
@@ -58,13 +58,21 @@ async function mockCloudEndpoint(page: Page, commitOutcome: 'success' | 'unknown
                     ? fileContents.split(/\r?\n/).filter(Boolean).length
                     : Math.max(0, fileContents.trim().split(/\r?\n/).length - 1);
             const id = queryId.replace('clickstudio-import-', '');
-            if (commitOutcome === 'unknown' || (commitOutcome === 'unknown-then-succeed' && imports.length === 1) || (commitOutcome === 'running' && imports.length === 1)) {
-                await route.fulfill({ status: 502, json: { error: { code: 'CLICKHOUSE_ERROR', message: 'The request ended before the insert response arrived.' } } });
-                return;
-            }
             const createValue = body.match(/name="createTable"\r\n\r\n([^\r\n]+)/)?.[1];
             const createTable = createValue ? JSON.parse(createValue) as { name: string; columns: { name: string; type: string }[]; generateId: boolean } : undefined;
             const targetValue = createTable ? `default.${createTable.name}` : table;
+            const unresolvedOutcome = commitOutcome === 'unknown' || (commitOutcome === 'running' && imports.length === 1);
+            if (unresolvedOutcome) {
+                const status = commitOutcome === 'unknown' ? 'unknown' : 'running';
+                await route.fulfill({ json: {
+                    id, connectionId: 'clickhouse-cloud', table: targetValue, queryId, rows,
+                    createdAt: '2026-09-28T00:00:00.000Z', status,
+                    ...(status === 'unknown'
+                        ? { tableExists: true, error: 'ClickHouse could not confirm the insert. The rows may already be there.' }
+                        : { reconciliationRequired: true }),
+                } });
+                return;
+            }
             if (createTable) {
                 activeSchema = {
                     ...activeSchema,
@@ -533,8 +541,15 @@ test('ClickHouse Cloud can create a table from a file when no tables exist', asy
     expect(JSON.parse(createTable!)).toMatchObject({ name: 'events', generateId: true });
 });
 
-test('ClickHouse Cloud import opens the table first and retries the original file after inspection', async ({ page }) => {
-    const imports = await mockCloudEndpoint(page, 'unknown-then-succeed');
+test('ClickHouse Cloud import focuses mapping errors before writing and opens unknown imports for inspection', async ({ page }) => {
+    const schemaWithId = {
+        ...previewCloudSchema,
+        columns: [
+            ...previewCloudSchema.columns.map(column => column.name === 'day' ? { ...column, type: 'Nullable(Date)' } : column),
+            { database: 'default', table: 'events', name: 'id', type: 'UInt64', defaultKind: 'DEFAULT', comment: '' },
+        ],
+    };
+    const imports = await mockCloudEndpoint(page, 'unknown', schemaWithId);
     await connectPreviewCloud(page);
     await page.getByRole('button', { name: 'Import', exact: true }).last().click();
 
@@ -542,15 +557,26 @@ test('ClickHouse Cloud import opens the table first and retries the original fil
     await dialog.getByLabel('Choose a CSV, JSON, or NDJSON file').setInputFiles({
         name: 'events.csv',
         mimeType: 'text/csv',
-        buffer: Buffer.from('day,events\n2026-09-28,20\n'),
+        buffer: Buffer.from('day,events\n2026-01-01,20\n'),
     });
     await dialog.getByRole('button', { name: 'Read file and continue' }).click();
     await chooseExistingCloudTable(dialog);
+    await dialog.getByLabel('Map day to destination').selectOption('id');
+    await dialog.getByRole('button', { name: 'Review import' }).click();
+
+    const mappingError = dialog.getByRole('alert');
+    await expect(mappingError).toContainText('Input row 1: "day" value "2026-01-01" cannot be inserted into "id" (UInt64).');
+    await expect(mappingError).toBeFocused();
+    await expect(dialog.getByRole('button', { name: 'Review import' })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Import rows', exact: true })).toHaveCount(0);
+    expect(imports).toHaveLength(0);
+
+    await dialog.getByLabel('Map day to destination').selectOption('day');
     await dialog.getByRole('button', { name: 'Review import' }).click();
     await dialog.getByRole('button', { name: 'Import rows', exact: true }).click();
 
     await expect(dialog).toContainText('ClickHouse couldn’t confirm the rows in default.events.');
-    await expect(dialog).toContainText('The table exists, but it may contain all, some, or none of this file’s rows. Open it to check.');
+    await expect(dialog).toContainText('ClickHouse could not confirm the insert. The rows may already be there.');
     await expect(dialog.getByRole('button', { name: 'Open table to inspect' })).toBeVisible();
     await expect(dialog.getByRole('button', { name: 'Check status' })).toHaveCount(0);
     await expect(dialog.getByRole('button', { name: /Rows missing/ })).toHaveCount(0);
@@ -563,25 +589,14 @@ test('ClickHouse Cloud import opens the table first and retries the original fil
     await expect(page.getByText(/default\.events in Objects\. Check whether the imported rows are there\./)).toBeVisible();
 
     await page.getByRole('button', { name: 'Import', exact: true }).last().click();
-    await expect(dialog).toContainText('After checking default.events, confirm if the rows are there or choose the original file to retry.');
+    await expect(dialog).toContainText('ClickHouse could not confirm the insert. The rows may already be there.');
     await expect(dialog.getByRole('button', { name: 'I checked; the rows are there' })).toBeVisible();
-    await expect(dialog.getByRole('button', { name: 'Rows missing; choose original file' })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: /retry|rows missing/i })).toHaveCount(0);
     await expect(dialog.getByRole('button', { name: 'Check status' })).toHaveCount(0);
-
-    await dialog.getByRole('button', { name: 'Rows missing; choose original file' }).click();
-    await dialog.getByLabel('Choose a CSV, JSON, or NDJSON file').setInputFiles({
-        name: 'events.csv',
-        mimeType: 'text/csv',
-        buffer: Buffer.from('day,events\n2026-09-28,20\n'),
-    });
-    await dialog.getByRole('button', { name: 'Read file and continue' }).click();
-    await chooseExistingCloudTable(dialog);
-    await dialog.getByRole('button', { name: 'Review import' }).click();
-    await dialog.getByRole('button', { name: 'Import rows', exact: true }).click();
-    await expect(dialog.locator('.import-status-card.is-success')).toContainText('1 source row processed successfully');
-    expect(imports).toHaveLength(2);
-    const retryTokens = imports.map(body => body.match(/name="deduplicationToken"\r\n\r\n([^\r\n]+)/)?.[1]);
-    expect(retryTokens[1]).toBe(retryTokens[0]);
+    await dialog.getByRole('button', { name: 'I checked; the rows are there' }).click();
+    await expect(dialog.locator('.import-status-card.is-success')).toContainText('You confirmed the imported rows in default.events');
+    await expect(dialog.getByRole('button', { name: 'Import another file' })).toBeVisible();
+    expect(imports).toHaveLength(1);
 });
 
 test('ClickHouse Cloud import can be confirmed after the user checks the selected table', async ({ page }) => {
