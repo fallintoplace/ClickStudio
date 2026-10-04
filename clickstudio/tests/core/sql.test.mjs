@@ -41,6 +41,16 @@ for (const sql of [
 ])
     test(`Read-only guard rejects ${sql}`, () => assert.throws(() => guardSql(sql)));
 test('Missing named parameter is explicit', () => assert.throws(() => guardSql('SELECT {n:UInt64}'), { code: 'MISSING_PARAMETER' }));
+for (const name of ['cluster', 'clusterAllReplicas', 'CLUSTER', 'ClUsTeRaLlRePlIcAs']) {
+    for (const spacing of ['', ' ', '\n', ' /* comment */ '])
+        test(`External I/O guard rejects ${name} with spacing ${JSON.stringify(spacing)}`, () => {
+            assert.throws(() => guardSql(`SELECT ${name}${spacing}()`), { code: 'EXTERNAL_IO' });
+        });
+}
+test('Cluster names in data, comments, and column identifiers remain valid', () => {
+    for (const sql of ["SELECT 'cluster() clusterAllReplicas()'", 'SELECT 1 /* cluster() */', 'SELECT cluster, clusterAllReplicas FROM events', 'SELECT `cluster` FROM events'])
+        assert.doesNotThrow(() => guardSql(sql));
+});
 test('Child filter is bound, not interpolated', () => { const f = insertChildFilter('SELECT x FROM t', 'x', "x' OR 1=1"); assert.ok(!f.sql.includes("OR 1=1")); assert.equal(f.parameters.wb_filter, "x' OR 1=1"); });
 test('SQL comment detection ignores comment markers inside quoted values', () => {
     assert.equal(hasSqlComments("SELECT '-- text', '/* text */', '# text'"), false);

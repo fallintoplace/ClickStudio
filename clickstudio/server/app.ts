@@ -369,7 +369,7 @@ export function createApp(config: Config, overrides: {
     const imports = new ImportService(store, driver, authorized), tableCreation = new TableCreationService(store, driver, authorized), tableDeletion = new TableDeletionService(store, driver, authorized), monitors = new MonitorService(store, runs, artifacts), sessions = new SessionService(config.token), cloudSessions = new CloudConnectionSessions(), redact = redactor(config), parserWasm = overrides.parserWasm ?? cachedClickHouseParserWasm;
     const { secretFree, safeExport } = createSecretGuards(config);
     configureHttp(app, config, runs, artifacts, sessions, cloudSessions, parserWasm);
-    registerMcpRoutes(app, { config, driver, runs, safeExport }); registerCloudApi(app, config, cloudSessions, overrides.cloudApi ?? cloudApi);
+    const closeMcp = registerMcpRoutes(app, { config, driver, runs, safeExport }); registerCloudApi(app, config, cloudSessions, overrides.cloudApi ?? cloudApi);
     app.get('/api/connections', (_req, res) => { const p = principal(res); res.json(driver.connections(p).map(c => ({ ...c, trusted: runs.isTrusted(p, c.id) }))); });
     app.post('/api/connections/:id/test', async (req, res) => { canWrite(principal(res)); res.json(await driver.test(id(req))); });
     app.post('/api/connections/:id/trust', (req, res) => { const p = principal(res), v = body(req), connectionId = id(req); requireThat(v.confirmation === connectionId, 400, 'TRUST_CONFIRMATION', 'Confirm the selected connection ID'); runs.trust(p, connectionId, boolean(v.trusted, 'trusted')); res.json({ trusted: runs.isTrusted(p, connectionId) }); });
@@ -649,5 +649,5 @@ export function createApp(config: Config, overrides: {
     const tooLarge = error !== null && typeof error === 'object' && 'type' in error && error.type === 'entity.too.large';
     res.status(tooLarge ? 413 : error instanceof AppError ? error.status : error instanceof SyntaxError ? 400 : 500).json({ error: { ...parsed, message: redact(parsed.message) }, requestId: res.locals.requestId }); };
     app.use(errors);
-    return { app, store, runs, artifacts, ai, voice, imports, monitors, driver, close: async () => { await runs.close(); await driver.close(); } };
+    return { app, store, runs, artifacts, ai, voice, imports, monitors, driver, close: async () => { await closeMcp(); await runs.close(); await driver.close(); } };
 }

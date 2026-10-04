@@ -59,18 +59,29 @@ You can also run `npm start` for the API alone, or use the [production setup](CL
 | Tool | What it does |
 | --- | --- |
 | `list_connections` | Lists configured connections, trust, tested capabilities, and query limits. |
-| `execute_sql` | Runs one read-only statement with optional bound parameters and limits. |
-| `list_tables` | Reads visible table names and engines in one database. |
-| `describe_table` | Reads column types, defaults, and comments for one table. |
-| `explain_query` | Runs EXPLAIN indexes, plan, pipeline, or analyze on a supported connection. Analyze executes the query. |
+| `execute_sql` | Submits one read-only statement with optional bound parameters and limits. |
+| `list_tables` | Submits a query for visible table names and engines in one database. |
+| `describe_table` | Submits a query for column types, defaults, and comments for one table. |
+| `explain_query` | Submits EXPLAIN indexes, plan, pipeline, or analyze on a supported connection. Analyze executes the query. |
 | `get_result` | Gets current status or a retained result page without running SQL again. |
 | `cancel_query` | Requests cancellation of a queued or running query. |
 
 `list_tables` and `describe_table` default to the connection's database. Both accept a `database` argument. Metadata visibility depends on the ClickHouse user's permissions; an empty response does not prove that an object is absent.
 
+Bound parameters accept up to 50 entries. Names start with a letter or underscore and contain up to 64 letters, digits, or underscores; `__proto__`, `constructor`, and `prototype` are reserved. Values are strings of up to 4,000 characters.
+
 ## Results and retries
 
-Each submission returns a run ID, status, and `clientRequestId`. By default, it waits up to 10 seconds and includes the first 100 rows if the query finishes. Set `waitSeconds: 0` to return immediately, or choose up to 30 seconds. If the run is still pending, use `get_result` with its run ID. Closing the client request stops waiting; the stored query continues until completion, cancellation, or its deadline.
+SQL, metadata, and EXPLAIN submissions return a durable run ID, status, and `clientRequestId` immediately. Use `get_result` with `runId: run.id` to poll or read the first 100 rows. Only `get_result` accepts `waitSeconds`, from 0 (the default) to 30:
+
+```json
+{
+  "runId": "<run.id from the submission>",
+  "waitSeconds": 10
+}
+```
+
+Cancelling or closing a result request stops its wait. The stored query continues until completion, explicit `cancel_query`, or its deadline. The run ID remains available for later polling.
 
 Results include typed `columns`, array `rows`, `totalRows`, `nextOffset`, and `completeness`. Use `get_result` with `offset: nextOffset` to read later pages. Each page accepts `count` from 1 to 1,000. A remaining page is different from query truncation: `completeness: "truncated"` means ClickStudio retained only the bounded output, even after you read all its pages.
 
@@ -105,6 +116,6 @@ Add `CONNECTIONS_FILE` with that file's path and `WAREHOUSE_PASSWORD` to `clicks
 
 ## Deployment scope
 
-This endpoint runs in the persistent Express server. The Vercel browser preview does not expose it. Version one uses bearer tokens, not OAuth, and supports POST requests without protocol sessions; GET and DELETE return 405. SQL is read-only and scripts, imports, and schema writes are not tools.
+This endpoint runs in the persistent Express server. The Vercel browser preview does not expose it. The MCP v2 handler supports the `2026-07-28` protocol and legacy 2025 clients on the same URL. It uses bearer tokens and POST requests without protocol sessions; GET and DELETE return 405. SQL is read-only and scripts, imports, and schema writes are not tools.
 
 The default loopback server follows the existing tokenless local mode if no workspace token is configured. A shared bind requires the existing workspace token settings. For remote clients, use a private HTTPS deployment with the correct `HOST` and `APP_ORIGIN`. The endpoint validates Host and Origin headers and does not enable cross-origin browser access.

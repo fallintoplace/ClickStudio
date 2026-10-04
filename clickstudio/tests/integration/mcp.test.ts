@@ -4,8 +4,9 @@ import type { AddressInfo } from 'node:net';
 import { request } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
+import { Client as LegacyClient } from '@modelcontextprotocol/sdk/client/index.js';
+import { StreamableHTTPClientTransport as LegacyTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { createApp } from '../../server/app.js';
 import { loadConfig } from '../../server/config.js';
 import { DemoDriver } from '../../server/demo.js';
@@ -53,7 +54,7 @@ interface Output {
     error?: ApiError;
     cancellationRequested?: boolean;
 }
-async function start(t: TestContext, options: { token?: string; trusted?: boolean; secret?: string; driver?: McpFixtureDriver } = {}) {
+async function start(t: TestContext, options: { token?: string; trusted?: boolean; secret?: string; driver?: McpFixtureDriver; protocol?: 'modern' | 'legacy' } = {}) {
     const config = loadConfig({ DEMO_MODE: 'true', CLICKSTUDIO_TOKEN: options.token });
     if (options.secret) config.profiles[0]!.password = options.secret;
     const driver = options.driver ?? new McpFixtureDriver(), store = new MemoryStore();
@@ -62,7 +63,9 @@ async function start(t: TestContext, options: { token?: string; trusted?: boolea
     await new Promise<void>((resolve, reject) => { listener.once('listening', resolve); listener.once('error', reject); });
     config.port = (listener.address() as AddressInfo).port;
     config.origin = `http://127.0.0.1:${config.port}`;
-    const client = new Client({ name: 'ClickStudio integration tests', version: '1.0.0' });
+    const client = new Client({ name: 'ClickStudio integration tests', version: '1.0.0' }, options.protocol === 'legacy' ? undefined : {
+        versionNegotiation: { mode: options.protocol === 'modern' ? { pin: '2026-07-28' } : 'auto' },
+    });
     const headers = options.token ? { Authorization: `Bearer ${options.token}` } : {};
     const transport = new StreamableHTTPClientTransport(new URL('/mcp', config.origin), { requestInit: { headers } });
     t.after(async () => {
@@ -81,27 +84,92 @@ async function start(t: TestContext, options: { token?: string; trusted?: boolea
         assert.deepEqual(JSON.parse(content[0]!.text), value.structuredContent);
         return { ...value, data: value.structuredContent as Output };
     };
+    const completed = async (name: string, args: Record<string, unknown> = {}) => {
+        const submission = await call(name, args);
+        const result = submission.data.run ? await call('get_result', { runId: submission.data.run.id, waitSeconds: 3 }) : submission;
+        return { ...result, submission };
+    };
     const http = (method = 'POST', extraHeaders: Record<string, string> = {}, body: unknown = { jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }) => {
         const requestHeaders = new Headers({ ...headers, 'content-type': 'application/json', accept: 'application/json, text/event-stream' });
         for (const [name, value] of Object.entries(extraHeaders)) requestHeaders.set(name, value);
         return fetch(`${config.origin}/mcp`, { method, headers: requestHeaders, ...(method === 'POST' ? { body: JSON.stringify(body) } : {}) });
     };
-    return { ...service, client, transport, call, http, origin: config.origin, fixture: driver };
+    return { ...service, client, transport, call, completed, http, origin: config.origin, fixture: driver };
 }
 const query = (extra: Record<string, unknown> = {}) => ({ connectionId: 'demo', sql: 'SELECT 1', ...extra });
 
 test('MCP initializes, discovers seven tools, and exposes safe connection metadata', async t => {
     const s = await start(t, { token: 'workspace-token-for-mcp-integration-test', trusted: false });
+    assert.equal(s.client.getProtocolEra(), 'modern');
+    assert.equal(s.client.getNegotiatedProtocolVersion(), '2026-07-28');
     assert.equal(s.transport.sessionId, undefined);
     const tools = (await s.client.listTools()).tools;
     assert.deepEqual(tools.map(tool => tool.name), ['list_connections', 'execute_sql', 'list_tables', 'describe_table', 'explain_query', 'get_result', 'cancel_query']);
     assert.equal(tools.find(tool => tool.name === 'cancel_query')?.annotations?.readOnlyHint, false);
+    assert.equal(tools.find(tool => tool.name === 'cancel_query')?.annotations?.destructiveHint, true);
     const response = await s.call('list_connections');
     assert.equal(response.data.connections?.[0]?.trusted, false);
     assert.equal(response.data.connections?.[0]?.readonly, true);
     assert.equal(response.data.connections?.[0]?.limits.rows, 5000);
     assert.equal(JSON.stringify(response).includes('workspace-token-for-mcp-integration-test'), false);
     assert.equal(s.fixture.calls.length, 0);
+});
+
+test('MCP serves a current client pinned to the modern protocol', async t => {
+    const s = await start(t, { protocol: 'modern' });
+    assert.equal(s.client.getProtocolEra(), 'modern');
+    assert.equal(s.client.getNegotiatedProtocolVersion(), '2026-07-28');
+    const result = await s.completed('execute_sql', query());
+    assert.equal(result.submission.data.run?.status, 'queued');
+    assert.equal(result.data.run?.status, 'succeeded');
+    assert.equal(s.fixture.calls.length, 1);
+});
+
+test('MCP serves a current client using legacy negotiation', async t => {
+    const s = await start(t, { protocol: 'legacy' });
+    assert.equal(s.client.getProtocolEra(), 'legacy');
+    assert.equal(s.client.getNegotiatedProtocolVersion(), '2025-11-25');
+    const result = await s.completed('execute_sql', query());
+    assert.equal(result.submission.data.run?.status, 'queued');
+    assert.equal(result.data.run?.status, 'succeeded');
+});
+
+test('MCP remains compatible with a legacy SDK client on the same endpoint', async t => {
+    const token = 'legacy-client-workspace-token', s = await start(t, { token });
+    const client = new LegacyClient({ name: 'ClickStudio legacy integration tests', version: '1.0.0' });
+    t.after(() => client.close());
+    await client.connect(new LegacyTransport(new URL('/mcp', s.origin), { requestInit: { headers: { Authorization: `Bearer ${token}` } } }));
+    assert.equal((await client.listTools()).tools.length, 7);
+    const input = query({ clientRequestId: randomUUID() });
+    const submission = (await client.callTool({ name: 'execute_sql', arguments: input })).structuredContent as Output;
+    assert.equal(submission.run?.status, 'queued');
+    assert.equal(submission.result, undefined);
+    const result = await client.callTool({ name: 'get_result', arguments: { runId: submission.run!.id, waitSeconds: 3 } });
+    assert.equal((result.structuredContent as Output).run?.status, 'succeeded');
+    assert.deepEqual((result.structuredContent as Output).result?.rows, s.fixture.result.rows);
+    assert.equal((await s.call('execute_sql', input)).data.run?.id, submission.run!.id);
+    assert.equal(s.fixture.calls.length, 1);
+});
+
+test('MCP publishes parameter limits and reserves waiting for result requests', async t => {
+    const s = await start(t), tools = (await s.client.listTools()).tools;
+    for (const name of ['execute_sql', 'list_tables', 'describe_table', 'explain_query']) {
+        const schema = tools.find(tool => tool.name === name)!.inputSchema;
+        assert.equal(Object.hasOwn(schema.properties!, 'waitSeconds'), false);
+        assert.equal(schema.additionalProperties, false);
+    }
+    assert.ok(tools.find(tool => tool.name === 'get_result')!.inputSchema.properties!.waitSeconds);
+    for (const name of ['execute_sql', 'explain_query']) {
+        const parameters = tools.find(tool => tool.name === name)!.inputSchema.properties!.parameters as {
+            maxProperties: number; propertyNames: { pattern: string }; additionalProperties: { type: string; maxLength: number };
+        };
+        assert.equal(parameters.maxProperties, 50);
+        assert.equal(parameters.additionalProperties.type, 'string');
+        assert.equal(parameters.additionalProperties.maxLength, 4000);
+        const key = new RegExp(parameters.propertyNames.pattern);
+        for (const name of ['value', '_value', 'a'.repeat(64)]) assert.equal(key.test(name), true);
+        for (const name of ['', 'bad-name', '1value', 'a'.repeat(65), '__proto__', 'constructor', 'prototype']) assert.equal(key.test(name), false);
+    }
 });
 
 test('MCP uses bearer authentication independently of browser cookies', async t => {
@@ -149,9 +217,10 @@ test('MCP rejects untrusted connections and unsafe SQL before calling the databa
     assert.equal(untrusted.data.error?.code, 'WORKSPACE_UNTRUSTED');
     assert.equal((await s.call('list_tables', { connectionId: 'demo' })).data.error?.code, 'WORKSPACE_UNTRUSTED');
     s.runs.trust(owner, 'demo', true);
-    for (const sql of ['CREATE TABLE x (id UInt64)', 'DELETE FROM x WHERE 1', 'SELECT 1; SELECT 2', "SELECT * FROM url('https://unrelated.example', CSV, 'x String')"]) {
+    for (const sql of ['CREATE TABLE x (id UInt64)', 'DELETE FROM x WHERE 1', 'SELECT 1; SELECT 2', "SELECT * FROM url('https://unrelated.example', CSV, 'x String')", 'SELECT cluster()', 'SELECT clusterAllReplicas()']) {
         assert.equal((await s.call('execute_sql', query({ sql }))).isError, true);
     }
+    assert.equal((await s.call('explain_query', query({ sql: 'SELECT cluster /* comment */ ()' }))).data.error?.code, 'EXTERNAL_IO');
     assert.equal((await s.call('execute_sql', query({ connectionId: 'missing' }))).data.error?.code, 'CONNECTION_NOT_FOUND');
     assert.equal(s.fixture.calls.length, 0);
     assert.equal(s.store.count('runs'), 0);
@@ -159,12 +228,12 @@ test('MCP rejects untrusted connections and unsafe SQL before calling the databa
 
 test('MCP preserves exact values, bound parameters, limits, and shared API history', async t => {
     const s = await start(t), requestId = randomUUID();
-    const response = await s.call('execute_sql', query({ sql: 'SELECT {value:UInt64}', parameters: { value: '18446744073709551615' }, clientRequestId: requestId, limits: { rows: 2, seconds: 3 } }));
+    const response = await s.completed('execute_sql', query({ sql: 'SELECT {value:UInt64}', parameters: { value: '18446744073709551615' }, clientRequestId: requestId, limits: { rows: 2, seconds: 3 } }));
     assert.equal(response.isError, undefined);
     assert.equal(response.data.run?.status, 'succeeded');
     assert.deepEqual(response.data.result?.rows, [['18446744073709551615', '12345678901234567890.1234']]);
     assert.equal(response.data.result?.columns[0]?.type, 'UInt64');
-    assert.equal(response.data.clientRequestId, requestId);
+    assert.equal(response.submission.data.clientRequestId, requestId);
     assert.equal(response.data.run?.limits.rows, 2);
     assert.equal(response.data.run?.limits.seconds, 3);
     assert.equal(response.data.run?.limits.memory, 536870912);
@@ -179,7 +248,7 @@ test('MCP preserves exact values, bound parameters, limits, and shared API histo
 test('MCP reuses a request ID and rejects conflicting input without rerunning SQL', async t => {
     const s = await start(t), input = query({ clientRequestId: randomUUID() });
     const first = await s.call('execute_sql', input);
-    const second = await s.call('execute_sql', { ...input, waitSeconds: 0 });
+    const second = await s.call('execute_sql', input);
     assert.equal(second.data.run?.id, first.data.run?.id);
     assert.equal((await s.call('execute_sql', { ...input, sql: 'SELECT 2' })).data.error?.code, 'IDEMPOTENCY_CONFLICT');
     assert.equal(s.fixture.calls.length, 1);
@@ -189,14 +258,14 @@ test('MCP reuses a request ID and rejects conflicting input without rerunning SQ
 test('MCP pages retained output and distinguishes paging from query truncation', async t => {
     const s = await start(t);
     s.fixture.result.rows = Array.from({ length: 105 }, (_, i) => [String(i), '0.0000']);
-    const first = await s.call('execute_sql', query());
+    const first = await s.completed('execute_sql', query());
     assert.equal(first.data.result?.rows.length, 100);
     assert.equal(first.data.result?.nextOffset, 100);
     assert.equal(first.data.result?.completeness, 'complete');
     const last = await s.call('get_result', { runId: first.data.run!.id, offset: 100, count: 10 });
     assert.equal(last.data.result?.rows.length, 5);
     assert.equal(last.data.result?.nextOffset, null);
-    const bounded = await s.call('execute_sql', query({ limits: { rows: 3 } }));
+    const bounded = await s.completed('execute_sql', query({ limits: { rows: 3 } }));
     assert.equal(bounded.data.run?.status, 'truncated');
     assert.equal(bounded.data.result?.totalRows, 3);
     assert.equal(bounded.data.result?.completeness, 'truncated');
@@ -207,8 +276,8 @@ test('MCP pages retained output and distinguishes paging from query truncation',
 
 test('MCP returns a run ID immediately and can poll the same run to completion', async t => {
     const s = await start(t);
-    const pending = await s.call('execute_sql', query({ sql: 'SELECT mcp_slow', waitSeconds: 0 }));
-    assert.ok(['queued', 'running'].includes(pending.data.run!.status));
+    const pending = await s.call('execute_sql', query({ sql: 'SELECT mcp_slow' }));
+    assert.equal(pending.data.run?.status, 'queued');
     assert.equal(pending.data.result, undefined);
     const finished = await s.call('get_result', { runId: pending.data.run!.id, waitSeconds: 3 });
     assert.equal(finished.data.run?.status, 'succeeded');
@@ -218,16 +287,47 @@ test('MCP returns a run ID immediately and can poll the same run to completion',
 
 test('MCP wait timeout returns pending state and keeps the database run alive', async t => {
     const s = await start(t);
-    const pending = await s.call('execute_sql', query({ sql: 'SELECT mcp_slow', waitSeconds: 1 }));
+    const submission = await s.call('execute_sql', query({ sql: 'SELECT mcp_slow' }));
+    const pending = await s.call('get_result', { runId: submission.data.run!.id, waitSeconds: 1 });
     assert.equal(pending.data.run?.status, 'running');
     assert.equal(s.fixture.cancellations.length, 0);
     await s.call('cancel_query', { runId: pending.data.run!.id });
 });
 
+test('MCP request cancellation releases the result wait and leaves the durable run available', async t => {
+    const s = await start(t, { protocol: 'modern' });
+    const submission = await s.call('execute_sql', query({ sql: 'SELECT mcp_slow' })), runId = submission.data.run!.id;
+    let subscriptions = 0;
+    const subscribe = s.runs.subscribe.bind(s.runs);
+    s.runs.subscribe = (...args: Parameters<typeof subscribe>) => {
+        subscriptions++;
+        const unsubscribe = subscribe(...args);
+        return () => { subscriptions--; unsubscribe(); };
+    };
+    const controller = new AbortController();
+    t.after(() => controller.abort());
+    const rejected = assert.rejects(s.client.callTool({ name: 'get_result', arguments: { runId, waitSeconds: 30 } }, { signal: controller.signal }));
+    const waitForSubscriptions = async (count: number) => {
+        const deadline = Date.now() + 1000;
+        while (subscriptions !== count && Date.now() < deadline) await sleep(10);
+        assert.equal(subscriptions, count);
+    };
+    await waitForSubscriptions(1);
+    controller.abort();
+    await rejected;
+    await waitForSubscriptions(0);
+    assert.equal(s.runs.get(owner, runId).status, 'running');
+    assert.equal(s.fixture.cancellations.length, 0);
+    assert.equal((await s.call('get_result', { runId })).data.run?.status, 'running');
+    assert.equal((await s.call('cancel_query', { runId })).data.cancellationRequested, true);
+    assert.equal((await s.call('get_result', { runId, waitSeconds: 1 })).data.run?.status, 'cancelled');
+    assert.deepEqual(s.fixture.cancellations, [runId]);
+});
+
 test('MCP cancels running and queued work and reports unconfirmed remote cancellation', async t => {
     const s = await start(t);
     s.fixture.cancelFails = true;
-    const inputs = await Promise.all(Array.from({ length: 3 }, () => s.call('execute_sql', query({ sql: 'SELECT mcp_slow', waitSeconds: 0 }))));
+    const inputs = await Promise.all(Array.from({ length: 3 }, () => s.call('execute_sql', query({ sql: 'SELECT mcp_slow' }))));
     const queued = inputs.find(value => s.runs.get(owner, value.data.run!.id).status === 'queued')!;
     assert.ok(queued);
     const cancelledQueue = await s.call('cancel_query', { runId: queued.data.run!.id });
@@ -251,11 +351,14 @@ test('MCP cancels running and queued work and reports unconfirmed remote cancell
 
 test('MCP uses bound metadata filters rather than interpolating database and table names', async t => {
     const s = await start(t);
-    const tables = await s.call('list_tables', { connectionId: 'demo' });
+    const tables = await s.completed('list_tables', { connectionId: 'demo' });
+    assert.equal(tables.submission.data.run?.status, 'queued');
     assert.equal(tables.data.run?.status, 'succeeded');
     assert.equal(s.fixture.calls[0]?.parameters.database, 'demo');
     const database = "odd'name", table = 'table with spaces';
-    await s.call('describe_table', { connectionId: 'demo', database, table });
+    const columns = await s.completed('describe_table', { connectionId: 'demo', database, table });
+    assert.equal(columns.submission.data.run?.status, 'queued');
+    assert.equal(columns.data.run?.status, 'succeeded');
     assert.deepEqual(s.fixture.calls[1]?.parameters, { database, table });
     assert.equal(s.fixture.calls[1]?.sql.includes(database), false);
     assert.equal(s.fixture.calls[1]?.sql.includes(table), false);
@@ -270,32 +373,50 @@ test('MCP explain honors tested capabilities and uses the existing run kinds', a
     assert.equal(s.fixture.calls.length, 0);
     s.fixture.explainAvailable = true;
     for (const [mode, kind] of [['indexes', 'explain'], ['plan', 'plan'], ['pipeline', 'pipeline'], ['analyze', 'analyze']]) {
-        assert.equal((await s.call('explain_query', query({ mode }))).data.run?.kind, kind);
+        const result = await s.completed('explain_query', query({ mode }));
+        assert.equal(result.submission.data.run?.status, 'queued');
+        assert.equal(result.data.run?.kind, kind);
+        assert.equal(result.data.run?.status, 'succeeded');
     }
     assert.equal(s.fixture.calls.length, 4);
 });
 
 test('MCP validates tool arguments and parameter keys before submitting a run', async t => {
     const s = await start(t);
-    for (const args of [query({ limits: { rows: 20001 } }), query({ unexpected: true }), query({ waitSeconds: 31 }), query({ parameters: { x: 42 } }), query({ sql: 'x'.repeat(200001) })]) {
+    for (const args of [query({ limits: { rows: 20001 } }), query({ unexpected: true }), query({ waitSeconds: 0 }), query({ parameters: { x: 42 } }), query({ sql: 'x'.repeat(200001) })]) {
         assert.equal((await s.client.callTool({ name: 'execute_sql', arguments: args })).isError, true);
     }
-    for (const parameters of [{ 'bad-name': '1' }, { constructor: '1' }, Object.fromEntries(Array.from({ length: 51 }, (_, i) => [`p${i}`, '1']))]) {
-        assert.equal((await s.call('execute_sql', query({ parameters }))).isError, true);
+    for (const parameters of [
+        { 'bad-name': '1' }, { '1value': '1' }, { '': '1' }, { ['a'.repeat(65)]: '1' },
+        ...['__proto__', 'constructor', 'prototype'].map(key => Object.fromEntries([[key, '1']])),
+        { value: 'x'.repeat(4001) }, Object.fromEntries(Array.from({ length: 51 }, (_, i) => [`p${i}`, '1'])),
+    ]) {
+        for (const name of ['execute_sql', 'explain_query']) assert.equal((await s.client.callTool({ name, arguments: query({ parameters }) })).isError, true, `${name}: ${Object.keys(parameters).join(', ')}`);
     }
+    for (const name of ['list_tables', 'describe_table', 'explain_query']) assert.equal((await s.client.callTool({ name, arguments: query({ table: 'events', waitSeconds: 0 }) })).isError, true);
     assert.equal((await s.client.callTool({ name: 'get_result', arguments: { runId: randomUUID(), count: 0 } })).isError, true);
+    assert.equal((await s.client.callTool({ name: 'get_result', arguments: { runId: randomUUID(), waitSeconds: 31 } })).isError, true);
     assert.equal((await s.call('get_result', { runId: randomUUID() })).data.error?.code, 'NOT_FOUND');
     assert.equal(s.fixture.calls.length, 0);
+});
+
+test('MCP accepts the parameter count, key length, and value length boundaries', async t => {
+    const s = await start(t);
+    const parameters = { ...Object.fromEntries(Array.from({ length: 48 }, (_, i) => [`p${i}`, '1'])), ['a'.repeat(64)]: 'x'.repeat(4000), _empty: '' };
+    assert.equal(Object.keys(parameters).length, 50);
+    const result = await s.completed('execute_sql', query({ parameters }));
+    assert.equal(result.data.run?.status, 'succeeded');
+    assert.deepEqual(s.fixture.calls[0]?.parameters, parameters);
 });
 
 test('MCP distinguishes an empty completed result, a failure, and an expired snapshot', async t => {
     const s = await start(t);
     s.fixture.result.rows = [];
-    const empty = await s.call('execute_sql', query());
+    const empty = await s.completed('execute_sql', query());
     assert.equal(empty.data.run?.status, 'succeeded');
     assert.deepEqual(empty.data.result?.rows, []);
     assert.equal(empty.data.result?.completeness, 'complete');
-    const failed = await s.call('execute_sql', query({ sql: 'SELECT mcp_error' }));
+    const failed = await s.completed('execute_sql', query({ sql: 'SELECT mcp_error' }));
     assert.equal(failed.isError, true);
     assert.equal(failed.data.run?.status, 'failed');
     assert.equal(failed.data.run?.error?.code, 'DATABASE_ERROR');
@@ -312,11 +433,11 @@ test('MCP distinguishes an empty completed result, a failure, and an expired sna
 test('MCP redacts configured secrets in errors and rejects secret-bearing result rows', async t => {
     const secret = 'configured-db-"secret"\nwith-newline', s = await start(t, { secret });
     s.fixture.failureMessage = `Database rejected ${secret}`;
-    const failed = await s.call('execute_sql', query({ sql: 'SELECT mcp_error' }));
+    const failed = await s.completed('execute_sql', query({ sql: 'SELECT mcp_error' }));
     assert.match(failed.data.run!.error!.message, /\[redacted\]/);
     assert.equal(JSON.stringify(failed).includes(JSON.stringify(secret).slice(1, -1)), false);
     s.fixture.result.rows = [[secret, '0.0000']];
-    const blocked = await s.call('execute_sql', query());
+    const blocked = await s.completed('execute_sql', query());
     assert.equal(blocked.isError, true);
     assert.equal(blocked.data.error?.code, 'SECRET_IN_EXPORT');
     assert.ok(blocked.data.runId);
@@ -324,7 +445,7 @@ test('MCP redacts configured secrets in errors and rejects secret-bearing result
 });
 
 test('MCP never reads or cancels a run owned by another principal', async t => {
-    const s = await start(t), finished = await s.call('execute_sql', query());
+    const s = await start(t), finished = await s.completed('execute_sql', query());
     const run = s.runs.get(owner, finished.data.run!.id);
     run.owner = 'another-owner';
     s.store.put('runs', run.id, run);

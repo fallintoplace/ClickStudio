@@ -38,7 +38,7 @@ export function guardSql(sql: string, parameters: Record<string, string> = {}): 
             if (upper === 'SYSTEM' && tokens[i + 1]?.text === '.')
                 continue;
             requireThat(!forbidden.has(upper), 403, 'READ_ONLY_SQL', `${upper} is not allowed in exploration SQL`, 'Use the limits form rather than SQL SETTINGS. Quote an identifier that shares a reserved word.');
-            const external = /^(url|s3|s3cluster|azureblobstorage|hdfs|file|remote|remotesecure|mysql|postgresql|sqlite|executable|jdbc|odbc)$/i;
+            const external = /^(url|s3|s3cluster|azureblobstorage|hdfs|file|remote|remotesecure|cluster|clusterallreplicas|mysql|postgresql|sqlite|executable|jdbc|odbc)$/i;
             requireThat(!(external.test(token.text) && tokens[i + 1]?.text === '('), 403, 'EXTERNAL_IO', 'External I/O table functions are not enabled in this workspace');
         }
         for (const p of parameterNames(sql))
