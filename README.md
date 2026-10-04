@@ -147,6 +147,7 @@ Open http://localhost:8080 and sign in with `CLICKSTUDIO_TOKEN` from `.env`. Com
 - **Import files.** Preview CSV, JSON, and NDJSON files. Map columns and check the row count before import.
 - **Inspect query runs.** Track progress, cancel queries, reopen run details, and view query plans and runtime charts.
 - **Use the AI assistant.** Review information sent to AI and choose which SQL suggestions to apply or run.
+- **Connect an external AI client.** The local server exposes read-only SQL, schema inspection, results, and cancellation through [seven MCP tools](docs/MCP.md).
 
 ## Checks
 
@@ -165,6 +166,7 @@ For ClickHouse integration checks, start the local database first. Then run thes
 
 ## More guides
 
+- [MCP connection guide](docs/MCP.md): connect an external client to the local server or a configured Cloud database.
 - [Setup and implementation guide](docs/CLICKSTUDIO.md): setup, settings, and details.
 - [SQL editing tools](docs/EDITOR-TOOLS.md): navigation, snippets, and autocomplete.
 - [ClickHouse exploration workflows](clickstudio/docs/native-explorers.md): objects, MergeTree activity, and query comparisons.

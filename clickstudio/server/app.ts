@@ -32,6 +32,7 @@ import { DemoDriver } from './demo.js';
 import { OpenAIDriver } from './openai.js';
 import { OpenAIVoiceService, safetyIdentifier, type VoiceService } from './voice.js';
 import { telemetry, recordRun } from './telemetry.js';
+import { registerMcpRoutes } from './mcp.js';
 type Driver = QueryDriver & ImportDriver & Pick<ClickHouseDriver, 'connection' | 'connections' | 'test' | 'targets' | 'database' | 'createTable' | 'dropTable' | 'profileEvidence' | 'profilePipeline' | 'profileFlamegraph' | 'workload' | 'replication' | 'queryTree' | 'tableParts' | 'nativeExplorer' | 'searchDocumentation' | 'documentationEntry' | 'close'>;
 const MAX_WASM_PARSER_BYTES = 64 * 1024 * 1024;
 const ASSISTANT_ACTIONS = ['ask', 'generate', 'explain', 'repair', 'result', 'performance', 'review'] as const satisfies readonly AssistantAction[];
@@ -368,7 +369,7 @@ export function createApp(config: Config, overrides: {
     const imports = new ImportService(store, driver, authorized), tableCreation = new TableCreationService(store, driver, authorized), tableDeletion = new TableDeletionService(store, driver, authorized), monitors = new MonitorService(store, runs, artifacts), sessions = new SessionService(config.token), cloudSessions = new CloudConnectionSessions(), redact = redactor(config), parserWasm = overrides.parserWasm ?? cachedClickHouseParserWasm;
     const { secretFree, safeExport } = createSecretGuards(config);
     configureHttp(app, config, runs, artifacts, sessions, cloudSessions, parserWasm);
-    registerCloudApi(app, config, cloudSessions, overrides.cloudApi ?? cloudApi);
+    registerMcpRoutes(app, { config, driver, runs, safeExport }); registerCloudApi(app, config, cloudSessions, overrides.cloudApi ?? cloudApi);
     app.get('/api/connections', (_req, res) => { const p = principal(res); res.json(driver.connections(p).map(c => ({ ...c, trusted: runs.isTrusted(p, c.id) }))); });
     app.post('/api/connections/:id/test', async (req, res) => { canWrite(principal(res)); res.json(await driver.test(id(req))); });
     app.post('/api/connections/:id/trust', (req, res) => { const p = principal(res), v = body(req), connectionId = id(req); requireThat(v.confirmation === connectionId, 400, 'TRUST_CONFIRMATION', 'Confirm the selected connection ID'); runs.trust(p, connectionId, boolean(v.trusted, 'trusted')); res.json({ trusted: runs.isTrusted(p, connectionId) }); });
