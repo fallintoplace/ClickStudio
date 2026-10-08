@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseRunEvent } from '../../.core-build/shared/run-wire.js';
+import { parseRunEvent, preferNewerRun } from '../../.core-build/shared/run-wire.js';
 
 const run = {
     dataSource: 'fixture',
@@ -54,4 +54,22 @@ test('run event decoder rejects malformed run payloads', () => {
         () => parseRunEvent({ sequence: 4, type: 'unknown', run }),
         /Invalid run event/,
     );
+});
+
+test('older HTTP responses cannot undo a newer completed run event', () => {
+    const queued = { ...run, status: 'queued', sequence: 0 };
+    const running = { ...run, status: 'running', sequence: 2 };
+    const completed = { ...run, status: 'succeeded', sequence: 3, resultState: 'reopenable' };
+
+    assert.equal(preferNewerRun(undefined, queued), queued);
+    assert.equal(preferNewerRun(queued, running), running);
+    assert.equal(preferNewerRun(running, completed), completed);
+    assert.equal(preferNewerRun(completed, queued), completed);
+    assert.equal(preferNewerRun(completed, running), completed);
+});
+
+test('equal-sequence snapshots can still update result retention state', () => {
+    const completed = { ...run, status: 'succeeded', sequence: 3, resultState: 'reopenable' };
+    const expired = { ...completed, resultState: 'expired' };
+    assert.equal(preferNewerRun(completed, expired), expired);
 });
