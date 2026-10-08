@@ -44,7 +44,7 @@
     --amber: #ffad52;
     --red: #ff6b75;
     --violet: #c598ff;
-    --editor-selection: color-mix(in srgb, var(--accent) 23%, transparent);
+    --editor-selection: color-mix(in srgb, var(--accent) 8%, transparent);
     --shadow: 0 24px 76px #0000009c;
     --radius: 14px;
     --radius-control: 9px;
@@ -119,7 +119,7 @@
     --amber: #a35700;
     --red: #b83f50;
     --violet: #7543a0;
-    --editor-selection: color-mix(in srgb, var(--accent) 23%, transparent);
+    --editor-selection: color-mix(in srgb, var(--accent) 6%, transparent);
     --shadow: 0 22px 64px #17303a1f;
 }
 

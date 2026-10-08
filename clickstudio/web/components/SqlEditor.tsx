@@ -4,7 +4,8 @@ import { EditorState, Compartment, StateEffect, StateField } from '@codemirror/s
 import { Decoration, EditorView, hoverTooltip, keymap, lineNumbers, highlightActiveLine, drawSelection, rectangularSelection, type DecorationSet } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, indentWithTab, indentSelection } from '@codemirror/commands';
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search';
-import { bracketMatching, foldGutter, foldKeymap, syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
+import { bracketMatching, foldGutter, foldKeymap, syntaxHighlighting, HighlightStyle } from '@codemirror/language';
+import { tags } from '@lezer/highlight';
 import { autocompletion, ifNotIn, nextSnippetField, prevSnippetField, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete';
 import { sql, SQLDialect } from '@codemirror/lang-sql';
 import { setDiagnostics } from '@codemirror/lint';
@@ -16,6 +17,15 @@ import { activeStatementIndex, CLICKHOUSE_KEYWORDS, completionTarget, matchingNa
 import { appendSqlSnippet, clickhouseSnippetCompletions, sqlEditorTools, sqlStatementOutline } from './editor-tools';
 import { clickHouseNativeParser } from '../clickhouse-native-parser';
 import { ScrollEdgeFrame } from './ScrollEdgeShadows';
+const sqlHighlightStyle = HighlightStyle.define([
+    { tag: tags.keyword, color: 'var(--text)', fontWeight: '600' },
+    { tag: [tags.number, tags.bool, tags.null], color: 'var(--violet)' },
+    { tag: [tags.string, tags.escape], color: 'var(--amber)' },
+    { tag: tags.special(tags.string), color: 'var(--text)' },
+    { tag: tags.standard(tags.name), color: 'var(--accent)' },
+    { tag: tags.comment, color: 'var(--muted)' },
+    { tag: [tags.operator, tags.punctuation, tags.typeName], color: 'var(--text-soft)' },
+]);
 const keywordCompletions = [...new Set(CLICKHOUSE_KEYWORDS.split(' '))].map(label => ({ label, type: 'keyword' }));
 const clickhouse = SQLDialect.define({ keywords: CLICKHOUSE_KEYWORDS, types: 'String Bool UInt8 UInt16 UInt32 UInt64 UInt128 UInt256 Int8 Int16 Int32 Int64 Int128 Int256 Float32 Float64 Date Date32 DateTime DateTime64 Nullable Array Tuple Map Decimal LowCardinality UUID JSON', builtin: 'count sum avg min max uniq uniqExact quantile median toDate toDateTime toStartOfDay toStartOfHour now today numbers arrayJoin arrayMap arrayFilter multiIf ifNull coalesce', doubleQuotedStrings: false, hashComments: true });
 const clickhouseFunctions = [
@@ -204,9 +214,9 @@ export const SqlEditor = forwardRef<EditorHandle, SqlEditorProps>(function SqlEd
     }, []);
     const languageExtension = useCallback(() => sql({ dialect: clickhouse, schema: schemaIndexRef.current.codeMirror }), []);
     const invalidateNativeValidation = useCallback(() => { validationRevision.current++; }, []);
-    const themeExtension = () => EditorView.theme({ '&': { height: '100%', backgroundColor: 'var(--panel)', color: 'var(--text)' }, '.cm-scroller': { fontFamily: 'var(--font-mono)', fontSize: '13px', lineHeight: '1.55', fontVariantLigatures: 'none', fontVariantNumeric: 'tabular-nums' }, '.cm-gutters': { backgroundColor: 'var(--panel)', color: 'var(--muted)', border: 'none', fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }, '.cm-content': { minHeight: '220px' }, '.cm-cursor': { borderLeftColor: 'var(--text)' }, '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': { backgroundColor: 'var(--editor-selection)' } }, { dark: current.current.dark });
+    const themeExtension = () => EditorView.theme({ '&': { height: '100%', backgroundColor: 'var(--panel)', color: 'var(--text)' }, '.cm-scroller': { fontFamily: 'var(--font-mono)', fontSize: '13px', lineHeight: '1.55', fontVariantLigatures: 'none', fontVariantNumeric: 'tabular-nums' }, '.cm-gutters': { backgroundColor: 'var(--panel)', color: 'var(--muted)', border: 'none', fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }, '.cm-content': { minHeight: '220px' }, '.cm-activeLine': { backgroundColor: 'color-mix(in srgb, var(--accent) 3%, transparent)' }, '.cm-activeLineGutter': { backgroundColor: 'color-mix(in srgb, var(--accent) 4%, transparent)' }, '.cm-cursor': { borderLeftColor: 'var(--text)' }, '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': { backgroundColor: 'var(--editor-selection)' } }, { dark: current.current.dark });
     useEffect(() => { if (!element.current)
-        return; const p = current.current; const editor = new EditorView({ parent: element.current, state: EditorState.create({ doc: p.value, selection: { anchor: Math.min(p.from, p.value.length), head: Math.min(p.to, p.value.length) }, extensions: [sqlEditorTools(), nativeDecorations, serverErrorDecorations, sqlMapHighlight, lineNumbers(), history(), drawSelection(), highlightActiveLine(), rectangularSelection(), bracketMatching(), foldGutter(), highlightSelectionMatches(), syntaxHighlighting(defaultHighlightStyle), autocompletion({ override: [ifNotIn(['QuotedIdentifier', 'String', 'LineComment', 'BlockComment'], context => completionSource(context, schemaIndexRef.current))] }), hoverTooltip((view, pos) => { const word = view.state.wordAt(pos); if (!word)
+        return; const p = current.current; const editor = new EditorView({ parent: element.current, state: EditorState.create({ doc: p.value, selection: { anchor: Math.min(p.from, p.value.length), head: Math.min(p.to, p.value.length) }, extensions: [sqlEditorTools(), nativeDecorations, serverErrorDecorations, sqlMapHighlight, lineNumbers(), history(), drawSelection(), highlightActiveLine(), rectangularSelection(), bracketMatching(), foldGutter(), highlightSelectionMatches(), syntaxHighlighting(sqlHighlightStyle), autocompletion({ override: [ifNotIn(['QuotedIdentifier', 'String', 'LineComment', 'BlockComment'], context => completionSource(context, schemaIndexRef.current))] }), hoverTooltip((view, pos) => { const word = view.state.wordAt(pos); if (!word)
                 return null; const label = view.state.sliceDoc(word.from, word.to), info = hoverInfo(schemaIndexRef.current, current.current.value, label); if (!info)
                 return null; return { pos: word.from, end: word.to, above: true, create: () => { const dom = document.createElement('div'); dom.className = 'sql-hover'; dom.textContent = info; return { dom }; } }; }), language.current.of(languageExtension()), theme.current.of(themeExtension()), EditorState.allowMultipleSelections.of(true), EditorView.contentAttributes.of({ 'aria-label': 'SQL editor', 'spellcheck': 'false' }), keymap.of([{ key: 'Tab', run: nextSnippetField, shift: prevSnippetField }, ...defaultKeymap, ...historyKeymap, ...searchKeymap, ...foldKeymap, indentWithTab]), EditorView.updateListener.of(update => { if (update.docChanged)
                     current.current.onChange(update.state.doc.toString()); if (update.selectionSet) {
