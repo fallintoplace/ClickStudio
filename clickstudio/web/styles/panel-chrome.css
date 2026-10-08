@@ -1,3 +1,4 @@
+.workspace-content { padding: 6px; }
 .workspace-content.has-panel-split { gap: 0; }
 
 /* Keep collapsed panels at their heading height after responsive layout rules. */
