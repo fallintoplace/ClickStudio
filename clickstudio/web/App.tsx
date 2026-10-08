@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, message, post } from './api';
-import { Button, cx, Icon, SelectControl } from './components/ui';
+import { Button, cx, Icon } from './components/ui';
 import { CloudConnectionDialog } from './components/CloudConnectionDialog';
 import { CLICKHOUSE_CLOUD_CONNECTION_ID, disconnectClickHouseCloud, restoreClickHouseCloudSession, type SavedCloudConnectionProfile } from './cloud-connection';
 import { Workspace } from './Workspace';
-import { experienceOptions, getCopy, localeOptions, resolveLocale, themeAppearance, themeOptions, type ExperienceLevel, type Locale, type Theme } from './i18n';
+import { experienceOptions, getCopy, resolveLocale, themeAppearance, themeOptions, type ExperienceLevel, type Locale, type Theme } from './i18n';
 import { RadioGroup } from '@clickhouse/click-ui/RadioGroup';
 import clickhouseLogomarkDark from './assets/clickhouse-logomark-dark.svg';
 import clickhouseLogomarkLight from './assets/clickhouse-logomark-light.svg';
@@ -45,7 +45,7 @@ function cloudProfileDefaults(connection?: Connected): SavedCloudConnectionProfi
 }
 
 function App() {
-    const [locale, setLocale] = useState<Locale>(() => resolveLocale(storedPreference('clickstudio:locale'), ...browserLocales()));
+    const [locale] = useState<Locale>(() => resolveLocale(storedPreference('clickstudio:locale'), ...browserLocales()));
     const [theme, setTheme] = useState<Theme>(() => pref('clickstudio:theme', ['click-dark', 'click-light'] as const, 'click-dark'));
     const [accent, setAccent] = useState<AccentChoice>(() => pref('clickstudio:accent', ['cyan', 'clickhouse-yellow'] as const, 'cyan'));
     const [experience, setExperience] = useState<ExperienceLevel>(() => pref('clickstudio:experience', ['beginner', 'expert'] as const, 'beginner'));
@@ -236,7 +236,6 @@ function App() {
                     <div className="topbar-divider topbar-divider-short"/>
                 </>}
                 <div className="topbar-preferences">
-                    <SelectControl label={copy.app.language} value={locale} options={localeOptions} onChange={setLocale}/>
                     <div className="accent-mode-control" role="group" aria-label={copy.app.accent}>
                         <button type="button" className={`accent-mode-option ${accent === 'cyan' ? 'is-active' : ''}`} aria-label={copy.app.cyanAccent} aria-pressed={accent === 'cyan'} title={copy.app.cyanAccent} onClick={() => setAccent('cyan')}>
                             <span className="accent-mode-swatch is-cyan" aria-hidden="true"/>
