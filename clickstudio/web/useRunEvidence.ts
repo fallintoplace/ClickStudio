@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import type { ProfilePipeline, QueryProfile, Result, ResultPage, Run } from '../shared/types';
 import type { FlamegraphSnapshot } from '../shared/flamegraph';
-import { parseRunEvent } from '../shared/run-wire';
+import { parseRunEvent, preferNewerRun } from '../shared/run-wire';
 import { api, isFrontendDemoPreview, message } from './api';
 import { CLICKHOUSE_CLOUD_CONNECTION_ID } from './cloud-connection';
 import { terminal } from './components/ui';
@@ -36,7 +36,7 @@ export function useRunEvidence({ activeRunId, connectionId, loadHistory, setErro
         let cancelled = false;
         void api<Run>(`/runs/${encodeURIComponent(activeRunId)}`).then(next => {
             if (cancelled || next.connectionId !== connectionId) return;
-            setRunForRun(activeRunId, next);
+            setRunForRun(activeRunId, current => preferNewerRun(current, next));
             if (terminal(next)) void loadHistory().catch(() => undefined);
         }).catch(caught => { if (!cancelled) setError(message(caught)); });
         return () => { cancelled = true; };
@@ -62,7 +62,7 @@ export function useRunEvidence({ activeRunId, connectionId, loadHistory, setErro
                 const parsed: unknown = JSON.parse(event.data);
                 const payload = parseRunEvent(parsed);
                 if (payload.run.id !== activeRunId || payload.run.connectionId !== connectionId) return;
-                setRunForRun(activeRunId, current => !current || current.sequence <= payload.sequence ? payload.run : current);
+                setRunForRun(activeRunId, current => preferNewerRun(current, payload.run));
                 if (terminal(payload.run)) {
                     stream.close();
                     setEventState('idle');
@@ -79,7 +79,7 @@ export function useRunEvidence({ activeRunId, connectionId, loadHistory, setErro
         return startVisiblePolling(async signal => {
             const next = await api<Run>(`/runs/${encodeURIComponent(activeRunId)}`, { signal });
             if (signal.aborted || next.connectionId !== connectionId) return;
-            setRunForRun(activeRunId, current => !current || current.sequence <= next.sequence ? next : current);
+            setRunForRun(activeRunId, current => preferNewerRun(current, next));
             if (terminal(next)) void loadHistory().catch(() => undefined);
         }, { intervalMs: 1500, immediate: false });
     }, [activeRunId, connectionId, eventState, loadHistory, running, setRunForRun]);
