@@ -128,6 +128,11 @@ export function isResult(value: unknown): value is Result {
         && typeof value.expiresAt === 'string';
 }
 
+/** Reconcile HTTP snapshots and live events without moving a run backward. */
+export function preferNewerRun(current: Run | undefined, incoming: Run): Run {
+    return !current || current.sequence <= incoming.sequence ? incoming : current;
+}
+
 export function parseRunEvent(value: unknown): RunEvent {
     if (!isRecord(value)
         || !isSafeInteger(value.sequence)
