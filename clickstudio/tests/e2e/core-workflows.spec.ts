@@ -710,6 +710,13 @@ for (const mode of ['Standard', 'Experimental']) test(`${mode} query and results
     await page.getByRole('button', { name: 'Open results in a separate window', exact: true }).click();
     const resultsPopup = await resultsPopupPromise;
     await expect(resultsPopup.getByRole('table', { name: 'Retained query rows' })).toHaveText(retainedRows, { useInnerText: true });
+    const popupFilter = resultsPopup.locator('.results-header').getByRole('searchbox', { name: 'Filter current page' });
+    await expect(resultsPopup.locator('.results-header .result-row-count')).toHaveText('7 rows');
+    await expect(resultsPopup.locator('.table-pagination')).toHaveCount(0);
+    await popupFilter.fill('2026-01-02');
+    await expect(resultsPopup.locator('tbody tr')).toHaveCount(1);
+    await expect(resultsPopup.locator('.result-row-count')).toHaveText('1 of 7 rows on this page');
+    await popupFilter.fill('');
     await expect(resultsPopup.locator('html')).toHaveAttribute('data-theme', 'click-light');
     await expect(resultsPopup.getByRole('button', { name: /Float|Maximize|Restore/ })).toHaveCount(0);
     await resultsPopup.close();
@@ -1036,7 +1043,7 @@ test('Result filtering searches only the visible retained page without mutating 
     await filter.fill('2026-01-02');
     await expect(rows).toHaveCount(1);
     await expect(rows.first()).toContainText('2026-01-02');
-    await expect(results).toContainText('1 matches on this page');
+    await expect(results.locator('.results-header .result-row-count')).toHaveText('1 of 7 rows on this page');
     await filter.fill('no matching value');
     await expect(rows).toHaveCount(0);
     await expect(results).toContainText('No rows match on this page.');
@@ -1138,6 +1145,8 @@ test('Single-row numeric results render as a number and expose supported chart t
     const results = await runQuery(page);
     await results.getByRole('tab', { name: 'Chart', exact: true }).click();
     await expect(results.locator('.chart-number-card')).toContainText('42');
+    await expect(results.locator('.result-table-toolbar')).toHaveCount(0);
+    await expect(results.locator('.results-table-tools')).toBeEmpty();
     await expect(results.getByLabel('Type').locator('option')).toHaveText(['Number', 'Line', 'Bar', 'Scatter', 'Heatmap', 'Candlestick']);
 });
 

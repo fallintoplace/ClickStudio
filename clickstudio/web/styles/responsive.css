@@ -188,11 +188,11 @@
     .results-title h2 { font-size: 10px; }
     .results-title > .inline-flex { display: none; }
     .results-header .toolbar-small { display: none; }
-    .result-filter { flex: 1; justify-content: flex-start; }
-    .result-filter input { width: min(38vw, 160px); }
-    .table-pagination { flex-wrap: wrap; justify-content: flex-start; gap: 7px 10px; font-size: 8px; }
-    .table-pagination-summary { width: 100%; flex: 1 1 100%; justify-content: center; text-align: center; }
-    .table-pagination > .result-filter { flex: 1 1 220px; }
+    .results-actions { width: 100%; }
+    .results-table-tools { flex: 1 1 100%; order: 1; }
+    .result-table-toolbar { justify-content: space-between; }
+    .result-filter { width: min(45vw, 190px); }
+    .table-pagination { justify-content: flex-start; gap: 7px 10px; }
     .table-pagination-controls { margin-left: auto; }
     .insight-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .insights-heading { flex-direction: column; }
