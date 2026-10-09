@@ -1895,13 +1895,31 @@ test('Selecting an earlier script statement stops automatic following while late
 });
 
 test('Cancelling a long-running query reaches a terminal cancelled state', async ({ page }) => {
-    await trust(page);
-    await replaceSql(page, 'SELECT fixture_slow');
-    await runButton(page).click();
-    const cancel = page.locator('.execution-bar').getByRole('button', { name: 'Cancel', exact: true });
-    await expect(cancel).toBeVisible();
-    await cancel.click();
-    await expect(page.locator('.execution-bar')).toHaveAttribute('data-run-status', 'cancelled', { timeout: 10000 });
+    let releaseCancel: (() => void) | undefined;
+    const cancelGate = new Promise<void>(resolve => { releaseCancel = resolve; });
+    await page.route(url => /\/api\/runs\/[^/]+\/cancel$/.test(url.pathname), async route => {
+        await cancelGate;
+        await route.continue();
+    });
+    try {
+        await trust(page);
+        await replaceSql(page, 'SELECT fixture_slow');
+        await runButton(page).click();
+        await expect(runButton(page)).toHaveAttribute('aria-label', 'Cancel');
+        await expect(runButton(page)).toBeEnabled();
+        const cancelRequest = page.waitForRequest(request => request.method() === 'POST' && /\/api\/runs\/[^/]+\/cancel$/.test(new URL(request.url()).pathname));
+        const cancelResponse = page.waitForResponse(response => response.request().method() === 'POST' && /\/api\/runs\/[^/]+\/cancel$/.test(new URL(response.url()).pathname));
+        await runButton(page).click();
+        await cancelRequest;
+        await expect(runButton(page)).toHaveAttribute('aria-label', 'Cancelling…');
+        await expect(runButton(page)).toBeDisabled();
+        releaseCancel?.();
+        await cancelResponse;
+        await expect(page.locator('.execution-bar')).toHaveAttribute('data-run-status', 'cancelled', { timeout: 10000 });
+        await expect(runButton(page)).toHaveAttribute('aria-label', 'Run');
+    } finally {
+        releaseCancel?.();
+    }
 });
 
 test('Cancellation stays available while execution profile loading is pending', async ({ page }) => {

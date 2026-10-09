@@ -35,6 +35,7 @@ export type WorkspaceQueryPanelState = Readonly<{
     inspector: Inspector;
     demoMode: boolean;
     executionPending: boolean;
+    cancelling: boolean;
 }>;
 
 export type WorkspaceQueryPanelActions = Readonly<{
@@ -43,6 +44,7 @@ export type WorkspaceQueryPanelActions = Readonly<{
     onSave: (draft?: Draft) => Promise<void>;
     onFormat: (formatter: WorkspaceFormatter) => Promise<void>;
     onRun: (kind?: RunKind, sqlOverride?: string) => Promise<void>;
+    onCancel: () => void;
     runActionTitle: (capability: WorkspaceRunCapability | undefined, action: WorkspaceRunCapabilityAction) => string | undefined;
     onConnectionAction: () => Promise<void>;
     onNativeParserStatus: (status: NativeParserStatus) => void;
@@ -91,10 +93,13 @@ export function WorkspaceQueryPanel({
     const statementsToRun = safeStatementCount(sqlToRun);
     const runRequiresScript = statementsToRun !== undefined && statementsToRun > 1;
     const runDisabled = !trusted || Boolean(busy) || unsupportedParameters || (runRequiresScript && !connection.manifest?.scripts.available);
+    const executionCanCancel = state.executionPending && busy !== 'run' && busy !== 'script';
+    const cancelButtonActive = executionCanCancel || state.cancelling;
     const runTitle = runRequiresScript ? actions.runActionTitle(connection.manifest?.scripts, 'script') : undefined;
     const standardFormatter = nativeParserEnabled && nativeParserStatus === 'ready' ? 'wasm' : 'builtin';
+    const runButtonLabel = state.cancelling ? 'Cancelling…' : executionCanCancel ? copy.common.cancel : busy === 'run' || busy === 'script' ? copy.common.running : copy.common.run;
     const runSql = () => actions.onRun('query');
-    const runButton = <Button variant="primary" className="run-query-button compact-run-button" data-testid="run-button" aria-label={copy.common.run} title={runTitle} onClick={() => void runSql()} disabled={runDisabled}><Icon name="play"/>{busy === 'run' || busy === 'script' ? copy.common.running : copy.common.run}</Button>;
+    const runButton = <Button variant={cancelButtonActive ? 'danger' : 'primary'} className="run-query-button compact-run-button" data-testid="run-button" aria-label={runButtonLabel} title={cancelButtonActive ? runButtonLabel : runTitle} onClick={() => executionCanCancel ? actions.onCancel() : void runSql()} disabled={state.cancelling || (!executionCanCancel && runDisabled)}><Icon name={cancelButtonActive ? 'stop' : 'play'}/>{runButtonLabel}</Button>;
     const saveButton = <Button
         variant="secondary"
         className="save-revision-button standard-save-button"

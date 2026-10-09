@@ -36,6 +36,7 @@ const iconPaths = {
     check: <path d="m5 12 4 4L19 6"/>,
     more: <><circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none"/></>,
     play: <path d="m8 5 11 7-11 7V5Z"/>,
+    stop: <rect x="6.5" y="6.5" width="11" height="11" rx="1.5"/>,
     chevron: <path d="m8 10 4 4 4-4"/>,
     floatPanel: <><rect x="3" y="8" width="13" height="12" rx="2"/><path d="M3 12h13"/><rect x="9" y="3" width="12" height="12" rx="2"/><path d="M9 7h12"/></>,
     newWindow: <><rect x="3" y="5" width="18" height="15" rx="2"/><path d="M3 9h18M13 3h8v8M21 3l-9 9"/></>,

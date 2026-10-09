@@ -847,13 +847,14 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
 
     const queryPanel = <WorkspaceQueryPanel
         state={{ active, connection, schema, copy, experience, dark, nativeParserEnabled, nativeParserStatus,
-            trusted, unsupportedParameters, parameters, busy, inspector, demoMode, executionPending: Boolean(pendingExecution.execution) }}
+            trusted, unsupportedParameters, parameters, busy, inspector, demoMode, executionPending: Boolean(pendingExecution.execution), cancelling }}
         actions={{
             onPatch: patch,
             onOpenAssistant: () => showInspector('assistant'),
             onSave: saveDraft,
             onFormat: formatActiveSql,
             onRun: execute,
+            onCancel: () => void cancel(),
             runActionTitle,
             onConnectionAction: () => !demoMode && !connection.manifest
                 ? testConnectionActionRef.current()
