@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+    MAX_ASSISTANT_CHAT_TITLE_LENGTH,
     assistantChatsStorageKey,
     createAssistantChat,
     createAssistantChatState,
@@ -41,7 +42,7 @@ export function useAssistantChats(connectionId: string) {
         setState(current => current.chats.some(chat => chat.id === chatId) ? { ...current, activeChatId: chatId } : current);
     };
     const renameChat = (chatId: string, title: string) => {
-        const normalizedTitle = title.trim().slice(0, 80);
+        const normalizedTitle = title.trim().slice(0, MAX_ASSISTANT_CHAT_TITLE_LENGTH);
         if (!normalizedTitle) return;
         updateChat(chatId, chat => ({ ...chat, title: normalizedTitle }));
     };

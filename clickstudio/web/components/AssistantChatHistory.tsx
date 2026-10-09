@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import type { AssistantChat } from '../assistant-chat-state';
+import { MAX_ASSISTANT_CHAT_TITLE_LENGTH, type AssistantChat } from '../assistant-chat-state';
 import { OverlayPortal } from './OverlayPortal';
 import { Button, Icon } from './ui';
 
@@ -164,7 +164,7 @@ export function AssistantChatHistory({ chats, activeChatId, onNewChat, onSelectC
                     {visibleChats.map(chat => <li className="assistant-chat-history-item" key={chat.id}>
                         {renamingChatId === chat.id
                             ? <form className="assistant-chat-rename-inline" aria-label={`Rename ${chat.title}`} onSubmit={event => { event.preventDefault(); saveRename(chat.id); }}>
-                                <input autoFocus aria-label={`New name for ${chat.title}`} value={renameValue} maxLength={80} onChange={event => setRenameValue(event.target.value)} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); cancelRename(chat.id); } }}/>
+                                <input autoFocus aria-label={`New name for ${chat.title}`} value={renameValue} maxLength={MAX_ASSISTANT_CHAT_TITLE_LENGTH} onChange={event => setRenameValue(event.target.value)} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); cancelRename(chat.id); } }}/>
                                 <Button variant="primary" type="submit" aria-label="Save conversation name" title="Save name" disabled={!renameValue.trim()}><Icon name="check"/></Button>
                                 <Button variant="ghost" aria-label="Cancel renaming" title="Cancel" onClick={() => cancelRename(chat.id)}><Icon name="close"/></Button>
                             </form>

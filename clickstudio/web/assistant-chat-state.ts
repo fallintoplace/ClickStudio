@@ -36,6 +36,8 @@ export interface AssistantChatState {
     chats: AssistantChat[];
 }
 
+export const MAX_ASSISTANT_CHAT_TITLE_LENGTH = 4_000;
+
 const record = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
 
 export const assistantChatsStorageKey = (connectionId: string) => `clickstudio:assistant-chats:${encodeURIComponent(connectionId)}:v1`;
@@ -106,12 +108,17 @@ function recoverTurn(value: unknown): AssistantChatTurn | undefined {
 
 function recoverChat(value: unknown): AssistantChat | undefined {
     if (!record(value) || typeof value.id !== 'string' || typeof value.title !== 'string' ||
-        typeof value.createdAt !== 'string' || typeof value.updatedAt !== 'string' || !Array.isArray(value.turns)) return undefined;
+        value.title.length > MAX_ASSISTANT_CHAT_TITLE_LENGTH || typeof value.createdAt !== 'string' || typeof value.updatedAt !== 'string' || !Array.isArray(value.turns)) return undefined;
     const turns = value.turns.flatMap((turn): AssistantChatTurn[] => {
         const recovered = recoverTurn(turn);
         return recovered ? [recovered] : [];
     });
-    return { id: value.id, title: value.title.slice(0, 80), createdAt: value.createdAt, updatedAt: value.updatedAt, turns };
+    const firstQuestion = turns[0]?.question.replace(/\s+/g, ' ').trim();
+    const legacyTitle = firstQuestion && firstQuestion.length > 48
+        ? `${firstQuestion.slice(0, 47).trimEnd()}…`
+        : firstQuestion;
+    const title = firstQuestion && value.title === legacyTitle ? firstQuestion : value.title;
+    return { id: value.id, title, createdAt: value.createdAt, updatedAt: value.updatedAt, turns };
 }
 
 export function recoverAssistantChatState(value: unknown): AssistantChatState | undefined {

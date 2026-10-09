@@ -97,8 +97,7 @@ function conversationHistory(turns: readonly AssistantChatTurn[]): AssistantConv
 }
 
 function chatTitle(question: string) {
-    const title = question.replace(/\s+/g, ' ').trim();
-    return title.length > 48 ? `${title.slice(0, 47).trimEnd()}…` : title;
+    return question.replace(/\s+/g, ' ').trim();
 }
 
 type AssistantPhase = 'preparing' | 'generating' | 'deciding';
