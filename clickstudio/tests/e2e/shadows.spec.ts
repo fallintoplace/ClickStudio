@@ -74,7 +74,7 @@ for (const theme of ['Dark', 'Light']) for (const mode of ['Standard', 'Experime
         }
         await expect(page.locator('.topbar-control-rail')).toHaveCSS('border-radius', '0px');
         await expect(page.locator('.document-tab.is-active')).toHaveCSS('border-radius', '4px 4px 0px 0px');
-        await expect(page.locator('.data-table th small').first()).toHaveCSS('border-radius', '0px');
+        await expect(page.locator('.data-table th small').first()).toHaveCSS('border-radius', '2px');
         await expect(page.locator('.data-table th').first()).toHaveCSS('border-radius', '0px');
         await expect(page.locator('.accent-mode-swatch').first()).toHaveCSS('border-radius', '50%');
         await expect(page.locator('.status-light').first()).toHaveCSS('border-radius', '50%');

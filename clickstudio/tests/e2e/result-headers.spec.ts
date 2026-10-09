@@ -41,12 +41,13 @@ for (const theme of ['Light', 'Dark']) for (const mode of ['Standard', 'Experime
             const type = element.querySelector('small')!;
             const nameRect = name.getBoundingClientRect();
             const typeRect = type.getBoundingClientRect();
+            const typeStyle = getComputedStyle(type);
             return {
                 height: element.getBoundingClientRect().height,
                 nameWidth: nameRect.width,
                 typeWidth: typeRect.width,
                 nameBottom: nameRect.bottom,
-                typeBottom: typeRect.bottom,
+                typeBottom: typeRect.bottom - Number.parseFloat(typeStyle.paddingBottom) - Number.parseFloat(typeStyle.borderBottomWidth),
                 typeLeft: typeRect.left,
                 nameRight: nameRect.right,
             };
@@ -61,13 +62,35 @@ for (const theme of ['Light', 'Dark']) for (const mode of ['Standard', 'Experime
         }
         await expect(headers.first().locator('span')).toHaveCSS('font-size', '10px');
         await expect(headers.first().locator('small')).toHaveCSS('font-size', '9px');
-        await expect(headers.first().locator('small')).toHaveCSS('border-width', '0px');
-        await expect(headers.first().locator('small')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-        const muted = await page.locator('html').evaluate(element => {
-            const hex = getComputedStyle(element).getPropertyValue('--muted').trim().slice(1);
-            return `rgb(${[0, 2, 4].map(offset => Number.parseInt(hex.slice(offset, offset + 2), 16)).join(', ')})`;
-        });
-        await expect(headers.first().locator('small')).toHaveCSS('color', muted);
+        await expect(headers.first().locator('small')).toHaveCSS('border-width', '1px');
+        await expect(headers.first().locator('small')).toHaveCSS('border-radius', '2px');
+        await expect(headers.first().locator('small')).toHaveCSS('padding', '1px 4px');
+        for (const accent of ['Cyan accent', 'ClickHouse yellow accent']) {
+            await page.getByRole('button', { name: accent, exact: true }).click();
+            const badges = await headers.evaluateAll(elements => {
+                const canvas = document.createElement('canvas');
+                canvas.width = canvas.height = 1;
+                const context = canvas.getContext('2d')!;
+                const luminance = (color: string) => {
+                    context.fillStyle = color;
+                    context.fillRect(0, 0, 1, 1);
+                    return [...context.getImageData(0, 0, 1, 1).data].slice(0, 3).map(value => {
+                        const channel = value / 255;
+                        return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+                    }).reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index]!, 0);
+                };
+                return elements.map(element => {
+                    const style = getComputedStyle(element.querySelector('small')!);
+                    const text = luminance(style.color);
+                    const fill = luminance(style.backgroundColor);
+                    return { color: style.color, accent: getComputedStyle(element).borderTopColor, contrast: (Math.max(text, fill) + 0.05) / (Math.min(text, fill) + 0.05) };
+                });
+            });
+            for (const [index, badge] of badges.entries()) {
+                expect(badge.color).toBe(badge.accent);
+                expect(badge.contrast, `${theme} ${accent} column ${index} badge contrast`).toBeGreaterThanOrEqual(4.5);
+            }
+        }
         const complex = headers.nth(6);
         await expect(complex).toHaveAttribute('scope', 'col');
         const clipped = await complex.locator('.result-column-heading').evaluate(element => {
