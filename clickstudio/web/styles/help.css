@@ -28,7 +28,7 @@
         --help-experimental-border: color-mix(in srgb, var(--help-experimental) 34%, var(--help-border));
         --help-experimental-text: color-mix(in srgb, var(--help-experimental) 62%, var(--text));
         --help-radius-control: var(--radius-control);
-        --help-radius-card: 11px;
+        --help-radius-card: var(--radius-panel);
         --help-control-height: 36px;
         --help-text-meta: 10px;
         --help-text-small: 11px;
@@ -46,7 +46,7 @@
         flex-direction: column;
         overflow: hidden;
         border: 1px solid var(--help-border-strong);
-        border-radius: 15px;
+        border-radius: var(--radius-dialog);
         background: radial-gradient(ellipse at 12% 0, color-mix(in srgb, var(--accent) 7%, transparent), transparent 48%), var(--panel-raised);
         color: var(--text);
         font-size: var(--help-text-body);
@@ -272,7 +272,7 @@
         margin-top: 20px;
         padding: 15px;
         border: 1px solid var(--help-experimental-border);
-        border-radius: 13px;
+        border-radius: var(--radius-panel);
         background: radial-gradient(ellipse at 0 0, color-mix(in srgb, var(--help-experimental) 9%, transparent), transparent 55%), var(--help-experimental-surface);
     }
 
@@ -284,7 +284,7 @@
         gap: 7px;
         padding: 5px 9px;
         border: 1px solid var(--help-experimental-border);
-        border-radius: 999px;
+        border-radius: var(--radius-label);
         background: color-mix(in srgb, var(--help-experimental) 12%, var(--panel-raised));
         color: var(--help-experimental-text);
         font-size: var(--help-text-meta);
@@ -326,12 +326,12 @@
     .workspace-help-guide-scroll { min-width: 0; min-height: 0; flex: 1; overflow: auto; padding: 2px 1px 1px; }
     .workspace-help-guide-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
     .workspace-help-guide-card { position: relative; display: flex; min-width: 0; flex-direction: column; align-items: flex-start; gap: 8px; padding: 16px; border: 1px solid var(--help-border); border-radius: var(--help-radius-card); background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 4%, var(--help-surface)), var(--help-surface) 65%); color: var(--text-soft); }
-    .workspace-help-guide-index { display: grid; width: 30px; height: 30px; place-items: center; border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--help-border)); border-radius: 9px; background: color-mix(in srgb, var(--accent) 8%, var(--panel-raised)); color: var(--accent); font-family: var(--font-mono); font-size: var(--help-text-small); font-weight: 750; }
+    .workspace-help-guide-index { display: grid; width: 30px; height: 30px; place-items: center; border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--help-border)); border-radius: var(--radius-label); background: color-mix(in srgb, var(--accent) 8%, var(--panel-raised)); color: var(--accent); font-family: var(--font-mono); font-size: var(--help-text-small); font-weight: 750; }
     .workspace-help-guide-index svg { width: 16px; height: 16px; }
     .workspace-help-guide-card > .eyebrow { color: var(--accent); font-size: var(--help-text-meta); font-weight: 760; letter-spacing: .12em; }
     .workspace-help-guide-card h4 { margin: 0; color: var(--text); font-size: 14px; font-weight: 740; line-height: 1.35; }
     .workspace-help-guide-card p { margin: 0; color: var(--muted); font-size: var(--help-text-small); line-height: 1.55; }
-    .workspace-help-guide-card p code { padding: 2px 5px; border: 1px solid var(--help-border); border-radius: 5px; background: var(--help-code-surface); color: var(--accent); font-family: var(--font-mono); white-space: nowrap; }
+    .workspace-help-guide-card p code { padding: 2px 5px; border: 1px solid var(--help-border); border-radius: var(--radius-label); background: var(--help-code-surface); color: var(--accent); font-family: var(--font-mono); white-space: nowrap; }
     .workspace-help-guide-card ul { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
     .workspace-help-guide-card li { position: relative; padding-left: 14px; color: var(--muted); font-size: var(--help-text-small); line-height: 1.5; }
     .workspace-help-guide-card li::before { position: absolute; top: .55em; left: 1px; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); content: ""; }
@@ -340,11 +340,11 @@
     .workspace-help-assistant-demo { display: grid; gap: 12px; padding: 15px; border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--help-border)); border-radius: var(--help-radius-card); background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 5%, var(--help-surface)), var(--help-surface) 58%); }
     .workspace-help-assistant-demo-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
     .workspace-help-assistant-demo-heading .eyebrow { color: var(--accent); font-size: var(--help-text-meta); font-weight: 760; letter-spacing: .12em; }
-    .workspace-help-assistant-demo-tag { padding: 3px 8px; border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--help-border)); border-radius: 999px; color: var(--accent); font-size: 9px; font-weight: 700; letter-spacing: .08em; }
+    .workspace-help-assistant-demo-tag { padding: 3px 8px; border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--help-border)); border-radius: var(--radius-label); color: var(--accent); font-size: 9px; font-weight: 700; letter-spacing: .08em; }
     .workspace-help-assistant-demo-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
     .workspace-help-assistant-demo-steps article { display: flex; min-width: 0; flex-direction: column; align-items: flex-start; gap: 9px; padding: 12px; border: 1px solid var(--help-border); border-radius: var(--help-radius-card); background: color-mix(in srgb, var(--panel) 76%, transparent); }
     .workspace-help-assistant-step { display: inline-flex; align-items: center; gap: 7px; color: var(--accent); font-size: var(--help-text-meta); font-weight: 760; letter-spacing: .1em; }
-    .workspace-help-assistant-step b { display: grid; width: 22px; height: 22px; place-items: center; border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--help-border)); border-radius: 7px; background: color-mix(in srgb, var(--accent) 8%, var(--help-surface)); font-family: var(--font-mono); font-size: 9px; letter-spacing: 0; }
+    .workspace-help-assistant-step b { display: grid; width: 22px; height: 22px; place-items: center; border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--help-border)); border-radius: var(--radius-label); background: color-mix(in srgb, var(--accent) 8%, var(--help-surface)); font-family: var(--font-mono); font-size: 9px; letter-spacing: 0; }
     .workspace-help-assistant-demo-steps p { margin: 0; color: var(--text-soft); font-size: var(--help-text-small); line-height: 1.5; }
     .workspace-help-assistant-demo-steps p.workspace-help-assistant-prompt { color: var(--text); font-weight: 650; }
     .workspace-help-assistant-demo-steps small { color: var(--muted); font-size: var(--help-text-meta); line-height: 1.45; }
@@ -361,28 +361,28 @@
     .workspace-help-monitoring-preview-heading > div { display: flex; align-items: center; gap: 9px; }
     .workspace-help-monitoring-preview-heading .eyebrow { color: var(--accent); font-size: var(--help-text-meta); font-weight: 760; letter-spacing: .12em; }
     .workspace-help-monitoring-preview-heading strong { color: var(--text); font-size: 13px; }
-    .workspace-help-monitoring-demo-tag { padding: 3px 7px; border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--help-border)); border-radius: 999px; color: var(--accent); font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+    .workspace-help-monitoring-demo-tag { padding: 3px 7px; border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--help-border)); border-radius: var(--radius-label); color: var(--accent); font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
     .workspace-help-monitoring-preview-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
     .workspace-help-monitoring-sample-card { display: grid; min-width: 0; align-content: start; gap: 9px; padding: 10px; border: 1px solid var(--help-border); border-radius: var(--help-radius-card); background: color-mix(in srgb, var(--panel) 72%, transparent); }
     .workspace-help-monitoring-sample-card > header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
     .workspace-help-monitoring-sample-card > header .eyebrow { color: var(--accent); font-size: var(--help-text-meta); font-weight: 750; letter-spacing: .1em; }
     .workspace-help-monitoring-sample-card > header strong { color: var(--text-soft); font-size: 12px; }
     .workspace-help-monitoring-sample-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
-    .workspace-help-monitoring-sample-metrics > span { display: grid; min-width: 0; gap: 4px; padding: 6px 7px; border: 1px solid var(--help-border); border-radius: 6px; background: color-mix(in srgb, var(--help-surface) 82%, transparent); }
+    .workspace-help-monitoring-sample-metrics > span { display: grid; min-width: 0; gap: 4px; padding: 6px 7px; border: 1px solid var(--help-border); border-radius: var(--radius-label); background: color-mix(in srgb, var(--help-surface) 82%, transparent); }
     .workspace-help-monitoring-sample-metrics small { overflow: hidden; color: var(--muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
     .workspace-help-monitoring-sample-metrics strong { color: var(--text); font-family: var(--font-mono); font-size: 12px; }
     .workspace-help-monitoring-sample-metrics .has-warning strong { color: var(--amber); }
-    .workspace-help-monitoring-sample-chart { display: grid; gap: 3px; padding: 4px 6px 2px; border: 1px solid var(--help-border); border-radius: 7px; background-image: linear-gradient(color-mix(in srgb, var(--accent) 4%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--accent) 4%, transparent) 1px, transparent 1px); background-size: 18px 18px; }
+    .workspace-help-monitoring-sample-chart { display: grid; gap: 3px; padding: 4px 6px 2px; border: 1px solid var(--help-border); border-radius: var(--radius-panel); background-image: linear-gradient(color-mix(in srgb, var(--accent) 4%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--accent) 4%, transparent) 1px, transparent 1px); background-size: 18px 18px; }
     .workspace-help-monitoring-sample-chart > div:first-child, .workspace-help-monitoring-chart-axis { display: flex; justify-content: space-between; color: var(--muted); font-size: 9px; }
     .workspace-help-monitoring-sample-chart svg { display: block; width: 100%; height: 66px; overflow: visible; }
     .workspace-help-monitoring-sample-chart circle { fill: var(--accent); opacity: .74; }
     .workspace-help-monitoring-sample-chart circle.is-error { fill: var(--amber); }
     .workspace-help-monitoring-gridline { stroke: var(--help-border); stroke-width: 1; stroke-dasharray: 2 4; }
     .workspace-help-monitoring-sample-families, .workspace-help-monitoring-sample-replicas { display: grid; gap: 4px; }
-    .workspace-help-monitoring-sample-families > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 5px; background: color-mix(in srgb, var(--help-surface) 82%, transparent); }
+    .workspace-help-monitoring-sample-families > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 5px 6px; border-radius: var(--radius-panel); background: color-mix(in srgb, var(--help-surface) 82%, transparent); }
     .workspace-help-monitoring-sample-families code, .workspace-help-monitoring-sample-replicas code { overflow: hidden; color: var(--text-soft); font-family: var(--font-mono); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
     .workspace-help-monitoring-sample-families span, .workspace-help-monitoring-sample-replicas > div > span:not(.workspace-help-replica-dot) { color: var(--muted); font-size: 9px; white-space: nowrap; }
-    .workspace-help-monitoring-sample-replicas > div { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto auto auto; align-items: center; gap: 6px; padding: 6px; border-radius: 5px; background: color-mix(in srgb, var(--help-surface) 82%, transparent); }
+    .workspace-help-monitoring-sample-replicas > div { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto auto auto; align-items: center; gap: 6px; padding: 6px; border-radius: var(--radius-panel); background: color-mix(in srgb, var(--help-surface) 82%, transparent); }
     .workspace-help-monitoring-sample-replicas strong { color: var(--green); font-size: 9px; text-transform: uppercase; }
     .workspace-help-monitoring-sample-replicas strong.is-warning { color: var(--amber); }
     .workspace-help-monitoring-sample-replicas small { grid-column: 2 / -1; color: var(--muted); font-size: 9px; }
@@ -407,7 +407,7 @@
     .workspace-help-geo-preview::before { position: absolute; inset: 13% 6%; border: 1px solid color-mix(in srgb, var(--help-border-strong) 70%, transparent); border-radius: 50%; background: linear-gradient(90deg, transparent 32%, color-mix(in srgb, var(--help-border-strong) 34%, transparent) 32.2%, transparent 32.5%, transparent 66%, color-mix(in srgb, var(--help-border-strong) 34%, transparent) 66.2%, transparent 66.5%), linear-gradient(transparent 49.6%, color-mix(in srgb, var(--help-border-strong) 34%, transparent) 50%, transparent 50.4%); content: ""; opacity: .48; }
     .geo-demo-marker { position: absolute; z-index: 1; left: 0; top: 0; width: var(--geo-demo-size); height: var(--geo-demo-size); border: 2px solid color-mix(in srgb, var(--panel-raised) 84%, hsl(var(--geo-hue) 90% 70%)); border-radius: 50%; background: hsl(var(--geo-hue) 92% 58%); box-shadow: var(--status-ring); transform: translate(-50%, -50%); color: hsl(var(--geo-hue) 90% 58%); }
     .geo-demo-marker.has-label { z-index: 2; }
-    .geo-demo-marker-label { position: absolute; top: 50%; left: 12px; display: grid; min-width: 72px; gap: 2px; padding: 5px 7px; border: 1px solid color-mix(in srgb, hsl(var(--geo-hue) 92% 60%) 52%, var(--help-border)); border-radius: 8px; background: color-mix(in srgb, var(--panel-raised) 94%, transparent); color: var(--text); font-size: var(--help-text-meta); line-height: 1.2; box-shadow: var(--shadow-popover); transform: translateY(-50%); white-space: nowrap; }
+    .geo-demo-marker-label { position: absolute; top: 50%; left: 12px; display: grid; min-width: 72px; gap: 2px; padding: 5px 7px; border: 1px solid color-mix(in srgb, hsl(var(--geo-hue) 92% 60%) 52%, var(--help-border)); border-radius: var(--radius-popover); background: color-mix(in srgb, var(--panel-raised) 94%, transparent); color: var(--text); font-size: var(--help-text-meta); line-height: 1.2; box-shadow: var(--shadow-popover); transform: translateY(-50%); white-space: nowrap; }
     .geo-demo-marker-label strong { color: hsl(var(--geo-hue) 92% 68%); font-family: var(--font-mono); font-size: var(--help-text-meta); }
     .geo-demo-marker-label-left .geo-demo-marker-label { right: 12px; left: auto; }
     .workspace-help-geo-copy { display: flex; min-width: 0; flex-direction: column; gap: 10px; }
@@ -464,14 +464,14 @@
     .sql-example-option-description { grid-column: 1 / -1; color: var(--muted); font-size: var(--help-text-small); line-height: 1.45; }
     .sql-example-option-meta { display: flex; min-width: 0; grid-column: 1 / -1; align-items: center; gap: 6px; }
     .sql-example-option-category,
-    .sql-example-chart-kind { padding: 3px 7px; border-radius: 999px; font-size: var(--help-text-meta); white-space: nowrap; }
+    .sql-example-chart-kind { padding: 3px 7px; border-radius: var(--radius-label); font-size: var(--help-text-meta); white-space: nowrap; }
     .sql-example-option-category { min-width: 0; overflow: hidden; border: 1px solid var(--help-border); color: var(--muted); text-overflow: ellipsis; }
     .sql-example-chart-kind { flex: none; border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--help-border)); background: color-mix(in srgb, var(--accent) 5%, transparent); color: var(--text-soft); }
 
     .sql-example-preview { display: flex; min-width: 0; min-height: 0; flex-direction: column; gap: 11px; padding: 18px; overflow: auto; }
     .sql-example-preview-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
     .sql-example-preview-heading h3 { overflow-wrap: anywhere; margin: 4px 0 0; color: var(--text); font-size: 16px; font-weight: 740; line-height: 1.3; }
-    .sql-example-readonly { flex: none; padding: 5px 8px; border: 1px solid var(--help-border); border-radius: 6px; color: var(--muted); font-family: var(--font-mono); font-size: var(--help-text-meta); }
+    .sql-example-readonly { flex: none; padding: 5px 8px; border: 1px solid var(--help-border); border-radius: var(--radius-label); color: var(--muted); font-family: var(--font-mono); font-size: var(--help-text-meta); }
     .sql-example-preview pre { min-height: 80px; max-height: 300px; margin: 0; padding: 13px; overflow: auto; border: 1px solid var(--help-border); border-radius: var(--help-radius-control); background: var(--help-code-surface); color: var(--text-soft); font-family: var(--font-mono); font-size: var(--help-text-small); line-height: 1.65; tab-size: 4; white-space: pre; }
     .sql-example-actions { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: 8px; }
     .sql-example-action { display: inline-flex; min-height: var(--help-control-height); flex: none; align-items: center; justify-content: center; gap: 7px; padding: 0 12px; font-size: var(--help-text-small); }
@@ -507,7 +507,7 @@
 
 @media (max-width: 850px) {
     .workspace-help-backdrop { padding: 12px; }
-    .workspace-help-panel { width: calc(100vw - 24px); height: calc(100dvh - 24px); max-height: calc(100dvh - 24px); border-radius: 12px; }
+    .workspace-help-panel { width: calc(100vw - 24px); height: calc(100dvh - 24px); max-height: calc(100dvh - 24px); border-radius: var(--radius-dialog); }
     .workspace-help-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
     .workspace-help-tabs { flex-direction: row; gap: 5px; overflow-x: auto; overflow-y: hidden; padding: 7px 10px; border-right: 0; border-bottom: 1px solid var(--line); }
     .workspace-help-tab { min-width: max-content; min-height: 38px; flex: none; grid-template-columns: 16px auto; padding: 6px 10px; }
@@ -515,7 +515,7 @@
     .workspace-help-tab > span { display: block; }
     .workspace-help-tab small { display: none; }
     .workspace-help-tabs-group-label { align-self: center; margin: 0 3px; padding: 0 10px; border-top: 0; border-left: 1px solid var(--help-experimental-border); }
-    .workspace-help-tab-short-tag { display: inline-flex; align-items: center; padding: 3px 5px; border: 1px solid var(--help-experimental-border); border-radius: 999px; background: var(--help-experimental-surface); color: var(--help-experimental-text); font-size: 8px; font-weight: 850; letter-spacing: .08em; line-height: 1; }
+    .workspace-help-tab-short-tag { display: inline-flex; align-items: center; padding: 3px 5px; border: 1px solid var(--help-experimental-border); border-radius: var(--radius-label); background: var(--help-experimental-surface); color: var(--help-experimental-text); font-size: 8px; font-weight: 850; letter-spacing: .08em; line-height: 1; }
     .workspace-help-content { min-height: 0; }
     .workspace-help-tour,
     .workspace-help-feature-view { padding: 14px; }
@@ -535,7 +535,7 @@
 
 @media (max-width: 560px) {
     .workspace-help-backdrop { padding: 8px; }
-    .workspace-help-panel { width: calc(100vw - 16px); height: calc(100dvh - 16px); max-height: calc(100dvh - 16px); border-radius: 12px; }
+    .workspace-help-panel { width: calc(100vw - 16px); height: calc(100dvh - 16px); max-height: calc(100dvh - 16px); border-radius: var(--radius-dialog); }
     .workspace-help-header { gap: 9px; padding: 13px 13px 11px; }
     .workspace-help-header h2 { font-size: 18px; }
     .workspace-help-header p { max-width: 270px; }
@@ -546,7 +546,7 @@
     .workspace-help-tab { min-height: 36px; padding: 5px 8px; }
     .workspace-help-tour,
     .workspace-help-feature-view { padding: 12px; }
-    .workspace-help-tour-experimental { margin-top: 15px; padding: 11px; border-radius: 11px; }
+    .workspace-help-tour-experimental { margin-top: 15px; padding: 11px; border-radius: var(--radius-panel); }
     .workspace-help-guide-card { padding: 12px; }
     .workspace-help-monitoring-sample-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .workspace-help-monitoring-sample-replicas > div { grid-template-columns: 8px minmax(0, 1fr) auto auto; }

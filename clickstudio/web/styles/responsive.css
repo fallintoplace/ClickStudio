@@ -41,7 +41,7 @@
     .results-header { min-height: 47px; padding-top: 5px; padding-bottom: 5px; }
     .empty-workspace { gap: 7px; padding: 10px; }
     .empty-graphic { display: grid; width: 42px; height: 42px; margin-bottom: 0; }
-    .empty-core { width: 28px; height: 28px; border-radius: 9px; }
+    .empty-core { width: 28px; height: 28px; border-radius: var(--radius-panel); }
     .empty-core svg { width: 14px; height: 14px; }
     .empty-orbit { inset: 1px; }
     .empty-orbit.orbit-two { inset: 7px -4px; }
@@ -145,7 +145,7 @@
     .select-control select { max-width: 91px; }
     .connection-wrap { min-width: 0; width: 140px; max-width: 140px; }
     .cloud-topbar-action { min-height: 30px; padding-inline: 7px; font-size: 9px; }
-    .connection-menu { position: fixed; top: 64px; right: 8px; left: 8px; width: auto; max-height: calc(100dvh - 80px); padding: 7px; border-radius: 12px; }
+    .connection-menu { position: fixed; top: 64px; right: 8px; left: 8px; width: auto; max-height: calc(100dvh - 80px); padding: 7px; border-radius: var(--radius-popover); }
     .connection-env, .connection-quick-status { font-size: 6px; letter-spacing: .04em; }
     .workspace-content.has-run { grid-template-rows: minmax(285px, 1fr) minmax(250px, .94fr); }
     .beginner-workspace-content { grid-template-rows: minmax(310px, 1fr) minmax(165px, .65fr); }

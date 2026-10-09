@@ -10,6 +10,7 @@ const backdrop = (locator: Locator, native = false) => locator.evaluate((element
 
 for (const theme of ['Dark', 'Light']) for (const mode of ['Standard', 'Experimental']) {
     test(`${theme} ${mode} keeps workspace panels flat and overlay depth neutral across accents`, async ({ page }) => {
+        await page.emulateMedia({ reducedMotion: 'reduce' });
         await page.setViewportSize({ width: 1440, height: 900 });
         await trust(page);
         await page.getByText(mode, { exact: true }).click();
@@ -30,16 +31,32 @@ for (const theme of ['Dark', 'Light']) for (const mode of ['Standard', 'Experime
         await filter.fill('2026-01-02');
         await expect(page.locator('.data-table tbody tr')).toHaveCount(1);
         await filter.fill('');
+        for (const selector of ['.editor-surface', '.results-surface', '[data-testid="run-button"]', '[data-testid="save-query"]', '.panel-window-button', '.panel-collapse-button', '[aria-label="Filter current page"]']) {
+            await expect(page.locator(selector).first()).toHaveCSS('border-radius', '4px');
+        }
+        await expect(page.locator('.topbar-control-rail')).toHaveCSS('border-radius', '0px');
+        await expect(page.locator('.document-tab.is-active')).toHaveCSS('border-radius', '4px 4px 0px 0px');
+        await expect(page.locator('.data-table th small').first()).toHaveCSS('border-radius', '2px');
+        await expect(page.locator('.data-table th').first()).toHaveCSS('border-radius', '0px');
+        await expect(page.locator('.accent-mode-swatch').first()).toHaveCSS('border-radius', '50%');
+        await expect(page.locator('.status-light').first()).toHaveCSS('border-radius', '50%');
+        const inspector = page.locator('.inspector-pane.is-docked-inspector');
+        if (!await inspector.isVisible()) await page.locator('.icon-rail').getByRole('button', { name: 'Objects', exact: true }).click();
+        await expect(inspector).toHaveCSS('border-radius', '0px');
+        await expect(inspector.locator('.object-tree-scroll')).toHaveCSS('border-radius', '4px');
+        await expect(inspector.locator('.object-tree-count').first()).toHaveCSS('border-radius', '2px');
 
         await page.locator('.connection-trigger').click();
         const menu = page.getByRole('dialog', { name: 'Connection details', exact: true });
         await expect(menu).toBeVisible();
+        await expect(menu).toHaveCSS('border-radius', '6px');
         const menuShadow = await shadow(menu);
         expect(menuShadow).not.toBe('none');
         await page.locator('.connection-trigger').click();
         await page.getByRole('button', { name: 'Help', exact: true }).click();
         const help = page.getByRole('dialog', { name: 'Explore ClickStudio', exact: true });
         await expect(help).toBeVisible();
+        await expect(help).toHaveCSS('border-radius', '8px');
         const dialogShadow = await shadow(help);
         expect(dialogShadow).not.toBe(menuShadow);
         const scrim = await backdrop(page.locator('.workspace-help-backdrop'));
@@ -53,12 +70,17 @@ for (const theme of ['Dark', 'Light']) for (const mode of ['Standard', 'Experime
         await expect(help).toBeHidden();
 
         await page.getByRole('button', { name: 'ClickHouse yellow accent', exact: true }).click();
+        await expect(editor).toHaveCSS('border-radius', '4px');
+        await expect(runButton(page)).toHaveCSS('border-radius', '4px');
         await page.locator('.connection-trigger').click();
         await expect(menu).toHaveCSS('box-shadow', menuShadow);
         await page.locator('.connection-trigger').click();
         await page.getByRole('button', { name: 'Export', exact: true }).click();
         const exportDialog = page.getByRole('dialog', { name: 'Export', exact: true });
         await expect(exportDialog).toBeVisible();
+        await expect(exportDialog).toHaveCSS('border-radius', '8px');
+        await expect(exportDialog.locator('.export-option').first()).toHaveCSS('border-radius', '4px');
+        await expect(exportDialog.getByRole('button', { name: 'Close export options', exact: true })).toHaveCSS('border-radius', '4px');
         await expect.poll(() => shadow(exportDialog)).toBe(dialogShadow);
         expect(await backdrop(exportDialog, true)).toEqual(scrim);
         await page.keyboard.press('Escape');
@@ -69,7 +91,11 @@ for (const theme of ['Dark', 'Light']) for (const mode of ['Standard', 'Experime
         await expect(importDialog).toBeVisible();
         await expect(importDialog).toHaveCSS('box-shadow', dialogShadow);
         expect(await backdrop(importDialog, true)).toEqual(scrim);
+        await expect(importDialog).toHaveCSS('border-radius', '8px');
+        await page.setViewportSize({ width: 390, height: 844 });
+        await expect(importDialog).toHaveCSS('border-radius', '8px');
         const step = importDialog.locator('.import-step-item.is-current .import-step-number');
+        await expect(step).toHaveCSS('border-radius', '2px');
         const stepColors = await step.evaluate(element => {
             const style = getComputedStyle(element);
             return { text: style.color, fill: style.backgroundColor };
@@ -77,6 +103,9 @@ for (const theme of ['Dark', 'Light']) for (const mode of ['Standard', 'Experime
         expect(stepColors.text).not.toBe(stepColors.fill);
         await page.keyboard.press('Escape');
         await expect(importDialog).toBeHidden();
+        await expect(runButton(page)).toHaveCSS('border-radius', '4px');
+        await runButton(page).click({ trial: true });
+        await page.setViewportSize({ width: 1440, height: 900 });
 
         const otherTheme = theme === 'Dark' ? 'Light' : 'Dark';
         await page.getByRole('radio', { name: `${otherTheme} theme`, exact: true }).click();

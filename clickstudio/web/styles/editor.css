@@ -60,7 +60,7 @@
     .editor-control-rail { display: flex; min-width: 0; min-height: 0; flex-direction: column; gap: 9px; overflow: auto; padding: 10px; border-left: 1px solid var(--line); background: color-mix(in srgb, var(--control-well) 82%, transparent); box-shadow: none; }
     .editor-rail-status { display: flex; flex: none; align-items: center; justify-content: space-between; gap: 6px; padding: 2px 2px 7px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 8px; }
     .editor-rail-status .editor-mode-label { gap: 6px; color: var(--text-soft); font-size: 9px; }
-    .file-type-icon { display: grid; width: 32px; height: 32px; flex: none; place-items: center; border: 1px solid color-mix(in srgb, var(--signal-accent) 28%, var(--line)); border-radius: var(--radius-control); background: color-mix(in srgb, var(--signal-accent) 8%, var(--panel)); color: var(--signal-accent); font-family: var(--font-mono); font-size: 8px; font-weight: 800; letter-spacing: .03em; }
+    .file-type-icon { display: grid; width: 32px; height: 32px; flex: none; place-items: center; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--panel-raised); color: var(--signal-accent); font-family: var(--font-mono); font-size: 8px; font-weight: 800; letter-spacing: .03em; }
     .file-type-icon.small { width: 28px; height: 28px; font-size: 7px; }
     .document-name { display: grid; min-width: 0; gap: 1px; }
     .document-name input { width: min(30vw, 260px); padding: 0; border: 0; outline: none; background: transparent; color: var(--text); font-size: 13px; font-weight: 630; }
@@ -89,7 +89,7 @@
     .icon-only { width: 31px; min-width: 31px; padding: 0; }
     .toolbar-small { min-height: 27px; padding: 0 8px; font-size: 8px; letter-spacing: .04em; }
     .editor-heading-actions > .toolbar-small { min-height: 29px; padding-inline: 9px; font-size: 9px; letter-spacing: .01em; }
-    .editor-heading-actions > [role="status"] { display: inline-flex; align-items: center; gap: 6px; border: 1px solid color-mix(in srgb, var(--amber) 38%, var(--line)); border-radius: 999px; background: color-mix(in srgb, var(--amber) 9%, var(--panel)); color: color-mix(in srgb, var(--amber) 82%, var(--text)); }
+    .editor-heading-actions > [role="status"] { display: inline-flex; align-items: center; gap: 6px; border: 1px solid color-mix(in srgb, var(--amber) 38%, var(--line)); border-radius: var(--radius-label); background: color-mix(in srgb, var(--amber) 9%, var(--panel)); color: color-mix(in srgb, var(--amber) 82%, var(--text)); }
     .editor-heading-actions > [role="status"]::before { width: 6px; height: 6px; flex: none; border-radius: 50%; background: var(--amber); content: ""; }
     .run-query-button { min-height: 34px; padding: 0 13px; font-size: 11px; }
     .run-action-group { display: flex; min-width: 0; width: 100%; flex-direction: column; align-items: stretch; gap: 4px; }
@@ -102,7 +102,7 @@
     .run-explain-actions .run-option-button { min-height: 30px; padding-inline: 4px; font-size: 8px; }
     .run-option-disabled-anchor { position: relative; display: flex; min-width: 0; width: 100%; flex: none; }
     .run-option-disabled-anchor > .run-option-button { width: 100%; justify-content: center; }
-    .run-option-disabled-anchor:focus-visible { border-radius: 8px; outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent); outline-offset: 3px; }
+    .run-option-disabled-anchor:focus-visible { border-radius: var(--radius-panel); outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent); outline-offset: 3px; }
     .sql-ai-button { color: var(--violet); }
     .sql-ai-button[aria-pressed="true"] { border-color: color-mix(in srgb, var(--violet) 25%, transparent); background: color-mix(in srgb, var(--violet) 8%, transparent); }
     .save-revision-button { min-height: 34px; }
@@ -124,7 +124,7 @@
     .sql-editor .cm-focused { outline: none; }
     .sql-editor .cm-selectionBackground, .sql-editor ::selection { background: var(--editor-selection) !important; }
     .sql-editor .cm-cursor { border-left-width: 2px; }
-    .sql-editor .cm-tooltip { z-index: var(--z-editor-tooltip); border: 1px solid var(--line-bright); border-radius: 9px; background: var(--panel-raised); color: var(--text); box-shadow: var(--shadow-popover); }
+    .sql-editor .cm-tooltip { z-index: var(--z-editor-tooltip); border: 1px solid var(--line-bright); border-radius: var(--radius-popover); background: var(--panel-raised); color: var(--text); box-shadow: var(--shadow-popover); }
     .sql-editor .cm-completionInfo { pointer-events: none; }
     .sql-editor .cm-tooltip-lint { box-sizing: border-box; width: max-content; max-width: min(560px, calc(100vw - 32px)); max-height: min(184px, 34vh); overflow: auto; border-color: color-mix(in srgb, var(--red) 38%, var(--line-bright)); }
     .sql-editor .cm-tooltip-lint .cm-diagnostic { margin: 0; padding: 10px 12px; border-left: 3px solid var(--red); color: var(--text-soft); font-family: var(--font-sans); font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; white-space: pre-wrap; }

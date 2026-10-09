@@ -2,7 +2,7 @@
     .application { position: relative; display: flex; flex-direction: column; width: 100%; height: 100vh; min-height: 540px; overflow: hidden; isolation: isolate; background: radial-gradient(ellipse at 18% -8%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 34%), radial-gradient(ellipse at 88% 100%, color-mix(in srgb, var(--signal-accent) 4%, transparent), transparent 34%), var(--page); }
     .application::before { position: absolute; z-index: var(--z-underlay); inset: 0; pointer-events: none; content: ""; opacity: .18; background-image: linear-gradient(color-mix(in srgb, var(--text) 5%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--text) 5%, transparent) 1px, transparent 1px); background-size: 44px 44px; mask-image: linear-gradient(to bottom, #000 0, transparent 65%); }
     .topbar { z-index: var(--z-app-chrome); display: flex; flex: none; align-items: center; gap: 21px; min-height: 68px; padding: 0 24px; border-bottom: 1px solid var(--line); background: var(--surface-glass); box-shadow: none; backdrop-filter: blur(22px); }
-    .topbar-control-rail { display: flex; min-width: 0; align-items: center; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 13px; background: var(--control-well); box-shadow: var(--shadow-inset); }
+    .topbar-control-rail { display: flex; min-width: 0; align-items: center; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: var(--radius-shell); background: var(--control-well); box-shadow: var(--shadow-inset); }
     .brand-lockup { display: inline-flex; flex: none; align-items: center; gap: 11px; }
     .brand-symbol { display: block; width: 30px; height: 30px; flex: none; object-fit: contain; }
     .brand-name { position: relative; color: var(--text); font-family: var(--font-display); font-size: 15px; font-weight: 720; letter-spacing: -.035em; line-height: 1; }
@@ -18,7 +18,7 @@
     .cloud-topbar-connect.button-secondary:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent) 68%, var(--line-bright)); background: color-mix(in srgb, var(--accent) 13%, var(--panel-raised)); }
     .cloud-topbar-disconnect.button-danger { border-color: color-mix(in srgb, var(--red) 42%, var(--line)); background: color-mix(in srgb, var(--red) 7%, var(--panel)); color: var(--red); }
     .cloud-topbar-disconnect.button-danger:hover:not(:disabled) { border-color: color-mix(in srgb, var(--red) 65%, var(--line-bright)); background: color-mix(in srgb, var(--red) 15%, var(--panel)); color: var(--text); }
-    .connection-trigger { display: grid; width: 100%; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 4px 10px; border: 1px solid transparent; border-radius: 10px; background: transparent; text-align: left; cursor: pointer; transition: .2s ease; }
+    .connection-trigger { display: grid; width: 100%; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 4px 10px; border: 1px solid transparent; border-radius: var(--radius-control); background: transparent; text-align: left; cursor: pointer; transition: .2s ease; }
     .connection-trigger:hover, .connection-trigger[aria-expanded="true"] { border-color: var(--active-border); background: var(--control-hover); }
     .connection-trigger > strong { grid-column: 1; grid-row: 2; overflow: hidden; color: var(--text); font-size: 12px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
     .connection-env { display: flex; grid-column: 1; grid-row: 1; align-items: center; gap: 7px; color: var(--muted); font-size: 8px; font-weight: 750; letter-spacing: .13em; white-space: nowrap; }
@@ -26,20 +26,20 @@
     .connection-quick-status.is-ready { color: var(--green); }
     .connection-database { display: inline-flex; grid-column: 2; grid-row: 2; align-items: center; gap: 4px; color: var(--text-soft); font-family: var(--font-mono); font-size: 10px; }
     .connection-database svg { width: 13px; height: 13px; color: var(--muted); }
-    .connection-menu { position: absolute; z-index: var(--z-popover); top: calc(100% + 8px); left: 0; display: flex; width: min(380px, calc(100vw - 24px)); max-height: min(78dvh, 600px); flex-direction: column; overflow: hidden; padding: 8px; border: 1px solid color-mix(in srgb, var(--accent) 38%, var(--line-bright)); border-radius: 13px; background: radial-gradient(ellipse at 0 0, color-mix(in srgb, var(--accent) 16%, transparent), transparent 46%), radial-gradient(ellipse at 100% 100%, color-mix(in srgb, var(--violet) 12%, transparent), transparent 42%), var(--panel-raised); box-shadow: var(--shadow-popover); }
+    .connection-menu { position: absolute; z-index: var(--z-popover); top: calc(100% + 8px); left: 0; display: flex; width: min(380px, calc(100vw - 24px)); max-height: min(78dvh, 600px); flex-direction: column; overflow: hidden; padding: 8px; border: 1px solid color-mix(in srgb, var(--accent) 38%, var(--line-bright)); border-radius: var(--radius-popover); background: radial-gradient(ellipse at 0 0, color-mix(in srgb, var(--accent) 16%, transparent), transparent 46%), radial-gradient(ellipse at 100% 100%, color-mix(in srgb, var(--violet) 12%, transparent), transparent 42%), var(--panel-raised); box-shadow: var(--shadow-popover); }
     .connection-menu-content { display: grid; min-height: 0; gap: 5px; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
-    .connection-menu-current { display: grid; gap: 4px; padding: 9px 10px 10px; border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--line)); border-radius: 10px; background: linear-gradient(120deg, color-mix(in srgb, var(--accent) 10%, var(--panel)), color-mix(in srgb, var(--violet) 8%, var(--panel-raised))); }
+    .connection-menu-current { display: grid; gap: 4px; padding: 9px 10px 10px; border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--line)); border-radius: var(--radius-panel); background: linear-gradient(120deg, color-mix(in srgb, var(--accent) 10%, var(--panel)), color-mix(in srgb, var(--violet) 8%, var(--panel-raised))); }
     .connection-menu-heading { color: color-mix(in srgb, var(--accent) 64%, var(--muted)); font-size: 8px; font-weight: 760; letter-spacing: .13em; line-height: 1.35; text-transform: uppercase; }
     .connection-menu-current strong, .connection-switch-list strong { overflow: hidden; color: var(--text); font-size: 12px; font-weight: 680; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
     .connection-menu-current small, .connection-switch-list small { overflow: hidden; color: var(--muted); font-size: 10px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
     .connection-menu-current small { display: -webkit-box; white-space: normal; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-    .connection-menu-note { margin: 0; padding: 7px 9px; border: 1px solid color-mix(in srgb, var(--amber) 24%, var(--line)); border-left: 3px solid var(--amber); border-radius: 8px; background: color-mix(in srgb, var(--amber) 8%, var(--panel)); color: var(--text-soft); font-size: 9px; line-height: 1.45; }
+    .connection-menu-note { margin: 0; padding: 7px 9px; border: 1px solid color-mix(in srgb, var(--amber) 24%, var(--line)); border-left: 3px solid var(--amber); border-radius: var(--radius-panel); background: color-mix(in srgb, var(--amber) 8%, var(--panel)); color: var(--text-soft); font-size: 9px; line-height: 1.45; }
     .connection-menu-note.is-ready { border-color: color-mix(in srgb, var(--green) 24%, var(--line)); border-left-color: var(--green); background: color-mix(in srgb, var(--green) 7%, var(--panel)); }
     .connection-menu-note.is-sample { border-color: color-mix(in srgb, var(--accent) 24%, var(--line)); border-left-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, var(--panel)); }
     .connection-menu-action { width: 100%; min-height: 32px; font-size: 10px; }
     .connection-switch-list { display: grid; gap: 2px; margin-top: 3px; padding-top: 7px; border-top: 1px solid color-mix(in srgb, var(--violet) 35%, var(--line)); }
     .connection-switch-list > .connection-menu-heading { padding: 0 8px 2px; }
-    .connection-switch-list > button { display: flex; width: 100%; min-width: 0; min-height: 46px; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 8px; border: 1px solid transparent; border-radius: 8px; background: transparent; text-align: left; cursor: pointer; transition: background .16s ease, border-color .16s ease; }
+    .connection-switch-list > button { display: flex; width: 100%; min-width: 0; min-height: 46px; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 8px; border: 1px solid transparent; border-radius: var(--radius-control); background: transparent; text-align: left; cursor: pointer; transition: background .16s ease, border-color .16s ease; }
     .connection-switch-list > button:hover { background: linear-gradient(100deg, color-mix(in srgb, var(--accent) 10%, var(--panel-raised)), color-mix(in srgb, var(--violet) 7%, var(--panel-raised))); }
     .connection-switch-list > button:focus-visible { outline: 2px solid var(--focus-color); outline-offset: 1px; }
     .connection-switch-list > button > span:first-child { display: grid; min-width: 0; gap: 2px; }
@@ -49,7 +49,7 @@
     .connection-menu-footer .connection-menu-action:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent) 66%, var(--line-bright)); background: linear-gradient(110deg, color-mix(in srgb, var(--accent) 24%, var(--panel-raised)), color-mix(in srgb, var(--violet) 18%, var(--panel-raised))); color: var(--text); }
     .cloud-connect-layer { position: fixed; z-index: var(--z-dialog); inset: 0; display: grid; place-items: center; padding: 18px; }
     .cloud-connect-scrim { position: absolute; inset: 0; border: 0; background: var(--overlay-backdrop); backdrop-filter: var(--overlay-backdrop-filter); }
-    .cloud-connect-dialog { position: relative; display: grid; width: min(500px, calc(100vw - 32px)); max-height: min(760px, calc(100dvh - 32px)); gap: 15px; overflow: auto; padding: 20px; border: 1px solid var(--line-bright); border-radius: 15px; outline: none; background: var(--panel-raised); box-shadow: var(--shadow-dialog); }
+    .cloud-connect-dialog { position: relative; display: grid; width: min(500px, calc(100vw - 32px)); max-height: min(760px, calc(100dvh - 32px)); gap: 15px; overflow: auto; padding: 20px; border: 1px solid var(--line-bright); border-radius: var(--radius-dialog); outline: none; background: var(--panel-raised); box-shadow: var(--shadow-dialog); }
     .cloud-connect-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
     .cloud-connect-heading h2 { margin: 4px 0 0; color: var(--text); font-family: var(--font-display); font-size: 18px; font-weight: 680; letter-spacing: -.025em; }
     .cloud-connect-description { margin: 0; color: var(--text-soft); font-size: 10px; line-height: 1.55; }
@@ -57,14 +57,14 @@
     .cloud-connect-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .cloud-connect-form .field-label { color: var(--text-soft); font-size: 9px; }
     .cloud-connect-form .field-input { min-height: 36px; font-size: 10px; }
-    .cloud-connect-notice { display: flex; align-items: flex-start; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 9px; background: color-mix(in srgb, var(--accent) 6%, var(--panel)); color: var(--muted); font-size: 9px; line-height: 1.5; }
+    .cloud-connect-notice { display: flex; align-items: flex-start; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: var(--radius-panel); background: color-mix(in srgb, var(--accent) 6%, var(--panel)); color: var(--muted); font-size: 9px; line-height: 1.5; }
     .cloud-connect-notice svg { width: 13px; height: 13px; flex: none; margin-top: 1px; color: var(--accent); }
     .cloud-connect-error { margin: 0; }
     .cloud-connect-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 2px; }
     .cloud-connect-actions .loading-orbit { width: 12px; height: 12px; vertical-align: middle; }
     @media (max-width: 520px) { .cloud-connect-layer { padding: 8px; } .cloud-connect-dialog { width: 100%; max-height: calc(100dvh - 16px); padding: 15px; } .cloud-connect-fields { grid-template-columns: 1fr; } }
-    .experience-switch { display: flex; align-items: center; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--control-well); }
-    .topbar-control-rail > .experience-switch { gap: 3px; padding: 2px; border-color: transparent; border-radius: 10px; background: transparent; }
+    .experience-switch { display: flex; align-items: center; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: var(--radius-shell); background: var(--control-well); }
+    .topbar-control-rail > .experience-switch { gap: 3px; padding: 2px; border-color: transparent; border-radius: var(--radius-shell); background: transparent; }
     .topbar-control-rail > .topbar-divider { height: 23px; opacity: .7; }
     .topbar-control-rail .topbar-preferences { align-items: center; gap: 4px; }
     .topbar-control-rail .theme-switch { padding: 2px; border-color: transparent; background: transparent; }
@@ -99,7 +99,7 @@
     .workspace-root.has-inspector-dock .workspace-layout > .inspector-pane.is-docked-inspector { grid-column: 3; grid-row: 1; border-left: 1px solid var(--line-bright); }
     .icon-rail { z-index: var(--z-app-chrome); display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 14px 7px; border-right: 1px solid var(--line); background: color-mix(in srgb, var(--page-raised) 74%, transparent); }
     .rail-separator { width: 24px; height: 1px; flex: none; margin: 3px 0 5px; background: var(--line); }
-    .rail-icon-button { position: relative; display: grid; width: 39px; height: 39px; flex: none; place-items: center; border: 1px solid transparent; border-radius: 11px; background: transparent; color: var(--muted); cursor: pointer; transition: transform .2s ease, background .2s ease, color .2s ease, border .2s ease; }
+    .rail-icon-button { position: relative; display: grid; width: 39px; height: 39px; flex: none; place-items: center; border: 1px solid transparent; border-radius: var(--radius-control); background: transparent; color: var(--muted); cursor: pointer; transition: transform .2s ease, background .2s ease, color .2s ease, border .2s ease; }
     .rail-icon-button:hover { border-color: var(--line); background: var(--panel); color: var(--text); transform: translateY(-1px); }
     .rail-icon-button:disabled { cursor: not-allowed; opacity: .42; }
     .rail-icon-button:hover:disabled { transform: none; }
@@ -107,18 +107,18 @@
     .rail-icon-button.is-accent { color: var(--violet); }
     .rail-icon-button.is-accent.is-active { border-color: color-mix(in srgb, var(--violet) 35%, var(--line)); background: color-mix(in srgb, var(--violet) 10%, var(--panel)); }
     .rail-icon-muted { margin-top: 3px; }
-    .rail-tooltip { position: absolute; z-index: var(--z-tooltip); top: 50%; left: calc(100% + 11px); width: max-content; padding: 7px 9px; border: 1px solid var(--line-bright); border-radius: 7px; background: var(--panel-raised); color: var(--text); font-size: 10px; box-shadow: var(--shadow-popover); opacity: 0; pointer-events: none; transform: translate(-4px, -50%); transition: .16s ease; }
+    .rail-tooltip { position: absolute; z-index: var(--z-tooltip); top: 50%; left: calc(100% + 11px); width: max-content; padding: 7px 9px; border: 1px solid var(--line-bright); border-radius: var(--radius-popover); background: var(--panel-raised); color: var(--text); font-size: 10px; box-shadow: var(--shadow-popover); opacity: 0; pointer-events: none; transform: translate(-4px, -50%); transition: .16s ease; }
     .rail-icon-button:hover .rail-tooltip { opacity: 1; transform: translate(0, -50%); }
     .workspace-main { display: flex; min-width: 0; min-height: 0; flex-direction: column; overflow: hidden; }
     .document-tabs { display: flex; min-width: 0; min-height: 36px; flex: none; align-items: stretch; overflow: visible; padding: 0 10px; border-bottom: 1px solid var(--line); background: var(--surface-glass); }
     .document-tabs.is-compact-single { min-height: 33px; }
     .document-tabs-scroll { display: flex; min-width: 0; flex: 1 1 auto; align-items: stretch; gap: 2px; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; scrollbar-width: none; }
     .document-tabs-scroll::-webkit-scrollbar { display: none; }
-    .document-tab { position: relative; display: flex; width: max-content; min-width: 160px; max-width: 340px; flex: 0 0 auto; align-items: center; gap: 7px; padding: 0 9px; border: 1px solid transparent; border-bottom: 0; border-radius: 7px 7px 0 0; color: var(--muted); font-size: 10px; cursor: pointer; transition: .18s ease; }
+    .document-tab { position: relative; display: flex; width: max-content; min-width: 160px; max-width: 340px; flex: 0 0 auto; align-items: center; gap: 7px; padding: 0 9px; border: 1px solid transparent; border-bottom: 0; border-radius: var(--radius-control) var(--radius-control) 0 0; color: var(--muted); font-size: 10px; cursor: pointer; transition: .18s ease; }
     .document-tab-actions { position: relative; z-index: 1; display: flex; flex: none; align-items: stretch; gap: 2px; padding-left: 5px; background: color-mix(in srgb, var(--page-raised) 94%, transparent); }
     .document-tab-actions:has(.restore-sql-trigger[aria-expanded="true"]) { z-index: var(--z-app-chrome); }
     .document-tabs.has-tab-overflow .document-tab-actions { box-shadow: -14px 0 18px color-mix(in srgb, var(--page-raised) 94%, transparent); }
-    .document-tabs-scroll-button { display: grid; width: 27px; height: 31px; flex: none; align-self: center; place-items: center; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); color: var(--text-soft); cursor: pointer; transition: .16s ease; }
+    .document-tabs-scroll-button { display: grid; width: 27px; height: 31px; flex: none; align-self: center; place-items: center; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--panel); color: var(--text-soft); cursor: pointer; transition: .16s ease; }
     .document-tabs-scroll-button:hover:not(:disabled) { border-color: var(--active-border); background: var(--active-surface); color: var(--accent); }
     .document-tabs-scroll-button:disabled { color: var(--muted); cursor: default; opacity: .3; }
     .document-tabs-scroll-button svg { width: 14px; height: 14px; }
@@ -129,13 +129,13 @@
     .document-tab.is-active { border-color: var(--active-border); background: var(--panel); color: var(--text); box-shadow: inset 0 2px var(--accent); }
     .document-tab:focus-visible { outline: 2px solid var(--focus-color); outline-offset: 2px; }
     .document-tab-name { overflow: hidden; flex: 1; text-overflow: ellipsis; white-space: nowrap; }
-    .document-tab-rename { min-width: 0; flex: 1; padding: 2px 4px; border: 1px solid color-mix(in srgb, var(--accent) 48%, var(--line)); border-radius: 4px; outline: none; background: var(--panel-raised); color: var(--text); font: inherit; }
+    .document-tab-rename { min-width: 0; flex: 1; padding: 2px 4px; border: 1px solid color-mix(in srgb, var(--accent) 48%, var(--line)); border-radius: var(--radius-control); outline: none; background: var(--panel-raised); color: var(--text); font: inherit; }
     .document-tab-rename:focus-visible { box-shadow: var(--focus-ring); }
     .tab-unsaved { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--amber); box-shadow: var(--status-ring); color: var(--amber); }
-    .document-tab > button { width: 19px; height: 19px; flex: none; border: 0; border-radius: 5px; background: transparent; color: var(--muted); font-size: 15px; line-height: 1; cursor: pointer; opacity: 0; }
+    .document-tab > button { width: 19px; height: 19px; flex: none; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--muted); font-size: 15px; line-height: 1; cursor: pointer; opacity: 0; }
     .document-tab:hover > button, .document-tab.is-active > button { opacity: 1; }
     .document-tab > button:hover { background: var(--panel-hover); color: var(--text); }
-    .new-tab-button { display: grid; width: 31px; height: 31px; flex: none; align-self: center; place-items: center; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; transition: .18s ease; }
+    .new-tab-button { display: grid; width: 31px; height: 31px; flex: none; align-self: center; place-items: center; border: 1px solid transparent; border-radius: var(--radius-control); background: transparent; color: var(--muted); cursor: pointer; transition: .18s ease; }
     .new-tab-button:hover { border-color: var(--line); background: var(--panel); color: var(--accent); }
     .new-tab-button svg { width: 16px; height: 16px; }
     .new-tab-labeled { display: inline-flex; width: auto; min-width: max-content; gap: 6px; padding: 0 9px; font-size: 10px; font-weight: 650; }
@@ -147,8 +147,8 @@
     .restore-sql-menu { position: relative; display: flex; flex: none; align-self: center; }
     .restore-sql-trigger { color: var(--text-soft); }
     .restore-sql-trigger:hover, .restore-sql-trigger[aria-expanded="true"] { border-color: color-mix(in srgb, var(--accent) 42%, var(--line)); background: color-mix(in srgb, var(--accent) 8%, var(--panel)); color: var(--accent); }
-    .restore-sql-menu-list { position: absolute; z-index: var(--z-popover); top: calc(100% + 6px); right: 0; left: auto; display: grid; width: min(300px, calc(100vw - 24px)); max-height: min(360px, calc(100dvh - 90px)); gap: 2px; overflow: auto; padding: 5px; border: 1px solid var(--line-bright); border-radius: 9px; background: var(--panel-raised); box-shadow: var(--shadow-popover); }
-    .restore-sql-menu-list button { display: flex; width: 100%; min-width: 0; align-items: center; gap: 8px; padding: 7px 8px; border: 0; border-radius: 6px; background: transparent; color: var(--text-soft); text-align: left; cursor: pointer; }
+    .restore-sql-menu-list { position: absolute; z-index: var(--z-popover); top: calc(100% + 6px); right: 0; left: auto; display: grid; width: min(300px, calc(100vw - 24px)); max-height: min(360px, calc(100dvh - 90px)); gap: 2px; overflow: auto; padding: 5px; border: 1px solid var(--line-bright); border-radius: var(--radius-popover); background: var(--panel-raised); box-shadow: var(--shadow-popover); }
+    .restore-sql-menu-list button { display: flex; width: 100%; min-width: 0; align-items: center; gap: 8px; padding: 7px 8px; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--text-soft); text-align: left; cursor: pointer; }
     .restore-sql-menu-list button:hover, .restore-sql-menu-list button:focus-visible { outline: none; background: var(--panel-hover); color: var(--text); }
     .restore-sql-menu-list button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
     .restore-sql-menu-list button > svg { width: 14px; height: 14px; flex: none; color: var(--muted); }

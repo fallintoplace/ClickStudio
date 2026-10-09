@@ -343,6 +343,7 @@ test('Static preview includes materialized views and storage activity in sample 
     const graph = page.getByRole('dialog', { name: 'Materialized view dependencies', exact: true });
     await expect(graph).toContainText('SAMPLE DATA');
     await expect(graph.locator('.native-lineage-node')).toHaveCount(5);
+    await expect(graph.locator('.native-lineage-node rect').first()).toHaveCSS('rx', '4px');
     await page.keyboard.press('Escape');
     await page.getByRole('button', { name: 'events MergeTree', exact: true }).click();
     await page.getByRole('button', { name: 'Visualize parts', exact: true }).click();
