@@ -108,10 +108,11 @@
     .result-execution-progress.is-initial .result-execution-sql { width: min(100%, 860px); }
     .script-results { display: grid; min-width: 0; min-height: 0; flex: 0 1 auto; gap: 5px; max-height: min(132px, 24vh); overflow: auto; padding: 6px 12px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--panel-raised) 75%, var(--page)); }
     .script-results-heading { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 10px; }
-    .script-results-heading > span { display: flex; min-width: 0; align-items: baseline; gap: 8px; }
+    .script-results-summary { display: flex; min-width: 0; align-items: baseline; gap: 8px; }
     .script-results-heading strong { color: var(--text-soft); font-size: 9px; font-weight: 650; text-transform: capitalize; }
     .script-results-heading i { padding: 0 3px; color: var(--muted); font-style: normal; }
     .script-results-heading .button-base { min-height: 24px; }
+    .script-cancel-status { flex: none; color: var(--amber); font-size: 8px; font-weight: 600; line-height: 1; white-space: nowrap; }
     .script-statement-list { display: flex; min-width: 0; gap: 6px; overflow-x: auto; overflow-y: hidden; padding: 1px 0 3px; scrollbar-width: thin; }
     .script-statement { display: grid; min-width: 190px; max-width: 280px; grid-template-columns: 22px minmax(0, 1fr) auto; align-items: center; gap: 7px; padding: 5px 7px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--panel); color: var(--text-soft); text-align: left; cursor: pointer; transition: border-color .18s ease, background .18s ease; }
     .script-statement:hover:not(:disabled) { border-color: var(--line-bright); }

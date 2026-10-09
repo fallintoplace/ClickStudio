@@ -69,8 +69,8 @@ export function ScriptResults({ script, runs, activeRunId, onSelectRun, onSelect
         return { statement, index, details };
     });
     return <section className="script-results" aria-label="Script statement results">
-        <div className="script-results-heading"><span><span className="eyebrow">SCRIPT EXECUTION</span><strong>{script.statements.length} statements <i>·</i> {script.status}</strong></span>{script.status === 'running' && (script.cancelled
-            ? <span role="status">Finishing current statement…</span>
+        <div className="script-results-heading"><div className="script-results-summary"><span className="eyebrow">SCRIPT EXECUTION</span><strong>{script.statements.length} statements <i>·</i> {script.status}</strong></div>{script.status === 'running' && (script.cancelled
+            ? <span className="script-cancel-status" role="status">{cancelAfterCurrentStatement ? 'Stopping after this query…' : 'Cancelling script…'}</span>
             : <Button variant="danger" className="toolbar-small" onClick={onCancel} disabled={cancelDisabled}>{cancelAfterCurrentStatement ? 'Stop after current statement' : 'Cancel script'}</Button>)}</div>
         <div className="script-statement-list" role="group" aria-label="Select a statement result">{statements.map(({ statement, index, details }) => {
             const active = statement.runId ? !errorSelected && statement.runId === activeRunId : Boolean(statement.error && errorSelected);
