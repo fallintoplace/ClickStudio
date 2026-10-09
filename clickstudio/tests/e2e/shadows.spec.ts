@@ -8,6 +8,16 @@ const backdrop = (locator: Locator, native = false) => locator.evaluate((element
     return { color: style.backgroundColor, filter: style.backdropFilter };
 }, native);
 
+async function expectWrappedSearchFocus(input: Locator, wrapper: Locator) {
+    await input.focus();
+    await expect(input).toBeFocused();
+    await expect(input).toHaveCSS('outline-style', 'none');
+    await expect(input).toHaveCSS('box-shadow', 'none');
+    await expect.poll(() => shadow(wrapper)).toMatch(/0px 0px 0px 2px/);
+    await input.press('Tab');
+    await expect.poll(() => shadow(wrapper)).toMatch(/^(none|.+ 0px 0px 0px 0px)$/);
+}
+
 async function expectNeutralWorkspace(page: Page) {
     const panel = await page.locator('.editor-surface').evaluate(element => getComputedStyle(element).backgroundColor);
     const line = await page.locator('.topbar').evaluate(element => getComputedStyle(element).borderBottomColor);
@@ -112,6 +122,7 @@ for (const theme of ['Dark', 'Light']) for (const mode of ['Standard', 'Experime
         await expect(inspector).toHaveCSS('border-radius', '0px');
         await expect(inspector.locator('.object-tree-scroll')).toHaveCSS('border-radius', '4px');
         await expect(inspector.locator('.object-tree-count').first()).toHaveCSS('border-radius', '2px');
+        await expectWrappedSearchFocus(inspector.getByTestId('schema-search'), inspector.locator('.object-search'));
         await expectNeutralWorkspace(page);
 
         await page.locator('.connection-trigger').click();
@@ -129,6 +140,10 @@ for (const theme of ['Dark', 'Light']) for (const mode of ['Standard', 'Experime
         expect(dialogShadow).not.toBe(menuShadow);
         const scrim = await backdrop(page.locator('.workspace-help-backdrop'));
         await help.getByTestId('help-section-examples').click();
+        await expectWrappedSearchFocus(help.getByTestId('sql-example-search'), help.locator('.sql-example-search'));
+        await help.getByTestId('help-section-reference').click();
+        await expectWrappedSearchFocus(help.getByRole('textbox', { name: 'Search ClickHouse…', exact: true }), help.locator('.reference-search'));
+        await help.getByTestId('help-section-examples').click();
         const category = help.locator('.sql-example-category').first();
         await page.keyboard.press('Tab');
         await category.focus();
@@ -141,6 +156,14 @@ for (const theme of ['Dark', 'Light']) for (const mode of ['Standard', 'Experime
         await expect(editor).toHaveCSS('border-radius', '4px');
         await expect(runButton(page)).toHaveCSS('border-radius', '4px');
         await expectNeutralWorkspace(page);
+        await expectWrappedSearchFocus(inspector.getByTestId('schema-search'), inspector.locator('.object-search'));
+        await page.getByRole('button', { name: 'Help', exact: true }).click();
+        await help.getByTestId('help-section-examples').click();
+        await expectWrappedSearchFocus(help.getByTestId('sql-example-search'), help.locator('.sql-example-search'));
+        await help.getByTestId('help-section-reference').click();
+        await expectWrappedSearchFocus(help.getByRole('textbox', { name: 'Search ClickHouse…', exact: true }), help.locator('.reference-search'));
+        await page.keyboard.press('Escape');
+        await expect(help).toBeHidden();
         await page.locator('.connection-trigger').click();
         await expect(menu).toHaveCSS('box-shadow', menuShadow);
         await page.locator('.connection-trigger').click();

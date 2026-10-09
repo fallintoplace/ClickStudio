@@ -578,3 +578,5 @@
     .workspace-help-backdrop,
     .workspace-help-panel { animation: none; }
 }
+
+.sql-example-search input:focus-visible { outline: none; }

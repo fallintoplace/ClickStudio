@@ -72,6 +72,7 @@
     .object-search:focus-within { border-color: var(--focus-color); background: var(--panel-raised); box-shadow: var(--focus-ring); }
     .object-search > svg { width: 16px; height: 16px; color: var(--muted); filter: none; }
     .object-search input { min-width: 0; font-size: 11px; }
+    .object-search input:focus-visible { outline: none; }
     .object-search input::placeholder { color: color-mix(in srgb, var(--muted) 80%, transparent); }
     .object-search-clear { display: grid; width: 27px; height: 27px; flex: none; place-items: center; border: 1px solid transparent; border-radius: var(--radius-control); background: transparent; color: var(--muted); font-size: 15px; cursor: pointer; }
     .object-search-clear:hover, .object-search-clear:focus-visible { border-color: var(--line-bright); background: var(--panel-hover); color: var(--text); outline: none; }
@@ -185,6 +186,7 @@
     .reference-source-light.is-bundled { background: var(--amber); box-shadow: var(--status-ring); color: var(--amber); }
     .reference-search { width: 100%; border-color: color-mix(in srgb, var(--explorer-signal) 24%, var(--line)); background: var(--page); }
     .reference-search:focus-within { border-color: var(--explorer-signal); box-shadow: var(--focus-ring); }
+    .reference-search input:focus-visible { outline: none; }
     .reference-categories { display: flex; flex: none; gap: 5px; overflow-x: auto; padding: 2px 0 4px; scrollbar-width: thin; }
     .reference-categories button { min-height: 28px; flex: none; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--panel-raised); color: var(--muted); font-size: 8px; font-weight: 650; cursor: pointer; transition: .16s ease; }
     .reference-categories button:hover { border-color: color-mix(in srgb, var(--explorer-signal) 42%, var(--line)); color: var(--text-soft); }
