@@ -1,5 +1,7 @@
-.workspace-content { padding: 2px; }
+.workspace-content { padding: 2px; gap: 0; }
 .workspace-content.has-panel-split { gap: 0; }
+.workspace-panel-splitter { margin-block: -5px; }
+.workspace-panel-splitter::before { position: absolute; top: 50%; left: 50%; translate: -50% -50%; }
 
 /* Keep collapsed panels at their heading height after responsive layout rules. */
 .workspace-content.has-run.is-query-collapsed { grid-template-rows: max-content minmax(0, 1fr); }

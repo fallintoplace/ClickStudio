@@ -750,8 +750,14 @@ test('Desktop docked query and output panels resize with the splitter', async ({
     expect(queryBefore).not.toBeNull();
     expect(resultsBefore).not.toBeNull();
     expect(splitBox).not.toBeNull();
-    expect(Math.abs(splitBox!.y - (queryBefore!.y + queryBefore!.height))).toBeLessThanOrEqual(2);
-    expect(Math.abs(resultsBefore!.y - (splitBox!.y + splitBox!.height))).toBeLessThanOrEqual(2);
+    expect(splitBox!.height).toBe(10);
+    expect(Math.abs(splitBox!.y + splitBox!.height / 2 - (queryBefore!.y + queryBefore!.height))).toBeLessThanOrEqual(1);
+    expect(Math.abs(resultsBefore!.y - (queryBefore!.y + queryBefore!.height))).toBeLessThanOrEqual(1);
+    for (const offset of [1, 5, 9]) {
+        expect(await page.evaluate(({ x, y }) => Boolean(document.elementFromPoint(x, y)?.closest('.workspace-panel-splitter')), {
+            x: splitBox!.x + splitBox!.width / 2, y: splitBox!.y + offset,
+        })).toBe(true);
+    }
 
     await page.mouse.move(splitBox!.x + splitBox!.width / 2, splitBox!.y + splitBox!.height / 2);
     await page.mouse.down();
@@ -766,8 +772,9 @@ test('Desktop docked query and output panels resize with the splitter', async ({
     expect(splitAfter).not.toBeNull();
     expect(queryAfter!.height).toBeGreaterThan(queryBefore!.height + 45);
     expect(resultsAfter!.height).toBeLessThan(resultsBefore!.height - 45);
-    expect(Math.abs(splitAfter!.y - (queryAfter!.y + queryAfter!.height))).toBeLessThanOrEqual(2);
-    expect(Math.abs(resultsAfter!.y - (splitAfter!.y + splitAfter!.height))).toBeLessThanOrEqual(2);
+    expect(Math.abs(splitAfter!.y + splitAfter!.height / 2 - (queryAfter!.y + queryAfter!.height))).toBeLessThanOrEqual(1);
+    expect(Math.abs(resultsAfter!.y - (queryAfter!.y + queryAfter!.height))).toBeLessThanOrEqual(1);
+    expect(Math.abs(queryAfter!.y + queryAfter!.height - (splitBox!.y + 100))).toBeLessThanOrEqual(1);
 
     const ratioBeforeKeyboard = Number(await splitter.getAttribute('aria-valuenow'));
     await splitter.press('ArrowUp');

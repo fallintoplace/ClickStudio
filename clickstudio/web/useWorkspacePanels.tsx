@@ -90,9 +90,8 @@ export function useWorkspacePanels({
         const computed = getComputedStyle(content);
         const paddingTop = Number.parseFloat(computed.paddingTop) || 0;
         const paddingBottom = Number.parseFloat(computed.paddingBottom) || 0;
-        const splitterHeight = 10;
         const top = rect.top + paddingTop;
-        const usableHeight = Math.max(1, rect.height - paddingTop - paddingBottom - splitterHeight);
+        const usableHeight = Math.max(1, rect.height - paddingTop - paddingBottom);
         let latest = panelLayout.splitRatio;
         document.body.classList.add('is-workspace-panel-gesturing');
         const move = (pointer: PointerEvent) => {

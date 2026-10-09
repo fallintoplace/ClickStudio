@@ -139,6 +139,9 @@ for (const mode of ['Standard', 'Experimental']) {
             await page.getByRole('radio', { name: `${theme} theme`, exact: true }).click();
             for (const width of [1440, 720, 390]) {
                 await page.setViewportSize({ width, height: 900 });
+                const queryBounds = await page.locator('.editor-surface').boundingBox();
+                const resultsBounds = await results.boundingBox();
+                expect(Math.abs(resultsBounds!.y - (queryBounds!.y + queryBounds!.height))).toBeLessThanOrEqual(1);
                 await expect(toggle).toHaveAttribute('aria-expanded', 'false');
                 await expect(filter).toBeHidden();
                 await expectToolbarFits();
