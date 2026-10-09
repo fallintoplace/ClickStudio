@@ -847,13 +847,9 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
 
     const queryPanel = <WorkspaceQueryPanel
         state={{ active, connection, schema, copy, experience, dark, nativeParserEnabled, nativeParserStatus,
-            trusted, unsupportedParameters, parameters, busy, inspector, demoMode, view }}
+            trusted, unsupportedParameters, parameters, busy, inspector, demoMode }}
         actions={{
             onPatch: patch,
-            onToggleSqlMap: () => {
-                setView(current => current === 'sqlmap' ? 'results' : 'sqlmap');
-                panels.revealPanelTemporarily('results');
-            },
             onOpenAssistant: () => showInspector('assistant'),
             onSave: saveDraft,
             onFormat: formatActiveSql,

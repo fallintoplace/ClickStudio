@@ -25,6 +25,7 @@
     .topbar-preferences .select-control > span { display: none; }
     .editor-heading-tools > .button-base { width: 32px; min-width: 32px; padding-inline: 0; font-size: 0; }
     .editor-heading-tools > .button-base svg { width: 15px; height: 15px; }
+    .editor-heading-tools > .run-query-button { width: auto; min-width: 70px; padding-inline: 12px; font-size: 11px; }
     .execution-bar { gap: 9px; }
     .execution-link-state { display: none; }
     .execution-telemetry { gap: 8px; }

@@ -7,7 +7,6 @@ import type {
     BusyAction,
     Connected,
     Inspector,
-    ResultsView,
     WorkspaceFormatter,
     WorkspaceRunCapability,
     WorkspaceRunCapabilityAction,
@@ -35,12 +34,10 @@ export type WorkspaceQueryPanelState = Readonly<{
     busy: BusyAction;
     inspector: Inspector;
     demoMode: boolean;
-    view: ResultsView;
 }>;
 
 export type WorkspaceQueryPanelActions = Readonly<{
     onPatch: (values: Partial<Draft>) => void;
-    onToggleSqlMap: () => void;
     onOpenAssistant: () => void;
     onSave: (draft?: Draft) => Promise<void>;
     onFormat: (formatter: WorkspaceFormatter) => Promise<void>;
@@ -83,7 +80,6 @@ export function WorkspaceQueryPanel({
         busy,
         inspector,
         demoMode,
-        view,
     } = state;
     const { statementCount, editorErrorContext, editorErrorRange } = viewState;
     const { queryPanelRef } = panels;
@@ -96,6 +92,7 @@ export function WorkspaceQueryPanel({
     const runTitle = runRequiresScript ? actions.runActionTitle(connection.manifest?.scripts, 'script') : undefined;
     const standardFormatter = nativeParserEnabled && nativeParserStatus === 'ready' ? 'wasm' : 'builtin';
     const runSql = () => actions.onRun('query');
+    const runButton = <Button variant="primary" className="run-query-button compact-run-button" data-testid="run-button" aria-label={copy.common.run} title={runTitle} onClick={() => void runSql()} disabled={runDisabled}><Icon name="play"/>{busy === 'run' || busy === 'script' ? copy.common.running : copy.common.run}</Button>;
     const saveButton = <Button
         variant="secondary"
         className="save-revision-button standard-save-button"
@@ -135,7 +132,7 @@ export function WorkspaceQueryPanel({
                 }}
             /></label></div>
             {experience === 'expert' && <div className="editor-heading-tools">
-                <Button variant="ghost" className="sql-map-button" aria-label={copy.common.visualizeSqlStructure} aria-pressed={view === 'sqlmap'} title={copy.common.visualizeSqlStructure} onClick={actions.onToggleSqlMap}><Icon name="pipeline"/>{copy.common.sqlMap}</Button>
+                {runButton}
                 {saveButton}
             </div>}
             <div className="editor-heading-actions">
@@ -143,7 +140,7 @@ export function WorkspaceQueryPanel({
                     <Button variant="ghost" className="sql-ai-button" data-testid="open-ai" aria-label={copy.common.askAi} aria-pressed={inspector === 'assistant'} onClick={actions.onOpenAssistant}><Icon name="assistant"/>{copy.common.askAi}</Button>
                     <Button variant="ghost" className="toolbar-small standard-format-button" data-testid="format-sql" aria-label={copy.common.formatSql} title={copy.common.formatSql} onClick={() => void actions.onFormat(standardFormatter)}>{copy.common.format}</Button>
                     {saveButton}
-                    <Button variant="primary" className="run-query-button compact-run-button" data-testid="run-button" aria-label={copy.common.run} title={runTitle} onClick={() => void runSql()} disabled={runDisabled}><Icon name="play"/>{busy === 'run' || busy === 'script' ? copy.common.running : copy.common.run}</Button>
+                    {runButton}
                 </>}
                 {experience === 'expert' && <>
                     {nativeParserEnabled && nativeParserStatus === 'unavailable' && <>
@@ -171,7 +168,7 @@ export function WorkspaceQueryPanel({
                 {experience === 'expert' && <aside className="editor-control-rail" aria-label={copy.common.runActions}>
                     <div className="editor-rail-status"><div className="editor-mode-label"><span className="editor-language-dot"/>{copy.common.clickhouseSql}</div><span>{statementCount === undefined ? copy.common.incompleteSql : (statementCount === 1 ? copy.common.oneStatement : copy.common.manyStatements).replace('{count}', String(statementCount))}</span></div>
                     <div className="editor-actions">
-                        <RunActionGroup copy={copy.common} runLabel={copy.common.run} runTitle={runTitle} running={busy === 'run' || busy === 'script'} disabled={runDisabled} onRun={() => void runSql()} actions={[
+                        <RunActionGroup copy={copy.common} actions={[
                             { id: 'explain', label: copy.common.explain, disabled: !trusted || Boolean(busy) || unsupportedParameters || !connection.manifest?.explain.available, title: actions.runActionTitle(connection.manifest?.explain, 'explain'), onSelect: () => void actions.onRun('explain') },
                             { id: 'explain-plan', label: copy.common.explainPlan, disabled: !trusted || Boolean(busy) || unsupportedParameters || !(connection.manifest?.explainPlan ?? connection.manifest?.explain)?.available, title: actions.runActionTitle(connection.manifest?.explainPlan ?? connection.manifest?.explain, 'explain-plan'), onSelect: () => void actions.onRun('plan') },
                             { id: 'explain-pipeline', label: copy.common.explainPipeline, disabled: !trusted || Boolean(busy) || unsupportedParameters || !(connection.manifest?.explainPipeline ?? connection.manifest?.pipeline)?.available, title: actions.runActionTitle(connection.manifest?.explainPipeline ?? connection.manifest?.pipeline, 'explain-pipeline'), onSelect: () => void actions.onRun('pipeline') },

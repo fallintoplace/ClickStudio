@@ -107,9 +107,6 @@
     .run-option-disabled-anchor:focus-visible { border-radius: 8px; outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent); outline-offset: 3px; }
     .sql-ai-button { color: var(--violet); }
     .sql-ai-button[aria-pressed="true"] { border-color: color-mix(in srgb, var(--violet) 25%, transparent); background: color-mix(in srgb, var(--violet) 8%, transparent); }
-    .sql-map-button { gap: 6px; color: var(--accent); }
-    .sql-map-button[aria-pressed="true"] { border-color: color-mix(in srgb, var(--accent) 28%, transparent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
-    .sql-map-button svg { width: 14px; height: 14px; }
     .save-revision-button { min-height: 34px; }
     .editor-frame { min-height: 120px; flex: 1; overflow: auto; background: var(--page-raised); }
     .sql-editor { position: relative; min-width: 0; }

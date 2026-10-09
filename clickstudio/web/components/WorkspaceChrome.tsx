@@ -20,12 +20,7 @@ function DisabledRunAction({ action, label }: { action: RunAction; label: string
     </span>;
 }
 
-export function RunActionGroup({ runLabel, runTitle, running, disabled, onRun, actions, copy }: {
-    runLabel: string;
-    runTitle?: string;
-    running: boolean;
-    disabled: boolean;
-    onRun: () => void;
+export function RunActionGroup({ actions, copy }: {
     actions: RunAction[];
     copy: Copy['common'];
 }) {
@@ -40,7 +35,6 @@ export function RunActionGroup({ runLabel, runTitle, running, disabled, onRun, a
         return <DisabledRunAction key={action.id} action={action} label={label}/>;
     };
     return <div className="run-action-group" role="group" aria-label={copy.runActions}>
-        <Button variant="primary" className="run-query-button" data-testid="run-button" aria-label={runLabel} title={runTitle} onClick={onRun} disabled={disabled}><Icon name="play"/>{running ? copy.running : runLabel}</Button>
         {otherActions.map(renderAction)}
         {explainActions.length > 0 && <div className="run-explain-actions" role="group" aria-label={explainGroupLabel}>
             <span className="run-explain-label" aria-hidden="true">{explainGroupLabel}</span>

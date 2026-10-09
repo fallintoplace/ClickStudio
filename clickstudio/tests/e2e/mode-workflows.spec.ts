@@ -466,3 +466,35 @@ test('Experimental insights and AI requests do not execute SQL', async ({ page }
     expect(runRequests).toHaveLength(1);
     await expect(page.locator('.execution-bar')).toHaveAttribute('data-query-id', queryId);
 });
+
+for (const theme of ['Dark', 'Light']) test(`Experimental puts Run first in the header and opens SQL map after execution in ${theme} mode`, async ({ page }) => {
+    await trust(page);
+    await useAdvancedMode(page);
+    await page.getByRole('radio', { name: `${theme} theme`, exact: true }).click();
+    const run = page.getByTestId('run-button');
+    const header = page.locator('.editor-heading-tools');
+    await expect(run).toHaveCount(1);
+    await expect(header.getByTestId('run-button')).toBeVisible();
+    await expect(header.getByRole('button').first()).toHaveAttribute('data-testid', 'run-button');
+    await expect(page.getByRole('button', { name: 'Visualize SQL structure', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('tab', { name: 'SQL map', exact: true })).toHaveCount(0);
+    for (const width of [1440, 720, 390]) {
+        await page.setViewportSize({ width, height: 900 });
+        await expect(run).toBeVisible();
+        await expect(run).toHaveText('Run');
+        await expect(run).toHaveCSS('font-size', '11px');
+        const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+        expect(overflow).toBeLessThanOrEqual(1);
+    }
+    let executions = 0;
+    page.on('request', request => {
+        if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/runs') executions++;
+    });
+    await run.click();
+    const results = page.getByRole('region', { name: 'Query results', exact: true });
+    await expect(results.getByRole('table', { name: 'Retained query rows' })).toBeVisible();
+    await expect(results.getByRole('tab', { name: 'Results', exact: true })).toHaveAttribute('aria-selected', 'true');
+    await results.getByRole('tab', { name: 'SQL map', exact: true }).click();
+    await expect(page.locator('.sql-flow-view')).toBeVisible();
+    expect(executions).toBe(1);
+});

@@ -845,10 +845,11 @@ test('SQL structure switches from logical flow to native AST', async ({ page }) 
         highlights: [],
     };
     await page.addInitScript(parserWorkerStub('ready', parserResponse));
-    await page.goto('/');
+    await trust(page);
     await replaceSql(page, 'SELECT uniqExact(user_id) FROM analytics.events');
 
-    await page.getByRole('button', { name: 'Visualize SQL structure', exact: true }).click();
+    await runButton(page).click();
+    await page.getByRole('tab', { name: 'SQL map', exact: true }).click();
     const structure = page.locator('.sql-flow-view');
     const flow = structure.getByRole('button', { name: 'Logical flow', exact: true });
     const nativeAst = structure.getByRole('button', { name: 'Native AST', exact: true });
@@ -875,9 +876,10 @@ test('SQL structure switches from logical flow to native AST', async ({ page }) 
 });
 
 test('SQL structure loads the server analyzer tree', async ({ page }) => {
-    await page.goto('/');
+    await trust(page);
     await replaceSql(page, 'SELECT event_type, count() AS events FROM demo.events GROUP BY event_type');
-    await page.getByRole('button', { name: 'Visualize SQL structure', exact: true }).click();
+    await runButton(page).click();
+    await page.getByRole('tab', { name: 'SQL map', exact: true }).click();
     const structure = page.locator('.sql-flow-view');
     const analyzer = structure.getByRole('button', { name: 'Analyzer', exact: true });
     await expect(analyzer).toBeEnabled();
