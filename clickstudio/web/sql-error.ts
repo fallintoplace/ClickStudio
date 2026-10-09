@@ -61,6 +61,16 @@ export function sqlErrorLineColumn(sql: string, position: number) {
     return { line: lines.length, column: (lines.at(-1)?.length ?? 0) + 1 };
 }
 
+export function sqlErrorExcerpt(sql: string, range?: SqlErrorRange) {
+    if (!range || !Number.isSafeInteger(range.from) || !Number.isSafeInteger(range.to) || range.from < 0 || range.to < range.from || range.to > sql.length) return sql;
+    const end = sql.indexOf('\n', range.from);
+    const lineEnd = end < 0 ? sql.length : end;
+    const lineStart = range.from === 0 ? 0 : sql.lastIndexOf('\n', range.from - 1) + 1;
+    const indent = sql.slice(lineStart, range.from).replace(/[^\t]/g, ' ');
+    const marker = '^'.repeat(Math.max(1, Math.min(range.to, lineEnd) - range.from));
+    return `${sql.slice(0, lineEnd)}\n${indent}${marker}${sql.slice(lineEnd)}`;
+}
+
 export function queryFailureSummary(error: ApiError) {
     const syntax = error.code === 'SYNTAX_ERROR' || /\bsyntax error\b/i.test(error.message);
     const token = syntax ? /failed at position \d+ \(([^)]+)\)/i.exec(error.message)?.[1]?.trim() : undefined;

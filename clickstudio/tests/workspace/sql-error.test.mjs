@@ -1,8 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { queryFailureSummary, sqlErrorRange, sqlErrorRangeInDraft, sqlErrorLineColumn } from '../../.workspace-build/web/sql-error.js';
+import { queryFailureSummary, sqlErrorRange, sqlErrorRangeInDraft, sqlErrorLineColumn, sqlErrorExcerpt } from '../../.workspace-build/web/sql-error.js';
 
 const error = message => ({ code: 'CLICKHOUSE_62', message });
+
+test('Failed SQL preserves every line and places a caret below the submitted error', () => {
+    assert.equal(sqlErrorExcerpt('SELECT 1\nGROUP BY\nORDER BY 1', { from: 9, to: 14 }), 'SELECT 1\nGROUP BY\n^^^^^\nORDER BY 1');
+    assert.equal(sqlErrorExcerpt('\tSELECT missing(1)', { from: 8, to: 15 }), '\tSELECT missing(1)\n\t       ^^^^^^^');
+    assert.equal(sqlErrorExcerpt('SELECT', { from: 6, to: 6 }), 'SELECT\n      ^');
+    assert.equal(sqlErrorExcerpt('\nSELECT', { from: 0, to: 0 }), '\n^\nSELECT');
+    assert.equal(sqlErrorExcerpt('SELECT\n', { from: 7, to: 7 }), 'SELECT\n\n^');
+    assert.equal(sqlErrorExcerpt('SELECT\n1', { from: 2, to: 8 }), 'SELECT\n  ^^^^\n1');
+});
+
+test('Unknown or invalid error spans leave the submitted SQL untouched', () => {
+    assert.equal(sqlErrorExcerpt('SELECT 1'), 'SELECT 1');
+    for (const range of [{ from: -1, to: 1 }, { from: 4, to: 3 }, { from: 0, to: 99 }, { from: NaN, to: 1 }, { from: 0.5, to: 1 }, { from: 0, to: Infinity }])
+        assert.equal(sqlErrorExcerpt('SELECT 1', range), 'SELECT 1');
+});
 
 test('A ClickHouse syntax diagnostic summarizes the token without SQL or parser hints', () => {
     const detail = error('Syntax error: failed at position 10 (GROUP) (line 2, col 1): GROUP BY FORMAT JSON. Expected one of: token, expression.');

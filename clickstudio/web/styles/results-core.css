@@ -66,22 +66,20 @@
     .result-provenance-header { display: inline-flex; flex: none; align-items: center; gap: 6px; padding: 4px 7px; border: 1px solid color-mix(in srgb, var(--amber) 27%, var(--line)); border-radius: var(--radius-label); background: transparent; color: var(--text-soft); }
     .result-provenance-header.is-source-deleted { border-color: color-mix(in srgb, var(--red) 38%, var(--line)); }
     .result-provenance-header.is-source-deleted .status-light { background: var(--red); box-shadow: var(--status-ring); color: var(--red); }
-    .result-failure { flex: none; min-width: 0; margin: 0; padding: 4px 10px; border-top: 1px solid var(--line); background: var(--panel); color: var(--text-soft); }
-    .result-failure-heading { display: flex; min-width: 0; align-items: center; gap: 8px; }
+    .has-error-output .results-title h2 { position: relative; color: var(--text); }
+    .has-error-output .results-title h2::after { position: absolute; bottom: -14px; left: 0; width: 44px; height: 2px; background: var(--accent-cyan); content: ""; }
+    .result-failure { min-width: 0; flex: 1; padding: 24px; background: var(--panel); color: var(--text); }
+    .result-failure-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
     .result-failure-heading > .status-light { width: 7px; height: 7px; flex: none; box-shadow: none; }
-    .result-failure-message { display: flex; min-width: 0; flex: 1; flex-wrap: wrap; align-items: baseline; gap: 3px 8px; font-size: 11px; line-height: 1.4; }
-    .result-failure-message strong { color: var(--red); font-weight: 650; overflow-wrap: anywhere; }
-    .result-failure-message > span { color: var(--muted); overflow-wrap: anywhere; }
-    .result-failure-message > span::before { margin-right: 8px; content: "·"; }
-    .result-failure-actions { display: flex; flex: none; align-items: center; margin-left: auto; }
-    .result-failure-actions .button-base { min-height: 28px; padding: 4px 8px; font-size: 10px; }
-    .result-failure-diagnostics { position: fixed; inset: auto; box-sizing: border-box; width: min(560px, calc(100vw - 16px)); margin: 0; padding: 10px; overflow: auto; border: 1px solid var(--line-bright); border-radius: var(--radius-popover); background: var(--panel-raised); color: var(--text-soft); box-shadow: var(--shadow-popover); }
-    .result-failure-diagnostics:not(:popover-open) { display: none; }
-    .result-failure-diagnostics-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-    .result-failure-diagnostics-heading .button-base { min-height: 28px; width: 28px; }
-    .result-failure-code { color: var(--text-soft); font: 11px var(--font-mono); }
-    .result-failure-detail { margin: 7px 0; padding: 8px; border: 1px solid var(--line); border-radius: var(--radius-panel); background: var(--panel); color: var(--text-soft); font: 11px/1.5 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
-    .result-failure-sql-label { display: block; margin: 8px 0 5px; color: var(--muted); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+    .result-failure-heading h3 { margin: 0; color: var(--red); font-size: 13px; font-weight: 600; }
+    .result-failure-detail { max-width: 110ch; margin: 12px 0 0; color: var(--text-soft); font: 13px/1.6 var(--font-sans); white-space: pre-wrap; overflow-wrap: anywhere; }
+    .result-failure-code { color: var(--accent-cyan); font: 11px var(--font-mono); }
+    .result-failure-location { color: var(--muted); font-size: 11px; }
+    .result-failure-sql-label { margin: 24px 0 8px; color: var(--muted); font-size: 11px; font-weight: 500; }
+    .result-failure .result-execution-sql { max-width: 920px; max-height: none; margin: 0; padding: 12px 14px; overflow: auto; border: 0; border-left: 2px solid var(--line-bright); border-radius: 0; background: var(--page); color: var(--text); font: 13px/1.65 var(--font-mono); white-space: pre; overflow-wrap: normal; }
+    .query-failed-status { display: inline-flex; width: max-content; max-width: 100%; align-items: center; gap: 5px; padding: 0; border: 0; border-radius: var(--radius-label); background: transparent; color: var(--red); font: 10px/12px var(--font-sans); white-space: nowrap; cursor: pointer; }
+    .query-failed-status:hover { text-decoration: underline; text-underline-offset: 2px; }
+    .query-failed-status .status-light { width: 6px; height: 6px; flex: none; box-shadow: none; }
     .result-provenance-header .status-light { width: 7px; height: 7px; }
     .result-provenance-header strong { color: var(--text); font-size: 9px; font-weight: 600; white-space: nowrap; }
     .result-execution-header { display: inline-flex; align-items: center; gap: 7px; color: var(--text-soft); font-size: 9px; }
@@ -142,4 +140,12 @@
     .empty-workspace h3 em { color: var(--accent); font-style: normal; }
     .empty-workspace p { max-width: 390px; margin: 0 0 5px; color: var(--text-soft); font-size: 10px; line-height: 1.7; }
     .empty-workspace > .button-base { min-height: 34px; padding-inline: 14px; }
+}
+
+@media (max-width: 760px) {
+    .results-surface.has-error-output .results-header { flex-wrap: nowrap; }
+    .results-surface.has-error-output .results-title { flex: 1; }
+    .results-surface.has-error-output .results-actions { width: auto; flex: none; }
+    .result-failure { padding: 16px; }
+    .result-failure-detail, .result-failure .result-execution-sql, .result-failure-sql-label { font-size: 12px; }
 }

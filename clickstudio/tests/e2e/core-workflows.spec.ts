@@ -531,64 +531,62 @@ test('The execution indicator clears when run submission fails', async ({ page }
     }
 });
 
-test('A failed query stays above Results beside the previous success until retry', async ({ page }, testInfo) => {
+test('Failed execution replaces visible results and can close, reopen and retry', async ({ page }, testInfo) => {
     await trust(page);
     const results = await runQuery(page);
-    const failedTab = page.getByRole('tab').filter({ hasText: 'Getting started.sql' });
+    const previousSql = await page.locator('.cm-content').innerText();
     let failNextRun = true;
     const runRoute = (url: URL) => url.pathname === '/api/runs';
     await page.route(runRoute, async route => {
         if (route.request().method() === 'POST' && failNextRun) {
             failNextRun = false;
-            await route.fulfill({ status: 400, json: { error: { code: 'SYNTAX_ERROR', message: 'Syntax error at position 15', position: 15 } } });
-            return;
+            return route.fulfill({ status: 400, json: { error: { code: 'SYNTAX_ERROR', message: 'Syntax error at position 15', position: 15 } } });
         }
         await route.continue();
     });
-
     try {
-        const submittedSql = 'SELECT * FROM missing_table';
-        await replaceSql(page, submittedSql);
-        const failedResponse = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/runs');
+        await replaceSql(page, 'SELECT * FROM missing_table');
         await runButton(page).click();
-        await failedResponse;
-
         const failure = page.getByTestId('query-failure');
         await expect(failure).toContainText('SYNTAX_ERROR');
         await expect(failure).toContainText('Syntax error at position 15');
-        await expect(failure.locator('pre.result-execution-sql')).toHaveText(submittedSql);
-        await expect(results.locator('.result-row-count')).toContainText('previous run');
+        await expect(results.getByRole('heading', { name: 'Output', exact: true })).toBeVisible();
+        await expect(results.getByRole('table')).toHaveCount(0);
         await expect(results.locator('.result-provenance-header')).toHaveCount(0);
-        await expect(results.getByRole('table', { name: 'Retained query rows' })).toBeVisible();
         await expect(page.locator('.execution-bar')).toHaveAttribute('data-run-status', 'failed');
         await expect(page.locator('.execution-bar')).not.toHaveAttribute('data-query-id');
-
-        await expect(page.getByRole('button', { name: 'Dismiss error', exact: true })).toHaveCount(0);
-        await expect(page.locator('.execution-bar')).toContainText('Query failed');
-        await expect(failure.getByRole('button', { name: 'Go to error', exact: true })).toHaveCount(0);
-        const details = failure.getByRole('button', { name: 'Details', exact: true });
-        await expect(details).toHaveAttribute('aria-expanded', 'false');
-        await details.click();
-        await expect(failure.locator('.result-failure-detail')).toBeVisible();
-        await expect(failure.locator('.result-execution-sql')).toBeVisible();
-        await details.click();
-        await expect(failure.locator('.result-failure-detail')).toBeHidden();
-        await page.screenshot({ path: testInfo.outputPath('previous-results.png') });
-
+        await expect(page.locator('.execution-bar')).not.toContainText('Query failed');
+        await expect(page.locator('.query-failed-status')).toHaveText('Last execution failed');
+        await expect(failure.getByRole('button')).toHaveCount(0);
+        await page.screenshot({ path: testInfo.outputPath('failed-output.png') });
+        await results.getByRole('button', { name: 'Collapse Query results', exact: true }).click();
+        await expect(failure).toBeHidden();
+        await page.locator('.query-failed-status').click();
+        await expect(failure).toBeVisible();
+        await results.getByRole('button', { name: 'Close output', exact: true }).click();
+        await expect(results).toHaveCount(0);
+        await expect(page.locator('.workspace-content')).not.toHaveClass(/has-panel-split|has-run/);
+        await expect(page.locator('.cm-content')).toBeFocused();
         await openBlankSql(page);
-        await expect(page.locator('.execution-bar')).toHaveAttribute('data-run-status', 'ready');
-        await expect(page.getByTestId('query-failure')).toHaveCount(0);
-        await failedTab.click();
+        await expect(page.locator('.query-failed-status')).toHaveCount(0);
+        await page.getByRole('tab').filter({ hasText: 'Getting started.sql' }).click();
+        await expect(results).toHaveCount(0);
+        await page.locator('.query-failed-status').click();
         await expect(failure).toBeVisible();
 
-        await replaceSql(page, 'SELECT 1');
-        await expect(failure.getByRole('button', { name: 'Go to error', exact: true })).toHaveCount(0);
-        const retryResponse = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/runs');
-        await runButton(page).click();
-        await retryResponse;
-        await expect(failure).toHaveCount(0);
-        await expect(page.locator('.execution-bar')).toHaveAttribute('data-run-status', 'succeeded');
+        await openWorkspacePanel(page, 'history');
+        await page.locator('.history-card').filter({ hasText: previousSql.replace(/\s+/g, ' ').slice(0, 58) }).first().click();
         await expect(results.getByRole('table', { name: 'Retained query rows' })).toBeVisible();
+        await expect(failure).toHaveCount(0);
+        await page.getByRole('tab').filter({ hasText: 'Getting started.sql' }).first().click();
+        await page.locator('.query-failed-status').click();
+        await expect(failure).toBeVisible();
+        await results.getByRole('button', { name: 'Close output', exact: true }).click();
+        await replaceSql(page, 'SELECT 1');
+        await runQuery(page);
+        await expect(failure).toHaveCount(0);
+        await expect(page.locator('.query-failed-status')).toHaveCount(0);
+        await expect(page.locator('.execution-bar')).toHaveAttribute('data-run-status', 'succeeded');
     } finally {
         await page.unroute(runRoute);
     }
@@ -617,93 +615,67 @@ test('A query failure in another draft remains discoverable without showing its 
 });
 
 for (const theme of ['Dark', 'Light']) for (const mode of ['Standard', 'Experimental']) {
-    test(`Query failure is compact and recoverable in ${theme.toLowerCase()} ${mode} mode`, async ({ page }, testInfo) => {
+    test(`Failed Output preserves the split in ${theme.toLowerCase()} ${mode} mode`, async ({ page }, testInfo) => {
         await page.emulateMedia({ reducedMotion: 'reduce' });
         await trust(page);
         await page.getByRole('radio', { name: `${theme} theme`, exact: true }).click();
         await page.getByText(mode, { exact: true }).click();
         const results = await runQuery(page);
-        const table = results.getByRole('table', { name: 'Retained query rows' });
         await expect(results.locator('.results-header .result-row-count')).toBeVisible();
         await page.evaluate(() => document.fonts.ready);
         await results.evaluate(async element => {
             await Promise.allSettled(element.getAnimations({ subtree: true }).map(animation => animation.finished));
             await new Promise(requestAnimationFrame);
         });
-        const resultsBefore = await results.boundingBox();
-        const tableBefore = await table.boundingBox();
-        const sql = 'SELECT 1\nGROUP BY';
+        const before = (await results.boundingBox())!;
+        const runBefore = (await runButton(page).boundingBox())!;
+        const saveBefore = (await page.getByTestId('save-query').boundingBox())!;
         const message = 'Syntax error: failed at position 10 (GROUP) (line 2, col 1): GROUP BY FORMAT JSONCompactStringsEachRowWithNamesAndTypes. Expected one of: token, expression, identifier.';
         await page.route(url => url.pathname === '/api/runs', async route => {
             if (route.request().method() === 'POST') return route.fulfill({ status: 400, json: { error: { code: 'CLICKHOUSE_62', message } } });
             await route.continue();
         });
-        await replaceSql(page, sql);
+        await replaceSql(page, 'SELECT 1\nGROUP BY');
         await runButton(page).click();
-        const failure = page.getByTestId('query-failure');
+        const failure = results.getByTestId('query-failure');
         await expect(failure).toBeVisible();
-        await expect(page.locator('.editor-surface').getByTestId('query-failure')).toBeVisible();
-        await expect(results.getByTestId('query-failure')).toHaveCount(0);
-        expect((await failure.boundingBox())!.y + (await failure.boundingBox())!.height).toBeLessThanOrEqual((await results.boundingBox())!.y + 1);
-        expect((await results.boundingBox())!.y).toBeCloseTo(resultsBefore!.y, 0);
-        expect((await table.boundingBox())!.y).toBeCloseTo(tableBefore!.y, 0);
-        expect(await failure.evaluate(element => element.contains(element.ownerDocument.activeElement))).toBe(false);
-        await expect(failure.locator('.result-failure-heading')).toContainText('Syntax error');
-        await expect(failure.locator('.result-failure-heading')).toContainText('Line 2, column 1');
-        await expect(failure.locator('.result-failure-heading')).toContainText('Syntax error near GROUP');
-        await expect(failure.locator('.result-failure-heading')).not.toContainText('Expected one of');
-        await expect(failure.locator('.result-failure-detail')).toBeHidden();
-        await expect(results).not.toContainText('No retained result');
+        await expect(page.locator('.editor-surface').getByTestId('query-failure')).toHaveCount(0);
+        const after = (await results.boundingBox())!;
+        expect(after.y).toBeCloseTo(before.y, 0);
+        expect(after.height).toBeCloseTo(before.height, 0);
+        for (const [button, previous] of [[runButton(page), runBefore], [page.getByTestId('save-query'), saveBefore]] as const) {
+            const current = (await button.boundingBox())!;
+            expect(current.x).toBeCloseTo(previous.x, 0);
+            expect(current.y).toBeCloseTo(previous.y, 0);
+            expect(current.width).toBeCloseTo(previous.width, 0);
+        }
+        await expect(page.locator('.editor-heading-actions .query-failed-status')).toHaveCount(0);
+        await expect(failure.locator('.result-failure-detail')).toHaveText(`[CLICKHOUSE_62] ${message}`);
+        await expect(failure.locator('.result-failure-location')).toHaveText('Line 2, column 1');
+        await expect(failure.locator('.result-execution-sql')).toHaveText('SELECT 1\nGROUP BY\n^');
+        await expect(results.getByRole('table')).toHaveCount(0);
+        await expect(results.locator('.result-row-count')).toHaveCount(0);
         await expect(page.locator('.toast-error')).toHaveCount(0);
-        await expect(results.locator('.result-provenance-header')).toHaveCount(0);
-        await expect(results.locator('.result-row-count')).toContainText('previous run');
-        const bounds = await failure.boundingBox();
-        expect(bounds!.height).toBeLessThan(75);
-        await expect(failure.getByRole('button', { name: 'Go to error', exact: true })).toHaveCount(0);
-        const details = failure.getByRole('button', { name: 'Details', exact: true });
-        const popover = failure.getByRole('dialog', { name: 'Details', exact: true });
-        await details.click();
-        await expect(popover).toBeVisible();
-        await expect(failure.locator('.result-failure-detail')).toHaveText(message);
-        await expect(failure.locator('.result-execution-sql')).toHaveText(sql);
-        expect((await table.boundingBox())!.y).toBeCloseTo(tableBefore!.y, 0);
-        const popupBounds = (await popover.boundingBox())!;
-        expect(popupBounds.y + popupBounds.height).toBeLessThanOrEqual((await failure.boundingBox())!.y + 5);
-        await page.keyboard.press('Escape');
-        await expect(popover).toBeHidden();
-        await expect(details).toHaveAttribute('aria-expanded', 'false');
-        await expect(details).toBeFocused();
-        await details.click();
-        await popover.getByRole('button', { name: 'Close', exact: true }).click();
-        await expect(popover).toBeHidden();
+        await expect(page.locator('.query-failed-status')).toBeVisible();
+        await expect(page.locator('.cm-server-error-line')).toContainText('GROUP BY');
+        await expect(page.locator('.cm-lint-marker-error')).toBeVisible();
         await page.locator('.cm-content').focus();
         await page.keyboard.press('ControlOrMeta+a');
-        await expect(popover).toBeHidden();
         await expect(failure).toBeVisible();
         await page.screenshot({ path: testInfo.outputPath('error-desktop.png') });
         await page.setViewportSize({ width: 390, height: 844 });
-        await expect(details).toBeInViewport();
-        const mobileTable = await table.boundingBox();
-        await details.click();
-        await expect(popover).toBeVisible();
-        expect((await table.boundingBox())!.y).toBeCloseTo(mobileTable!.y, 0);
-        const mobilePopup = (await popover.boundingBox())!;
-        expect(mobilePopup.x).toBeGreaterThanOrEqual(0);
-        expect(mobilePopup.x + mobilePopup.width).toBeLessThanOrEqual(390);
-        expect(mobilePopup.y).toBeGreaterThanOrEqual(0);
-        expect(mobilePopup.y + mobilePopup.height).toBeLessThanOrEqual(844);
-        await results.locator('h2').click();
-        await expect(popover).toBeHidden();
         await expect(failure).toBeVisible();
+        await expect(results.getByRole('button', { name: 'Close output', exact: true })).toBeInViewport();
         expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
         await page.screenshot({ path: testInfo.outputPath('error-mobile.png') });
         await replaceSql(page, 'SELECT 2');
-        await expect(failure.getByRole('button', { name: 'Go to error', exact: true })).toHaveCount(0);
-        await expect(failure.locator('.result-failure-message')).not.toContainText('Line 2');
+        await expect(failure.locator('.result-failure-location')).toHaveText('Line 2, column 1');
+        await expect(failure.locator('.result-execution-sql')).toHaveText('SELECT 1\nGROUP BY\n^');
+        await expect(page.locator('.cm-server-error-line')).toHaveCount(0);
     });
 }
 
-test('A failed saved run shows its error above Results', async ({ page }) => {
+test('A failed saved run shows its submitted error in Output', async ({ page }) => {
     await trust(page);
     let failedRun: Record<string, unknown> | undefined;
     const runRoute = (url: URL) => url.pathname === '/api/runs';
@@ -732,7 +704,13 @@ test('A failed saved run shows its error above Results', async ({ page }) => {
         await expect(page.locator('.execution-bar')).toHaveAttribute('data-run-status', 'failed');
         await expect(results).not.toContainText('No retained result');
         await expect(results.locator('.result-provenance-header')).toHaveCount(0);
-        await expect(page.locator('.result-failure-message')).toContainText('Line 2, column 16');
+        await expect(page.locator('.result-failure-location')).toContainText('Line 2, column 16');
+        await page.locator('.cm-content').focus();
+        await page.keyboard.press('ControlOrMeta+a');
+        await page.keyboard.press('ArrowRight');
+        await page.keyboard.press('Shift+ArrowLeft');
+        await expect(page.locator('.result-failure-location')).toContainText('Line 2, column 16');
+        await expect(page.locator('.cm-server-error-line')).toContainText('SELECT * FROM missing_table');
         await expect(page.getByRole('button', { name: 'Go to error', exact: true })).toHaveCount(0);
     } finally {
         await page.unroute(runRoute);
@@ -740,51 +718,36 @@ test('A failed saved run shows its error above Results', async ({ page }) => {
     }
 });
 
-test('Error details stay usable in separate editor and results windows', async ({ page }) => {
+test('Failed Output and editor markers stay usable in separate windows', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await trust(page);
     await runQuery(page);
     await page.route(url => url.pathname === '/api/runs', async route => {
-        if (route.request().method() === 'POST') return route.fulfill({ status: 400, json: { error: { code: 'CLICKHOUSE_62', message: 'Syntax error: failed at position 10 (GROUP) (line 2, col 1): GROUP BY' } } });
+        if (route.request().method() === 'POST') return route.fulfill({ status: 400, json: { error: { code: 'CLICKHOUSE_62', message: 'Syntax error (line 2, col 1): GROUP BY' } } });
         await route.continue();
     });
     await replaceSql(page, 'SELECT 1\nGROUP BY');
     await runButton(page).click();
     await expect(page.getByTestId('query-failure')).toBeVisible();
-
-    for (const label of ['Open editor in a separate window', 'Open results in a separate window']) {
-        const opened = page.waitForEvent('popup');
-        await page.getByRole('button', { name: label, exact: true }).click();
-        const detached = await opened;
-        await detached.emulateMedia({ reducedMotion: 'reduce' });
-        await detached.setViewportSize({ width: 500, height: 400 });
-        const failure = detached.getByTestId('query-failure');
-        await expect(failure).toBeVisible();
-        await expect(failure.getByRole('button', { name: 'Go to error', exact: true })).toHaveCount(0);
-        const table = detached.getByRole('table', { name: 'Retained query rows' });
-        if (label.includes('results')) {
-            await expect(detached.locator('.results-header .result-row-count')).toBeVisible();
-            await detached.locator('.results-surface').evaluate(async element => {
-                await Promise.allSettled(element.getAnimations({ subtree: true }).map(animation => animation.finished));
-                await new Promise(requestAnimationFrame);
-            });
-        }
-        const tableBefore = label.includes('results') ? await table.boundingBox() : undefined;
-        await failure.getByRole('button', { name: 'Details', exact: true }).click();
-        const popover = failure.getByRole('dialog', { name: 'Details', exact: true });
-        await expect(popover).toBeVisible();
-        const bounds = (await popover.boundingBox())!;
-        expect(bounds.x).toBeGreaterThanOrEqual(0);
-        expect(bounds.x + bounds.width).toBeLessThanOrEqual(500);
-        expect(bounds.y).toBeGreaterThanOrEqual(0);
-        expect(bounds.y + bounds.height).toBeLessThanOrEqual(400);
-        if (tableBefore) expect((await table.boundingBox())!.y).toBeCloseTo(tableBefore.y, 0);
-        await detached.keyboard.press('Escape');
-        await expect(popover).toBeHidden();
-        await expect(failure).toBeVisible();
-        await detached.close();
-        await expect(page.locator('.editor-surface').getByTestId('query-failure')).toBeVisible();
-    }
+    const editorOpened = page.waitForEvent('popup');
+    await page.getByRole('button', { name: 'Open editor in a separate window', exact: true }).click();
+    const editor = await editorOpened;
+    await expect(editor.locator('.query-failed-status')).toBeVisible();
+    await expect(editor.locator('.cm-server-error-line')).toContainText('GROUP BY');
+    await expect(editor.getByTestId('query-failure')).toHaveCount(0);
+    await editor.close();
+    const outputOpened = page.waitForEvent('popup');
+    await page.getByRole('button', { name: 'Open results in a separate window', exact: true }).click();
+    const output = await outputOpened;
+    await output.setViewportSize({ width: 500, height: 400 });
+    await expect(output.getByTestId('query-failure')).toBeVisible();
+    await expect(output.getByTestId('query-failure').locator('.result-execution-sql')).toHaveText('SELECT 1\nGROUP BY\n^');
+    await expect(output.getByRole('table')).toHaveCount(0);
+    await output.getByRole('button', { name: 'Close output', exact: true }).click();
+    await expect.poll(() => output.isClosed()).toBe(true);
+    await expect(page.locator('.results-surface')).toHaveCount(0);
+    await page.locator('.query-failed-status').click();
+    await expect(page.getByTestId('query-failure')).toBeVisible();
 });
 
 test('Run Script shows the full submitted script while submission is pending', async ({ page }) => {
@@ -1743,16 +1706,14 @@ test('Script errors without a statement run ID show the ClickHouse error and fai
         await expect(failure).toContainText(message);
         await expect(results.getByRole('button', { name: 'Statement 1: failed', exact: true })).toBeVisible();
         await expect(results.getByRole('button', { name: 'Statement 2: skipped', exact: true })).toBeVisible();
-        await failure.getByRole('button', { name: 'Details', exact: true }).click();
-        await expect(failure.locator('.result-failure-detail')).toHaveText(message);
-        await expect(failure.locator('.result-failure-heading')).not.toContainText('every parser hint');
+        await expect(failure.locator('.result-failure-detail')).toHaveText(`[CLICKHOUSE_ERROR] ${message}`);
         await expect(failure.locator('.result-execution-sql.is-full')).toHaveText('SELECT 1 AS value FORMAT JSONEachRow');
     } finally {
         await cleanup();
     }
 });
 
-test('A script error without a run ID keeps the previous result visible', async ({ page }) => {
+test('A script error without a run ID replaces the previous visible result', async ({ page }) => {
     await trust(page);
     const results = await runQuery(page);
     const sql = 'SELECT * FROM default.missing_table; SELECT 2';
@@ -1762,12 +1723,44 @@ test('A script error without a run ID keeps the previous result visible', async 
     try {
         await runScript(page);
         await expect(page.getByTestId('query-failure')).toContainText('CLICKHOUSE_ERROR');
-        await expect(results.locator('.result-row-count')).toContainText('previous run');
+        await expect(results.locator('.result-row-count')).toHaveCount(0);
         await expect(results.locator('.result-provenance-header')).toHaveCount(0);
-        await expect(results.getByRole('table', { name: 'Retained query rows' })).toBeVisible();
+        await expect(results.getByRole('table')).toHaveCount(0);
     } finally {
         await cleanup();
     }
+});
+
+test('A script submission failure still lets a successful statement open its result', async ({ page }) => {
+    await trust(page);
+    await replaceSql(page, 'SELECT 1');
+    const response = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/runs');
+    const results = await runQuery(page);
+    const run = runIdentity(await (await response).json());
+    const sql = 'SELECT 1; SELECT missing_table';
+    const script = {
+        id: 'script-no-second-run', owner: 'local-owner', connectionId: 'demo', sql,
+        createdAt: '2026-09-23T00:00:00.000Z', status: 'partial', stopOnError: true, cancelled: false,
+        statements: [
+            { sql: 'SELECT 1', from: 0, to: 8, runId: run.id, status: 'succeeded' },
+            { sql: 'SELECT missing_table', from: 10, to: sql.length, status: 'failed', error: { code: 'CLICKHOUSE_ERROR', message: 'Table missing_table does not exist.' } },
+        ],
+    };
+    await page.route(url => url.pathname === '/api/scripts' || url.pathname === `/api/scripts/${script.id}`, async route => {
+        await route.fulfill({ status: route.request().method() === 'POST' ? 202 : 200, json: script });
+    });
+    await replaceSql(page, sql);
+    await runScript(page);
+    await expect(results.getByTestId('query-failure')).toBeVisible();
+    await expect(results.getByRole('table')).toHaveCount(0);
+    await results.getByRole('button', { name: 'Statement 1: succeeded', exact: true }).click();
+    await expect(results.getByTestId('query-failure')).toHaveCount(0);
+    await expect(results.getByRole('table', { name: 'Retained query rows' })).toBeVisible();
+    await expect(page.locator('.query-failed-status')).toHaveCount(0);
+    await results.getByRole('button', { name: 'Statement 2: failed', exact: true }).click();
+    await expect(results.getByTestId('query-failure')).toContainText('Table missing_table does not exist.');
+    await expect(results.getByRole('table')).toHaveCount(0);
+    await expect(results.getByRole('button', { name: 'Statement 2: failed', exact: true })).toHaveAttribute('aria-pressed', 'true');
 });
 
 test('Script polling persists every statement run ID, including fast intermediate results', async ({ page }) => {

@@ -8,7 +8,7 @@ import { bracketMatching, foldGutter, foldKeymap, syntaxHighlighting, HighlightS
 import { tags } from '@lezer/highlight';
 import { autocompletion, ifNotIn, nextSnippetField, prevSnippetField, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete';
 import { sql, SQLDialect } from '@codemirror/lang-sql';
-import { setDiagnostics } from '@codemirror/lint';
+import { lintGutter, setDiagnostics } from '@codemirror/lint';
 import type { ApiError, Schema } from '../../shared/types';
 import type { SqlErrorRange } from '../sql-error';
 import { nativeDiagnosticForStatement, nativeHighlightRanges, type NativeDiagnostic, type NativeHighlightType, type NativeParseSnapshot, type NativeParseStatement, type NativeParserStatus } from '../../shared/native-parser';
@@ -198,7 +198,7 @@ export const SqlEditor = forwardRef<EditorHandle, SqlEditorProps>(function SqlEd
             return;
         const diagnostics = nativeDiagnostics.current.map(item => ({ ...item, severity: 'error' as const, source: 'ClickHouse native parser' }));
         const errorRange = current.current.errorRange;
-        const position = errorRange?.from ?? current.current.error?.position;
+        const position = errorRange?.from;
         const from = position === undefined ? undefined : Math.max(0, Math.min(position, editor.state.doc.length));
         const to = from === undefined ? undefined : Math.max(from, Math.min(errorRange?.to ?? from + 1, editor.state.doc.length));
         if (from !== undefined && to !== undefined) {
@@ -216,7 +216,7 @@ export const SqlEditor = forwardRef<EditorHandle, SqlEditorProps>(function SqlEd
     const invalidateNativeValidation = useCallback(() => { validationRevision.current++; }, []);
     const themeExtension = () => EditorView.theme({ '&': { height: '100%', backgroundColor: 'var(--panel)', color: 'var(--text)' }, '.cm-scroller': { fontFamily: 'var(--font-mono)', fontSize: '13px', lineHeight: '1.55', fontVariantLigatures: 'none', fontVariantNumeric: 'tabular-nums' }, '.cm-gutters': { backgroundColor: 'var(--panel)', color: 'var(--muted)', border: 'none', fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }, '.cm-content': { minHeight: '220px' }, '.cm-activeLine': { backgroundColor: 'color-mix(in srgb, var(--accent) 3%, transparent)' }, '.cm-activeLineGutter': { backgroundColor: 'color-mix(in srgb, var(--accent) 4%, transparent)' }, '.cm-cursor': { borderLeftColor: 'var(--text)' }, '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': { backgroundColor: 'var(--editor-selection)' } }, { dark: current.current.dark });
     useEffect(() => { if (!element.current)
-        return; const p = current.current; const editor = new EditorView({ parent: element.current, state: EditorState.create({ doc: p.value, selection: { anchor: Math.min(p.from, p.value.length), head: Math.min(p.to, p.value.length) }, extensions: [sqlEditorTools(), nativeDecorations, serverErrorDecorations, sqlMapHighlight, lineNumbers(), history(), drawSelection(), highlightActiveLine(), rectangularSelection(), bracketMatching(), foldGutter(), highlightSelectionMatches(), syntaxHighlighting(sqlHighlightStyle), autocompletion({ override: [ifNotIn(['QuotedIdentifier', 'String', 'LineComment', 'BlockComment'], context => completionSource(context, schemaIndexRef.current))] }), hoverTooltip((view, pos) => { const word = view.state.wordAt(pos); if (!word)
+        return; const p = current.current; const editor = new EditorView({ parent: element.current, state: EditorState.create({ doc: p.value, selection: { anchor: Math.min(p.from, p.value.length), head: Math.min(p.to, p.value.length) }, extensions: [sqlEditorTools(), nativeDecorations, serverErrorDecorations, sqlMapHighlight, lineNumbers(), lintGutter(), history(), drawSelection(), highlightActiveLine(), rectangularSelection(), bracketMatching(), foldGutter(), highlightSelectionMatches(), syntaxHighlighting(sqlHighlightStyle), autocompletion({ override: [ifNotIn(['QuotedIdentifier', 'String', 'LineComment', 'BlockComment'], context => completionSource(context, schemaIndexRef.current))] }), hoverTooltip((view, pos) => { const word = view.state.wordAt(pos); if (!word)
                 return null; const label = view.state.sliceDoc(word.from, word.to), info = hoverInfo(schemaIndexRef.current, current.current.value, label); if (!info)
                 return null; return { pos: word.from, end: word.to, above: true, create: () => { const dom = document.createElement('div'); dom.className = 'sql-hover'; dom.textContent = info; return { dom }; } }; }), language.current.of(languageExtension()), theme.current.of(themeExtension()), EditorState.allowMultipleSelections.of(true), EditorView.contentAttributes.of({ 'aria-label': 'SQL editor', 'spellcheck': 'false' }), keymap.of([{ key: 'Tab', run: nextSnippetField, shift: prevSnippetField }, ...defaultKeymap, ...historyKeymap, ...searchKeymap, ...foldKeymap, indentWithTab]), EditorView.updateListener.of(update => { if (update.docChanged)
                     current.current.onChange(update.state.doc.toString()); if (update.selectionSet) {

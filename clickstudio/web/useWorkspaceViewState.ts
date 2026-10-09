@@ -9,7 +9,7 @@ import { recommendChart } from '../shared/results';
 import { draftSaveStatus } from '../shared/workspace-view';
 import type { NativeParseSnapshot } from '../shared/native-parser';
 import type { Copy, ExperienceLevel } from './i18n';
-import { sqlErrorRangeInDraft } from './sql-error';
+import { sqlErrorRange, sqlErrorRangeInDraft, sqlErrorLineColumn } from './sql-error';
 import type { Connected, ResultsView } from './workspace-types';
 import type { Draft } from './workspace-state';
 import {
@@ -32,6 +32,7 @@ export function useWorkspaceViewState({
     run,
     failedQueryError,
     script,
+    scriptResultSelected = false,
     copy,
     experience,
     view,
@@ -50,6 +51,7 @@ export function useWorkspaceViewState({
     run?: Run;
     failedQueryError?: FailedQueryError;
     script?: Script;
+    scriptResultSelected?: boolean;
     copy: Copy;
     experience: ExperienceLevel;
     view: ResultsView;
@@ -67,16 +69,28 @@ export function useWorkspaceViewState({
     });
     const statementCount = safeStatementCount(active.sql);
     const failedScriptStatement = script?.statements.find(statement => statement.status === 'failed' && statement.error);
-    const failureError = failedQueryError?.error ?? failedScriptStatement?.error ?? (run?.status === 'failed' ? run.error : undefined);
-    const failureSql = failedQueryError?.statementSql ?? failedScriptStatement?.sql ?? (run?.status === 'failed' ? run.sql : undefined);
+    const unrecordedScriptFailure = failedScriptStatement && !failedScriptStatement.runId && !scriptResultSelected ? failedScriptStatement : undefined;
+    const failureError = failedQueryError?.error ?? unrecordedScriptFailure?.error ?? (run?.status === 'failed' ? run.error : undefined);
+    const failureSql = failedQueryError?.statementSql ?? unrecordedScriptFailure?.sql ?? (run?.status === 'failed' ? run.sql : undefined);
+    const statementError = failureError && !failedQueryError && !unrecordedScriptFailure && failureError.position !== undefined && run?.sourceFrom !== undefined
+        ? { ...failureError, position: failureError.position - run.sourceFrom }
+        : failureError;
+    const failureRange = failureSql && statementError ? sqlErrorRange(failureSql, statementError) : undefined;
     const selectedRunStatement = safeSelectedStatement(active.sql, active.from, active.to);
-    const runErrorContext = run?.error && (run.sql === active.sql || run.sql === selectedRunStatement?.sql)
+    const runErrorContext = run?.error && (run.sql === active.sql || run.sql === selectedRunStatement?.sql || (run.sourceFrom !== undefined && active.sql.slice(run.sourceFrom, run.sourceFrom + run.sql.length) === run.sql))
         ? { draftId: active.id, draftSql: active.sql, statementSql: run.sql, sourceFrom: run.sourceFrom ?? (run.sql === active.sql ? 0 : selectedRunStatement?.from ?? 0), error: run.error }
         : undefined;
     const requestErrorContext = failedQueryError?.draftId === active.id && failedQueryError.draftSql === active.sql ? failedQueryError : undefined;
     const editorErrorContext = requestErrorContext ?? runErrorContext;
     const editorErrorRange = editorErrorContext
         ? sqlErrorRangeInDraft(active.sql, editorErrorContext.statementSql, editorErrorContext.sourceFrom, editorErrorContext.error, editorErrorContext === runErrorContext && run?.sourceFrom !== undefined ? 'draft' : 'statement')
+        : undefined;
+    const submittedDraft = failedQueryError?.draftSql ?? runErrorContext?.draftSql;
+    const submittedOffset = failedQueryError?.sourceFrom ?? runErrorContext?.sourceFrom ?? 0;
+    const failureLocation = failureSql && failureRange
+        ? submittedDraft && submittedDraft.slice(submittedOffset, submittedOffset + failureSql.length) === failureSql
+            ? sqlErrorLineColumn(submittedDraft, submittedOffset + failureRange.from)
+            : sqlErrorLineColumn(failureSql, failureRange.from)
         : undefined;
     const invalidatedSource = run && active.activeRunId === run.id && active.invalidatedSource?.runId === run.id
         ? active.invalidatedSource
@@ -130,6 +144,8 @@ export function useWorkspaceViewState({
         statementCount,
         failureError,
         failureSql,
+        failureRange,
+        failureLocation,
         editorErrorContext,
         editorErrorRange,
         staleResult,

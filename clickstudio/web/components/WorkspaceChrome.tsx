@@ -51,11 +51,13 @@ export function EmptyWorkspace({ onRun, beginner }: { onRun: () => void; beginne
     return <div className="empty-workspace"><div className="empty-graphic"><span className="empty-orbit orbit-one"/><span className="empty-orbit orbit-two"/><span className="empty-core"><Icon name="bolt"/></span><span className="empty-spark spark-one"/><span className="empty-spark spark-two"/></div><span className="eyebrow">YOUR NEXT INSIGHT STARTS HERE</span><h3>Make the data<br/><em>say something.</em></h3><p>{beginner ? 'Run SQL to see your data. Select text to run only that selection.' : 'Run all SQL in the editor, or select SQL to run only that selection. Your query, run, and evidence stay linked.'}</p><Button variant="primary" onClick={onRun}><Icon name="play"/>Focus SQL editor</Button></div>;
 }
 
-export function ScriptResults({ script, runs, activeRunId, onSelectRun, onCancel, cancelDisabled, cancelAfterCurrentStatement = false }: {
+export function ScriptResults({ script, runs, activeRunId, onSelectRun, onSelectError, errorSelected = false, onCancel, cancelDisabled, cancelAfterCurrentStatement = false }: {
     script: Script;
     runs: Run[];
     activeRunId?: string;
     onSelectRun: (runId: string) => void;
+    onSelectError?: () => void;
+    errorSelected?: boolean;
     onCancel: () => void;
     cancelDisabled: boolean;
     cancelAfterCurrentStatement?: boolean;
@@ -71,15 +73,15 @@ export function ScriptResults({ script, runs, activeRunId, onSelectRun, onCancel
             ? <span role="status">Finishing current statement…</span>
             : <Button variant="danger" className="toolbar-small" onClick={onCancel} disabled={cancelDisabled}>{cancelAfterCurrentStatement ? 'Stop after current statement' : 'Cancel script'}</Button>)}</div>
         <div className="script-statement-list" role="group" aria-label="Select a statement result">{statements.map(({ statement, index, details }) => {
-            const active = statement.runId === activeRunId;
-            return <button key={`${script.id}-${index}`} type="button" className={cx('script-statement', active && 'is-active')} aria-label={`Statement ${index + 1}: ${statement.status}`} aria-pressed={active} title={`${statement.sql.replace(/\s+/g, ' ').slice(0, 160)} · ${details}`} disabled={!statement.runId} onClick={() => statement.runId && onSelectRun(statement.runId)}>
+            const active = statement.runId ? !errorSelected && statement.runId === activeRunId : Boolean(statement.error && errorSelected);
+            return <button key={`${script.id}-${index}`} type="button" className={cx('script-statement', active && 'is-active')} aria-label={`Statement ${index + 1}: ${statement.status}`} aria-pressed={active} title={`${statement.sql.replace(/\s+/g, ' ').slice(0, 160)} · ${details}`} disabled={!statement.runId && !(statement.error && onSelectError)} onClick={() => statement.runId ? onSelectRun(statement.runId) : onSelectError?.()}>
                 <span className="script-statement-index">{String(index + 1).padStart(2, '0')}</span><span className="script-statement-copy"><strong>Statement {index + 1}</strong><code>{statement.sql.replace(/\s+/g, ' ').slice(0, 72)}</code><small>{details}</small></span><span className={cx('script-status', `status-${statement.status}`)}>{statement.status}</span>
             </button>;
         })}</div>
     </section>;
 }
 
-export function ExecutionBar({ run, failedAttempt, eventState, onCancel, onOpenDetails, cancelling, scriptRunning, helpButton, copy }: { run?: Run; failedAttempt?: boolean; eventState: RunEventState; onCancel: () => void; onOpenDetails: () => void; cancelling: boolean; scriptRunning: boolean; helpButton: ReactNode; copy: Copy['common'] }) {
+export function ExecutionBar({ run, failedAttempt, failureInToolbar, eventState, onCancel, onOpenDetails, cancelling, scriptRunning, helpButton, copy }: { run?: Run; failedAttempt?: boolean; failureInToolbar?: boolean; eventState: RunEventState; onCancel: () => void; onOpenDetails: () => void; cancelling: boolean; scriptRunning: boolean; helpButton: ReactNode; copy: Copy['common'] }) {
     const currentRun = failedAttempt ? undefined : run;
     const progress = currentRun?.progress;
     const executionInProgress = Boolean(currentRun && (!terminal(currentRun) || scriptRunning));
@@ -89,14 +91,14 @@ export function ExecutionBar({ run, failedAttempt, eventState, onCancel, onOpenD
 
     return <footer className={cx('execution-bar', executionInProgress && 'is-running')} data-run-status={failedAttempt ? 'failed' : currentRun?.status ?? 'ready'} data-query-id={currentRun?.queryId}>
         <div className="execution-state">
-            {failedAttempt
+            {!failureInToolbar && (failedAttempt
                 ? <span className="execution-ready-state" role="status"><span className="status-light is-error"/>{copy.queryFailed}</span>
                 : currentRun
                 ? <Status run={currentRun} copy={copy}/>
-                : <span className="execution-ready-state"><span className="status-light is-trusted"/>{copy.statusReady}</span>}
+                : <span className="execution-ready-state"><span className="status-light is-trusted"/>{copy.statusReady}</span>)}
             {currentRun && scriptRunning && <span className="execution-kind">{copy.runScript.toUpperCase()}</span>}
             {currentRun && <>
-                <span className="execution-separator"/>
+                {!failureInToolbar && <span className="execution-separator"/>}
                 <strong>{elapsedMs?.toLocaleString()} ms</strong>
                 <span className="execution-link-state">
                     <span className={cx('status-light', eventState === 'live' ? 'is-trusted' : eventState === 'reconnecting' ? 'is-warning' : '')}/>

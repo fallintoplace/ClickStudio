@@ -18,7 +18,6 @@ import type { WorkspaceViewState } from '../useWorkspaceViewState';
 import { SqlEditor, type EditorHandle } from './SqlEditor';
 import { Button, cx, Icon } from './ui';
 import { RunActionGroup } from './WorkspaceChrome';
-import { QueryFailureNotice } from './QueryFailureNotice';
 
 export type WorkspaceQueryPanelState = Readonly<{
     active: Draft;
@@ -35,6 +34,7 @@ export type WorkspaceQueryPanelState = Readonly<{
     busy: BusyAction;
     inspector: Inspector;
     demoMode: boolean;
+    executionPending: boolean;
 }>;
 
 export type WorkspaceQueryPanelActions = Readonly<{
@@ -49,6 +49,7 @@ export type WorkspaceQueryPanelActions = Readonly<{
     onNativeParseSnapshot: (snapshot?: NativeParseSnapshot) => void;
     onOpenDetached: () => void;
     onDockDetached: () => void;
+    onShowOutput: () => void;
 }>;
 
 export function WorkspaceQueryPanel({
@@ -82,7 +83,7 @@ export function WorkspaceQueryPanel({
         inspector,
         demoMode,
     } = state;
-    const { statementCount, editorErrorContext, editorErrorRange, failureError, failureSql } = viewState;
+    const { statementCount, editorErrorContext, editorErrorRange } = viewState;
     const { queryPanelRef } = panels;
     const selectedSql = active.to > active.from ? active.sql.slice(active.from, active.to) : undefined;
     const queryNameAtFocus = useRef(active.name);
@@ -106,10 +107,10 @@ export function WorkspaceQueryPanel({
     ><Icon name="documents"/>{copy.common.save}</Button>;
     return <section
         ref={queryPanelRef}
-        className={cx('editor-surface', panels.queryCollapsed && 'is-collapsed')}
+        className={cx('editor-surface', viewState.failureError && !state.executionPending && 'has-error-output', panels.queryCollapsed && 'is-collapsed')}
     >
         <div className="editor-heading">
-            <div className="editor-file-heading"><span className="file-type-icon">SQL</span><label className="document-name"><span className="eyebrow">{copy.common.query}</span><input
+            <div className="editor-file-heading"><span className="file-type-icon">SQL</span><div className="document-name">{viewState.failureError && !state.executionPending ? <button type="button" className="query-failed-status" onClick={actions.onShowOutput} title={copy.common.showOutput}><span className="status-light is-error" aria-hidden="true"/>{copy.common.lastExecutionFailed}</button> : <span className="eyebrow">{copy.common.query}</span>}<input
                 aria-label="SQL document name"
                 value={active.name}
                 onFocus={() => { queryNameAtFocus.current = active.name; }}
@@ -131,7 +132,7 @@ export function WorkspaceQueryPanel({
                         event.currentTarget.blur();
                     }
                 }}
-            /></label></div>
+            /></div></div>
             <div className="editor-heading-actions">
                 {experience === 'beginner' && <Button variant="ghost" className="sql-ai-button" data-testid="open-ai" aria-label={copy.common.askAi} aria-pressed={inspector === 'assistant'} onClick={actions.onOpenAssistant}><Icon name="assistant"/>{copy.common.askAi}</Button>}
                 {experience === 'expert' && nativeParserEnabled && nativeParserStatus === 'unavailable' && <>
@@ -170,11 +171,5 @@ export function WorkspaceQueryPanel({
                 </aside>}
             </div>
         </div>
-        {!panels.queryCollapsed && failureError && <QueryFailureNotice
-            key={`${failureError.code}:${failureError.message}:${failureSql}`}
-            error={failureError} sql={failureSql} copy={copy.common}
-            errorRange={editorErrorContext?.error === failureError ? editorErrorRange : undefined}
-            draftSql={active.sql}
-        />}
     </section>;
 }

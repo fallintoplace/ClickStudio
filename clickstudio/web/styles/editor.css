@@ -132,7 +132,9 @@
     .sql-editor .cm-tooltip-lint .cm-diagnostic { margin: 0; padding: 10px 12px; border-left: 3px solid var(--red); color: var(--text-soft); font-family: var(--font-sans); font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; white-space: pre-wrap; }
     .sql-editor .cm-tooltip-autocomplete ul li[aria-selected] { background: color-mix(in srgb, var(--accent) 16%, var(--panel)); color: var(--text); }
     .sql-editor .cm-lint-marker-error { filter: saturate(.8); }
-    .sql-editor .cm-server-error-line { background: color-mix(in srgb, var(--red) 6%, transparent) !important; }
+    .sql-editor .cm-server-error-line { background: color-mix(in srgb, var(--red) 14%, transparent) !important; }
+    .sql-editor .cm-lint-marker-error { content: normal !important; background-image: none; color: var(--red); }
+    .sql-editor .cm-lint-marker-error::after { content: "×"; font-size: 15px; font-weight: 700; }
     .sql-editor .cm-server-error-token { border-radius: 2px; background: color-mix(in srgb, var(--red) 11%, transparent); text-decoration: underline wavy var(--red); text-underline-offset: 3px; }
     .sql-hover { max-width: 430px; padding: 9px 11px; color: var(--text-soft); font-family: var(--font-mono); font-size: 10px; }
     .parameters-row { display: flex; flex: none; flex-wrap: wrap; align-items: end; gap: 11px; padding: 10px 14px; border-top: 1px solid var(--line); background: color-mix(in srgb, var(--panel-raised) 65%, transparent); }
