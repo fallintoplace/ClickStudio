@@ -91,6 +91,16 @@ for (const theme of ['Light', 'Dark']) for (const mode of ['Standard', 'Experime
                 expect(badge.contrast, `${theme} ${accent} column ${index} badge contrast`).toBeGreaterThanOrEqual(4.5);
             }
         }
+        const shortHeader = headers.first();
+        await shortHeader.hover();
+        const shortTooltip = page.getByRole('tooltip');
+        await expect(shortTooltip).toHaveText('xBool');
+        const shortBounds = await shortTooltip.boundingBox();
+        const shortHeaderBounds = await shortHeader.boundingBox();
+        expect(shortBounds!.width).toBeLessThanOrEqual(160);
+        expect(shortBounds!.y + shortBounds!.height).toBeLessThanOrEqual(shortHeaderBounds!.y + 2);
+        await page.mouse.move(0, 0);
+        await expect(shortTooltip).toBeHidden();
         const complex = headers.nth(6);
         await expect(complex).toHaveAttribute('scope', 'col');
         const clipped = await complex.locator('.result-column-heading').evaluate(element => {
@@ -110,6 +120,7 @@ for (const theme of ['Light', 'Dark']) for (const mode of ['Standard', 'Experime
         const bounds = await tooltip.boundingBox();
         expect(bounds!.x).toBeGreaterThanOrEqual(8);
         expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(1092);
+        expect(bounds!.y + bounds!.height).toBeLessThanOrEqual((await complex.boundingBox())!.y + 2);
         await page.keyboard.press('Escape');
         await expect(tooltip).toBeHidden();
         await complex.hover();
@@ -154,7 +165,9 @@ test('Very long result types remain readable and scrollable in a narrow viewport
     const bounds = await tooltip.boundingBox();
     expect(bounds!.x).toBeGreaterThanOrEqual(8);
     expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(382);
+    expect(bounds!.width).toBeLessThanOrEqual(360);
     expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(712);
+    expect(bounds!.y + bounds!.height).toBeLessThanOrEqual((await header.boundingBox())!.y + 2);
     await page.keyboard.press('PageDown');
     await expect.poll(() => tooltip.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
     await expect(tooltip).toBeVisible();

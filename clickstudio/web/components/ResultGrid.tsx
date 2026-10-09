@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { displayValue, filterRows } from '../../shared/results';
 import type { ResultPage, Run } from '../../shared/types';
@@ -31,18 +31,23 @@ function resultTypeGroup(type: string): ResultTypeGroup {
 
 function ResultColumnHeader({ name, type, group }: { name: string; type: string; group: ResultTypeGroup }) {
     const header = useRef<HTMLTableCellElement>(null);
+    const typeBadge = useRef<HTMLElement>(null);
     const details = useRef<HTMLDivElement>(null);
     const closeTimer = useRef<number | undefined>(undefined);
     const detailsId = useId();
-    const [position, setPosition] = useState<{ left: number; top: number; width: number; maxHeight: number }>();
+    const [position, setPosition] = useState<{ left: number; top: number; maxHeight: number; above: boolean }>();
     const showDetails = useCallback(() => {
         window.clearTimeout(closeTimer.current);
-        const element = header.current;
-        if (!element) return;
-        const rect = element.getBoundingClientRect();
-        const width = Math.min(420, window.innerWidth - 16);
-        const top = Math.min(rect.bottom + 6, window.innerHeight - 48);
-        setPosition({ left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)), top, width, maxHeight: window.innerHeight - top - 8 });
+        const headerElement = header.current;
+        if (!headerElement) return;
+        const headerRect = headerElement.getBoundingClientRect();
+        const badgeRect = typeBadge.current?.getBoundingClientRect() ?? headerRect;
+        const gap = 6;
+        const spaceAbove = Math.max(0, headerRect.top - gap - 8);
+        const spaceBelow = Math.max(0, window.innerHeight - headerRect.bottom - gap - 8);
+        const above = spaceAbove >= 72 || spaceAbove >= spaceBelow;
+        const maxHeight = Math.max(24, above ? spaceAbove : spaceBelow);
+        setPosition({ left: badgeRect.left, top: above ? headerRect.top - gap : headerRect.bottom + gap, maxHeight, above });
     }, []);
     const hideDetails = () => {
         window.clearTimeout(closeTimer.current);
@@ -52,6 +57,12 @@ function ResultColumnHeader({ name, type, group }: { name: string; type: string;
     };
     useEffect(() => () => window.clearTimeout(closeTimer.current), []);
     const open = Boolean(position);
+    useLayoutEffect(() => {
+        if (!position || !details.current) return;
+        const width = details.current.getBoundingClientRect().width;
+        const left = Math.max(8, Math.min(position.left, window.innerWidth - width - 8));
+        if (Math.abs(left - position.left) > 0.5) setPosition(current => current ? { ...current, left } : current);
+    }, [position]);
     useEffect(() => {
         if (!open) return;
         const close = (event: Event) => {
@@ -89,9 +100,10 @@ function ResultColumnHeader({ name, type, group }: { name: string; type: string;
                 details.current.scrollTop += event.key.endsWith('Up') ? -step : step;
             }
         }}>
-        <div className="result-column-heading"><span>{name}</span><small>{type}</small></div>
-        {position && createPortal(<div ref={details} id={detailsId} role="tooltip" className="result-column-details" style={position}
-            onMouseEnter={() => window.clearTimeout(closeTimer.current)} onMouseLeave={hideDetails}><strong>{name}</strong><div>{type}</div></div>, document.body)}
+        <div className="result-column-heading"><span>{name}</span><small ref={typeBadge}>{type}</small></div>
+        {position && createPortal(<div ref={details} id={detailsId} role="tooltip" className={`result-column-details${position.above ? ' is-above' : ''}`}
+            style={{ left: position.left, top: position.top, maxHeight: position.maxHeight }}
+            onMouseEnter={() => window.clearTimeout(closeTimer.current)} onMouseLeave={hideDetails}><strong>{name}</strong><span>{type}</span></div>, document.body)}
     </th>;
 }
 
