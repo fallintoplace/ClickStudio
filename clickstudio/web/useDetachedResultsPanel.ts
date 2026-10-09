@@ -23,9 +23,8 @@ export function useDetachedResultsPanel({
     setNotice: (message: string) => void;
 }) {
     const { detached, open, focus, dock, setTitle } = useDetachedResultsWindow();
-    const previousResultsMode = useRef(panels.panelLayout.results.mode);
     const detachedWasOpen = useRef(false);
-    const { panelLayout, setPanelLayout, revealPanelTemporarily, clearTemporaryPanelReveal } = panels;
+    const { setPanelLayout, revealPanelTemporarily, clearTemporaryPanelReveal } = panels;
 
     useEffect(() => {
         if (!detached) {
@@ -34,7 +33,7 @@ export function useDetachedResultsPanel({
                 clearTemporaryPanelReveal('results');
                 setPanelLayout(current => ({
                     ...current,
-                    results: { ...current.results, mode: previousResultsMode.current },
+                    results: { ...current.results, mode: 'docked' },
                 }));
             }
             return;
@@ -52,7 +51,6 @@ export function useDetachedResultsPanel({
     }, [activeName, clearTemporaryPanelReveal, detached, experience, resultsTitle, setPanelLayout, setTitle]);
 
     const openResults = useCallback(() => {
-        previousResultsMode.current = panelLayout.results.mode;
         if (!open(`${activeName} · ${resultsTitle}`, experience)) {
             setError(copy.resultsWindowBlocked);
             return;
@@ -60,7 +58,7 @@ export function useDetachedResultsPanel({
         revealPanelTemporarily('results', activeDraftId);
         setPanelLayout(current => ({ ...current, results: { ...current.results, mode: 'docked' } }));
         setNotice(copy.resultsWindowOpened);
-    }, [activeDraftId, activeName, copy.resultsWindowBlocked, copy.resultsWindowOpened, experience, open, panelLayout.results.mode, resultsTitle, revealPanelTemporarily, setError, setNotice, setPanelLayout]);
+    }, [activeDraftId, activeName, copy.resultsWindowBlocked, copy.resultsWindowOpened, experience, open, resultsTitle, revealPanelTemporarily, setError, setNotice, setPanelLayout]);
 
     const dockResults = useCallback(() => {
         dock();

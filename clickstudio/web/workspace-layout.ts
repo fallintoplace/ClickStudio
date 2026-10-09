@@ -89,14 +89,11 @@ function panelState(value: unknown, panel: WorkspacePanelId, viewport: ViewportS
     const fallback = defaultPanelGeometry(panel, viewport);
     if (!value || typeof value !== 'object') return { mode: 'docked', geometry: fallback, collapsed: false };
     const candidate = value as Partial<WorkspacePanelState>;
-    const mode = candidate.mode === 'floating' || candidate.mode === 'maximized' || candidate.mode === 'docked'
-        ? candidate.mode
-        : 'docked';
     const raw = candidate.geometry;
     const geometry = raw && finite(raw.x) && finite(raw.y) && finite(raw.width) && finite(raw.height)
         ? normalizePanelGeometry(raw, viewport)
         : fallback;
-    return { mode, geometry, collapsed: candidate.collapsed === true };
+    return { mode: 'docked', geometry, collapsed: candidate.collapsed === true };
 }
 
 export function defaultWorkspacePanelLayout(viewport: ViewportSize): WorkspacePanelLayout {
@@ -112,8 +109,8 @@ export function normalizeWorkspacePanelLayout(layout: WorkspacePanelLayout, view
     return {
         version: 1,
         splitRatio: clampPanelSplitRatio(layout.splitRatio),
-        query: { ...layout.query, geometry: normalizePanelGeometry(layout.query.geometry, viewport) },
-        results: { ...layout.results, geometry: normalizePanelGeometry(layout.results.geometry, viewport) },
+        query: { ...layout.query, mode: 'docked', geometry: normalizePanelGeometry(layout.query.geometry, viewport) },
+        results: { ...layout.results, mode: 'docked', geometry: normalizePanelGeometry(layout.results.geometry, viewport) },
     };
 }
 

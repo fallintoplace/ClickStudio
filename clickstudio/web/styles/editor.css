@@ -10,9 +10,6 @@
     .workspace-content.has-run.is-results-collapsed { grid-template-rows: minmax(0, 1fr) auto; }
     .workspace-content.has-run.is-query-collapsed.is-results-collapsed { grid-template-rows: auto auto; align-content: start; }
     .workspace-content:not(.has-run).is-query-collapsed { grid-template-rows: auto; align-content: start; }
-    .workspace-content.has-run.has-floating-query,
-    .workspace-content.has-run.has-floating-results,
-    .workspace-content:not(.has-run).has-floating-query { grid-template-rows: minmax(0, 1fr); }
     .workspace-content.has-panel-split { display: flex; min-height: 0; flex-direction: column; gap: 0; overflow: hidden; }
     .workspace-content.has-panel-split > .editor-surface { flex: 0 0 var(--query-panel-basis, 54%); }
     .workspace-content.has-panel-split > .results-surface { flex: 1 1 0; }
@@ -24,25 +21,6 @@
     .editor-surface { box-shadow: 0 12px 36px #00000012, inset 0 1px #ffffff08; }
     .results-surface { box-shadow: none; }
     .editor-surface::before, .results-surface::before { position: absolute; z-index: var(--z-local-raised); top: 0; left: 16px; width: 88px; height: 1px; pointer-events: none; background: linear-gradient(90deg, transparent, var(--signal-accent), transparent); box-shadow: 0 0 9px color-mix(in srgb, var(--signal-accent) 48%, transparent); content: ""; }
-    .editor-surface.is-floating, .results-surface.is-floating { position: fixed; margin: 0; border-color: var(--line-bright); box-shadow: 0 28px 90px #00000066, 0 0 0 1px #ffffff08; }
-    .editor-surface.is-floating.is-front, .results-surface.is-floating.is-front { border-color: color-mix(in srgb, var(--accent) 34%, var(--line-bright)); box-shadow: 0 32px 100px #00000073, 0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent); }
-    .editor-surface.is-floating.is-collapsed, .results-surface.is-floating.is-collapsed { min-height: 54px; height: 54px !important; }
-    .editor-surface.is-maximized, .results-surface.is-maximized { border-radius: 11px; }
-    .workspace-panel-drag-handle { cursor: move; touch-action: none; }
-    .workspace-panel-drag-handle button, .workspace-panel-drag-handle input, .workspace-panel-drag-handle select { cursor: pointer; touch-action: auto; }
-    .workspace-panel-drag-handle input { cursor: text; }
-    .workspace-panel-resize-handle { position: absolute; z-index: var(--z-local-intersection); display: block; touch-action: none; }
-    .workspace-panel-resize-handle.edge-n, .workspace-panel-resize-handle.edge-s { right: 10px; left: 10px; height: 8px; cursor: ns-resize; }
-    .workspace-panel-resize-handle.edge-n { top: 0; }
-    .workspace-panel-resize-handle.edge-s { bottom: 0; }
-    .workspace-panel-resize-handle.edge-e, .workspace-panel-resize-handle.edge-w { top: 10px; bottom: 10px; width: 8px; cursor: ew-resize; }
-    .workspace-panel-resize-handle.edge-e { right: 0; }
-    .workspace-panel-resize-handle.edge-w { left: 0; }
-    .workspace-panel-resize-handle.edge-ne, .workspace-panel-resize-handle.edge-nw, .workspace-panel-resize-handle.edge-se, .workspace-panel-resize-handle.edge-sw { width: 14px; height: 14px; }
-    .workspace-panel-resize-handle.edge-ne { top: 0; right: 0; cursor: nesw-resize; }
-    .workspace-panel-resize-handle.edge-nw { top: 0; left: 0; cursor: nwse-resize; }
-    .workspace-panel-resize-handle.edge-se { right: 0; bottom: 0; cursor: nwse-resize; }
-    .workspace-panel-resize-handle.edge-sw { bottom: 0; left: 0; cursor: nesw-resize; }
     body.is-workspace-panel-gesturing { user-select: none; }
     .panel-window-button { width: 34px; min-width: 34px; min-height: 34px; padding: 0; }
     .panel-content { display: flex; min-width: 0; min-height: 0; flex: 1; flex-direction: column; }

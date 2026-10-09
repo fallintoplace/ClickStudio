@@ -14,7 +14,7 @@ import type {
 } from '../workspace-types';
 import type { Draft } from '../workspace-state';
 import { safeStatementCount } from '../workspace-helpers';
-import { PanelResizeHandles, panelTargetIsInteractive, type WorkspacePanelController } from '../useWorkspacePanels';
+import type { WorkspacePanelController } from '../useWorkspacePanels';
 import type { WorkspaceViewState } from '../useWorkspaceViewState';
 import { SqlEditor, type EditorHandle } from './SqlEditor';
 import { Button, cx, Icon } from './ui';
@@ -86,18 +86,7 @@ export function WorkspaceQueryPanel({
         view,
     } = state;
     const { statementCount, editorErrorContext, editorErrorRange } = viewState;
-    const {
-        queryPanelRef,
-        queryMode,
-        queryFloating,
-        activeFloatingPanel,
-        setActiveFloatingPanel,
-        panelStyle,
-        togglePanelFloating,
-        togglePanelMaximized,
-        startPanelDrag,
-        startPanelResize,
-    } = panels;
+    const { queryPanelRef } = panels;
     const selectedSql = active.to > active.from ? active.sql.slice(active.from, active.to) : undefined;
     const queryNameAtFocus = useRef(active.name);
     const sqlToRun = selectedSql ?? active.sql;
@@ -119,17 +108,9 @@ export function WorkspaceQueryPanel({
     ><Icon name="documents"/>{copy.common.save}</Button>;
     return <section
         ref={queryPanelRef}
-        className={cx('editor-surface', panels.queryCollapsed && 'is-collapsed', queryFloating && 'is-floating', queryMode === 'maximized' && 'is-maximized', activeFloatingPanel === 'query' && queryFloating && 'is-front')}
-        style={panelStyle('query', queryMode)}
-        onPointerDownCapture={() => { if (queryFloating) setActiveFloatingPanel('query'); }}
+        className={cx('editor-surface', panels.queryCollapsed && 'is-collapsed')}
     >
-        <div
-            className={cx('editor-heading', queryFloating && 'workspace-panel-drag-handle')}
-            onPointerDown={event => startPanelDrag('query', event)}
-            onDoubleClick={event => {
-                if (queryFloating && !panelTargetIsInteractive(event.target)) togglePanelMaximized('query');
-            }}
-        >
+        <div className="editor-heading">
             <div className="editor-file-heading"><span className="file-type-icon">SQL</span><label className="document-name"><span className="eyebrow">{copy.common.query}</span><input
                 aria-label="SQL document name"
                 value={active.name}
@@ -174,8 +155,6 @@ export function WorkspaceQueryPanel({
                 {detached
                     ? <Button variant="ghost" className="panel-window-button" aria-label={copy.common.dockQueryEditor} title={copy.common.dockQueryEditor} onClick={actions.onDockDetached}><Icon name="dock"/></Button>
                     : !panels.compactViewport && <Button variant="ghost" className="panel-window-button" aria-label={copy.common.openQueryInNewWindow} title={copy.common.openQueryInNewWindow} onClick={actions.onOpenDetached}><Icon name="newWindow"/></Button>}
-                {!detached && !panels.compactViewport && <Button variant="ghost" className="panel-window-button" aria-label={queryFloating ? 'Dock query panel' : 'Float query panel'} title={queryFloating ? 'Dock query panel' : 'Float query panel'} onClick={() => togglePanelFloating('query')}><Icon name={queryFloating ? 'dock' : 'floatPanel'}/></Button>}
-                {queryFloating && <Button variant="ghost" className="panel-window-button" aria-label={queryMode === 'maximized' ? 'Restore query panel' : 'Maximize query panel'} title={queryMode === 'maximized' ? 'Restore query panel' : 'Maximize query panel'} onClick={() => togglePanelMaximized('query')}><Icon name={queryMode === 'maximized' ? 'restore' : 'maximize'}/></Button>}
                 <Button variant="ghost" className="panel-collapse-button" aria-label={panels.queryCollapsed ? copy.common.expandQuery : copy.common.collapseQuery} aria-expanded={!panels.queryCollapsed} aria-controls="sql-editor-content" title={panels.queryCollapsed ? copy.common.expandQuery : copy.common.collapseQuery} onClick={() => panels.setQueryCollapsed(value => !value)}><Icon className="panel-toggle-icon" name="chevron"/></Button>
             </div>
         </div>
@@ -202,6 +181,5 @@ export function WorkspaceQueryPanel({
                 </aside>}
             </div>
         </div>
-        {queryMode === 'floating' && !panels.queryCollapsed && <PanelResizeHandles onResize={(edge, event) => startPanelResize('query', edge, event)}/>}
     </section>;
 }

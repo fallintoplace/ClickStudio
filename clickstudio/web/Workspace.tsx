@@ -1031,8 +1031,6 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
                         visibleResultsView === 'sqlmap' && 'has-sql-map',
                         panels.queryCollapsed && 'is-query-collapsed',
                         (run || visibleResultsView === 'sqlmap') && panels.resultsCollapsed && 'is-results-collapsed',
-                        panels.queryFloating && 'has-floating-query',
-                        panels.resultsFloating && 'has-floating-results',
                         panels.canSplitPanels && 'has-panel-split',
                     )}
                 >

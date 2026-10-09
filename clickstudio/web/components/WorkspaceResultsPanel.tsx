@@ -6,7 +6,7 @@ import type { BusyAction, Connected, ResultsView } from '../workspace-types';
 import type { Draft } from '../workspace-state';
 import type { FailedQueryError } from '../workspace-helpers';
 import { CLICKHOUSE_CLOUD_CONNECTION_ID } from '../cloud-connection';
-import { PanelResizeHandles, panelTargetIsInteractive, type WorkspacePanelController } from '../useWorkspacePanels';
+import type { WorkspacePanelController } from '../useWorkspacePanels';
 import type { WorkspaceViewState } from '../useWorkspaceViewState';
 import { ChartView, GeoView, InsightsView, ResultGrid } from './ResultViews';
 import { ExplainAnalyzeView } from './ExplainAnalyzeView';
@@ -125,18 +125,7 @@ export function WorkspaceResultsPanel({
         staleResultReason,
         sourceDeleted,
     } = viewState;
-    const {
-        resultsPanelRef,
-        resultsMode,
-        resultsFloating,
-        activeFloatingPanel,
-        setActiveFloatingPanel,
-        panelStyle,
-        togglePanelFloating,
-        togglePanelMaximized,
-        startPanelDrag,
-        startPanelResize,
-    } = panels;
+    const { resultsPanelRef } = panels;
 
     const showPreviousResult = Boolean(execution && retainedExecutionResult && visibleResultsView === 'results');
     const resultsRun = showPreviousResult ? retainedExecutionResult!.run : run;
@@ -160,18 +149,10 @@ export function WorkspaceResultsPanel({
 
     return <section
         ref={resultsPanelRef}
-        className={cx('results-surface', experience === 'expert' && 'results-expert', panels.resultsCollapsed && 'is-collapsed', resultsFloating && 'is-floating', resultsMode === 'maximized' && 'is-maximized', activeFloatingPanel === 'results' && resultsFloating && 'is-front')}
-        style={panelStyle('results', resultsMode)}
+        className={cx('results-surface', experience === 'expert' && 'results-expert', panels.resultsCollapsed && 'is-collapsed')}
         aria-label={resultsPanelLabel}
-        onPointerDownCapture={() => { if (resultsFloating) setActiveFloatingPanel('results'); }}
     >
-        <div
-            className={cx('results-header', resultsFloating && 'workspace-panel-drag-handle')}
-            onPointerDown={event => startPanelDrag('results', event)}
-            onDoubleClick={event => {
-                if (resultsFloating && !panelTargetIsInteractive(event.target)) togglePanelMaximized('results');
-            }}
-        >
+        <div className="results-header">
             <div className="results-title">
                 <span className="results-mark"><Icon name={visibleResultsView === 'sqlmap' || visibleResultsView === 'pipeline' || visibleResultsView === 'indexes' || visibleResultsView === 'runtime' ? 'pipeline' : 'chart'}/></span>
                 <div><span className="eyebrow">{resultsEyebrow}</span><h2>{resultsTitle}</h2></div>
@@ -196,13 +177,7 @@ export function WorkspaceResultsPanel({
                 {run && resultTabs.length > 1 && <div className="results-tabs" role="tablist" aria-label={copy.common.workspaceOutput}>{resultTabs.map(tab => <button key={tab} role="tab" aria-selected={visibleResultsView === tab} type="button" onClick={() => actions.onSelectView(tab)}>{resultsTabLabel(tab, copy.common)}{tab === 'chart' && retainedSnapshot && <span className="suggested-dot"/>}</button>)}</div>}
                 {detached
                     ? <Button variant="ghost" className="panel-window-button" aria-label={copy.common.dockResultsPanel} title={copy.common.dockResultsPanel} onClick={actions.onDockDetached}><Icon name="dock"/></Button>
-                    : <>
-                        {!panels.compactViewport && <>
-                            <Button variant="ghost" className="panel-window-button" aria-label={copy.common.openResultsInNewWindow} title={copy.common.openResultsInNewWindow} onClick={actions.onOpenDetached}><Icon name="newWindow"/></Button>
-                            <Button variant="ghost" className="panel-window-button" aria-label={resultsFloating ? 'Dock output panel' : 'Float output panel'} title={resultsFloating ? 'Dock output panel' : 'Float output panel'} onClick={() => togglePanelFloating('results')}><Icon name={resultsFloating ? 'dock' : 'floatPanel'}/></Button>
-                        </>}
-                        {resultsFloating && <Button variant="ghost" className="panel-window-button" aria-label={resultsMode === 'maximized' ? 'Restore output panel' : 'Maximize output panel'} title={resultsMode === 'maximized' ? 'Restore output panel' : 'Maximize output panel'} onClick={() => togglePanelMaximized('results')}><Icon name={resultsMode === 'maximized' ? 'restore' : 'maximize'}/></Button>}
-                    </>}
+                    : !panels.compactViewport && <Button variant="ghost" className="panel-window-button" aria-label={copy.common.openResultsInNewWindow} title={copy.common.openResultsInNewWindow} onClick={actions.onOpenDetached}><Icon name="newWindow"/></Button>}
                 <Button variant="ghost" className="panel-collapse-button" aria-label={`${panels.resultsCollapsed ? copy.common.expand : copy.common.collapse} ${resultsPanelLabel}`} aria-expanded={!panels.resultsCollapsed} aria-controls="query-results-content" title={panels.resultsCollapsed ? copy.common.expandOutput : copy.common.collapseOutput} onClick={() => panels.setResultsCollapsed(value => !value)}><Icon className="panel-toggle-icon" name="chevron"/></Button>
             </div>
         </div>
@@ -236,6 +211,5 @@ export function WorkspaceResultsPanel({
             {run && visibleResultsView === 'map' && <GeoView result={retainedSnapshot} loading={!retainedSnapshot && run.resultState === 'reopenable'} locale={locale}/>}
             {run && visibleResultsView === 'insights' && <InsightsView comparison={{ connectionId: connection.id, trusted, history, initialRun: run, profiles: profilesByRun, pipelines: pipelinesByRun, queryLogAvailable: connection.manifest?.queryLog.available === true }} run={run} profile={profile} pipeline={pipeline} pipelineAvailable={Boolean(trusted && connection.manifest?.pipeline.available)} flamegraph={flamegraph} flamegraphCapability={trusted ? connection.manifest?.traceLog : { available: false, reason: 'Trust this connection to inspect profiler samples.' }} onLoad={actions.onLoadProfile} onLoadPipeline={actions.onLoadPipeline} onLoadFlamegraph={actions.onLoadFlamegraph} loading={busy === 'save'}/>}
         </div>}</ScrollEdgeFrame>
-        {resultsMode === 'floating' && !panels.resultsCollapsed && <PanelResizeHandles onResize={(edge, event) => startPanelResize('results', edge, event)}/>}
     </section>;
 }

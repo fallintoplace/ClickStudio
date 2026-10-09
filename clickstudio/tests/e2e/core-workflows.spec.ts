@@ -636,72 +636,95 @@ test('Query and result panels collapse to their headings', async ({ page }) => {
 });
 
 
-test('Desktop workspace panels float, resize, maximize, and dock without losing content', async ({ page }) => {
+for (const legacyMode of ['floating', 'maximized']) test(`Saved ${legacyMode} panels dock without losing SQL, results, or layout preferences`, async ({ page }) => {
     await page.setViewportSize({ width: 1400, height: 1000 });
     await trust(page);
+    const sql = 'SELECT number AS value FROM numbers(7)';
+    await replaceSql(page, sql);
     const results = await runQuery(page);
-    const queryPanel = page.locator('.editor-surface');
-    const editor = page.locator('#sql-editor-content .cm-content');
+    const retainedRows = await results.getByRole('table', { name: 'Retained query rows' }).innerText();
+    const queryId = await currentQueryId(page);
+    await page.evaluate(mode => localStorage.setItem('clickstudio:workspace-layout:v1', JSON.stringify({
+        version: 1,
+        splitRatio: 0.63,
+        query: { mode, collapsed: true, geometry: { x: 16, y: 34, width: 550, height: 260 } },
+        results: { mode, collapsed: false, geometry: { x: 700, y: 400, width: 600, height: 400 } },
+    })), legacyMode);
+    await page.reload();
+
+    await expect(page.locator('#sql-editor-content')).toBeHidden();
+    await expect(page.locator('.results-surface').getByRole('table', { name: 'Retained query rows' })).toHaveText(retainedRows, { useInnerText: true });
+    await expect(page.locator('.execution-bar')).toHaveAttribute('data-query-id', queryId);
+    for (const panel of ['.editor-surface', '.results-surface'])
+        await expect(page.locator(panel)).not.toHaveClass(/is-floating|is-maximized/);
+    await expect.poll(() => page.evaluate(() => {
+        const layout = JSON.parse(localStorage.getItem('clickstudio:workspace-layout:v1') ?? '{}');
+        return { queryMode: layout.query?.mode, resultsMode: layout.results?.mode, queryCollapsed: layout.query?.collapsed, resultsCollapsed: layout.results?.collapsed, splitRatio: layout.splitRatio };
+    })).toEqual({ queryMode: 'docked', resultsMode: 'docked', queryCollapsed: true, resultsCollapsed: false, splitRatio: 0.63 });
 
     await page.locator('button[aria-controls="sql-editor-content"]').click();
+    await expect(page.locator('#sql-editor-content .cm-content')).toHaveText(sql);
+    await expect(page.getByRole('separator', { name: 'Resize query and output panels', exact: true })).toHaveAttribute('aria-valuenow', '63');
+    for (const theme of ['Dark theme', 'Light theme']) {
+        await page.getByRole('radiogroup', { name: 'Theme' }).getByRole('radio', { name: theme }).click();
+        for (const mode of ['Standard', 'Experimental']) {
+            await page.getByText(mode, { exact: true }).click();
+            await expect(page.getByRole('button', { name: /^(Float|Maximize|Restore) (query|output) panel$/ })).toHaveCount(0);
+            await expect(page.getByRole('button', { name: 'Open editor in a separate window', exact: true })).toBeVisible();
+            await expect(page.getByRole('button', { name: 'Open results in a separate window', exact: true })).toBeVisible();
+            await expect(page.locator('.workspace-panel-resize-handle')).toHaveCount(0);
+        }
+    }
+    await page.reload();
+    await expect(page.locator('#sql-editor-content .cm-content')).toHaveText(sql);
+    await expect(page.locator('.results-surface').getByRole('table', { name: 'Retained query rows' })).toHaveText(retainedRows, { useInnerText: true });
+    await expect(page.getByRole('separator', { name: 'Resize query and output panels', exact: true })).toHaveAttribute('aria-valuenow', '63');
+});
+
+for (const mode of ['Standard', 'Experimental']) test(`${mode} query and results still open in separate windows and return to the workspace`, async ({ page }) => {
+    await page.setViewportSize({ width: 1400, height: 1000 });
+    await trust(page);
+    await page.getByText(mode, { exact: true }).click();
+    const results = await runQuery(page);
+    const retainedRows = await results.getByRole('table', { name: 'Retained query rows' }).innerText();
+    await page.locator('button[aria-controls="sql-editor-content"]').click();
+
+    const editorPopupPromise = page.waitForEvent('popup');
+    await page.getByRole('button', { name: 'Open editor in a separate window', exact: true }).click();
+    const editorPopup = await editorPopupPromise;
+    await expect(editorPopup.locator('.cm-content')).toBeVisible();
+    await expect(editorPopup.getByRole('button', { name: /Float|Maximize|Restore/ })).toHaveCount(0);
+    const editedSql = 'SELECT number AS value FROM numbers(3)';
+    await replaceSql(editorPopup, editedSql);
+    await page.getByRole('radiogroup', { name: 'Theme' }).getByRole('radio', { name: 'Light theme' }).click();
+    await expect(editorPopup.locator('html')).toHaveAttribute('data-theme', 'click-light');
+    await editorPopup.getByRole('button', { name: 'Dock editor here', exact: true }).click();
+    await expect.poll(() => editorPopup.isClosed()).toBe(true);
+    await expect(page.locator('.detached-query-placeholder')).toHaveCount(0);
     await expect(page.locator('#sql-editor-content')).toBeHidden();
-
-    const queryFloat = page.getByRole('button', { name: 'Float query panel', exact: true });
-    const queryFloatBox = await queryFloat.boundingBox();
-    expect(queryFloatBox).not.toBeNull();
-    expect(queryFloatBox!.width).toBeGreaterThanOrEqual(34);
-    expect(queryFloatBox!.height).toBeGreaterThanOrEqual(34);
-    await queryFloat.click();
-    await expect(queryPanel).toHaveClass(/is-floating/);
-    await expect(editor).toContainText('SELECT');
-
-    const beforeDrag = await queryPanel.boundingBox();
-    const dragTarget = await queryPanel.locator('.file-type-icon').boundingBox();
-    expect(beforeDrag).not.toBeNull();
-    expect(dragTarget).not.toBeNull();
-    await page.mouse.move(dragTarget!.x + dragTarget!.width / 2, dragTarget!.y + dragTarget!.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(dragTarget!.x + 150, dragTarget!.y + 90, { steps: 5 });
-    await page.mouse.up();
-    const afterDrag = await queryPanel.boundingBox();
-    expect(afterDrag).not.toBeNull();
-    expect(afterDrag!.x).toBeGreaterThan(beforeDrag!.x + 60);
-    expect(afterDrag!.y).toBeGreaterThan(beforeDrag!.y + 30);
-
-    const resizeHandle = await queryPanel.locator('.workspace-panel-resize-handle.edge-se').boundingBox();
-    expect(resizeHandle).not.toBeNull();
-    await page.mouse.move(resizeHandle!.x + resizeHandle!.width / 2, resizeHandle!.y + resizeHandle!.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(resizeHandle!.x + 120, resizeHandle!.y + 80, { steps: 5 });
-    await page.mouse.up();
-    const afterResize = await queryPanel.boundingBox();
-    expect(afterResize).not.toBeNull();
-    expect(afterResize!.width).toBeGreaterThan(afterDrag!.width + 70);
-    expect(afterResize!.height).toBeGreaterThan(afterDrag!.height + 40);
-
-    await page.getByRole('button', { name: 'Maximize query panel', exact: true }).click();
-    const maximized = await queryPanel.boundingBox();
-    expect(maximized).not.toBeNull();
-    expect(maximized!.width).toBeGreaterThan(1360);
-    expect(maximized!.height).toBeGreaterThan(960);
-
-    await page.getByRole('button', { name: 'Restore query panel', exact: true }).click();
-    await page.getByRole('button', { name: 'Dock query panel', exact: true }).click();
-    await expect(queryPanel).not.toHaveClass(/is-floating/);
-    await expect(page.locator('#sql-editor-content')).toBeHidden();
-
-    await page.getByRole('button', { name: 'Float output panel', exact: true }).click();
-    await expect(results).toHaveClass(/is-floating/);
-    await expect(results.getByRole('table', { name: 'Retained query rows' })).toBeVisible();
-    await page.getByRole('button', { name: 'Dock output panel', exact: true }).click();
-    await expect(results).not.toHaveClass(/is-floating/);
+    await page.locator('button[aria-controls="sql-editor-content"]').click();
+    await expect(page.locator('.cm-content')).toHaveText(editedSql);
 
     await page.locator('button[aria-controls="query-results-content"]').click();
+    const resultsPopupPromise = page.waitForEvent('popup');
+    await page.getByRole('button', { name: 'Open results in a separate window', exact: true }).click();
+    const resultsPopup = await resultsPopupPromise;
+    await expect(resultsPopup.getByRole('table', { name: 'Retained query rows' })).toHaveText(retainedRows, { useInnerText: true });
+    await expect(resultsPopup.locator('html')).toHaveAttribute('data-theme', 'click-light');
+    await expect(resultsPopup.getByRole('button', { name: /Float|Maximize|Restore/ })).toHaveCount(0);
+    await resultsPopup.close();
+    await expect(page.locator('.detached-results-placeholder')).toHaveCount(0);
     await expect(page.locator('#query-results-content')).toBeHidden();
-    await page.getByRole('button', { name: 'Float output panel', exact: true }).click();
-    await expect(page.locator('#query-results-content')).toBeVisible();
-    await page.getByRole('button', { name: 'Dock output panel', exact: true }).click();
-    await expect(page.locator('#query-results-content')).toBeHidden();
+    await page.locator('button[aria-controls="query-results-content"]').click();
+    await expect(page.getByRole('separator', { name: 'Resize query and output panels', exact: true })).toBeVisible();
+    await expect(page.locator('.results-surface').getByRole('table', { name: 'Retained query rows' })).toHaveText(retainedRows, { useInnerText: true });
+
+    const reopenedResultsPromise = page.waitForEvent('popup');
+    await page.getByRole('button', { name: 'Open results in a separate window', exact: true }).click();
+    const reopenedResults = await reopenedResultsPromise;
+    await reopenedResults.getByRole('button', { name: 'Dock results here', exact: true }).click();
+    await expect.poll(() => reopenedResults.isClosed()).toBe(true);
+    await expect(page.locator('.results-surface').getByRole('table', { name: 'Retained query rows' })).toHaveText(retainedRows, { useInnerText: true });
 });
 
 test('Desktop docked query and output panels resize with the splitter', async ({ page }) => {
@@ -736,6 +759,14 @@ test('Desktop docked query and output panels resize with the splitter', async ({
     expect(resultsAfter!.height).toBeLessThan(resultsBefore!.height - 45);
     expect(Math.abs(splitAfter!.y - (queryAfter!.y + queryAfter!.height))).toBeLessThanOrEqual(2);
     expect(Math.abs(resultsAfter!.y - (splitAfter!.y + splitAfter!.height))).toBeLessThanOrEqual(2);
+
+    const ratioBeforeKeyboard = Number(await splitter.getAttribute('aria-valuenow'));
+    await splitter.press('ArrowUp');
+    const expectedRatio = String(Math.max(25, ratioBeforeKeyboard - 5));
+    await expect(splitter).toHaveAttribute('aria-valuenow', expectedRatio);
+    await page.reload();
+    await expect(splitter).toHaveAttribute('aria-valuenow', expectedRatio);
+    await expect(page.locator('.results-surface').getByRole('table', { name: 'Retained query rows' })).toBeVisible();
 });
 
 test('Native parser can be retried after a temporary worker failure', async ({ page }) => {

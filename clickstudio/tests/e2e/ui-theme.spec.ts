@@ -118,14 +118,15 @@ test('localized desktop header keeps the theme switch in view', async ({ page })
     await page.setViewportSize({ width: 2048, height: 900 });
     await page.goto('/');
 
-    const localeSelect = page.locator('.topbar-preferences select');
     const topbar = page.locator('.topbar');
     const themeSwitch = page.locator('.theme-mode-control');
     const accentSwitch = page.locator('.accent-mode-control');
 
     for (const locale of ['en', 'zh']) {
-        await localeSelect.selectOption(locale);
+        await page.evaluate(value => localStorage.setItem('clickstudio:locale', value), locale);
+        await page.reload();
         await expect(page.locator('html')).toHaveAttribute('lang', locale);
+        await expect(page.locator('.topbar-preferences select')).toHaveCount(0);
         await expect(themeSwitch).toBeVisible();
         await expect(accentSwitch).toBeVisible();
 

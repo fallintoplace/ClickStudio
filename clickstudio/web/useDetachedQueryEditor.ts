@@ -24,9 +24,8 @@ export function useDetachedQueryEditor({
     setNotice: (message: string) => void;
 }) {
     const { detached, open, focus, dock, setTitle } = useDetachedEditorWindow();
-    const previousQueryMode = useRef(panels.panelLayout.query.mode);
     const detachedWasOpen = useRef(false);
-    const { panelLayout, setPanelLayout, revealPanelTemporarily, clearTemporaryPanelReveal } = panels;
+    const { setPanelLayout, revealPanelTemporarily, clearTemporaryPanelReveal } = panels;
 
     useEffect(() => {
         if (!detached) {
@@ -35,7 +34,7 @@ export function useDetachedQueryEditor({
                 clearTemporaryPanelReveal('query');
                 setPanelLayout(current => ({
                     ...current,
-                    query: { ...current.query, mode: previousQueryMode.current },
+                    query: { ...current.query, mode: 'docked' },
                 }));
                 window.requestAnimationFrame(() => editorRef.current?.focus());
             }
@@ -56,7 +55,6 @@ export function useDetachedQueryEditor({
     }, [activeName, clearTemporaryPanelReveal, detached, editorRef, experience, setPanelLayout, setTitle]);
 
     const openEditor = useCallback(() => {
-        previousQueryMode.current = panelLayout.query.mode;
         if (!open(activeName, experience)) {
             setError(copy.queryWindowBlocked);
             return;
@@ -64,7 +62,7 @@ export function useDetachedQueryEditor({
         revealPanelTemporarily('query', activeDraftId);
         setPanelLayout(current => ({ ...current, query: { ...current.query, mode: 'docked' } }));
         setNotice(copy.queryWindowOpened);
-    }, [activeDraftId, activeName, copy.queryWindowBlocked, copy.queryWindowOpened, experience, open, panelLayout.query.mode, revealPanelTemporarily, setError, setNotice, setPanelLayout]);
+    }, [activeDraftId, activeName, copy.queryWindowBlocked, copy.queryWindowOpened, experience, open, revealPanelTemporarily, setError, setNotice, setPanelLayout]);
 
     const dockEditor = useCallback(() => {
         dock();
