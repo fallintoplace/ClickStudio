@@ -264,7 +264,7 @@ test('Selecting text or another statement does not mark existing results as chan
     await replaceSql(page, 'SELECT 1;\nSELECT 3;');
     await expect(results.locator('.result-provenance-header')).toHaveCount(0);
     await replaceSql(page, 'SELECT 4;\nSELECT 3;');
-    await expect(results.locator('.result-provenance-header')).toHaveText('Query changed');
+    await expect(results.locator('.result-provenance-header')).toHaveCount(0);
     await expect(page.locator('.execution-bar')).toHaveAttribute('data-query-id', originalQueryId);
     await replaceSql(page, 'SELECT 1;\nSELECT 3;');
     await expect(results.locator('.result-provenance-header')).toHaveCount(0);
@@ -281,7 +281,7 @@ test('Selecting text or another statement does not mark existing results as chan
 });
 
 for (const theme of ['Dark', 'Light']) {
-    test(`Changed result badges stay compact in ${theme.toLowerCase()} mode`, async ({ page }, testInfo) => {
+    test(`Changed results have no status pill in ${theme.toLowerCase()} mode`, async ({ page }) => {
         await trust(page);
         await page.getByRole('radio', { name: `${theme} theme`, exact: true }).click();
         const results = await runQuery(page);
@@ -290,18 +290,11 @@ for (const theme of ['Dark', 'Light']) {
             await page.getByText(mode, { exact: true }).click();
             await page.setViewportSize({ width: 1440, height: 900 });
             await replaceSql(page, 'SELECT 42');
-            const badge = results.locator('.result-provenance-header');
-            await expect(badge).toHaveText('Query changed');
-            await expect(badge).toHaveAttribute('title', /previous SQL/);
-            await expect(badge.locator('small')).toHaveCount(0);
-            await expect(results.locator('.results-actions .result-provenance-header')).toBeVisible();
-            expect((await badge.boundingBox())!.height).toBeLessThan(28);
-            expect((await results.locator('.results-header').boundingBox())!.height).toBeLessThan(60);
-            await page.screenshot({ path: testInfo.outputPath(`${mode.toLowerCase()}-badge.png`) });
-            await page.setViewportSize({ width: 390, height: 844 });
-            await expect(badge).toBeInViewport();
-            expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+            await expect(results.locator('.result-provenance-header')).toHaveCount(0);
             await expect(page.locator('.execution-bar')).toHaveAttribute('data-query-id', queryId);
+            await page.setViewportSize({ width: 390, height: 844 });
+            await expect(results.locator('.result-provenance-header')).toHaveCount(0);
+            expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
         }
         await runQuery(page);
         await expect(results.locator('.result-provenance-header')).toHaveCount(0);
@@ -492,8 +485,7 @@ test('Restoring a version keeps run status aligned and marks its result as previ
         runFinished = true;
         releaseRunStatus();
         await expect(page.locator('.execution-bar')).toHaveAttribute('data-run-status', 'succeeded', { timeout: 10000 });
-        await expect(results.locator('.result-provenance-header')).toHaveText('Query changed');
-        await expect(results.locator('.result-provenance-header')).toHaveAttribute('title', /previous SQL/);
+        await expect(results.locator('.result-provenance-header')).toHaveCount(0);
     } finally {
         runFinished = true;
         releaseRunStatus();
@@ -1319,7 +1311,7 @@ test('Result filtering searches only the visible retained page without mutating 
     await expect(page.locator('.execution-bar')).toHaveAttribute('data-query-id', queryId);
 });
 
-test('SQL and parameter edits label old results without changing their run evidence', async ({ page }) => {
+test('SQL and parameter edits keep old results without a status pill', async ({ page }) => {
     let runRequests = 0;
     let submittedSql = '';
     page.on('request', request => {
@@ -1334,8 +1326,7 @@ test('SQL and parameter edits label old results without changing their run evide
     const queryId = await currentQueryId(page);
 
     await replaceSql(page, 'SELECT 42');
-    await expect(results.locator('.result-provenance-header')).toHaveText('Query changed');
-    await expect(results.locator('.result-provenance-header')).toHaveAttribute('title', /previous SQL/);
+    await expect(results.locator('.result-provenance-header')).toHaveCount(0);
     await expect(page.locator('.execution-bar')).toHaveAttribute('data-query-id', queryId);
     await replaceSql(page, submittedSql);
     await expect(results.locator('.result-provenance-header')).toHaveCount(0);
@@ -1345,8 +1336,7 @@ test('SQL and parameter edits label old results without changing their run evide
     await runQuery(page);
     const parameterRunId = await currentQueryId(page);
     await page.getByRole('textbox', { name: 'threshold:UInt64', exact: true }).fill('9007199254740994');
-    await expect(results.locator('.result-provenance-header')).toHaveText('Parameters changed');
-    await expect(results.locator('.result-provenance-header')).toHaveAttribute('title', /previous values/);
+    await expect(results.locator('.result-provenance-header')).toHaveCount(0);
     await expect(page.locator('.execution-bar')).toHaveAttribute('data-query-id', parameterRunId);
     expect(runRequests).toBe(2);
 });

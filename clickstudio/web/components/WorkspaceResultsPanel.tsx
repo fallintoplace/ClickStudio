@@ -120,10 +120,6 @@ export function WorkspaceResultsPanel({
         sqlMapParseStatement,
         queryTreeAvailable,
         queryTreeUnavailableReason,
-        staleResult,
-        staleResultReason,
-        staleResultLabel,
-        sourceDeleted,
         failureError,
         failureSql,
     } = viewState;
@@ -138,11 +134,6 @@ export function WorkspaceResultsPanel({
     const failedScriptStatement = script?.statements.find(statement => statement.status === 'failed' && statement.error);
     const showFailure = Boolean(failureError && !execution && visibleResultsView !== 'sqlmap');
     const previousSuccessfulResult = Boolean((failedAttempt || (failedScriptStatement && !failedScriptStatement.runId)) && run?.resultState === 'reopenable' && run.status !== 'failed');
-    const resultProvenance = visibleResultsView !== 'sqlmap' && !execution
-        ? !previousSuccessfulResult && !failedAttempt && staleResult
-                ? { description: staleResultReason, label: staleResultLabel, sourceDeleted }
-                : undefined
-        : undefined;
 
     if (!run && !execution && !failedAttempt && !failedScriptStatement && visibleResultsView !== 'sqlmap' && !detached) return null;
 
@@ -163,16 +154,6 @@ export function WorkspaceResultsPanel({
             </div>
             <div className="results-actions">
                 {!showFailure && run && resultTabs.length > 1 && <div className="results-tabs" role="tablist" aria-label={copy.common.workspaceOutput}>{resultTabs.map(tab => <button key={tab} role="tab" aria-selected={visibleResultsView === tab} type="button" onClick={() => actions.onSelectView(tab)}>{resultsTabLabel(tab, copy.common)}{tab === 'chart' && retainedSnapshot && <span className="suggested-dot"/>}</button>)}</div>}
-                {!showFailure && resultProvenance && <span
-                    className={cx('result-provenance-header', resultProvenance.sourceDeleted && 'is-source-deleted')}
-                    role="status"
-                    aria-live="polite"
-                    aria-label={resultProvenance.description}
-                    title={resultProvenance.description}
-                >
-                    <span className="status-light is-warning" aria-hidden="true"/>
-                    <strong>{resultProvenance.label}</strong>
-                </span>}
                 <div ref={setTableToolbar} className="results-table-tools" hidden={panels.resultsCollapsed || showFailure}/>
                 {!showFailure && previousSuccessfulResult && visibleResultsView !== 'results' && !(visibleResultsView === 'chart' && snapshotChart?.config.kind === 'table') && <span className="result-previous-run" title={copy.common.previousResultsDescription}>{copy.common.previousRun}</span>}
                 {detached
