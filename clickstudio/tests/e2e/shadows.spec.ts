@@ -46,6 +46,33 @@ async function expectNeutralWorkspace(page: Page) {
     }
 }
 
+async function expectCompactToolbar(page: Page) {
+    await expect(runButton(page)).toHaveCSS('height', '32px');
+    await expect(runButton(page)).toHaveCSS('font-size', '11px');
+    await expect(page.getByTestId('save-query')).toHaveCSS('height', '28px');
+    await expect(page.getByTestId('format-sql')).toHaveCSS('height', '28px');
+    await expect(page.locator('.results-tabs')).toHaveCSS('height', '28px');
+    for (const selector of ['.editor-heading', '.results-header']) {
+        const header = page.locator(selector);
+        await expect(header).toHaveCSS('height', '48px');
+        const bounds = await header.boundingBox();
+        expect(bounds).not.toBeNull();
+        for (const control of await header.locator('.button-base').all()) {
+            const before = await control.boundingBox();
+            expect(before).not.toBeNull();
+            expect(before!.x).toBeGreaterThanOrEqual(bounds!.x);
+            expect(before!.x + before!.width).toBeLessThanOrEqual(bounds!.x + bounds!.width);
+            expect(Math.abs(before!.y + before!.height / 2 - (bounds!.y + bounds!.height / 2))).toBeLessThanOrEqual(1);
+            await control.hover();
+            await expect(control).toHaveCSS('transform', 'none');
+        }
+        for (const control of await header.locator('.panel-window-button, .panel-collapse-button').all()) {
+            await expect(control).toHaveCSS('width', '28px');
+            await expect(control).toHaveCSS('height', '28px');
+        }
+    }
+}
+
 for (const theme of ['Dark', 'Light']) for (const mode of ['Standard', 'Experimental']) {
     test(`${theme} ${mode} keeps workspace panels flat and overlay depth neutral across accents`, async ({ page }) => {
         await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -55,12 +82,14 @@ for (const theme of ['Dark', 'Light']) for (const mode of ['Standard', 'Experime
         await page.getByRole('radio', { name: `${theme} theme`, exact: true }).click();
         await runButton(page).click();
         await expect(page.locator('.data-table')).toBeVisible();
+        await expectCompactToolbar(page);
         const editor = page.locator('.editor-surface');
         await page.locator('.cm-content').focus();
         await expect(editor).toHaveCSS('box-shadow', 'none');
         await expect(page.locator('.results-surface')).toHaveCSS('box-shadow', 'none');
         await expect(page.locator('.topbar')).toHaveCSS('box-shadow', 'none');
         const filter = await openResultFilter(page);
+        await expect(filter).toHaveCSS('height', '28px');
         await page.keyboard.press('Tab');
         await filter.focus();
         await expect(filter).toHaveCSS('outline-style', 'solid');
@@ -144,6 +173,8 @@ for (const theme of ['Dark', 'Light']) for (const mode of ['Standard', 'Experime
         await page.keyboard.press('Escape');
         await expect(importDialog).toBeHidden();
         await expect(runButton(page)).toHaveCSS('border-radius', '4px');
+        await expect(runButton(page)).toHaveCSS('height', '34px');
+        await expect(page.getByTestId('save-query')).toHaveCSS('height', '34px');
         await runButton(page).click({ trial: true });
         await page.setViewportSize({ width: 1440, height: 900 });
 

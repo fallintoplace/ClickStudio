@@ -23,6 +23,21 @@
 .panel-collapse-button .panel-toggle-icon { transition: transform .18s ease; }
 .panel-collapse-button[aria-expanded="true"] .panel-toggle-icon { transform: rotate(180deg); }
 
+@media (min-width: 761px) and (pointer: fine) {
+    .editor-heading, .results-header { min-height: 48px; padding-block: 6px; }
+    .editor-heading-actions { gap: 6px; padding-right: 34px; }
+    .results-actions, .results-header .result-table-toolbar { gap: 6px; }
+    .editor-heading-actions > .button-base, .results-header .button-base { min-height: 28px; gap: 6px; padding-inline: 8px; }
+    .editor-heading-actions > .run-query-button { min-height: 32px; padding-inline: 12px; }
+    :is(.editor-heading, .results-header) :is(.panel-window-button, .panel-collapse-button) { width: 28px; min-width: 28px; padding: 0; }
+    :is(.editor-heading, .results-header) :is(.panel-window-button svg, .panel-collapse-button .panel-toggle-icon) { width: 14px; height: 14px; }
+    :is(.editor-heading, .results-header) .button-base:is(:hover, :active):not(:disabled) { transform: none; }
+    :is(.editor-heading, .results-header) .panel-window-button:hover:not(:disabled) svg { transform: none; }
+    .results-tabs { height: 28px; padding: 2px; }
+    .results-tabs button { display: flex; align-items: center; padding: 0 8px; }
+    .results-header .result-filter { height: 28px; min-height: 28px; padding-block: 4px; }
+}
+
 @media (max-width: 760px) {
     .pipeline-graph-svg { transform: none; }
     .pipeline-graph-scroll::before { opacity: .28; }
@@ -32,4 +47,3 @@
     .pipeline-graph-edge, .pipeline-graph-node, .pipeline-node-face { transition: none; }
     .pipeline-edge-pulse { animation: none; }
 }
-
