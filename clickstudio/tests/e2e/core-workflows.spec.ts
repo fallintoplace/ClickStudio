@@ -557,7 +557,7 @@ test('Failed execution replaces visible results and can close, reopen and retry'
         await expect(page.locator('.execution-bar')).not.toHaveAttribute('data-query-id');
         await expect(page.locator('.execution-bar')).not.toContainText('Query failed');
         await expect(page.locator('.query-failed-status')).toHaveText('Last execution failed');
-        await expect(failure.getByRole('button')).toHaveCount(0);
+        await expect(failure.locator('details')).not.toHaveAttribute('open');
         await page.screenshot({ path: testInfo.outputPath('failed-output.png') });
         await results.getByRole('button', { name: 'Collapse Query results', exact: true }).click();
         await expect(failure).toBeHidden();
@@ -650,9 +650,10 @@ for (const theme of ['Dark', 'Light']) for (const mode of ['Standard', 'Experime
             expect(current.width).toBeCloseTo(previous.width, 0);
         }
         await expect(page.locator('.editor-heading-actions .query-failed-status')).toHaveCount(0);
-        await expect(failure.locator('.result-failure-detail')).toHaveText(`[CLICKHOUSE_62] ${message}`);
+        await expect(failure.locator('.result-failure-detail')).toBeHidden();
+        await expect(failure.locator('.result-failure-code')).toHaveText('CLICKHOUSE_62');
         await expect(failure.locator('.result-failure-location')).toHaveText('Line 2, column 1');
-        await expect(failure.locator('.result-execution-sql')).toHaveText('SELECT 1\nGROUP BY\n^');
+        await expect(failure.locator('.is-context .result-failure-line > span:last-child')).toHaveText(['SELECT 1', 'GROUP BY\n^']);
         await expect(results.getByRole('table')).toHaveCount(0);
         await expect(results.locator('.result-row-count')).toHaveCount(0);
         await expect(page.locator('.toast-error')).toHaveCount(0);
@@ -662,7 +663,27 @@ for (const theme of ['Dark', 'Light']) for (const mode of ['Standard', 'Experime
         await page.locator('.cm-content').focus();
         await page.keyboard.press('ControlOrMeta+a');
         await expect(failure).toBeVisible();
+        const editorFont = await page.locator('.cm-scroller').evaluate(element => {
+            const style = getComputedStyle(element);
+            return [style.fontFamily, style.fontSize, style.lineHeight];
+        });
+        const excerptFont = await failure.locator('.is-context').evaluate(element => {
+            const style = getComputedStyle(element);
+            return [style.fontFamily, style.fontSize, style.lineHeight];
+        });
+        expect(excerptFont).toEqual(editorFont);
         await page.screenshot({ path: testInfo.outputPath('error-desktop.png') });
+        const details = failure.locator('details');
+        await details.locator('summary').focus();
+        await page.keyboard.press('Enter');
+        await expect(failure.locator('.result-failure-detail')).toBeVisible();
+        await expect(failure.locator('.result-failure-detail')).toHaveText(`[CLICKHOUSE_62] ${message}`);
+        await expect(failure.locator('.is-full')).toHaveText('SELECT 1\nGROUP BY');
+        const expanded = (await results.boundingBox())!;
+        expect(expanded.y).toBeCloseTo(before.y, 0);
+        expect(expanded.height).toBeCloseTo(before.height, 0);
+        await page.keyboard.press('Enter');
+        await expect(failure.locator('.result-failure-detail')).toBeHidden();
         await page.setViewportSize({ width: 390, height: 844 });
         await expect(failure).toBeVisible();
         await expect(results.getByRole('button', { name: 'Close output', exact: true })).toBeInViewport();
@@ -670,10 +691,43 @@ for (const theme of ['Dark', 'Light']) for (const mode of ['Standard', 'Experime
         await page.screenshot({ path: testInfo.outputPath('error-mobile.png') });
         await replaceSql(page, 'SELECT 2');
         await expect(failure.locator('.result-failure-location')).toHaveText('Line 2, column 1');
-        await expect(failure.locator('.result-execution-sql')).toHaveText('SELECT 1\nGROUP BY\n^');
+        await expect(failure.locator('.is-context .result-failure-line > span:last-child')).toHaveText(['SELECT 1', 'GROUP BY\n^']);
         await expect(page.locator('.cm-server-error-line')).toHaveCount(0);
     });
 }
+
+for (const theme of ['Dark', 'Light']) test(`Long failed SQL stays compact in ${theme.toLowerCase()} Output`, async ({ page }, testInfo) => {
+    await trust(page);
+    await page.getByRole('radio', { name: `${theme} theme`, exact: true }).click();
+    const sql = ['SELECT', '    product_category,', '    count() AS reviews', 'FROM amazon.amazon_reviews', "WHERE product_category != ''", '    AND star_rating > 0', '    AND star_rating <= 5', 'GROUP BY product_category', '-- Keep categories with enough reviews', 'HAVIsNG reviews >= 100000', 'ORDER BY reviews DESC', 'LIMIT 12'].join('\n');
+    let message = 'Syntax error: failed at position 210 (HAVIsNG) (line 10, col 1): HAVIsNG reviews >= 100000 FORMAT JSONCompactStringsEachRowWithNamesAndTypes. Expected one of: token, expression, identifier, HAVING.';
+    await page.route(url => url.pathname === '/api/runs', async route => {
+        if (route.request().method() === 'POST') return route.fulfill({ status: 400, json: { error: { code: 'CLICKHOUSE_62', message } } });
+        await route.continue();
+    });
+    await replaceSql(page, sql);
+    await runButton(page).click();
+    const failure = page.getByTestId('query-failure');
+    await expect(failure.getByRole('heading', { name: 'Syntax error near HAVIsNG' })).toBeVisible();
+    await expect(failure.locator('.is-context .result-failure-line-number')).toHaveText(['8', '9', '10', '11', '12']);
+    await expect(failure.locator('.is-context')).toContainText('HAVIsNG reviews >= 100000');
+    await expect(failure.locator('.is-context')).not.toContainText('FORMAT JSONCompact');
+    await expect(failure.locator('.result-failure-detail')).toBeHidden();
+    await expect(failure.locator('.is-full')).toBeHidden();
+    await expect(failure.locator('summary')).toBeInViewport();
+    await page.screenshot({ path: testInfo.outputPath('long-error-output.png') });
+    await failure.locator('summary').click();
+    await expect(failure.locator('.result-failure-detail')).toHaveText(`[CLICKHOUSE_62] ${message}`);
+    await expect(failure.locator('.is-full')).toHaveText(sql);
+    await replaceSql(page, sql.replace('HAVIsNG', 'HAVING'));
+    await expect(failure.locator('.is-context')).toContainText('HAVIsNG');
+    await expect(failure.locator('details')).toHaveAttribute('open');
+    message = 'Syntax error (line 1, col 1): SELECT';
+    await runButton(page).click();
+    await expect(failure.locator('.result-failure-location')).toHaveText('Line 1, column 1');
+    await expect(failure.locator('details')).not.toHaveAttribute('open');
+    await expect(failure.locator('.is-context .result-failure-line-number')).toHaveText(['1', '2', '3', '4', '5']);
+});
 
 test('A failed saved run shows its submitted error in Output', async ({ page }) => {
     await trust(page);
@@ -741,7 +795,9 @@ test('Failed Output and editor markers stay usable in separate windows', async (
     const output = await outputOpened;
     await output.setViewportSize({ width: 500, height: 400 });
     await expect(output.getByTestId('query-failure')).toBeVisible();
-    await expect(output.getByTestId('query-failure').locator('.result-execution-sql')).toHaveText('SELECT 1\nGROUP BY\n^');
+    await expect(output.locator('.is-context .result-failure-line > span:last-child')).toHaveText(['SELECT 1', 'GROUP BY\n^']);
+    await output.locator('.result-failure-diagnostics summary').click();
+    await expect(output.locator('.result-failure-detail')).toBeVisible();
     await expect(output.getByRole('table')).toHaveCount(0);
     await output.getByRole('button', { name: 'Close output', exact: true }).click();
     await expect.poll(() => output.isClosed()).toBe(true);
@@ -1706,6 +1762,9 @@ test('Script errors without a statement run ID show the ClickHouse error and fai
         await expect(failure).toContainText(message);
         await expect(results.getByRole('button', { name: 'Statement 1: failed', exact: true })).toBeVisible();
         await expect(results.getByRole('button', { name: 'Statement 2: skipped', exact: true })).toBeVisible();
+        await expect(failure.locator('.result-failure-detail')).toBeHidden();
+        await expect(failure.locator('.result-failure-marker')).toHaveCount(0);
+        await failure.locator('summary').click();
         await expect(failure.locator('.result-failure-detail')).toHaveText(`[CLICKHOUSE_ERROR] ${message}`);
         await expect(failure.locator('.result-execution-sql.is-full')).toHaveText('SELECT 1 AS value FORMAT JSONEachRow');
     } finally {

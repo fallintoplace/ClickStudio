@@ -1,22 +1,43 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { queryFailureSummary, sqlErrorRange, sqlErrorRangeInDraft, sqlErrorLineColumn, sqlErrorExcerpt } from '../../.workspace-build/web/sql-error.js';
+import { queryFailureSummary, sqlErrorRange, sqlErrorRangeInDraft, sqlErrorLineColumn, sqlErrorContext } from '../../.workspace-build/web/sql-error.js';
 
 const error = message => ({ code: 'CLICKHOUSE_62', message });
 
-test('Failed SQL preserves every line and places a caret below the submitted error', () => {
-    assert.equal(sqlErrorExcerpt('SELECT 1\nGROUP BY\nORDER BY 1', { from: 9, to: 14 }), 'SELECT 1\nGROUP BY\n^^^^^\nORDER BY 1');
-    assert.equal(sqlErrorExcerpt('\tSELECT missing(1)', { from: 8, to: 15 }), '\tSELECT missing(1)\n\t       ^^^^^^^');
-    assert.equal(sqlErrorExcerpt('SELECT', { from: 6, to: 6 }), 'SELECT\n      ^');
-    assert.equal(sqlErrorExcerpt('\nSELECT', { from: 0, to: 0 }), '\n^\nSELECT');
-    assert.equal(sqlErrorExcerpt('SELECT\n', { from: 7, to: 7 }), 'SELECT\n\n^');
-    assert.equal(sqlErrorExcerpt('SELECT\n1', { from: 2, to: 8 }), 'SELECT\n  ^^^^\n1');
+test('SQL context shows five numbered lines around an error, including document offsets', () => {
+    const sql = Array.from({ length: 12 }, (_, index) => `line ${index + 1}`).join('\n');
+    for (const [line, expectedNumbers] of [[1, [1, 2, 3, 4, 5]], [6, [4, 5, 6, 7, 8]], [12, [8, 9, 10, 11, 12]]]) {
+        const from = sql.indexOf(`line ${line}`);
+        const context = sqlErrorContext(sql, { from, to: from + 4 });
+        assert.deepEqual(context.map(row => row.number), expectedNumbers);
+        assert.equal(context.find(row => row.marker)?.text, `line ${line}`);
+        assert.equal(context.find(row => row.marker)?.marker, '^^^^');
+    }
+    assert.deepEqual(sqlErrorContext('SELECT\nGROUP', { from: 7, to: 8 }, 9).map(row => row.number), [10, 11]);
 });
 
-test('Unknown or invalid error spans leave the submitted SQL untouched', () => {
-    assert.equal(sqlErrorExcerpt('SELECT 1'), 'SELECT 1');
-    for (const range of [{ from: -1, to: 1 }, { from: 4, to: 3 }, { from: 0, to: 99 }, { from: NaN, to: 1 }, { from: 0.5, to: 1 }, { from: 0, to: Infinity }])
-        assert.equal(sqlErrorExcerpt('SELECT 1', range), 'SELECT 1');
+test('SQL context retains tabs and Unicode, handles CRLF and marks end of input', () => {
+    const sql = "SELECT 'é😀'\r\n\tGROUP BY\r\n";
+    const from = sql.indexOf('GROUP');
+    assert.deepEqual(sqlErrorContext(sql, { from, to: from + 5 }), [
+        { number: 1, text: "SELECT 'é😀'", marker: undefined },
+        { number: 2, text: '\tGROUP BY', marker: '\t^^^^^' },
+        { number: 3, text: '', marker: undefined },
+    ]);
+    assert.equal(sqlErrorContext(sql, { from: sql.length, to: sql.length }).at(-1).marker, '^');
+    assert.equal(sqlErrorContext('SELECT', { from: 6, to: 6 })[0].marker, '      ^');
+    assert.equal(sqlErrorContext('SELECT\n1', { from: 2, to: 8 })[0].marker, '  ^^^^');
+});
+
+test('SQL context uses the first five lines without a marker if the location is unknown or invalid', () => {
+    const sql = 'SELECT 1\nSELECT 2\nSELECT 3\nSELECT 4\nSELECT 5\nSELECT 6';
+    for (const range of [undefined, { from: -1, to: 1 }, { from: 4, to: 3 }, { from: 0, to: 99 }, { from: NaN, to: 1 }, { from: 0.5, to: 1 }, { from: 0, to: Infinity }]) {
+        const context = sqlErrorContext(sql, range);
+        assert.deepEqual(context.map(row => row.number), [1, 2, 3, 4, 5]);
+        assert.ok(context.every(row => row.marker === undefined));
+    }
+    assert.deepEqual(sqlErrorContext('SELECT 1', undefined, -1), sqlErrorContext('SELECT 1'));
+    assert.deepEqual(sqlErrorContext('SELECT 1', undefined, NaN), sqlErrorContext('SELECT 1'));
 });
 
 test('A ClickHouse syntax diagnostic summarizes the token without SQL or parser hints', () => {

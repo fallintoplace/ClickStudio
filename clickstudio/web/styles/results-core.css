@@ -68,15 +68,26 @@
     .result-provenance-header.is-source-deleted .status-light { background: var(--red); box-shadow: var(--status-ring); color: var(--red); }
     .has-error-output .results-title h2 { position: relative; color: var(--text); }
     .has-error-output .results-title h2::after { position: absolute; bottom: -14px; left: 0; width: 44px; height: 2px; background: var(--accent-cyan); content: ""; }
-    .result-failure { min-width: 0; flex: 1; padding: 24px; background: var(--panel); color: var(--text); }
-    .result-failure-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+    .result-failure { position: relative; min-width: 0; flex: 1; padding: 18px 20px; background: var(--panel); color: var(--text); }
+    .result-failure-heading { display: flex; padding-right: 68px; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
     .result-failure-heading > .status-light { width: 7px; height: 7px; flex: none; box-shadow: none; }
     .result-failure-heading h3 { margin: 0; color: var(--red); font-size: 13px; font-weight: 600; }
-    .result-failure-detail { max-width: 110ch; margin: 12px 0 0; color: var(--text-soft); font: 13px/1.6 var(--font-sans); white-space: pre-wrap; overflow-wrap: anywhere; }
-    .result-failure-code { color: var(--accent-cyan); font: 11px var(--font-mono); }
+    .result-failure-summary { max-width: 100ch; margin: 8px 0 0; color: var(--text-soft); font: 13px/1.55 var(--font-sans); }
+    .result-failure-detail { max-width: 110ch; margin: 12px 0 0; color: var(--text-soft); font: 13px/1.55 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+    .result-failure-code { color: var(--muted); font: 11px/1.55 var(--font-mono); }
     .result-failure-location { color: var(--muted); font-size: 11px; }
-    .result-failure-sql-label { margin: 24px 0 8px; color: var(--muted); font-size: 11px; font-weight: 500; }
-    .result-failure .result-execution-sql { max-width: 920px; max-height: none; margin: 0; padding: 12px 14px; overflow: auto; border: 0; border-left: 2px solid var(--line-bright); border-radius: 0; background: var(--page); color: var(--text); font: 13px/1.65 var(--font-mono); white-space: pre; overflow-wrap: normal; }
+    .result-failure-sql-label { margin: 14px 0 6px; color: var(--muted); font-size: 11px; font-weight: 500; }
+    .result-failure .result-execution-sql { max-width: 920px; max-height: none; margin: 0; padding: 10px 12px; overflow: auto; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--page); color: var(--text); font: 13px/1.55 var(--font-mono); white-space: pre; overflow-wrap: normal; }
+    .result-failure-line { display: grid; width: max-content; min-width: 100%; grid-template-columns: 3ch auto; gap: 12px; }
+    .result-failure-line > span { font: inherit; }
+    .result-failure-line-number { color: var(--muted); text-align: right; user-select: none; }
+    .result-failure-marker { color: var(--red); font: inherit; }
+    .result-failure-line.is-error > .result-failure-line-number { color: var(--red); }
+    .result-failure-diagnostics { max-width: 920px; }
+    .result-failure-diagnostics[open] { margin-top: 12px; }
+    .result-failure-diagnostics summary { position: absolute; top: 18px; right: 20px; width: max-content; padding: 2px 0; border-radius: var(--radius-label); color: var(--text-soft); font: 12px/1.55 var(--font-sans); cursor: pointer; }
+    .result-failure-diagnostics summary:hover { color: var(--text); }
+    .result-failure-diagnostics summary:focus-visible { outline: 2px solid var(--focus-color); outline-offset: 3px; }
     .query-failed-status { display: inline-flex; width: max-content; max-width: 100%; align-items: center; gap: 5px; padding: 0; border: 0; border-radius: var(--radius-label); background: transparent; color: var(--red); font: 10px/12px var(--font-sans); white-space: nowrap; cursor: pointer; }
     .query-failed-status:hover { text-decoration: underline; text-underline-offset: 2px; }
     .query-failed-status .status-light { width: 6px; height: 6px; flex: none; box-shadow: none; }
@@ -147,5 +158,5 @@
     .results-surface.has-error-output .results-title { flex: 1; }
     .results-surface.has-error-output .results-actions { width: auto; flex: none; }
     .result-failure { padding: 16px; }
-    .result-failure-detail, .result-failure .result-execution-sql, .result-failure-sql-label { font-size: 12px; }
+    .result-failure-diagnostics summary { top: 16px; right: 16px; }
 }

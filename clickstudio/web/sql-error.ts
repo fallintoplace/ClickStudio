@@ -61,14 +61,21 @@ export function sqlErrorLineColumn(sql: string, position: number) {
     return { line: lines.length, column: (lines.at(-1)?.length ?? 0) + 1 };
 }
 
-export function sqlErrorExcerpt(sql: string, range?: SqlErrorRange) {
-    if (!range || !Number.isSafeInteger(range.from) || !Number.isSafeInteger(range.to) || range.from < 0 || range.to < range.from || range.to > sql.length) return sql;
-    const end = sql.indexOf('\n', range.from);
-    const lineEnd = end < 0 ? sql.length : end;
-    const lineStart = range.from === 0 ? 0 : sql.lastIndexOf('\n', range.from - 1) + 1;
-    const indent = sql.slice(lineStart, range.from).replace(/[^\t]/g, ' ');
-    const marker = '^'.repeat(Math.max(1, Math.min(range.to, lineEnd) - range.from));
-    return `${sql.slice(0, lineEnd)}\n${indent}${marker}${sql.slice(lineEnd)}`;
+export function sqlErrorContext(sql: string, range?: SqlErrorRange, lineOffset = 0) {
+    const validRange = range && Number.isSafeInteger(range.from) && Number.isSafeInteger(range.to)
+        && range.from >= 0 && range.to >= range.from && range.to <= sql.length ? range : undefined;
+    const lines = sql.split('\n');
+    const focus = validRange ? sqlErrorLineColumn(sql, validRange.from).line - 1 : 0;
+    const start = Math.max(0, Math.min(focus - 2, lines.length - 5));
+    const offset = Number.isSafeInteger(lineOffset) && lineOffset >= 0 ? lineOffset : 0;
+    const column = validRange ? sqlErrorLineColumn(sql, validRange.from).column - 1 : 0;
+    return lines.slice(start, start + 5).map((line, index) => {
+        const text = line.replace(/\r$/, '');
+        const marker = validRange && start + index === focus
+            ? text.slice(0, column).replace(/[^\t]/g, ' ') + '^'.repeat(Math.max(1, Math.min(validRange.to - validRange.from, text.length - column)))
+            : undefined;
+        return { number: offset + start + index + 1, text, marker };
+    });
 }
 
 export function queryFailureSummary(error: ApiError) {
