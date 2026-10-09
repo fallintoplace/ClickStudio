@@ -485,6 +485,7 @@ for (const theme of ['Dark', 'Light']) test(`Experimental matches Standard query
     await expect(page.getByRole('tab', { name: 'SQL map', exact: true })).toHaveCount(0);
     for (const width of [1440, 720, 390]) {
         await page.setViewportSize({ width, height: 900 });
+        await expect(page.getByTestId('save-query').locator('svg')).toHaveCSS('width', width <= 560 ? '15px' : '14px');
         const readActionStyles = () => header.locator('[data-testid="save-query"], [data-testid="run-button"]').evaluateAll(elements => elements.map(element => {
             const style = getComputedStyle(element);
             const bounds = element.getBoundingClientRect();
@@ -493,7 +494,7 @@ for (const theme of ['Dark', 'Light']) test(`Experimental matches Standard query
         const experimentalStyles = await readActionStyles();
         await page.getByText('Standard', { exact: true }).click();
         await expect(page.locator('.workspace-root')).toHaveClass(/is-beginner/);
-        expect(await readActionStyles()).toEqual(experimentalStyles);
+        await expect.poll(readActionStyles).toEqual(experimentalStyles);
         await useAdvancedMode(page);
         await expect(run).toBeVisible();
         await expect(run).toHaveText('Run');
