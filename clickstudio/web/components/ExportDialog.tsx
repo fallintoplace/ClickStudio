@@ -23,7 +23,7 @@ export function ExportDialog({ open, queryAvailable, rowsAvailable, onClose, onE
         aria-labelledby="export-dialog-title"
         onCancel={event => { event.preventDefault(); onClose(); }}
         onClick={event => { if (event.target === dialogRef.current) onClose(); }}
-        className="m-auto w-[min(480px,calc(100vw-2rem))] max-w-none overflow-hidden rounded-2xl border border-[var(--line-bright)] bg-[var(--panel)] p-0 text-[var(--text)] shadow-[var(--shadow)] backdrop:bg-black/70 backdrop:backdrop-blur-sm"
+        className="m-auto w-[min(480px,calc(100vw-2rem))] max-w-none overflow-hidden rounded-2xl border border-[var(--line-bright)] bg-[var(--panel)] p-0 text-[var(--text)] shadow-[var(--shadow-dialog)]"
     >
         <header className="flex items-start justify-between gap-4 border-b border-[var(--line)] px-5 py-4">
             <div>

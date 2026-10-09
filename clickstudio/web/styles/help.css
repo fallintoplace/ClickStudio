@@ -6,8 +6,8 @@
         display: grid;
         place-items: center;
         padding: 24px;
-        background: color-mix(in srgb, var(--page) 74%, transparent);
-        backdrop-filter: blur(5px);
+        background: var(--overlay-backdrop);
+        backdrop-filter: var(--overlay-backdrop-filter);
         animation: helpBackdrop .16s ease-out both;
     }
 
@@ -22,7 +22,7 @@
         --help-border-strong: var(--line-bright);
         --help-selected-surface: var(--active-surface);
         --help-selected-border: var(--active-border);
-        --help-focus-glow: var(--focus-glow);
+        --help-focus-ring: var(--focus-ring);
         --help-experimental: color-mix(in srgb, var(--accent) 54%, #c79aff);
         --help-experimental-surface: color-mix(in srgb, var(--help-experimental) 8%, var(--panel-raised));
         --help-experimental-border: color-mix(in srgb, var(--help-experimental) 34%, var(--help-border));
@@ -51,7 +51,7 @@
         color: var(--text);
         font-size: var(--help-text-body);
         line-height: 1.45;
-        box-shadow: 0 22px 70px #00000055, 0 4px 16px #00000028;
+        box-shadow: var(--shadow-dialog);
         animation: helpReveal .14s ease-out both;
     }
 
@@ -205,7 +205,8 @@
         flex: none;
         border-radius: 50%;
         background: var(--help-experimental);
-        box-shadow: 0 0 10px color-mix(in srgb, var(--help-experimental) 70%, transparent);
+        box-shadow: var(--status-ring);
+        color: var(--help-experimental);
     }
 
     .workspace-help-tab:hover { background: color-mix(in srgb, var(--text) 3%, var(--panel)); color: var(--text-soft); }
@@ -385,8 +386,8 @@
     .workspace-help-monitoring-sample-replicas strong { color: var(--green); font-size: 9px; text-transform: uppercase; }
     .workspace-help-monitoring-sample-replicas strong.is-warning { color: var(--amber); }
     .workspace-help-monitoring-sample-replicas small { grid-column: 2 / -1; color: var(--muted); font-size: 9px; }
-    .workspace-help-replica-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px color-mix(in srgb, var(--green) 40%, transparent); }
-    .workspace-help-replica-dot.is-warning { background: var(--amber); box-shadow: 0 0 8px color-mix(in srgb, var(--amber) 42%, transparent); }
+    .workspace-help-replica-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: var(--status-ring); color: var(--green); }
+    .workspace-help-replica-dot.is-warning { background: var(--amber); box-shadow: var(--status-ring); color: var(--amber); }
     .workspace-help-query .sql-flow-view { min-height: 100%; }
     .workspace-help-dependencies .native-lineage-layout,
     .workspace-help-compare .native-comparison-columns { min-width: 0; }
@@ -404,9 +405,9 @@
     }
 
     .workspace-help-geo-preview::before { position: absolute; inset: 13% 6%; border: 1px solid color-mix(in srgb, var(--help-border-strong) 70%, transparent); border-radius: 50%; background: linear-gradient(90deg, transparent 32%, color-mix(in srgb, var(--help-border-strong) 34%, transparent) 32.2%, transparent 32.5%, transparent 66%, color-mix(in srgb, var(--help-border-strong) 34%, transparent) 66.2%, transparent 66.5%), linear-gradient(transparent 49.6%, color-mix(in srgb, var(--help-border-strong) 34%, transparent) 50%, transparent 50.4%); content: ""; opacity: .48; }
-    .geo-demo-marker { position: absolute; z-index: 1; left: 0; top: 0; width: var(--geo-demo-size); height: var(--geo-demo-size); border: 2px solid color-mix(in srgb, var(--panel-raised) 84%, hsl(var(--geo-hue) 90% 70%)); border-radius: 50%; background: hsl(var(--geo-hue) 92% 58%); box-shadow: 0 0 0 4px hsl(var(--geo-hue) 90% 58% / 18%), 0 0 15px hsl(var(--geo-hue) 92% 58% / 72%); transform: translate(-50%, -50%); }
+    .geo-demo-marker { position: absolute; z-index: 1; left: 0; top: 0; width: var(--geo-demo-size); height: var(--geo-demo-size); border: 2px solid color-mix(in srgb, var(--panel-raised) 84%, hsl(var(--geo-hue) 90% 70%)); border-radius: 50%; background: hsl(var(--geo-hue) 92% 58%); box-shadow: var(--status-ring); transform: translate(-50%, -50%); color: hsl(var(--geo-hue) 90% 58%); }
     .geo-demo-marker.has-label { z-index: 2; }
-    .geo-demo-marker-label { position: absolute; top: 50%; left: 12px; display: grid; min-width: 72px; gap: 2px; padding: 5px 7px; border: 1px solid color-mix(in srgb, hsl(var(--geo-hue) 92% 60%) 52%, var(--help-border)); border-radius: 8px; background: color-mix(in srgb, var(--panel-raised) 94%, transparent); color: var(--text); font-size: var(--help-text-meta); line-height: 1.2; box-shadow: 0 5px 18px #00000026; transform: translateY(-50%); white-space: nowrap; }
+    .geo-demo-marker-label { position: absolute; top: 50%; left: 12px; display: grid; min-width: 72px; gap: 2px; padding: 5px 7px; border: 1px solid color-mix(in srgb, hsl(var(--geo-hue) 92% 60%) 52%, var(--help-border)); border-radius: 8px; background: color-mix(in srgb, var(--panel-raised) 94%, transparent); color: var(--text); font-size: var(--help-text-meta); line-height: 1.2; box-shadow: var(--shadow-popover); transform: translateY(-50%); white-space: nowrap; }
     .geo-demo-marker-label strong { color: hsl(var(--geo-hue) 92% 68%); font-family: var(--font-mono); font-size: var(--help-text-meta); }
     .geo-demo-marker-label-left .geo-demo-marker-label { right: 12px; left: auto; }
     .workspace-help-geo-copy { display: flex; min-width: 0; flex-direction: column; gap: 10px; }
@@ -449,7 +450,7 @@
     .sql-examples-schema-notice.is-error { border-color: color-mix(in srgb, var(--red) 38%, var(--help-border)); color: var(--text-soft); }
     .sql-examples-schema-notice .button-base { flex: none; }
     .sql-example-search { display: flex; min-width: 200px; min-height: var(--help-control-height); flex: 0 1 260px; align-items: center; gap: 8px; padding: 0 10px; border: 1px solid var(--help-border); border-radius: var(--help-radius-control); background: var(--panel); color: var(--muted); transition: border-color .14s ease, box-shadow .14s ease; }
-    .sql-example-search:focus-within { border-color: var(--help-selected-border); box-shadow: var(--help-focus-glow); }
+    .sql-example-search:focus-within { border-color: var(--help-selected-border); box-shadow: var(--help-focus-ring); }
     .sql-example-search svg { width: 15px; height: 15px; flex: none; }
     .sql-example-search input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text); font: inherit; font-size: var(--help-text-body); }
     .sql-example-search input::placeholder { color: var(--muted); }
@@ -485,7 +486,7 @@
     .help-parts-table-picker { display: grid; min-width: 200px; max-width: 420px; flex: 0 1 420px; gap: 5px; }
     .help-parts-table-picker .eyebrow { color: var(--muted); font-size: var(--help-text-meta); }
     .help-parts-table-picker select { width: 100%; min-width: 0; min-height: var(--help-control-height); padding: 0 10px; border: 1px solid var(--help-border-strong); border-radius: var(--help-radius-control); outline: none; background: var(--panel); color: var(--text); font: inherit; font-size: var(--help-text-small); }
-    .help-parts-table-picker select:focus-visible { border-color: var(--accent); box-shadow: var(--help-focus-glow); }
+    .help-parts-table-picker select:focus-visible { border-color: var(--accent); box-shadow: var(--help-focus-ring); }
     .help-parts-table-picker select:disabled { color: var(--muted); opacity: .72; }
     .help-parts-access-note,
     .help-parts-empty { margin: 0; color: var(--muted); font-size: var(--help-text-small); line-height: 1.45; }

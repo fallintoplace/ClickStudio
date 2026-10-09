@@ -45,7 +45,7 @@
     .sql-flow-mode-tabs { display: inline-flex; width: max-content; max-width: 100%; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-raised); }
     .sql-flow-mode-tabs button { min-height: 30px; padding: 0 11px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font: inherit; font-size: 9px; font-weight: 700; cursor: pointer; transition: background .16s ease, color .16s ease, box-shadow .16s ease; }
     .sql-flow-mode-tabs button:hover:not(:disabled) { color: var(--text); }
-    .sql-flow-mode-tabs button.is-active { background: color-mix(in srgb, var(--accent) 11%, var(--panel)); color: var(--text); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 28%, var(--line)); }
+    .sql-flow-mode-tabs button.is-active { background: color-mix(in srgb, var(--accent) 11%, var(--panel)); color: var(--text); box-shadow: var(--active-inset); }
     .sql-flow-mode-tabs button:disabled { cursor: not-allowed; opacity: .46; }
     .sql-flow-mode-tabs button:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 65%, transparent); outline-offset: 1px; }
     .pipeline-graph-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -64,7 +64,7 @@
     .pipeline-graph-controls .pipeline-control-action svg { width: 14px; height: 14px; flex: none; }
     .pipeline-graph-controls .pipeline-zoom-fit { padding-inline: 10px; }
     .pipeline-graph-controls output { display: inline-grid; min-width: 46px; min-height: 27px; place-items: center; padding-inline: 5px; border: 1px solid var(--line); border-radius: 7px; background: color-mix(in srgb, var(--panel-raised) 72%, var(--panel)); color: var(--text-soft); font-family: var(--font-mono); font-size: 9px; text-align: center; }
-    .pipeline-graph-scroll { position: relative; isolation: isolate; max-width: 100%; min-height: 150px; max-height: clamp(150px, 56dvh, 540px); overflow: auto; border: 1px solid color-mix(in srgb, var(--accent) 17%, var(--line)); border-radius: 10px; background: radial-gradient(ellipse at 50% 0, color-mix(in srgb, var(--accent) 10%, transparent), transparent 66%), radial-gradient(ellipse at 95% 100%, color-mix(in srgb, var(--violet) 5%, transparent), transparent 44%), linear-gradient(145deg, color-mix(in srgb, var(--panel-raised) 48%, var(--panel)), var(--panel) 62%); box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 4%, transparent), 0 14px 34px #00000024; scrollbar-gutter: stable; }
+    .pipeline-graph-scroll { position: relative; isolation: isolate; max-width: 100%; min-height: 150px; max-height: clamp(150px, 56dvh, 540px); overflow: auto; border: 1px solid color-mix(in srgb, var(--accent) 17%, var(--line)); border-radius: 10px; background: radial-gradient(ellipse at 50% 0, color-mix(in srgb, var(--accent) 10%, transparent), transparent 66%), radial-gradient(ellipse at 95% 100%, color-mix(in srgb, var(--violet) 5%, transparent), transparent 44%), linear-gradient(145deg, color-mix(in srgb, var(--panel-raised) 48%, var(--panel)), var(--panel) 62%); box-shadow: none; scrollbar-gutter: stable; }
     .pipeline-graph-scroll::before { position: absolute; z-index: 0; inset: 0; background-image: linear-gradient(90deg, color-mix(in srgb, var(--line-bright) 24%, transparent) 1px, transparent 1px), linear-gradient(color-mix(in srgb, var(--line-bright) 24%, transparent) 1px, transparent 1px); background-size: 32px 32px; content: ''; opacity: .42; mask-image: radial-gradient(ellipse at 50% 45%, #000 18%, transparent 100%); pointer-events: none; }
     .pipeline-graph-svg { position: relative; z-index: 1; display: block; max-width: none; }
     .pipeline-graph-atmosphere { pointer-events: none; }
@@ -74,24 +74,24 @@
     .pipeline-graph-edge { transition: opacity .2s ease; }
     .pipeline-graph-edge.is-muted { opacity: .2; }
     .pipeline-edge-glow, .pipeline-edge-line, .pipeline-edge-pulse { fill: none; stroke-linecap: round; stroke-linejoin: round; }
-    .pipeline-edge-glow { stroke: var(--accent); stroke-width: 9px; opacity: .24; filter: blur(5px); }
+    .pipeline-edge-glow { stroke: var(--accent); stroke-width: 9px; opacity: 0; filter: none; }
     .pipeline-edge-line { stroke: var(--line-bright); stroke-width: 1.5px; transition: stroke .2s ease, stroke-width .2s ease; }
     .pipeline-graph-edge.is-active .pipeline-edge-line { stroke: var(--accent); stroke-width: 2px; }
-    .pipeline-edge-pulse { stroke: var(--accent-strong); stroke-width: 2px; stroke-dasharray: 3 20; stroke-dashoffset: 28; opacity: 0; filter: drop-shadow(0 0 5px color-mix(in srgb, var(--accent) 75%, transparent)); animation: pipeline-signal-pass 1.15s ease-out 1 both; }
+    .pipeline-edge-pulse { stroke: var(--accent-strong); stroke-width: 2px; stroke-dasharray: 3 20; stroke-dashoffset: 28; opacity: 0; filter: none; animation: pipeline-signal-pass 1.15s ease-out 1 both; }
     @keyframes pipeline-signal-pass { 0% { stroke-dashoffset: 36; opacity: 0; } 24% { opacity: .95; } 100% { stroke-dashoffset: 0; opacity: 0; } }
     .pipeline-graph-edges text { fill: var(--muted); font-family: var(--font-mono); font-size: 9px; paint-order: stroke; stroke: var(--panel); stroke-width: 4px; stroke-linejoin: round; }
     .pipeline-graph-node { cursor: pointer; outline: none; }
     .pipeline-graph-node.is-muted { opacity: .34; filter: saturate(.55); }
     .pipeline-graph-node.is-related:not(.is-selected) .pipeline-node-face { fill: color-mix(in srgb, var(--accent) 5%, var(--panel-raised)); stroke: color-mix(in srgb, var(--accent) 44%, var(--line-bright)); }
-    .pipeline-node-shadow { fill: #03080c8c; stroke: color-mix(in srgb, var(--line) 65%, transparent); stroke-width: 1px; }
+    .pipeline-node-shadow { fill: var(--graph-node-shadow-color); stroke: color-mix(in srgb, var(--line) 65%, transparent); stroke-width: 1px; }
     .pipeline-node-side { fill: color-mix(in srgb, var(--accent) 14%, var(--page)); stroke: color-mix(in srgb, var(--accent) 22%, var(--line)); stroke-width: 1px; }
     .pipeline-node-side-right { fill: color-mix(in srgb, var(--accent) 20%, var(--page)); stroke: color-mix(in srgb, var(--accent) 25%, var(--line)); stroke-width: 1px; }
     .pipeline-node-face { fill: color-mix(in srgb, var(--panel-raised) 94%, var(--accent) 6%); stroke: var(--line-bright); stroke-width: 1.25px; transition: fill .18s ease, stroke .18s ease, filter .18s ease; }
     .pipeline-graph-node:hover .pipeline-node-face, .pipeline-graph-node:focus-visible .pipeline-node-face { stroke: var(--accent); stroke-width: 2px; }
-    .pipeline-graph-node.is-selected { filter: drop-shadow(0 7px 12px color-mix(in srgb, var(--accent) 23%, transparent)); }
+    .pipeline-graph-node.is-selected { filter: none; }
     .pipeline-graph-node.is-selected .pipeline-node-face { fill: color-mix(in srgb, var(--accent) 13%, var(--panel-raised)); stroke: var(--accent); stroke-width: 2px; }
     .pipeline-node-cap { fill: none; stroke: color-mix(in srgb, var(--text) 28%, transparent); stroke-width: 1px; }
-    .pipeline-node-accent-rail { fill: none; stroke: var(--accent); stroke-width: 2px; stroke-linecap: round; filter: drop-shadow(0 0 4px color-mix(in srgb, var(--accent) 66%, transparent)); }
+    .pipeline-node-accent-rail { fill: none; stroke: var(--accent); stroke-width: 2px; stroke-linecap: round; filter: none; }
     .pipeline-node-kind { fill: var(--muted); font-family: var(--font-sans); font-size: 8px; font-weight: 730; letter-spacing: .12em; }
     .pipeline-node-label { fill: var(--text); font-family: var(--font-mono); font-size: 11px; font-weight: 610; }
     .pipeline-node-parallel { fill: var(--accent); font-family: var(--font-mono); font-size: 9px; font-weight: 700; }
@@ -113,11 +113,11 @@
     .pipeline-graph-empty { padding: 13px; border: 1px dashed var(--line-bright); border-radius: 8px; color: var(--muted); font-size: 9px; text-align: center; }
     .ast-graph-card { min-width: 0; }
     .ast-graph-svg { display: block; min-width: 100%; }
-    .ast-graph-edges path { fill: none; stroke: color-mix(in srgb, var(--accent) 36%, var(--line-bright)); stroke-width: 1.5; filter: drop-shadow(0 0 3px color-mix(in srgb, var(--accent) 15%, transparent)); }
+    .ast-graph-edges path { fill: none; stroke: color-mix(in srgb, var(--accent) 36%, var(--line-bright)); stroke-width: 1.5; filter: none; }
     .ast-graph-node { cursor: pointer; outline: none; }
-    .ast-graph-node rect { fill: color-mix(in srgb, var(--panel-raised) 94%, transparent); stroke: var(--line-bright); stroke-width: 1; filter: drop-shadow(5px 7px 0 color-mix(in srgb, var(--page) 72%, transparent)); transition: fill .15s ease, stroke .15s ease, stroke-width .15s ease, filter .15s ease; }
+    .ast-graph-node rect { fill: color-mix(in srgb, var(--panel-raised) 94%, transparent); stroke: var(--line-bright); stroke-width: 1; filter: drop-shadow(var(--shadow-svg)); transition: fill .15s ease, stroke .15s ease, stroke-width .15s ease, filter .15s ease; }
     .ast-graph-node:hover rect { fill: color-mix(in srgb, var(--accent) 5%, var(--panel-raised)); stroke: color-mix(in srgb, var(--accent) 28%, var(--line-bright)); }
-    .ast-graph-node:focus-visible rect, .ast-graph-node.is-selected rect { fill: color-mix(in srgb, var(--accent) 9%, var(--panel-raised)); stroke: var(--accent); stroke-width: 1.6; filter: drop-shadow(5px 7px 0 color-mix(in srgb, var(--accent) 18%, var(--page))) drop-shadow(0 0 8px color-mix(in srgb, var(--accent) 18%, transparent)); }
+    .ast-graph-node:focus-visible rect, .ast-graph-node.is-selected rect { fill: color-mix(in srgb, var(--accent) 9%, var(--panel-raised)); stroke: var(--accent); stroke-width: 1.6; filter: drop-shadow(var(--shadow-svg)); }
     .ast-node-query rect { stroke: color-mix(in srgb, var(--accent) 34%, var(--line-bright)); }
     .ast-node-function rect { stroke: color-mix(in srgb, var(--green) 34%, var(--line-bright)); }
     .ast-node-identifier rect { stroke: color-mix(in srgb, var(--violet) 34%, var(--line-bright)); }
@@ -188,7 +188,7 @@
     .explain-index-metric > strong { color: var(--text); font-family: var(--font-mono); font-size: 10px; }
     .explain-index-metric > strong small { color: var(--muted); font-size: 8px; font-weight: 500; }
     .explain-index-meter { height: 4px; overflow: hidden; border-radius: 99px; background: color-mix(in srgb, var(--line-bright) 74%, transparent); }
-    .explain-index-meter > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 65%, var(--green))); box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 38%, transparent); }
+    .explain-index-meter > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 65%, var(--green))); box-shadow: none; }
     .explain-index-properties { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 5px; max-height: 150px; overflow: auto; margin: 0; }
     .explain-index-properties > div { display: grid; min-width: 0; gap: 4px; padding: 6px 7px; border: 1px solid var(--line); border-radius: 6px; background: color-mix(in srgb, var(--panel) 85%, transparent); }
     .explain-index-properties dt { color: var(--muted); font-family: var(--font-mono); font-size: 7px; font-weight: 700; }
@@ -215,7 +215,7 @@
     .market-pane-label { fill: var(--text-soft); font-family: var(--font-sans); font-size: 11px; font-weight: 650; letter-spacing: .02em; }
     .market-pane-empty { fill: var(--muted); font-family: var(--font-sans); font-size: 10px; }
     .market-candle { transition: opacity .12s ease; }
-    .market-candle:hover { filter: drop-shadow(0 0 4px color-mix(in srgb, var(--accent) 56%, transparent)); }
+    .market-candle:hover { opacity: .8; }
     .market-candle-body { stroke-width: .6; }
     .market-axis path, .market-axis line { shape-rendering: crispEdges; }
     .market-brush .overlay { cursor: crosshair; }
@@ -246,7 +246,7 @@
     .chart-y-tick-label, .chart-x-labels text { fill: var(--muted); font-family: var(--font-mono); font-size: 8px; }
     .chart-gridline { stroke: var(--line-bright); stroke-dasharray: 3 5; stroke-width: 1; opacity: .55; }
     .chart-zero-line { stroke: color-mix(in srgb, var(--text-soft) 62%, var(--line)); stroke-width: 1.5; }
-    .chart-line { fill: none; stroke: var(--series-color, var(--accent)); stroke-linecap: round; stroke-linejoin: round; stroke-width: 3; filter: drop-shadow(0 0 5px color-mix(in srgb, var(--series-color, var(--accent)) 40%, transparent)); stroke-dasharray: 1400; animation: drawLine 1.1s ease both; }
+    .chart-line { fill: none; stroke: var(--series-color, var(--accent)); stroke-linecap: round; stroke-linejoin: round; stroke-width: 3; filter: none; stroke-dasharray: 1400; animation: drawLine 1.1s ease both; }
     .chart-area-fill { fill: var(--series-color, var(--accent)); opacity: .11; }
     .chart-point { fill: var(--panel); stroke: var(--series-color, var(--accent)); stroke-width: 2; }
     .chart-bar { fill: var(--series-color, var(--accent)); stroke: color-mix(in srgb, var(--series-color, var(--accent)) 65%, white); stroke-width: 1; opacity: .88; transform-box: fill-box; transform-origin: bottom; animation: barRise .48s cubic-bezier(.18,.75,.25,1) both; }
@@ -256,7 +256,7 @@
     .chart-legend { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 9px; }
     .chart-legend > span { display: inline-flex; align-items: center; gap: 5px; }
     .chart-footer i { padding: 0 4px; font-style: normal; }
-    .chart-legend-dot { width: 7px; height: 7px; border-radius: 2px; background: var(--accent); box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 50%, transparent); }
+    .chart-legend-dot { width: 7px; height: 7px; border-radius: 2px; background: var(--accent); box-shadow: var(--status-ring); color: var(--accent); }
     .chart-empty { display: grid; min-height: 150px; place-items: center; color: var(--muted); font-size: 10px; }
     .chart-table-fallback { display: flex; min-width: 0; min-height: 0; flex: 1; flex-direction: column; }
     .chart-table-notice { flex: none; padding: 8px 14px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 9px; }
@@ -299,9 +299,9 @@
     .geo-feature.is-area { fill: color-mix(in srgb, hsl(var(--geo-hue) 88% 58%) var(--geo-intensity), var(--panel-raised)); stroke: color-mix(in srgb, hsl(var(--geo-hue) 88% 64%) 75%, var(--text)); stroke-width: 1; }
     .geo-feature.is-line { fill: none; stroke: color-mix(in srgb, hsl(var(--geo-hue) 88% 58%) var(--geo-intensity), var(--text-soft)); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
     .geo-point { fill: color-mix(in srgb, hsl(var(--geo-hue) 88% 58%) var(--geo-intensity), var(--panel-raised)); stroke: hsl(var(--geo-hue) 88% 70%); stroke-width: 1.5; }
-    .geo-feature:hover, .geo-feature.is-selected { opacity: 1; filter: drop-shadow(0 0 7px hsl(var(--geo-hue) 88% 60% / 65%)); }
+    .geo-feature:hover, .geo-feature.is-selected { opacity: 1; filter: none; }
     .geo-feature.is-selected { stroke: var(--text); stroke-width: 2.2; }
-    .geo-point-label { pointer-events: none; filter: drop-shadow(0 3px 8px #00000038); }
+    .geo-point-label { pointer-events: none; filter: drop-shadow(var(--shadow-svg)); }
     .geo-point-label rect { fill: color-mix(in srgb, var(--panel) 94%, transparent); stroke: color-mix(in srgb, hsl(var(--geo-hue) 88% 60%) 52%, var(--line-bright)); stroke-width: .8; vector-effect: non-scaling-stroke; }
     .geo-point-label-name { fill: var(--text); font: 650 9px var(--font-sans); }
     .geo-point-label-measure { fill: hsl(var(--geo-hue) 92% 68%); font: 720 8px var(--font-mono); }

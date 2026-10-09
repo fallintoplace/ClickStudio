@@ -144,7 +144,7 @@
     border-color: color-mix(in srgb, var(--accent) 72%, var(--line-bright));
     outline: 1px solid color-mix(in srgb, var(--accent) 78%, transparent);
     outline-offset: 1px;
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 12%, transparent);
+    box-shadow: var(--focus-ring);
 }
 .native-run-pickers > .button-base {
     min-height: 34px;
@@ -294,8 +294,9 @@
         height: 6px;
         border-radius: 50%;
         background: var(--comparison-run-accent);
-        box-shadow: 0 0 8px color-mix(in srgb, var(--comparison-run-accent) 62%, transparent);
+        box-shadow: var(--status-ring);
         content: "";
+        color: var(--comparison-run-accent);
     }
     .workspace-help-compare .native-run-picker:first-child { --comparison-run-accent: var(--accent-cyan); }
     .workspace-help-compare .native-run-picker:nth-child(2) { --comparison-run-accent: var(--violet); }
@@ -470,8 +471,9 @@
     flex: none;
     border-radius: 50%;
     background: var(--accent);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
+    box-shadow: var(--status-ring);
     content: "";
+    color: var(--accent);
 }
 .workspace-help-dependencies .native-lineage-meta-toolbar .button-base {
     min-height: 30px;
@@ -516,7 +518,7 @@
 .workspace-help-dependencies .native-lineage-controls .native-search input:focus-visible {
     border-color: var(--help-selected-border);
     outline: none;
-    box-shadow: var(--help-focus-glow);
+    box-shadow: var(--help-focus-ring);
 }
 .workspace-help-dependencies .native-lineage-controls > span {
     flex: none;
@@ -774,7 +776,7 @@
 .workspace-help-storage .help-parts-table-picker select:focus-visible {
     border-color: var(--help-selected-border);
     outline: none;
-    box-shadow: var(--help-focus-glow);
+    box-shadow: var(--help-focus-ring);
 }
 .workspace-help-storage .native-storage { gap: 8px; }
 .workspace-help-storage .native-tabs {
@@ -805,7 +807,7 @@
     border-color: var(--help-selected-border);
     background: var(--help-selected-surface);
     color: var(--accent);
-    box-shadow: inset 0 1px #ffffff0a;
+    box-shadow: var(--active-inset);
 }
 .workspace-help-storage .parts-explorer-embedded {
     align-items: flex-start;

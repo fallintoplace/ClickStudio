@@ -295,7 +295,7 @@ export function InsertRowDialog({ connectionId, table, columns, onClose, onInser
     }
 
     const canClose = !busy && job?.status !== 'running';
-    return <dialog ref={dialog} aria-labelledby="insert-row-title" onCancel={event => { event.preventDefault(); if (canClose) close(); }} onClick={event => { if (event.target === dialog.current && canClose) close(); }} className="m-auto max-h-[min(90vh,800px)] w-[min(760px,calc(100vw-2rem))] max-w-none overflow-hidden rounded-2xl border border-[var(--line-bright)] bg-[var(--panel)] p-0 text-[var(--text)] shadow-[var(--shadow)] backdrop:bg-black/70 backdrop:backdrop-blur-sm">
+    return <dialog ref={dialog} aria-labelledby="insert-row-title" onCancel={event => { event.preventDefault(); if (canClose) close(); }} onClick={event => { if (event.target === dialog.current && canClose) close(); }} className="m-auto max-h-[min(90vh,800px)] w-[min(760px,calc(100vw-2rem))] max-w-none overflow-hidden rounded-2xl border border-[var(--line-bright)] bg-[var(--panel)] p-0 text-[var(--text)] shadow-[var(--shadow-dialog)]">
         <div className="flex max-h-[min(90vh,800px)] flex-col">
             <header className="flex items-start justify-between gap-5 border-b border-[var(--line)] px-5 py-4 sm:px-7">
                 <div><span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--muted)]">ClickHouse</span><h2 id="insert-row-title" className="mt-1 text-lg font-semibold tracking-tight">Insert row</h2><p className="mt-1 text-xs text-[var(--text-soft)]">Add one row to <code>{name}</code>.</p></div>

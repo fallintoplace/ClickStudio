@@ -135,7 +135,7 @@ export function RowCountChart({ result, chart, suggestion, onChart, copy, locale
                         : <ScrollEdgeFrame<HTMLDivElement> className="chart-category-scroll-frame">{ref => <div ref={ref} className="chart-category-scroll" tabIndex={0}>{renderChartSvg(true)}</div>}</ScrollEdgeFrame>}
                 </div>}
         <div className="chart-footer">
-            <span className="chart-legend">{(timeAxis ? series : [{ key: 'rows', label: copy.rowsLabel }]).map((item, index) => <span key={item.key}><span className="chart-legend-dot" style={{ backgroundColor: seriesColor(index) }}/>{item.label}</span>)}</span>
+            <span className="chart-legend">{(timeAxis ? series : [{ key: 'rows', label: copy.rowsLabel }]).map((item, index) => <span key={item.key}><span className="chart-legend-dot" style={{ backgroundColor: seriesColor(index), color: seriesColor(index) }}/>{item.label}</span>)}</span>
             <span>{timeAxis
                 ? `${chartText(copy.timeSummary, { buckets: formatCount(timeTicks.length, locale), unit: timeUnit, rows: formatCount(result.rows.length, locale) })}${countData?.excludedRows ? ` · ${chartText(copy.invalidDatesSkipped, { count: formatCount(countData.excludedRows, locale) })}` : ''}`
                 : chartText(copy.categorySummary, { categories: formatCount(bars.length, locale), rows: formatCount(result.rows.length, locale) })}

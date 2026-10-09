@@ -40,12 +40,23 @@
     --signal-accent: var(--accent);
     --scrollbar-thumb: color-mix(in srgb, var(--accent) 35%, var(--muted));
     --scrollbar-thumb-hover: color-mix(in srgb, var(--accent) 55%, var(--muted));
-    --scroll-edge-shadow-color: #00000080;
+    --scroll-edge-shadow-color: #00000033;
+    --scroll-edge-size: 12px;
     --amber: #ffad52;
     --red: #ff6b75;
     --violet: #c598ff;
     --editor-selection: color-mix(in srgb, var(--accent) 8%, transparent);
-    --shadow: 0 24px 76px #0000009c;
+    --shadow-popover: 0 4px 12px #00000038, 0 12px 28px #0000002e;
+    --shadow-dialog: 0 8px 24px #00000042, 0 24px 56px #0000003d;
+    --shadow-inset: inset 0 1px color-mix(in srgb, var(--text) 4%, transparent);
+    --shadow-svg: 0 2px 5px #0000003d;
+    --graph-node-shadow-color: #00000033;
+    --status-ring-opacity: 18%;
+    --status-ring-width: 2px;
+    --status-ring: 0 0 0 var(--status-ring-width) color-mix(in srgb, currentColor var(--status-ring-opacity), transparent);
+    --status-ring-accent: 0 0 0 var(--status-ring-width) color-mix(in srgb, var(--accent) var(--status-ring-opacity), transparent);
+    --overlay-backdrop: #03080cad;
+    --overlay-backdrop-filter: blur(4px);
     --radius: 14px;
     --radius-control: 9px;
     --radius-compact: 7px;
@@ -57,7 +68,8 @@
     --active-border: color-mix(in srgb, var(--accent) 42%, var(--line-bright));
     --active-inset: inset 0 0 0 1px color-mix(in srgb, var(--accent) 17%, var(--line));
     --focus-color: color-mix(in srgb, var(--accent) 84%, var(--text));
-    --focus-glow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
+    --focus-ring: 0 0 0 2px color-mix(in srgb, var(--focus-color) 28%, transparent);
+    --focus-ring-invalid: 0 0 0 2px color-mix(in srgb, var(--red) 28%, transparent);
     --z-underlay: -1;
     --z-local-control: 1;
     --z-local-raised: 2;
@@ -101,7 +113,7 @@
     --text: #17262c;
     --text-soft: #3a4f57;
     --muted: #5a7079;
-    --scroll-edge-shadow-color: #17303a59;
+    --scroll-edge-shadow-color: #17303a17;
     --accent-cyan: #08758d;
     --accent-cyan-strong: #0a849d;
     --accent-cyan-action: #08758d;
@@ -120,7 +132,13 @@
     --red: #b83f50;
     --violet: #7543a0;
     --editor-selection: color-mix(in srgb, var(--accent) 6%, transparent);
-    --shadow: 0 22px 64px #17303a1f;
+    --shadow-popover: 0 2px 6px #17303a14, 0 8px 20px #17303a1a;
+    --shadow-dialog: 0 4px 12px #17303a14, 0 18px 44px #17303a29;
+    --shadow-inset: inset 0 1px color-mix(in srgb, var(--text) 3%, transparent);
+    --shadow-svg: 0 2px 5px #17303a1f;
+    --graph-node-shadow-color: #17303a14;
+    --status-ring-opacity: 12%;
+    --overlay-backdrop: #17303a47;
 }
 
 :root[data-accent="cyan"] {
@@ -153,9 +171,9 @@
 .topbar .navbar-mode-option.is-active > label { border-color: var(--active-border); background: var(--active-surface); color: var(--text); box-shadow: var(--active-inset); }
 .topbar .navbar-mode-option > button:focus-visible + label { outline: 2px solid var(--focus-color); outline-offset: 2px; }
 .topbar .navbar-mode-option > label::before { width: 7px; height: 7px; flex: none; content: ""; }
-.topbar .navbar-mode-option.is-beginner > label::before { border-radius: 50%; background: var(--accent); box-shadow: 0 0 9px color-mix(in srgb, var(--accent) 48%, transparent); }
+.topbar .navbar-mode-option.is-beginner > label::before { border-radius: 50%; background: var(--accent); box-shadow: var(--status-ring); color: var(--accent); }
 .topbar .navbar-mode-option.is-expert > label::before { border-radius: 1px; background: var(--accent); transform: rotate(45deg); }
-.topbar .parser-mode-option.is-wasm > label::before { border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 55%, transparent); }
+.topbar .parser-mode-option.is-wasm > label::before { border-radius: 50%; background: var(--accent); box-shadow: var(--status-ring); color: var(--accent); }
 .topbar .parser-mode-option.is-basic > label::before { border-radius: 50%; background: var(--muted); }
 .topbar .theme-switch { gap: 0; padding: 3px; border-radius: 9px; }
 .topbar .theme-mode-control { display: flex; align-items: center; gap: 2px; }
@@ -171,8 +189,8 @@
 .topbar .accent-mode-option.is-active { border-color: var(--active-border); background: var(--active-surface); box-shadow: var(--active-inset); }
 .topbar .accent-mode-option:focus-visible { outline: 2px solid var(--focus-color); outline-offset: 2px; }
 .topbar .accent-mode-swatch { width: 14px; height: 14px; border: 1px solid color-mix(in srgb, var(--text) 22%, transparent); border-radius: 50%; }
-.topbar .accent-mode-swatch.is-cyan { background: var(--accent-swatch-cyan); box-shadow: 0 0 8px color-mix(in srgb, var(--accent-swatch-cyan) 24%, transparent); }
-.topbar .accent-mode-swatch.is-clickhouse-yellow { background: var(--accent-swatch-clickhouse-yellow); box-shadow: 0 0 8px color-mix(in srgb, var(--accent-swatch-clickhouse-yellow) 24%, transparent); }
+.topbar .accent-mode-swatch.is-cyan { background: var(--accent-swatch-cyan); box-shadow: var(--status-ring); color: var(--accent-swatch-cyan); }
+.topbar .accent-mode-swatch.is-clickhouse-yellow { background: var(--accent-swatch-clickhouse-yellow); box-shadow: var(--status-ring); color: var(--accent-swatch-clickhouse-yellow); }
 
 @media (max-width: 2100px) {
     .topbar { gap: 12px; padding-inline: 14px; }
@@ -186,10 +204,16 @@
     button, input, select, textarea { font: inherit; }
     code, kbd, samp, pre { font-family: var(--font-mono); font-variant-ligatures: none; font-variant-numeric: tabular-nums; }
     button { color: inherit; }
-    button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--focus-color); outline-offset: 2px; }
+    button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline-offset: 2px; }
     ::selection { background: color-mix(in srgb, var(--accent) 40%, transparent); }
     ::-webkit-scrollbar { width: 9px; height: 9px; }
     ::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 9px; background: var(--scrollbar-thumb); background-clip: padding-box; }
     ::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); background-clip: padding-box; }
     ::-webkit-scrollbar-track { background: transparent; }
 }
+
+dialog::backdrop { background: var(--overlay-backdrop); backdrop-filter: var(--overlay-backdrop-filter); }
+
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--focus-color); }
+
+:is(input, select, textarea)[aria-invalid="true"]:focus-visible { outline-color: var(--red); }

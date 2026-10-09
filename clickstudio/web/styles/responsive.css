@@ -5,13 +5,12 @@
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes orbit { to { transform: rotate(360deg); } }
 @keyframes sparkle { 0%, 100% { opacity: .4; transform: scale(.7); } 50% { opacity: 1; transform: scale(1.5); } }
-@keyframes statusPulse { 0%, 100% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent), 0 0 7px color-mix(in srgb, var(--accent) 35%, transparent); } 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 6%, transparent), 0 0 13px color-mix(in srgb, var(--accent) 70%, transparent); } }
+@keyframes statusPulse { 0%, 100% { opacity: .65; } 50% { opacity: 1; } }
 @keyframes helpBeacon {
-    0%, 12%, 24%, 100% { border-color: color-mix(in srgb, var(--accent) 42%, var(--line-bright)); box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 18%, transparent); }
-    6%, 18% { border-color: var(--accent); box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 17%, transparent), 0 0 18px color-mix(in srgb, var(--accent) 36%, transparent); }
+    0%, 12%, 24%, 100% { border-color: color-mix(in srgb, var(--accent) 42%, var(--line-bright)); box-shadow: var(--active-inset); }
+    6%, 18% { border-color: var(--accent); box-shadow: var(--active-inset); }
 }
 @keyframes progressSweep { 0% { right: 100%; left: 0; opacity: 0; } 12% { opacity: 1; } 55% { right: 0; left: 15%; } 100% { right: 0; left: 100%; opacity: .2; } }
-@keyframes rowReveal { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes drawLine { from { stroke-dashoffset: 1400; } to { stroke-dashoffset: 0; } }
 @keyframes barRise { from { transform: scaleY(.02); opacity: .3; } to { transform: scaleY(1); opacity: 1; } }
 
@@ -128,7 +127,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .help-button { animation: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent), 0 0 12px color-mix(in srgb, var(--accent) 24%, transparent); }
+    .help-button { animation: none; border-color: var(--accent); box-shadow: var(--active-inset); }
 }
 
 @media (max-width: 560px) {

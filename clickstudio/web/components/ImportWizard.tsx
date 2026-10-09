@@ -181,7 +181,7 @@ export function ImportWizard({ onImportQuery, importCopy, ...controllerProps }: 
         aria-labelledby="import-wizard-title"
         onCancel={event => { event.preventDefault(); if (openingQuery) return; if (importKind === 'query') closeQueryMode(); else if (browserCloudImport || (!busy && job?.status !== 'running')) void closeWizard(); }}
         onClick={event => { if (event.target === dialogRef.current && !openingQuery) { if (importKind === 'query') closeQueryMode(); else if (browserCloudImport || (!busy && job?.status !== 'running')) void closeWizard(); } }}
-        className="import-wizard-dialog m-auto max-h-[min(90vh,800px)] w-[min(860px,calc(100vw-2rem))] max-w-none overflow-hidden rounded-2xl border border-[var(--line-bright)] bg-[var(--panel)] p-0 text-[var(--text)] shadow-[var(--shadow)] backdrop:bg-black/70 backdrop:backdrop-blur-sm"
+        className="import-wizard-dialog m-auto max-h-[min(90vh,800px)] w-[min(860px,calc(100vw-2rem))] max-w-none overflow-hidden rounded-2xl border border-[var(--line-bright)] bg-[var(--panel)] p-0 text-[var(--text)] shadow-[var(--shadow-dialog)]"
     >
         <div className="import-wizard-shell flex max-h-[min(90vh,800px)] flex-col">
             <header className="import-wizard-header flex items-start justify-between gap-5 border-b border-[var(--line)] px-5 py-4 sm:px-7">

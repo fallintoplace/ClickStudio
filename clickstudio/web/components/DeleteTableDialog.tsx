@@ -48,7 +48,7 @@ export function DeleteTableDialog({ connectionId, table, onClose, onDeleted }: P
         }
     }
 
-    return <dialog ref={dialog} aria-labelledby="delete-table-title" aria-describedby="delete-table-description" onCancel={event => { event.preventDefault(); if (!busy) onClose(); }} onClick={event => { if (event.target === dialog.current && !busy) onClose(); }} className="m-auto w-[min(440px,calc(100vw-2rem))] max-w-none overflow-hidden rounded-2xl border border-[var(--line-bright)] bg-[var(--panel)] p-0 text-[var(--text)] shadow-[var(--shadow)] backdrop:bg-black/70 backdrop:backdrop-blur-sm">
+    return <dialog ref={dialog} aria-labelledby="delete-table-title" aria-describedby="delete-table-description" onCancel={event => { event.preventDefault(); if (!busy) onClose(); }} onClick={event => { if (event.target === dialog.current && !busy) onClose(); }} className="m-auto w-[min(440px,calc(100vw-2rem))] max-w-none overflow-hidden rounded-2xl border border-[var(--line-bright)] bg-[var(--panel)] p-0 text-[var(--text)] shadow-[var(--shadow-dialog)]">
         <header className="flex items-start justify-between gap-5 border-b border-[var(--line)] px-5 py-4">
             <div><span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--muted)]">ClickHouse</span><h2 id="delete-table-title" className="mt-1 text-lg font-semibold tracking-tight">Delete table</h2></div>
             <button type="button" aria-label="Close delete table" disabled={busy} onClick={onClose} className="rounded-lg border border-[var(--line)] px-3 py-2 text-xs text-[var(--text-soft)] disabled:opacity-40">Close</button>

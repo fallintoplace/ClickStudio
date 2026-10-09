@@ -147,7 +147,7 @@ export function CreateTableDialog({ connection, databases, onClose, onCreated }:
         aria-labelledby="create-table-title"
         onCancel={event => { event.preventDefault(); if (!busy) onClose(); }}
         onClick={event => { if (event.target === dialog.current && !busy) onClose(); }}
-        className="create-table-dialog m-auto max-w-none overflow-hidden rounded-2xl border border-[var(--line-bright)] bg-[var(--panel)] p-0 text-[var(--text)] shadow-[var(--shadow)] backdrop:bg-black/70 backdrop:backdrop-blur-sm"
+        className="create-table-dialog m-auto max-w-none overflow-hidden rounded-2xl border border-[var(--line-bright)] bg-[var(--panel)] p-0 text-[var(--text)] shadow-[var(--shadow-dialog)]"
     >
         <form onSubmit={event => void create(event)} className="create-table-form">
             <header className="create-table-header flex items-start justify-between gap-5 border-b border-[var(--line)] px-5 py-4 sm:px-7">

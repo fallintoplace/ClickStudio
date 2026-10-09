@@ -36,7 +36,7 @@
     .workload-section-heading > div { display: grid; gap: 2px; }
     .workload-section-heading > div > strong { color: var(--text-soft); font-size: 9px; }
     .workload-chart-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--muted); font-size: 8px; }
-    .workload-chart-legend i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 7px color-mix(in srgb, var(--accent) 50%, transparent); }
+    .workload-chart-legend i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: var(--status-ring); color: var(--accent); }
     .workload-chart-legend i.is-error { margin-left: 4px; background: var(--red); box-shadow: none; }
     .workload-scatter-frame { max-width: 100%; border: 1px solid color-mix(in srgb, var(--line) 70%, transparent); border-radius: 7px; background: color-mix(in srgb, var(--page) 35%, transparent); }
     .workload-scatter-scroll { max-width: 100%; overflow-x: auto; border-radius: inherit; background: transparent; }
@@ -66,8 +66,8 @@
     .replication-table-card { display: grid; min-width: 0; align-content: start; gap: 9px; padding: 10px; border: 1px solid var(--line); border-radius: 9px; background: linear-gradient(145deg, color-mix(in srgb, var(--green) 3%, var(--panel-raised)), var(--panel-raised)); }
     .replication-table-card.has-warning { border-color: color-mix(in srgb, var(--amber) 37%, var(--line)); background: linear-gradient(145deg, color-mix(in srgb, var(--amber) 5%, var(--panel-raised)), var(--panel-raised)); }
     .replication-table-card > header { display: flex; min-width: 0; align-items: center; gap: 8px; }
-    .replication-health-dot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: var(--green); box-shadow: 0 0 9px color-mix(in srgb, var(--green) 45%, transparent); }
-    .replication-health-dot.is-warning { background: var(--amber); box-shadow: 0 0 9px color-mix(in srgb, var(--amber) 45%, transparent); }
+    .replication-health-dot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: var(--green); box-shadow: var(--status-ring); color: var(--green); }
+    .replication-health-dot.is-warning { background: var(--amber); box-shadow: var(--status-ring); color: var(--amber); }
     .replication-table-card header > div { min-width: 0; }
     .replication-table-card h4 { overflow: hidden; margin: 1px 0 0; color: var(--text); font-family: var(--font-mono); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
     .replication-health-label { margin-left: auto; color: var(--green); font-size: 8px; text-transform: uppercase; }
@@ -100,7 +100,7 @@
     .flamegraph-summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; color: var(--text-soft); font-size: 8px; }
     .flamegraph-summary > span { display: inline-flex; align-items: center; gap: 7px; font-family: var(--font-mono); }
     .flamegraph-summary small { color: var(--muted); font-size: 8px; }
-    .flamegraph-signal { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 65%, transparent); }
+    .flamegraph-signal { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: var(--status-ring); color: var(--accent); }
     .flamegraph-canvas-frame { max-width: 100%; border: 1px solid color-mix(in srgb, var(--accent) 21%, var(--line)); border-radius: 9px; background: radial-gradient(ellipse at 50% 0, color-mix(in srgb, var(--accent) 8%, transparent), transparent 60%), var(--panel); }
     .flamegraph-canvas { max-width: 100%; overflow: auto; border-radius: inherit; background: transparent; }
     .flamegraph-svg { display: block; width: 100%; min-width: 700px; height: auto; }
@@ -108,7 +108,7 @@
     .flamegraph-node.depth-2 rect { fill: color-mix(in srgb, var(--accent) 19%, var(--panel-raised)); }
     .flamegraph-node.depth-3 rect { fill: color-mix(in srgb, var(--cyan, var(--accent)) 17%, var(--panel-raised)); }
     .flamegraph-node.depth-4 rect, .flamegraph-node.depth-5 rect { fill: color-mix(in srgb, var(--violet) 13%, var(--panel-raised)); }
-    .flamegraph-node rect:hover, .flamegraph-node rect:focus-visible, .flamegraph-node.is-selected rect { stroke: var(--accent); stroke-width: 2; filter: drop-shadow(0 0 7px color-mix(in srgb, var(--accent) 32%, transparent)); outline: none; }
+    .flamegraph-node rect:hover, .flamegraph-node rect:focus-visible, .flamegraph-node.is-selected rect { stroke: var(--accent); stroke-width: 2; filter: none; outline: none; }
     .flamegraph-node text { fill: var(--text); font-family: var(--font-mono); font-size: 10px; pointer-events: none; }
     .flamegraph-detail { display: grid; min-height: 51px; gap: 5px; padding: 8px 9px; border: 1px solid var(--line); border-radius: 7px; background: color-mix(in srgb, var(--panel-raised) 76%, transparent); }
     .flamegraph-detail > strong { color: var(--text); font-family: var(--font-mono); font-size: 9px; overflow-wrap: anywhere; }

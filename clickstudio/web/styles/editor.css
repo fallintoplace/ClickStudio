@@ -15,18 +15,18 @@
     .workspace-content.has-panel-split > .results-surface { flex: 1 1 0; }
     .workspace-panel-splitter { position: relative; z-index: var(--z-local-intersection); display: grid; min-height: 10px; flex: 0 0 10px; place-items: center; cursor: row-resize; touch-action: none; }
     .workspace-panel-splitter::before { width: min(180px, 32%); height: 3px; border-radius: 99px; background: var(--line-bright); content: ""; transition: width .16s ease, background .16s ease, box-shadow .16s ease; }
-    .workspace-panel-splitter:hover::before, .workspace-panel-splitter:focus-visible::before { width: min(220px, 40%); background: color-mix(in srgb, var(--accent) 62%, var(--line-bright)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent); }
+    .workspace-panel-splitter:hover::before, .workspace-panel-splitter:focus-visible::before { width: min(220px, 40%); background: color-mix(in srgb, var(--accent) 62%, var(--line-bright)); box-shadow: var(--focus-ring); }
     .workspace-panel-splitter:focus-visible { outline: none; }
-    .editor-surface, .results-surface { position: relative; display: flex; min-width: 0; min-height: 0; flex-direction: column; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); box-shadow: inset 0 1px #ffffff08; transition: border-color .2s ease, box-shadow .2s ease; }
-    .editor-surface { box-shadow: 0 12px 36px #00000012, inset 0 1px #ffffff08; }
+    .editor-surface, .results-surface { position: relative; display: flex; min-width: 0; min-height: 0; flex-direction: column; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); box-shadow: none; transition: border-color .2s ease, box-shadow .2s ease; }
+    .editor-surface { box-shadow: none; }
     .results-surface { box-shadow: none; }
-    .editor-surface::before, .results-surface::before { position: absolute; z-index: var(--z-local-raised); top: 0; left: 16px; width: 88px; height: 1px; pointer-events: none; background: linear-gradient(90deg, transparent, var(--signal-accent), transparent); box-shadow: 0 0 9px color-mix(in srgb, var(--signal-accent) 48%, transparent); content: ""; }
+    .editor-surface::before, .results-surface::before { position: absolute; z-index: var(--z-local-raised); top: 0; left: 16px; width: 88px; height: 1px; pointer-events: none; background: linear-gradient(90deg, transparent, var(--signal-accent), transparent); box-shadow: none; content: ""; }
     body.is-workspace-panel-gesturing { user-select: none; }
     .panel-window-button { width: 34px; min-width: 34px; min-height: 34px; padding: 0; }
     .panel-content { display: flex; min-width: 0; min-height: 0; flex: 1; flex-direction: column; }
     .panel-content[hidden] { display: none; }
     .results-content-scrollable { overflow: auto; scrollbar-gutter: stable; }
-    .editor-surface:focus-within { border-color: var(--active-border); box-shadow: var(--focus-glow), 0 12px 42px #00000012, inset 0 1px #ffffff08; }
+    .editor-surface:focus-within { border-color: var(--active-border); box-shadow: none; }
     .detached-query-window-root { width: 100%; height: 100dvh; min-height: 0; padding: 10px; overflow: hidden; background: var(--page); }
     .detached-query-window-root > .editor-surface { width: 100%; height: 100%; min-height: 0; flex: 1; }
     .detached-query-window-root > .editor-surface.is-collapsed { height: auto; flex: 0 0 auto; }
@@ -59,7 +59,7 @@
     .editor-workspace-layout { display: grid; min-width: 0; min-height: 0; flex: 1; grid-template-columns: minmax(0, 1fr) 184px; overflow: hidden; }
     .workspace-root.is-beginner .editor-workspace-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
     .editor-main-column { display: flex; min-width: 0; min-height: 0; flex-direction: column; overflow: auto; }
-    .editor-control-rail { display: flex; min-width: 0; min-height: 0; flex-direction: column; gap: 9px; overflow: auto; padding: 10px; border-left: 1px solid var(--line); background: color-mix(in srgb, var(--control-well) 82%, transparent); box-shadow: inset 0 -16px 18px -14px color-mix(in srgb, var(--text) 28%, transparent); }
+    .editor-control-rail { display: flex; min-width: 0; min-height: 0; flex-direction: column; gap: 9px; overflow: auto; padding: 10px; border-left: 1px solid var(--line); background: color-mix(in srgb, var(--control-well) 82%, transparent); box-shadow: none; }
     .editor-rail-status { display: flex; flex: none; align-items: center; justify-content: space-between; gap: 6px; padding: 2px 2px 7px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 8px; }
     .editor-rail-status .editor-mode-label { gap: 6px; color: var(--text-soft); font-size: 9px; }
     .file-type-icon { display: grid; width: 32px; height: 32px; flex: none; place-items: center; border: 1px solid color-mix(in srgb, var(--signal-accent) 28%, var(--line)); border-radius: var(--radius-control); background: color-mix(in srgb, var(--signal-accent) 8%, var(--panel)); color: var(--signal-accent); font-family: var(--font-mono); font-size: 8px; font-weight: 800; letter-spacing: .03em; }
@@ -72,17 +72,17 @@
     .editor-mode-label { display: flex; align-items: center; gap: 9px; }
     .editor-mode-label { color: var(--text-soft); font-size: 10px; }
     .editor-actions { display: flex; min-width: 0; width: 100%; justify-content: stretch; }
-    .editor-language-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--signal-accent); box-shadow: 0 0 8px color-mix(in srgb, var(--signal-accent) 42%, transparent); }
+    .editor-language-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--signal-accent); box-shadow: var(--status-ring); color: var(--signal-accent); }
     .toolbar-divider { width: 1px; height: 13px; background: var(--line-bright); }
     .button-base { display: inline-flex; min-height: 31px; flex: none; align-items: center; justify-content: center; gap: 7px; padding: 0 11px; border: 1px solid transparent; border-radius: var(--radius-compact); font-size: 10px; font-weight: 620; line-height: 1; white-space: nowrap; cursor: pointer; transition: transform .18s ease, border-color .18s ease, background .18s ease, color .18s ease, box-shadow .18s ease; }
     .button-base svg { width: 14px; height: 14px; }
     .button-base:hover:not(:disabled) { transform: translateY(-1px); }
     .button-base:active:not(:disabled) { transform: translateY(0) scale(.98); }
     .button-base:disabled { cursor: not-allowed; opacity: .62; }
-    .button-primary { border-color: color-mix(in srgb, var(--accent-action) 72%, white 4%); background: linear-gradient(140deg, var(--accent-strong), var(--accent-action)); color: var(--accent-ink); box-shadow: 0 5px 15px color-mix(in srgb, var(--accent-action) 18%, transparent), inset 0 1px #ffffff4a; }
-    .button-primary:hover:not(:disabled) { box-shadow: 0 7px 20px color-mix(in srgb, var(--accent-action) 28%, transparent), inset 0 1px #ffffff62; }
+    .button-primary { border-color: color-mix(in srgb, var(--accent-action) 72%, white 4%); background: linear-gradient(140deg, var(--accent-strong), var(--accent-action)); color: var(--accent-ink); box-shadow: var(--shadow-inset); }
+    .button-primary:hover:not(:disabled) { box-shadow: var(--shadow-inset); }
     .button-primary:disabled { border-color: var(--line-bright); background: color-mix(in srgb, var(--accent-action) 34%, var(--panel-raised)); color: var(--text-soft); box-shadow: none; opacity: 1; }
-    .button-secondary { border-color: var(--line-bright); background: linear-gradient(180deg, var(--panel-raised), var(--panel)); color: var(--text-soft); box-shadow: inset 0 1px #ffffff08; }
+    .button-secondary { border-color: var(--line-bright); background: linear-gradient(180deg, var(--panel-raised), var(--panel)); color: var(--text-soft); box-shadow: var(--shadow-inset); }
     .button-secondary:hover:not(:disabled) { border-color: var(--active-border); background: var(--control-hover); color: var(--text); }
     .button-ghost { border-color: transparent; background: transparent; color: var(--muted); }
     .button-ghost:hover:not(:disabled) { background: var(--control-hover); color: var(--text); }
@@ -129,7 +129,7 @@
     .sql-editor .cm-focused { outline: none; }
     .sql-editor .cm-selectionBackground, .sql-editor ::selection { background: var(--editor-selection) !important; }
     .sql-editor .cm-cursor { border-left-width: 2px; }
-    .sql-editor .cm-tooltip { z-index: var(--z-editor-tooltip); border: 1px solid var(--line-bright); border-radius: 9px; background: var(--panel-raised); color: var(--text); box-shadow: var(--shadow); }
+    .sql-editor .cm-tooltip { z-index: var(--z-editor-tooltip); border: 1px solid var(--line-bright); border-radius: 9px; background: var(--panel-raised); color: var(--text); box-shadow: var(--shadow-popover); }
     .sql-editor .cm-completionInfo { pointer-events: none; }
     .sql-editor .cm-tooltip-lint { box-sizing: border-box; width: max-content; max-width: min(560px, calc(100vw - 32px)); max-height: min(184px, 34vh); overflow: auto; border-color: color-mix(in srgb, var(--red) 38%, var(--line-bright)); }
     .sql-editor .cm-tooltip-lint .cm-diagnostic { margin: 0; padding: 10px 12px; border-left: 3px solid var(--red); color: var(--text-soft); font-family: var(--font-sans); font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; white-space: pre-wrap; }
@@ -147,7 +147,7 @@
     .parameter-field > span { color: var(--text-soft); font-size: 9px; font-weight: 620; }
     .parameter-field code { margin-left: 4px; color: var(--muted); font-family: var(--font-mono); font-size: 8px; }
     .parameter-field input, .field-input, .field-textarea { width: 100%; min-height: 31px; padding: 7px 9px; border: 1px solid var(--line); border-radius: var(--radius-compact); outline: none; background: var(--page-raised); color: var(--text); font-size: 10px; transition: .18s ease; }
-    .parameter-field input:focus, .field-input:focus, .field-textarea:focus { border-color: var(--active-border); box-shadow: var(--focus-glow); }
+    .parameter-field input:focus, .field-input:focus, .field-textarea:focus { border-color: var(--active-border); box-shadow: var(--focus-ring); }
     .parameter-count { padding-bottom: 8px; color: var(--green); font-size: 9px; white-space: nowrap; }
     .editor-footer { display: flex; flex: none; align-items: center; justify-content: flex-end; gap: 10px; padding: 7px 13px; border-top: 1px solid var(--line); color: var(--muted); font-size: 8px; }
     .footer-dot { padding: 0 5px; color: var(--line-bright); }
