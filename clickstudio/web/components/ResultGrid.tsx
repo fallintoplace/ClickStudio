@@ -86,7 +86,7 @@ function ResultColumnHeader({ name, type, group }: { name: string; type: string;
         };
     }, [open, showDetails]);
     return <th ref={header} scope="col" tabIndex={0} data-type-group={group} aria-describedby={position ? detailsId : undefined}
-        onMouseEnter={showDetails} onFocus={showDetails}
+        onMouseMove={() => { if (!position) showDetails(); }} onFocus={showDetails}
         onMouseLeave={hideDetails}
         onBlur={() => setPosition(undefined)}
         onKeyDown={event => {
