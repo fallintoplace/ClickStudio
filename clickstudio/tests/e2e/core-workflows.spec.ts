@@ -414,7 +414,9 @@ test('A running query shows its submitted SQL and keeps previous rows until it e
         const startedRun = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/runs');
         releaseRun();
         const run = runIdentity(await (await startedRun).json());
-        const cancel = page.locator('.execution-bar').getByRole('button', { name: 'Cancel', exact: true });
+        const cancel = runButton(page);
+        await expect(cancel).toHaveAttribute('aria-label', 'Cancel');
+        await expect(page.locator('.execution-bar').getByRole('button', { name: 'Cancel', exact: true })).toHaveCount(0);
         await expect(cancel).toBeVisible();
         await expect(progress).toBeVisible();
         await expect(table).toContainText('2026-01-01');
@@ -1935,7 +1937,8 @@ test('Cancellation stays available while execution profile loading is pending', 
         const started = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/runs');
         await runButton(page).click();
         const run = runIdentity(await (await started).json());
-        const cancel = page.locator('.execution-bar').getByRole('button', { name: 'Cancel', exact: true });
+        const cancel = runButton(page);
+        await expect(cancel).toHaveAttribute('aria-label', 'Cancel');
         await expect(cancel).toBeVisible();
         const profileRequest = page.waitForRequest(request => new URL(request.url()).pathname === `/api/runs/${run.id}/profile`);
         await page.locator('.results-tabs').getByRole('tab', { name: 'Insights', exact: true }).click();

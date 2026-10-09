@@ -3,17 +3,19 @@ import type { ProfilePipeline, QueryProfile, Result, ResultPage, Run } from '../
 import type { FlamegraphSnapshot } from '../shared/flamegraph';
 import { parseRunEvent } from '../shared/run-wire';
 import { api, isFrontendDemoPreview, message } from './api';
+import { RetainedRunUnavailableError } from './demo-preview';
 import { CLICKHOUSE_CLOUD_CONNECTION_ID } from './cloud-connection';
 import { terminal } from './components/ui';
 import { useScopedValue } from './useScopedValue';
 import type { RunEventState } from './workspace-types';
 import { startVisiblePolling } from './visible-polling';
 
-export function useRunEvidence({ activeRunId, connectionId, loadHistory, setError }: {
+export function useRunEvidence({ activeRunId, connectionId, loadHistory, setError, onRunUnavailable }: {
     activeRunId?: string;
     connectionId: string;
     loadHistory: () => Promise<void>;
     setError: (error: string) => void;
+    onRunUnavailable: (runId: string) => void;
 }) {
     const [run, setRunForRun] = useScopedValue<Run>(activeRunId);
     const [resultPageState, setResultPageForRun] = useScopedValue<{ page: number; value: ResultPage }>(activeRunId);
@@ -38,9 +40,16 @@ export function useRunEvidence({ activeRunId, connectionId, loadHistory, setErro
             if (cancelled || next.connectionId !== connectionId) return;
             setRunForRun(activeRunId, next);
             if (terminal(next)) void loadHistory().catch(() => undefined);
-        }).catch(caught => { if (!cancelled) setError(message(caught)); });
+        }).catch(caught => {
+            if (cancelled) return;
+            if (caught instanceof RetainedRunUnavailableError) {
+                onRunUnavailable(activeRunId);
+                return;
+            }
+            setError(message(caught));
+        });
         return () => { cancelled = true; };
-    }, [activeRunId, connectionId, loadHistory, setError, setRunForRun]);
+    }, [activeRunId, connectionId, loadHistory, onRunUnavailable, setError, setRunForRun]);
 
     useEffect(() => {
         if (!activeRunId || !run || !terminal(run) || run.resultState !== 'reopenable') return;

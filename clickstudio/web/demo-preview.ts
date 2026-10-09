@@ -54,6 +54,13 @@ export {
 } from './demo-preview-data.js';
 export type { DemoPreviewStarter } from './demo-preview-data.js';
 
+export class RetainedRunUnavailableError extends Error {
+    constructor() {
+        super('This retained run is no longer available in this browser. Run the SQL again.');
+        this.name = 'RetainedRunUnavailableError';
+    }
+}
+
 type RequestOptions = { method?: string; body?: unknown; signal?: AbortSignal };
 const MAX_SCRIPT_STATEMENTS = 50;
 const MAX_SCRIPT_SQL_LENGTH = 200_000;
@@ -541,7 +548,7 @@ export class DemoPreviewApi {
 
     private getRun(id: string) {
         let run = this.runs.get(id);
-        if (!run) throw new Error('This retained run is no longer available in this browser. Run the SQL again.');
+        if (!run) throw new RetainedRunUnavailableError();
         const expiresAtMs = run.resultExpiresAt ? Date.parse(run.resultExpiresAt) : Number.NaN;
         if (run.connectionId === PLAYGROUND_CONNECTION_ID && run.resultState === 'reopenable' &&
             (!this.results.has(run.id) || Number.isFinite(expiresAtMs) && expiresAtMs <= Date.now())) {

@@ -125,6 +125,10 @@ function workspaceAfterTableDeleted(state: WorkspaceState, table: Pick<SchemaTab
         : draft) };
 }
 
+function workspaceWithUpdatedDraft(state: WorkspaceState, id: string, change: (draft: Draft) => Draft): WorkspaceState {
+    return { ...state, tabs: state.tabs.map(draft => draft.id === id ? change(draft) : draft) };
+}
+
 function activateMatchingPreviewDraft(
     tabs: readonly Draft[],
     name: string,
@@ -315,9 +319,8 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
 
     useEffect(() => { setDrawerOpen(experience === 'expert' && !window.matchMedia('(max-width: 850px)').matches); }, [experience]);
 
-    const update = useCallback((id: string, change: (draft: Draft) => Draft) => {
-        setWorkspace(current => ({ ...current, tabs: current.tabs.map(draft => draft.id === id ? change(draft) : draft) }));
-    }, []);
+    const update = useCallback((id: string, change: (draft: Draft) => Draft) => setWorkspace(current => workspaceWithUpdatedDraft(current, id, change)), []);
+    const clearUnavailableRun = useCallback((runId: string) => update(active.id, draft => draft.activeRunId === runId ? { ...draft, activeRunId: undefined } : draft), [active.id, update]);
     const patch = useCallback((values: Partial<Draft>) => update(active.id, draft => ({ ...draft, ...values })), [active.id, update]);
     const formatActiveSql = useWorkspaceSqlFormatter(active, setWorkspace, editor, nativeParserEnabled, nativeParserStatus);
 
@@ -325,7 +328,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         activeRunId,
         connectionId: connection.id,
         loadHistory,
-        setError,
+        setError, onRunUnavailable: clearUnavailableRun,
     });
     const trackSchemaRefresh = useSchemaRefreshAfterDdl(run, connection.id, importedReveal.refreshAfterImportedSqlRun);
     const selectableRunId = run && terminal(run) ? run.id : undefined;
@@ -1068,7 +1071,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         <ImportWizard open={importOpen} connectionId={connection.id} trusted={trusted} demoMode={demoMode} importCopy={copy.imports} onImportQuery={(name, sql) => openImportedSqlQuery(name, sql, openNewDraft, importedReveal.markImportedSqlDraft, setNotice)} onClose={() => setImportOpen(false)} onImported={importedReveal.onImported} onTableNeedsInspection={importedReveal.onUnconfirmedDestination}/>
         <ExportDialog open={exportOpen} queryAvailable={Boolean(active.sql.trim())} rowsAvailable={run?.resultState === 'reopenable'} onClose={() => setExportOpen(false)} onExportQuery={() => { setExportOpen(false); exportCurrentQuery(); }} onExportRows={() => { setExportOpen(false); void exportCurrentCsv(); }}/>
         <RestoreRevisionDialog revision={restoreRevisionConfirmation?.revision} locale={locale} onClose={() => setRestoreRevisionConfirmation(undefined)} onConfirm={() => { const revision = restoreRevisionConfirmation; if (!revision) return; setRestoreRevisionConfirmation(undefined); restoreDocumentRevision(revision, true); }}/>
-        <ExecutionBar run={run} failedAttempt={Boolean(failedQueryError || (viewState.failureError && run?.status !== 'failed' && !pendingExecution.execution))} failureInToolbar={Boolean(viewState.failureError && !pendingExecution.execution)} eventState={eventState} onCancel={() => void cancel()} onOpenDetails={() => showInspector('details')} cancelling={cancelling} scriptRunning={script?.status === 'running'} copy={copy.common} helpButton={<HelpButton copy={copy.common} open={helpPanelOpen} onOpen={openHelp}/>}/>
+        <ExecutionBar run={run} failedAttempt={Boolean(failedQueryError || (viewState.failureError && run?.status !== 'failed' && !pendingExecution.execution))} failureInToolbar={Boolean(viewState.failureError && !pendingExecution.execution)} eventState={eventState} onOpenDetails={() => showInspector('details')} scriptRunning={script?.status === 'running'} copy={copy.common} helpButton={<HelpButton copy={copy.common} open={helpPanelOpen} onOpen={openHelp}/>}/>
         {detachedEditor.detached && createPortal(queryPanel, detachedEditor.detached.container)}
         {outputVisible && detachedResults.detached && createPortal(resultsPanel, detachedResults.detached.container)}
     </div>;

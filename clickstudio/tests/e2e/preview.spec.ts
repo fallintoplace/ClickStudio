@@ -332,6 +332,44 @@ test('Playground examples preview real SQL and open a draft without executing it
     expect(exampleSqlRequests).toEqual([]);
 });
 
+test('Restoring a draft with an unavailable run keeps its SQL without an error toast', async ({ page }) => {
+    await page.addInitScript(({ workspaceKey, runId }) => {
+        if (sessionStorage.getItem('clickstudio:seeded-missing-run')) return;
+        const draftId = 'restored-stale-result';
+        localStorage.setItem(workspaceKey, JSON.stringify({
+            version: 1,
+            activeId: draftId,
+            tabs: [{
+                id: draftId,
+                name: 'Recovered query.sql',
+                sql: 'SELECT 42 AS preserved_query',
+                parameters: {},
+                chart: { kind: 'table', x: 0, ys: [], title: 'Query result' },
+                runIds: [runId],
+                activeRunId: runId,
+                checkpoints: [],
+                from: 0,
+                to: 0,
+                kind: 'query',
+                dependencies: [],
+            }],
+        }));
+        sessionStorage.setItem('clickstudio:seeded-missing-run', 'true');
+    }, { workspaceKey: 'clickstudio:workspace:playground:v1', runId: 'missing-retained-run' });
+
+    await page.goto('/?connection=playground');
+    await expect(page.locator('.cm-content')).toContainText('SELECT 42 AS preserved_query');
+    await expect.poll(() => page.evaluate(() => {
+        const workspace = JSON.parse(localStorage.getItem('clickstudio:workspace:playground:v1') ?? 'null');
+        return workspace?.tabs.find((tab: { id: string }) => tab.id === workspace.activeId)?.activeRunId;
+    })).toBeUndefined();
+    await expect(page.getByRole('alert').filter({ hasText: 'This retained run is no longer available in this browser.' })).toHaveCount(0);
+
+    await page.reload();
+    await expect(page.locator('.cm-content')).toContainText('SELECT 42 AS preserved_query');
+    await expect(page.getByRole('alert').filter({ hasText: 'This retained run is no longer available in this browser.' })).toHaveCount(0);
+});
+
 test('Charts filter opens a localized chart example in a new SQL tab without executing it', async ({ page }) => {
     const exampleSqlRequests: string[] = [];
     page.on('request', request => {

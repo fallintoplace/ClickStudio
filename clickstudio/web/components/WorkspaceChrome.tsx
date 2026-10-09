@@ -81,7 +81,7 @@ export function ScriptResults({ script, runs, activeRunId, onSelectRun, onSelect
     </section>;
 }
 
-export function ExecutionBar({ run, failedAttempt, failureInToolbar, eventState, onCancel, onOpenDetails, cancelling, scriptRunning, helpButton, copy }: { run?: Run; failedAttempt?: boolean; failureInToolbar?: boolean; eventState: RunEventState; onCancel: () => void; onOpenDetails: () => void; cancelling: boolean; scriptRunning: boolean; helpButton: ReactNode; copy: Copy['common'] }) {
+export function ExecutionBar({ run, failedAttempt, failureInToolbar, eventState, onOpenDetails, scriptRunning, helpButton, copy }: { run?: Run; failedAttempt?: boolean; failureInToolbar?: boolean; eventState: RunEventState; onOpenDetails: () => void; scriptRunning: boolean; helpButton: ReactNode; copy: Copy['common'] }) {
     const currentRun = failedAttempt ? undefined : run;
     const progress = currentRun?.progress;
     const executionInProgress = Boolean(currentRun && (!terminal(currentRun) || scriptRunning));
@@ -114,7 +114,6 @@ export function ExecutionBar({ run, failedAttempt, failureInToolbar, eventState,
         </div>}
         <div className="execution-right">
             {currentRun && <Button variant="ghost" className="execution-details-button" data-testid="execution-details" aria-label="Execution details" title="Open execution details" onClick={onOpenDetails}>Details</Button>}
-            {currentRun && (scriptRunning || !terminal(currentRun)) && <Button variant="danger" className="cancel-execution" onClick={onCancel} disabled={cancelling}>{cancelling ? 'Cancelling…' : scriptRunning ? `${copy.cancel} ${copy.runScript.toLowerCase()}` : copy.cancel}</Button>}
             {helpButton}
         </div>
         {executionInProgress && <span className="execution-progress-line"/>}
