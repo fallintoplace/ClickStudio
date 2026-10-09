@@ -320,12 +320,13 @@ test('Deleting a table marks its cached preview result stale and keeps the warni
     await deleteRequest;
 
     const provenance = results.locator('.result-provenance-header');
-    await expect(provenance).toContainText('The source table analytics.events was deleted after this run.');
+    await expect(provenance).toHaveText('Source deleted');
+    await expect(provenance).toHaveAttribute('title', 'The source table analytics.events was deleted after this run.');
     await expect(provenance).toHaveClass(/is-source-deleted/);
     await page.reload();
     await expect(page.getByRole('button', { name: 'Run', exact: true })).toBeVisible();
     const restoredResults = page.getByRole('region', { name: 'Query results', exact: true });
-    await expect(restoredResults.locator('.result-provenance-header')).toContainText('The source table analytics.events was deleted after this run.');
+    await expect(restoredResults.locator('.result-provenance-header')).toHaveAttribute('title', 'The source table analytics.events was deleted after this run.');
 });
 
 test('MergeTree storage opens a selectable, metric-switchable D3 parts explorer', async ({ page }) => {

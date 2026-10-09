@@ -120,6 +120,7 @@ export function WorkspaceResultsPanel({
         queryTreeUnavailableReason,
         staleResult,
         staleResultReason,
+        staleResultLabel,
         sourceDeleted,
     } = viewState;
     const { resultsPanelRef } = panels;
@@ -136,9 +137,9 @@ export function WorkspaceResultsPanel({
     const previousSuccessfulResult = Boolean((failedAttempt || (failedScriptStatement && !failedScriptStatement.runId)) && run?.resultState === 'reopenable' && run.status !== 'failed');
     const resultProvenance = visibleResultsView !== 'sqlmap' && !execution
         ? previousSuccessfulResult
-            ? { description: copy.common.previousResultsDescription, failed: true }
+            ? { description: copy.common.previousResultsDescription, label: copy.common.previousResults }
             : !failedAttempt && staleResult
-                ? { description: staleResultReason ?? 'SQL text, selection, or bound parameters changed since this run.', sourceDeleted }
+                ? { description: staleResultReason, label: staleResultLabel, sourceDeleted }
                 : undefined
         : undefined;
 
@@ -158,20 +159,19 @@ export function WorkspaceResultsPanel({
                     : detached && panels.resultsCollapsed && execution && visibleResultsView !== 'sqlmap'
                     ? <span className="result-execution-header"><span className="loading-orbit" aria-hidden="true"/>{copy.common.statusRunning}</span>
                     : detached && !failureError && !execution && run && visibleResultsView !== 'sqlmap' && <Status run={run} copy={copy.common}/>}
+            </div>
+            <div className="results-actions">
+                {run && resultTabs.length > 1 && <div className="results-tabs" role="tablist" aria-label={copy.common.workspaceOutput}>{resultTabs.map(tab => <button key={tab} role="tab" aria-selected={visibleResultsView === tab} type="button" onClick={() => actions.onSelectView(tab)}>{resultsTabLabel(tab, copy.common)}{tab === 'chart' && retainedSnapshot && <span className="suggested-dot"/>}</button>)}</div>}
                 {resultProvenance && <span
-                    className={cx('result-provenance-header', resultProvenance.failed && 'is-failed-attempt', resultProvenance.sourceDeleted && 'is-source-deleted')}
+                    className={cx('result-provenance-header', resultProvenance.sourceDeleted && 'is-source-deleted')}
                     role="status"
                     aria-live="polite"
                     aria-label={resultProvenance.description}
                     title={resultProvenance.description}
                 >
                     <span className="status-light is-warning" aria-hidden="true"/>
-                    <strong>{resultProvenance.failed ? copy.common.previousResults : 'Previous result'}</strong>
-                    {!resultProvenance.failed && <small>{resultProvenance.description}</small>}
+                    <strong>{resultProvenance.label}</strong>
                 </span>}
-            </div>
-            <div className="results-actions">
-                {run && resultTabs.length > 1 && <div className="results-tabs" role="tablist" aria-label={copy.common.workspaceOutput}>{resultTabs.map(tab => <button key={tab} role="tab" aria-selected={visibleResultsView === tab} type="button" onClick={() => actions.onSelectView(tab)}>{resultsTabLabel(tab, copy.common)}{tab === 'chart' && retainedSnapshot && <span className="suggested-dot"/>}</button>)}</div>}
                 <div ref={setTableToolbar} className="results-table-tools" hidden={panels.resultsCollapsed}/>
                 {detached
                     ? <Button variant="ghost" className="panel-window-button" aria-label={copy.common.dockResultsPanel} title={copy.common.dockResultsPanel} onClick={actions.onDockDetached}><Icon name="dock"/></Button>

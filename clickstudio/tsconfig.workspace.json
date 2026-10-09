@@ -25,6 +25,7 @@
     "web/workspace-persistence.ts",
     "web/statement-outcome.ts",
     "web/sql-error.ts",
+    "web/result-provenance.ts",
     "web/visible-polling.ts",
     "web/demo-preview.ts",
     "web/cloud-import.ts",

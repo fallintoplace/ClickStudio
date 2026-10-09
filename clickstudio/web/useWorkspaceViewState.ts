@@ -4,7 +4,7 @@ import { parseExplainPlan } from '../shared/explain-plan';
 import { parseExplainAnalyze } from '../shared/explain-analyze';
 import { parseExplainIndexAnalysis } from '../shared/explain-indexes';
 import { parsePipelineResult } from '../shared/profile';
-import { matchesDraft } from '../shared/evidence';
+import { retainedResultChange } from './result-provenance';
 import { recommendChart } from '../shared/results';
 import { draftSaveStatus } from '../shared/workspace-view';
 import type { NativeParseSnapshot } from '../shared/native-parser';
@@ -64,9 +64,6 @@ export function useWorkspaceViewState({
         readError: documentsReadError,
     });
     const statementCount = safeStatementCount(active.sql);
-    const runSourceSql = run && run.sourceFrom !== undefined && run.sourceTo !== undefined && run.sourceTo <= active.sql.length
-        ? active.sql.slice(run.sourceFrom, run.sourceTo)
-        : safeSelectedStatement(active.sql, active.from, active.to)?.sql;
     const selectedRunStatement = safeSelectedStatement(active.sql, active.from, active.to);
     const runErrorContext = run?.error && (run.sql === active.sql || run.sql === selectedRunStatement?.sql)
         ? { draftId: active.id, draftSql: active.sql, statementSql: run.sql, sourceFrom: run.sourceFrom ?? (run.sql === active.sql ? 0 : selectedRunStatement?.from ?? 0), error: run.error }
@@ -79,10 +76,17 @@ export function useWorkspaceViewState({
     const invalidatedSource = run && active.activeRunId === run.id && active.invalidatedSource?.runId === run.id
         ? active.invalidatedSource
         : undefined;
-    const staleResult = Boolean(run && (invalidatedSource || !runSourceSql || run.connectionId !== connection.id || !matchesDraft(run, runSourceSql, active.parameters)));
+    const resultChange = useMemo(() => run ? retainedResultChange(run, { sql: active.sql, parameters: active.parameters, connectionId: connection.id }) : undefined, [run, active.sql, active.parameters, connection.id]);
+    const staleResult = Boolean(invalidatedSource || resultChange);
+    const staleResultLabel = invalidatedSource ? copy.common.sourceDeleted
+        : resultChange === 'query' ? copy.common.queryChanged
+        : resultChange === 'parameters' ? copy.common.parametersChanged
+        : resultChange === 'connection' ? copy.common.connectionChanged : undefined;
     const staleResultReason = invalidatedSource
         ? `The source table ${invalidatedSource.database}.${invalidatedSource.table} was deleted after this run.`
-        : staleResult ? 'SQL text, selection, or bound parameters changed since this run.' : undefined;
+        : resultChange === 'query' ? copy.common.queryChangedDescription
+        : resultChange === 'parameters' ? copy.common.parametersChangedDescription
+        : resultChange === 'connection' ? copy.common.connectionChangedDescription : undefined;
     const requestedResultsView = experience === 'beginner' && view === 'insights' ? 'results' : view;
     const sqlMapStatement = safeSelectedStatement(active.sql, active.from, active.from);
     const queryTreeCapability = connection.manifest?.queryTree ?? connection.manifest?.explain;
@@ -123,6 +127,7 @@ export function useWorkspaceViewState({
         editorErrorRange,
         staleResult,
         staleResultReason,
+        staleResultLabel,
         sourceDeleted: Boolean(invalidatedSource),
         requestedResultsView,
         sqlMapStatement,
