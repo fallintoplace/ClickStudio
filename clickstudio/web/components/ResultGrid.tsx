@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { displayValue, filterRows } from '../../shared/results';
 import type { ResultPage, Run } from '../../shared/types';
 import { ScrollEdgeFrame } from './ScrollEdgeShadows';
-import { Button, cx, terminal } from './ui';
+import { Button, cx, Icon, terminal } from './ui';
 import { statementOutcome } from '../statement-outcome';
 
 type ResultTypeGroup = 'number' | 'text' | 'temporal' | 'boolean' | 'complex' | 'other';
@@ -31,6 +31,17 @@ function resultTypeGroup(type: string): ResultTypeGroup {
 
 export function ResultGrid({ run, page, pageIndex, loading, onPage, showPagination = true, obscured = false, toolbarContainer }: { run: Run; page?: ResultPage; pageIndex: number; loading: boolean; onPage: (page: number) => void; showPagination?: boolean; obscured?: boolean; toolbarContainer?: HTMLElement | null }) {
     const [filter, setFilter] = useState('');
+    const [filterOpen, setFilterOpen] = useState(false);
+    const filterId = useId();
+    const filterInput = useRef<HTMLInputElement>(null);
+    const filterButton = useRef<HTMLButtonElement>(null);
+    useEffect(() => {
+        if (filterOpen) filterInput.current?.focus();
+    }, [filterOpen]);
+    const closeFilter = () => {
+        setFilterOpen(false);
+        filterButton.current?.focus();
+    };
     if (run.resultState === 'expired') return <div className="result-empty-state"><span className="empty-result-icon">⌛</span><strong>Result retention expired</strong><p>The SQL and query ID are still available. Run it again to fetch fresh data.</p></div>;
     if (run.resultState !== 'reopenable') return <div className="result-empty-state">{terminal(run) ? <span className="empty-result-icon">!</span> : <span className="loading-orbit"/>}<strong>{terminal(run) ? 'No retained result' : 'Query is running'}</strong><p>{terminal(run) ? 'This run did not produce result rows.' : 'The live execution status appears in the bottom bar.'}</p></div>;
     if (loading || !page) return <div className="result-loading"><span className="loading-orbit"/><span>Loading retained rows…</span></div>;
@@ -42,12 +53,30 @@ export function ResultGrid({ run, page, pageIndex, loading, onPage, showPaginati
     const columnGroups = page.columns.map(column => resultTypeGroup(column.type));
     const pageCount = Math.max(1, Math.ceil(page.totalRows / 200));
     const rowCount = filter
-        ? `${visibleRows.length.toLocaleString()} of ${page.rows.length.toLocaleString()} rows on this page`
+        ? `${visibleRows.length.toLocaleString()} of ${page.rows.length.toLocaleString()} rows${pageCount > 1 ? ' on this page' : ''}`
         : `${page.totalRows.toLocaleString()} ${pageCount > 1 ? 'retained ' : ''}${page.totalRows === 1 ? 'row' : 'rows'}`;
     const toolbar = (showPagination || page.completeness === 'truncated') && <div className="result-table-toolbar" inert={obscured || undefined}>
         {showPagination && <span className="result-row-count" role="status" aria-live="polite">{rowCount}</span>}
         {page.completeness === 'truncated' && <span className="result-completeness" title="Only the retained prefix is available. The query may have matched more rows."><span className="status-light is-warning"/>Retained prefix · truncated</span>}
-        {showPagination && <input className="result-filter" type="search" aria-label="Filter current page" placeholder="Filter this page…" value={filter} onChange={event => setFilter(event.target.value)}/>}
+        {showPagination && <div className="result-filter-controls">
+            <button ref={filterButton} className="button-base button-secondary result-filter-toggle" type="button" aria-expanded={filterOpen} aria-controls={filterId} title="Filter the current page" onClick={() => {
+                if (filter) filterInput.current?.focus();
+                else setFilterOpen(value => !value);
+            }}><Icon name="search"/>Filter</button>
+            <input ref={filterInput} id={filterId} hidden={!filterOpen} className="result-filter" type="search" aria-label="Filter current page" placeholder="Filter this page…" value={filter} onChange={event => setFilter(event.target.value)} onKeyDown={event => {
+                if (event.key === 'Escape') {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if (!filter) closeFilter();
+                }
+            }}/>
+            {filterOpen && <>
+                <Button className="result-filter-clear" aria-label="Clear row filter" title="Clear row filter" onClick={() => {
+                    setFilter('');
+                    closeFilter();
+                }}><Icon name="close"/>Clear</Button>
+            </>}
+        </div>}
     </div>;
     const emptyRowsMessage = page.totalRows > 0
         ? 'No retained rows are available on this page.'

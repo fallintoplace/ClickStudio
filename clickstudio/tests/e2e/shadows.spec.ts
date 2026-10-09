@@ -1,5 +1,5 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
-import { replaceSql, runButton, trust } from './helpers.js';
+import { openResultFilter, replaceSql, runButton, trust } from './helpers.js';
 
 const shadow = (locator: Locator) => locator.evaluate(element => getComputedStyle(element).boxShadow)
     .then(value => value.replace(/rgba\(0, 0, 0, 0\) 0px 0px 0px 0px, /g, ''));
@@ -58,7 +58,7 @@ for (const theme of ['Dark', 'Light']) for (const mode of ['Standard', 'Experime
         await expect(editor).toHaveCSS('box-shadow', 'none');
         await expect(page.locator('.results-surface')).toHaveCSS('box-shadow', 'none');
         await expect(page.locator('.topbar')).toHaveCSS('box-shadow', 'none');
-        const filter = page.getByRole('searchbox', { name: 'Filter current page' });
+        const filter = await openResultFilter(page);
         await page.keyboard.press('Tab');
         await filter.focus();
         await expect(filter).toHaveCSS('outline-style', 'solid');
@@ -215,7 +215,7 @@ for (const theme of ['Dark', 'Light']) test(`${theme} scroll cues track overflow
         }
     });
     expect(stickyCellOnTop).toBe(true);
-    await page.getByRole('searchbox', { name: 'Filter current page' }).fill('row-99');
+    await (await openResultFilter(page)).fill('row-99');
     await expect(frame.locator('tbody tr')).toHaveCount(1);
     await expect(top).not.toHaveClass(/is-visible/);
     await expect(bottom).not.toHaveClass(/is-visible/);

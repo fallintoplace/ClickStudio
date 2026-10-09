@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { openBlankSql, runButton, trust } from './helpers.js';
+import { openBlankSql, openResultFilter, runButton, trust } from './helpers.js';
 
 function countRuns(page: Page) {
     let count = 0;
@@ -15,19 +15,24 @@ test('A no-match row filter stays local and can be cleared without rerunning SQL
     await runButton(page).click();
     const results = page.getByRole('region', { name: 'Query results' });
     await expect(results.getByRole('table', { name: 'Retained query rows' })).toBeVisible();
-    const filter = results.getByRole('searchbox', { name: 'Filter current page' });
+    await expect(results.getByRole('searchbox')).toBeHidden();
+    const filter = await openResultFilter(results);
+    await expect(filter).toBeFocused();
     await expect(results.locator('.results-header').getByRole('searchbox')).toHaveAttribute('placeholder', 'Filter this page…');
     await expect(results.locator('.result-row-count')).toHaveText('7 rows');
     await expect(results.locator('.table-pagination')).toHaveCount(0);
     await filter.fill('no-row-can-match-this');
-    await expect(results.locator('.result-row-count')).toHaveText('0 of 7 rows on this page');
+    await expect(results.locator('.result-row-count')).toHaveText('0 of 7 rows');
     await expect(results.getByText('No rows match on this page.')).toBeVisible();
     await expect(results.getByText('This query returned zero rows.')).toHaveCount(0);
-    await filter.fill('');
+    await results.getByRole('button', { name: 'Clear row filter', exact: true }).click();
+    await expect(filter).toBeHidden();
+    await expect(results.getByRole('button', { name: 'Filter', exact: true })).toBeFocused();
     await expect(results.locator('tbody tr')).toHaveCount(7);
     await expect(results.locator('.result-row-count')).toHaveText('7 rows');
+    await openResultFilter(results);
     await filter.fill('2026-01-02');
-    await expect(results.locator('.result-row-count')).toHaveText('1 of 7 rows on this page');
+    await expect(results.locator('.result-row-count')).toHaveText('1 of 7 rows');
     await results.getByRole('button', { name: 'Collapse Query results', exact: true }).click();
     await expect(filter).toBeHidden();
     await results.getByRole('button', { name: 'Expand Query results', exact: true }).click();
@@ -35,7 +40,8 @@ test('A no-match row filter stays local and can be cleared without rerunning SQL
     await expect(results.locator('tbody tr')).toHaveCount(1);
     expect(runs()).toBe(1);
     await runButton(page).click();
-    await expect(filter).toHaveValue('');
+    await expect(filter).toBeHidden();
+    await expect(results.getByRole('button', { name: 'Filter', exact: true })).toHaveAttribute('aria-expanded', 'false');
     await expect(results.locator('tbody tr')).toHaveCount(7);
     expect(runs()).toBe(2);
 });
@@ -91,7 +97,7 @@ test('Retained-result pagination reaches the end without rerunning SQL', async (
     await expect(results.locator('tbody tr')).toHaveCount(50);
     await expect(results.getByText('401–450 of 450 retained rows', { exact: true })).toBeVisible();
     await expect(results.getByRole('button', { name: 'Last', exact: true })).toBeDisabled();
-    const filter = results.getByRole('searchbox', { name: 'Filter current page' });
+    const filter = await openResultFilter(results);
     await filter.fill('row-449');
     await expect(results.locator('.result-row-count')).toHaveText('1 of 50 rows on this page');
     await expect(results.locator('tbody .row-number')).toHaveText('450');
@@ -115,27 +121,51 @@ for (const mode of ['Standard', 'Experimental']) {
         await runButton(page).click();
         const results = page.getByRole('region', { name: 'Query results', exact: true });
         const header = results.locator('.results-header');
-        const filter = header.getByRole('searchbox', { name: 'Filter current page' });
+        const toggle = header.getByRole('button', { name: 'Filter', exact: true });
+        const filter = header.getByRole('searchbox', { name: 'Filter current page', exact: true });
+        const expectToolbarFits = async () => {
+            const bounds = await header.evaluate(element => {
+                const header = element.getBoundingClientRect();
+                const tools = [...element.querySelectorAll('.result-row-count, .result-filter, .result-filter-toggle, .result-filter-clear, .results-tabs, .panel-collapse-button')];
+                return tools.every(tool => {
+                    if (!tool.getClientRects().length) return true;
+                    const rect = tool.getBoundingClientRect();
+                    return rect.left >= header.left && rect.right <= header.right && rect.top >= header.top && rect.bottom <= header.bottom;
+                });
+            });
+            expect(bounds).toBe(true);
+        };
         for (const theme of ['Dark', 'Light']) {
             await page.getByRole('radio', { name: `${theme} theme`, exact: true }).click();
             for (const width of [1440, 720, 390]) {
                 await page.setViewportSize({ width, height: 900 });
+                await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+                await expect(filter).toBeHidden();
+                await expectToolbarFits();
+                await toggle.click();
                 await expect(filter).toBeVisible();
+                await expect(filter).toBeFocused();
+                await filter.press('Escape');
+                await expect(filter).toBeHidden();
+                await expect(toggle).toBeFocused();
+                await openResultFilter(header);
                 await expect(header.locator('.result-row-count')).toHaveText('7 rows');
                 await expect(results.locator('.table-pagination')).toHaveCount(0);
-                const bounds = await header.evaluate(element => {
-                    const header = element.getBoundingClientRect();
-                    const tools = [...element.querySelectorAll('.result-row-count, .result-filter, .results-tabs, .panel-collapse-button')];
-                    return tools.every(tool => {
-                        const rect = tool.getBoundingClientRect();
-                        return rect.left >= header.left && rect.right <= header.right && rect.top >= header.top && rect.bottom <= header.bottom;
-                    });
-                });
-                expect(bounds).toBe(true);
+                await expectToolbarFits();
                 await filter.fill('2026-01-02');
-                await expect(header.locator('.result-row-count')).toHaveText('1 of 7 rows on this page');
+                await expect(header.locator('.result-row-count')).toHaveText('1 of 7 rows');
                 await expect(results.locator('tbody tr')).toHaveCount(1);
-                await filter.fill('');
+                await expectToolbarFits();
+                await filter.press('Escape');
+                await expect(filter).toHaveValue('2026-01-02');
+                await toggle.click();
+                await expect(filter).toBeVisible();
+                await expect(filter).toBeFocused();
+                await header.getByRole('button', { name: 'Clear row filter', exact: true }).click();
+                await expect(filter).toBeHidden();
+                await expect(toggle).toBeFocused();
+                await expect(header.locator('.result-row-count')).toHaveText('7 rows');
+                await expect(results.locator('tbody tr')).toHaveCount(7);
             }
             await page.setViewportSize({ width: 1440, height: 900 });
         }
@@ -198,15 +228,16 @@ test('A chart with no rows keeps its fallback table controls in the Results head
     const results = page.getByRole('region', { name: 'Query results', exact: true });
     await results.getByRole('tab', { name: 'Chart', exact: true }).click();
     await expect(results.locator('.chart-table-fallback')).toBeVisible();
-    const filter = results.locator('.results-header').getByRole('searchbox', { name: 'Filter current page' });
+    const filter = await openResultFilter(results.locator('.results-header'));
     await expect(results.locator('.result-row-count')).toHaveText('0 rows');
     await filter.fill('frontend');
     await expect(results.locator('tbody tr')).toHaveCount(0);
-    await expect(results.locator('.result-row-count')).toHaveText('0 of 0 rows on this page');
+    await expect(results.locator('.result-row-count')).toHaveText('0 of 0 rows');
     await expect(results.getByText('This query returned zero rows.')).toBeVisible();
     await expect(results.locator('.table-pagination')).toHaveCount(0);
     await results.getByRole('tab', { name: 'Results', exact: true }).click();
-    await expect(filter).toHaveValue('');
+    await expect(filter).toBeHidden();
+    await expect(results.getByRole('button', { name: 'Filter', exact: true })).toHaveAttribute('aria-expanded', 'false');
     await expect(results.locator('.result-table-toolbar')).toHaveCount(1);
     await expect(results.locator('.result-row-count')).toHaveText('0 rows');
 });

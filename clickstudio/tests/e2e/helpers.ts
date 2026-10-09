@@ -1,6 +1,11 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 
 export const runButton = (page: Page) => page.getByTestId('run-button');
+
+export async function openResultFilter(target: Page | Locator) {
+    await target.getByRole('button', { name: 'Filter', exact: true }).click();
+    return target.getByRole('searchbox', { name: 'Filter current page', exact: true });
+}
 
 export function jsonRecord(value: unknown, label = 'JSON value'): Record<string, unknown> {
     if (typeof value !== 'object' || value === null || Array.isArray(value))

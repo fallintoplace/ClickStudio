@@ -19,6 +19,9 @@
     .result-table-toolbar { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: 6px 10px; color: var(--text-soft); font-size: 11px; }
     .result-row-count { font-variant-numeric: tabular-nums; }
     .result-grid-wrap > .result-table-toolbar { flex: none; padding: 6px 12px; border-bottom: 1px solid var(--line); }
+    .result-filter-controls { display: flex; min-width: 0; max-width: 100%; align-items: center; gap: 6px; }
+    .result-filter-controls > .button-base { min-height: 30px; padding-inline: 8px; font-size: 11px; }
+    .result-filter-controls > .result-filter { min-width: 0; flex: 1 1 auto; }
     .result-filter { width: clamp(140px, 16vw, 190px); min-height: 30px; padding: 5px 8px; border: 1px solid var(--line); border-radius: var(--radius-panel); outline: none; background: var(--page-raised); color: var(--text); font-size: 11px; }
     .result-filter::placeholder { color: var(--muted); }
     .result-filter:focus { border-color: var(--active-border); box-shadow: var(--focus-ring); }

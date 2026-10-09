@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { currentQueryId, openBlankSql, openWorkspacePanel, runIdentity, runScript, runButton, trust, trustCurrentConnection, useAdvancedMode } from './helpers.js';
+import { currentQueryId, openBlankSql, openResultFilter, openWorkspacePanel, runIdentity, runScript, runButton, trust, trustCurrentConnection, useAdvancedMode } from './helpers.js';
 
 declare global {
     interface Window {
@@ -712,12 +712,12 @@ for (const mode of ['Standard', 'Experimental']) test(`${mode} query and results
     const resultsPopup = await resultsPopupPromise;
     await expect(resultsPopup.getByRole('table', { name: 'Retained query rows' })).toHaveText(retainedRows, { useInnerText: true });
     await expect(resultsPopup.locator('.results-surface')).toHaveCSS('border-radius', '4px');
-    const popupFilter = resultsPopup.locator('.results-header').getByRole('searchbox', { name: 'Filter current page' });
+    const popupFilter = await openResultFilter(resultsPopup.locator('.results-header'));
     await expect(resultsPopup.locator('.results-header .result-row-count')).toHaveText('7 rows');
     await expect(resultsPopup.locator('.table-pagination')).toHaveCount(0);
     await popupFilter.fill('2026-01-02');
     await expect(resultsPopup.locator('tbody tr')).toHaveCount(1);
-    await expect(resultsPopup.locator('.result-row-count')).toHaveText('1 of 7 rows on this page');
+    await expect(resultsPopup.locator('.result-row-count')).toHaveText('1 of 7 rows');
     await popupFilter.fill('');
     await expect(resultsPopup.locator('html')).toHaveAttribute('data-theme', 'click-light');
     await expect(resultsPopup.getByRole('button', { name: /Float|Maximize|Restore/ })).toHaveCount(0);
@@ -1058,13 +1058,13 @@ test('Result filtering searches only the visible retained page without mutating 
     const results = await runQuery(page);
     const queryId = await currentQueryId(page);
     const rows = results.locator('tbody tr');
-    const filter = results.getByRole('searchbox', { name: 'Filter current page' });
+    const filter = await openResultFilter(results);
     await expect(rows).toHaveCount(7);
 
     await filter.fill('2026-01-02');
     await expect(rows).toHaveCount(1);
     await expect(rows.first()).toContainText('2026-01-02');
-    await expect(results.locator('.results-header .result-row-count')).toHaveText('1 of 7 rows on this page');
+    await expect(results.locator('.results-header .result-row-count')).toHaveText('1 of 7 rows');
     await filter.fill('no matching value');
     await expect(rows).toHaveCount(0);
     await expect(results).toContainText('No rows match on this page.');
