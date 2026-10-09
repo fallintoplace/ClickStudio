@@ -73,10 +73,10 @@
     --radius-dialog: 8px;
     --radius: var(--radius-panel);
     --radius-compact: var(--radius-control);
-    --surface-glass: color-mix(in srgb, var(--page-raised) 90%, transparent);
-    --panel-header: linear-gradient(105deg, color-mix(in srgb, var(--accent) 4%, var(--panel-raised)), var(--panel-raised) 52%, var(--panel));
+    --surface-glass: var(--page-raised);
+    --panel-header: var(--panel-raised);
     --control-well: color-mix(in srgb, var(--panel-raised) 82%, var(--page));
-    --control-hover: color-mix(in srgb, var(--accent) 8%, var(--panel-raised));
+    --control-hover: var(--panel-hover);
     --active-surface: color-mix(in srgb, var(--accent) 10%, var(--panel));
     --active-border: color-mix(in srgb, var(--accent) 42%, var(--line-bright));
     --active-inset: inset 0 0 0 1px color-mix(in srgb, var(--accent) 17%, var(--line));
@@ -169,7 +169,7 @@
 }
 
 :root[data-theme="click-dark"] .application,
-:root[data-theme="click-light"] .application { background: radial-gradient(ellipse at 12% -10%, color-mix(in srgb, var(--signal-accent) 4%, transparent), transparent 42%), var(--page); }
+:root[data-theme="click-light"] .application { background: var(--page); }
 :root[data-theme="click-dark"] .application::before,
 :root[data-theme="click-light"] .application::before { display: none; }
 

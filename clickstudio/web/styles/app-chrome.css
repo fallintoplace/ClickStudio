@@ -1,7 +1,7 @@
 @layer components {
-    .application { position: relative; display: flex; flex-direction: column; width: 100%; height: 100vh; min-height: 540px; overflow: hidden; isolation: isolate; background: radial-gradient(ellipse at 18% -8%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 34%), radial-gradient(ellipse at 88% 100%, color-mix(in srgb, var(--signal-accent) 4%, transparent), transparent 34%), var(--page); }
+    .application { position: relative; display: flex; flex-direction: column; width: 100%; height: 100vh; min-height: 540px; overflow: hidden; isolation: isolate; background: var(--page); }
     .application::before { position: absolute; z-index: var(--z-underlay); inset: 0; pointer-events: none; content: ""; opacity: .18; background-image: linear-gradient(color-mix(in srgb, var(--text) 5%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--text) 5%, transparent) 1px, transparent 1px); background-size: 44px 44px; mask-image: linear-gradient(to bottom, #000 0, transparent 65%); }
-    .topbar { z-index: var(--z-app-chrome); display: flex; flex: none; align-items: center; gap: 21px; min-height: 68px; padding: 0 24px; border-bottom: 1px solid var(--line); background: var(--surface-glass); box-shadow: none; backdrop-filter: blur(22px); }
+    .topbar { z-index: var(--z-app-chrome); display: flex; flex: none; align-items: center; gap: 21px; min-height: 68px; padding: 0 24px; border-bottom: 1px solid var(--line); background: var(--surface-glass); box-shadow: none; }
     .topbar-control-rail { display: flex; min-width: 0; align-items: center; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: var(--radius-shell); background: var(--control-well); box-shadow: var(--shadow-inset); }
     .brand-lockup { display: inline-flex; flex: none; align-items: center; gap: 11px; }
     .brand-symbol { display: block; width: 30px; height: 30px; flex: none; object-fit: contain; }
@@ -14,8 +14,8 @@
     .connection-wrap { position: relative; min-width: 170px; }
     .cloud-connection-actions { display: flex; flex: none; align-items: center; }
     .cloud-topbar-action { min-height: 34px; padding-inline: 10px; }
-    .cloud-topbar-connect.button-secondary { border-color: color-mix(in srgb, var(--accent) 42%, var(--line-bright)); background: color-mix(in srgb, var(--accent) 7%, var(--panel)); color: var(--text); }
-    .cloud-topbar-connect.button-secondary:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent) 68%, var(--line-bright)); background: color-mix(in srgb, var(--accent) 13%, var(--panel-raised)); }
+    .cloud-topbar-connect.button-secondary { border-color: var(--line); background: var(--panel); color: var(--text); }
+    .cloud-topbar-connect.button-secondary:hover:not(:disabled) { border-color: var(--line-bright); background: var(--control-hover); }
     .cloud-topbar-disconnect.button-danger { border-color: color-mix(in srgb, var(--red) 42%, var(--line)); background: color-mix(in srgb, var(--red) 7%, var(--panel)); color: var(--red); }
     .cloud-topbar-disconnect.button-danger:hover:not(:disabled) { border-color: color-mix(in srgb, var(--red) 65%, var(--line-bright)); background: color-mix(in srgb, var(--red) 15%, var(--panel)); color: var(--text); }
     .connection-trigger { display: grid; width: 100%; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 4px 10px; border: 1px solid transparent; border-radius: var(--radius-control); background: transparent; text-align: left; cursor: pointer; transition: .2s ease; }
@@ -96,7 +96,7 @@
     .workspace-root.is-expert .workspace-main { grid-column: 2; grid-row: 1; }
     .workspace-root.has-inspector-dock .workspace-layout { grid-template-columns: 58px minmax(0, 1fr) minmax(320px, min(36vw, 460px)); }
     .workspace-root.has-inspector-dock .workspace-layout > .workspace-main { grid-column: 2; grid-row: 1; }
-    .workspace-root.has-inspector-dock .workspace-layout > .inspector-pane.is-docked-inspector { grid-column: 3; grid-row: 1; border-left: 1px solid var(--line-bright); }
+    .workspace-root.has-inspector-dock .workspace-layout > .inspector-pane.is-docked-inspector { grid-column: 3; grid-row: 1; border-left: 1px solid var(--line); }
     .icon-rail { z-index: var(--z-app-chrome); display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 14px 7px; border-right: 1px solid var(--line); background: color-mix(in srgb, var(--page-raised) 74%, transparent); }
     .rail-separator { width: 24px; height: 1px; flex: none; margin: 3px 0 5px; background: var(--line); }
     .rail-icon-button { position: relative; display: grid; width: 39px; height: 39px; flex: none; place-items: center; border: 1px solid transparent; border-radius: var(--radius-control); background: transparent; color: var(--muted); cursor: pointer; transition: transform .2s ease, background .2s ease, color .2s ease, border .2s ease; }

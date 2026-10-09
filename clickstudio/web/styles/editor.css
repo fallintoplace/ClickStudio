@@ -80,8 +80,8 @@
     .button-primary { border-color: color-mix(in srgb, var(--accent-action) 72%, white 4%); background: linear-gradient(140deg, var(--accent-strong), var(--accent-action)); color: var(--accent-ink); box-shadow: var(--shadow-inset); }
     .button-primary:hover:not(:disabled) { box-shadow: var(--shadow-inset); }
     .button-primary:disabled { border-color: var(--line-bright); background: color-mix(in srgb, var(--accent-action) 34%, var(--panel-raised)); color: var(--text-soft); box-shadow: none; opacity: 1; }
-    .button-secondary { border-color: var(--line-bright); background: linear-gradient(180deg, var(--panel-raised), var(--panel)); color: var(--text-soft); box-shadow: var(--shadow-inset); }
-    .button-secondary:hover:not(:disabled) { border-color: var(--active-border); background: var(--control-hover); color: var(--text); }
+    .button-secondary { border-color: var(--line); background: var(--panel); color: var(--text-soft); box-shadow: var(--shadow-inset); }
+    .button-secondary:hover:not(:disabled) { border-color: var(--line-bright); background: var(--control-hover); color: var(--text); }
     .button-ghost { border-color: transparent; background: transparent; color: var(--muted); }
     .button-ghost:hover:not(:disabled) { background: var(--control-hover); color: var(--text); }
     .button-danger { border-color: color-mix(in srgb, var(--red) 27%, transparent); background: color-mix(in srgb, var(--red) 7%, transparent); color: var(--red); }

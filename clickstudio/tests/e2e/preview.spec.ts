@@ -125,6 +125,31 @@ async function chooseExistingCloudTable(dialog: Locator) {
     await dialog.getByLabel('Import target table').selectOption('default.events');
 }
 
+test('Connect Cloud matches neutral secondary controls in both themes and accents', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/');
+    const connect = page.getByRole('button', { name: 'Connect Cloud', exact: true });
+    const save = page.getByTestId('save-query');
+    for (const theme of ['Dark', 'Light']) for (const accent of ['Cyan accent', 'ClickHouse yellow accent']) {
+        await page.getByRole('radio', { name: `${theme} theme`, exact: true }).click();
+        await page.getByRole('button', { name: accent, exact: true }).click();
+        await expect(connect).toHaveCSS('background-image', 'none');
+        for (const property of ['background-color', 'border-color']) {
+            await expect(connect).toHaveCSS(property, await save.evaluate((element, name) => getComputedStyle(element).getPropertyValue(name), property));
+        }
+        await save.hover();
+        await expect(save).toHaveCSS('color', await page.locator('.brand-name').evaluate(element => getComputedStyle(element).color));
+        const hover = await save.evaluate(element => {
+            const style = getComputedStyle(element);
+            return { background: style.backgroundColor, border: style.borderColor, text: style.color };
+        });
+        await connect.hover();
+        await expect(connect).toHaveCSS('background-color', hover.background);
+        await expect(connect).toHaveCSS('border-color', hover.border);
+        await expect(connect).toHaveCSS('color', hover.text);
+    }
+});
+
 test('Cloud actions stay outside the source picker and disconnect preserves another source', async ({ page }) => {
     await mockCloudEndpoint(page);
     await page.setViewportSize({ width: 384, height: 768 });

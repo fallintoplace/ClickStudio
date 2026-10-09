@@ -1,4 +1,4 @@
-import { test, expect, type Locator } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 import { replaceSql, runButton, trust } from './helpers.js';
 
 const shadow = (locator: Locator) => locator.evaluate(element => getComputedStyle(element).boxShadow)
@@ -7,6 +7,42 @@ const backdrop = (locator: Locator, native = false) => locator.evaluate((element
     const style = getComputedStyle(element, isNative ? '::backdrop' : undefined);
     return { color: style.backgroundColor, filter: style.backdropFilter };
 }, native);
+
+async function expectNeutralWorkspace(page: Page) {
+    const panel = await page.locator('.editor-surface').evaluate(element => getComputedStyle(element).backgroundColor);
+    const line = await page.locator('.topbar').evaluate(element => getComputedStyle(element).borderBottomColor);
+    const hoverPalette = await page.locator('html').evaluate(element => {
+        const style = getComputedStyle(element);
+        const color = (token: string) => {
+            const hex = style.getPropertyValue(token).trim().slice(1);
+            return `rgb(${[0, 2, 4].map(offset => Number.parseInt(hex.slice(offset, offset + 2), 16)).join(', ')})`;
+        };
+        return { background: color('--panel-hover'), border: color('--line-bright'), text: color('--text') };
+    });
+    for (const selector of ['.application', '.topbar', '.document-tabs', '.editor-heading', '.results-header', '.inspector-header', '.inspector-pane']) {
+        await expect(page.locator(selector)).toHaveCSS('background-image', 'none');
+        expect(await page.locator(selector).evaluate(element => getComputedStyle(element).backgroundColor)).toMatch(/^rgb\(/);
+    }
+    await expect(page.locator('.topbar')).toHaveCSS('backdrop-filter', 'none');
+    const header = await page.locator('.editor-heading').evaluate(element => getComputedStyle(element).backgroundColor);
+    await expect(page.locator('.results-header')).toHaveCSS('background-color', header);
+    await expect(page.locator('.inspector-header')).toHaveCSS('background-color', header);
+    await expect(page.locator('.inspector-pane')).toHaveCSS('background-color', panel);
+    const accent = await runButton(page).evaluate(element => getComputedStyle(element).backgroundImage);
+    expect(accent).toContain('linear-gradient');
+    const selected = await page.locator('.document-tab.is-active').evaluate(element => getComputedStyle(element).boxShadow);
+    expect(selected).not.toBe('none');
+    for (const control of [page.getByTestId('save-query'), page.locator('.panel-window-button').first(), page.locator('.panel-collapse-button').first()]) {
+        await expect(control).toHaveCSS('background-image', 'none');
+        await expect(control).toHaveCSS('background-color', panel);
+        await expect(control).toHaveCSS('border-color', line);
+        await control.hover();
+        await expect(control).toHaveCSS('background-image', 'none');
+        await expect(control).toHaveCSS('background-color', hoverPalette.background);
+        await expect(control).toHaveCSS('border-color', hoverPalette.border);
+        await expect(control).toHaveCSS('color', hoverPalette.text);
+    }
+}
 
 for (const theme of ['Dark', 'Light']) for (const mode of ['Standard', 'Experimental']) {
     test(`${theme} ${mode} keeps workspace panels flat and overlay depth neutral across accents`, async ({ page }) => {
@@ -45,6 +81,7 @@ for (const theme of ['Dark', 'Light']) for (const mode of ['Standard', 'Experime
         await expect(inspector).toHaveCSS('border-radius', '0px');
         await expect(inspector.locator('.object-tree-scroll')).toHaveCSS('border-radius', '4px');
         await expect(inspector.locator('.object-tree-count').first()).toHaveCSS('border-radius', '2px');
+        await expectNeutralWorkspace(page);
 
         await page.locator('.connection-trigger').click();
         const menu = page.getByRole('dialog', { name: 'Connection details', exact: true });
@@ -72,6 +109,7 @@ for (const theme of ['Dark', 'Light']) for (const mode of ['Standard', 'Experime
         await page.getByRole('button', { name: 'ClickHouse yellow accent', exact: true }).click();
         await expect(editor).toHaveCSS('border-radius', '4px');
         await expect(runButton(page)).toHaveCSS('border-radius', '4px');
+        await expectNeutralWorkspace(page);
         await page.locator('.connection-trigger').click();
         await expect(menu).toHaveCSS('box-shadow', menuShadow);
         await page.locator('.connection-trigger').click();
