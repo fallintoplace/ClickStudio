@@ -145,6 +145,11 @@ for (const mode of ['Standard', 'Experimental']) {
                 await toggle.click();
                 await expect(filter).toBeVisible();
                 await expect(filter).toBeFocused();
+                await expect(toggle).toBeHidden();
+                await header.getByRole('button', { name: 'Close row filter', exact: true }).click();
+                await expect(filter).toBeHidden();
+                await expect(toggle).toBeFocused();
+                await toggle.click();
                 await filter.press('Escape');
                 await expect(filter).toBeHidden();
                 await expect(toggle).toBeFocused();
@@ -158,7 +163,7 @@ for (const mode of ['Standard', 'Experimental']) {
                 await expectToolbarFits();
                 await filter.press('Escape');
                 await expect(filter).toHaveValue('2026-01-02');
-                await toggle.click();
+                await expect(toggle).toBeHidden();
                 await expect(filter).toBeVisible();
                 await expect(filter).toBeFocused();
                 await header.getByRole('button', { name: 'Clear row filter', exact: true }).click();

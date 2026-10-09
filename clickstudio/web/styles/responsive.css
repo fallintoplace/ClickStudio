@@ -186,7 +186,7 @@
     .results-actions { width: 100%; }
     .results-table-tools { flex: 1 1 100%; order: 1; }
     .result-table-toolbar { justify-content: space-between; }
-    .result-filter { width: min(45vw, 190px); }
+    .result-filter-field { width: min(45vw, 190px); }
     .table-pagination { justify-content: flex-start; gap: 7px 10px; }
     .table-pagination-controls { margin-left: auto; }
     .insight-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }

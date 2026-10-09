@@ -101,12 +101,17 @@ export function ResultGrid({ run, page, pageIndex, loading, onPage, showPaginati
     const filterId = useId();
     const filterInput = useRef<HTMLInputElement>(null);
     const filterButton = useRef<HTMLButtonElement>(null);
+    const restoreFilterFocus = useRef(false);
     useEffect(() => {
         if (filterOpen) filterInput.current?.focus();
+        else if (restoreFilterFocus.current) {
+            restoreFilterFocus.current = false;
+            filterButton.current?.focus();
+        }
     }, [filterOpen]);
     const closeFilter = () => {
+        restoreFilterFocus.current = true;
         setFilterOpen(false);
-        filterButton.current?.focus();
     };
     if (run.resultState === 'expired') return <div className="result-empty-state"><span className="empty-result-icon">⌛</span><strong>Result retention expired</strong><p>The SQL and query ID are still available. Run it again to fetch fresh data.</p></div>;
     if (run.resultState !== 'reopenable') return <div className="result-empty-state">{terminal(run) ? <span className="empty-result-icon">!</span> : <span className="loading-orbit"/>}<strong>{terminal(run) ? 'No retained result' : 'Query is running'}</strong><p>{terminal(run) ? 'This run did not produce result rows.' : 'The live execution status appears in the bottom bar.'}</p></div>;
@@ -125,23 +130,21 @@ export function ResultGrid({ run, page, pageIndex, loading, onPage, showPaginati
         {showPagination && <span className="result-row-count" role="status" aria-live="polite">{rowCount}</span>}
         {page.completeness === 'truncated' && <span className="result-completeness" title="Only the retained prefix is available. The query may have matched more rows."><span className="status-light is-warning"/>Retained prefix · truncated</span>}
         {showPagination && <div className="result-filter-controls">
-            <button ref={filterButton} className="button-base button-secondary result-filter-toggle" type="button" aria-expanded={filterOpen} aria-controls={filterId} title="Filter the current page" onClick={() => {
-                if (filter) filterInput.current?.focus();
-                else setFilterOpen(value => !value);
-            }}><Icon name="search"/>Filter</button>
-            <input ref={filterInput} id={filterId} hidden={!filterOpen} className="result-filter" type="search" aria-label="Filter current page" placeholder="Filter this page…" value={filter} onChange={event => setFilter(event.target.value)} onKeyDown={event => {
-                if (event.key === 'Escape') {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    if (!filter) closeFilter();
-                }
-            }}/>
-            {filterOpen && <>
-                <Button className="result-filter-clear" aria-label="Clear row filter" title="Clear row filter" onClick={() => {
+            <button ref={filterButton} hidden={filterOpen} className="button-base button-secondary result-filter-toggle" type="button" aria-expanded={filterOpen} aria-controls={filterId} title="Filter the current page" onClick={() => setFilterOpen(true)}><Icon name="search"/>Filter</button>
+            <div className="result-filter-field" hidden={!filterOpen}>
+                <Icon name="search" className="result-filter-icon"/>
+                <input ref={filterInput} id={filterId} hidden={!filterOpen} className="result-filter" type="search" aria-label="Filter current page" placeholder="Filter this page…" value={filter} onChange={event => setFilter(event.target.value)} onKeyDown={event => {
+                    if (event.key === 'Escape') {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        if (!filter) closeFilter();
+                    }
+                }}/>
+                {filterOpen && <button type="button" className="result-filter-clear" aria-label={filter ? 'Clear row filter' : 'Close row filter'} title={filter ? 'Clear row filter' : 'Close row filter'} onClick={() => {
                     setFilter('');
                     closeFilter();
-                }}><Icon name="close"/>Clear</Button>
-            </>}
+                }}><Icon name="close"/></button>}
+            </div>
         </div>}
     </div>;
     const emptyRowsMessage = page.totalRows > 0
