@@ -705,6 +705,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         history,
         run,
         failedQueryError,
+        script,
         copy,
         experience,
         view,

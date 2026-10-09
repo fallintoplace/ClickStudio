@@ -18,6 +18,7 @@ import type { WorkspaceViewState } from '../useWorkspaceViewState';
 import { SqlEditor, type EditorHandle } from './SqlEditor';
 import { Button, cx, Icon } from './ui';
 import { RunActionGroup } from './WorkspaceChrome';
+import { QueryFailureNotice } from './QueryFailureNotice';
 
 export type WorkspaceQueryPanelState = Readonly<{
     active: Draft;
@@ -81,7 +82,7 @@ export function WorkspaceQueryPanel({
         inspector,
         demoMode,
     } = state;
-    const { statementCount, editorErrorContext, editorErrorRange } = viewState;
+    const { statementCount, editorErrorContext, editorErrorRange, failureError, failureSql } = viewState;
     const { queryPanelRef } = panels;
     const selectedSql = active.to > active.from ? active.sql.slice(active.from, active.to) : undefined;
     const queryNameAtFocus = useRef(active.name);
@@ -169,5 +170,11 @@ export function WorkspaceQueryPanel({
                 </aside>}
             </div>
         </div>
+        {!panels.queryCollapsed && failureError && <QueryFailureNotice
+            key={`${failureError.code}:${failureError.message}:${failureSql}`}
+            error={failureError} sql={failureSql} copy={copy.common}
+            errorRange={editorErrorContext?.error === failureError ? editorErrorRange : undefined}
+            draftSql={active.sql}
+        />}
     </section>;
 }

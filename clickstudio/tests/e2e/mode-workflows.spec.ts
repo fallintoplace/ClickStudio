@@ -154,7 +154,7 @@ test('Standard keeps AI open after successful and failed query runs', async ({ p
     try {
         await replaceSql(page, 'SELECT * FROM missing_table');
         await runButton.click();
-        await expect(results.getByTestId('query-failure')).toContainText('SYNTAX_ERROR');
+        await expect(page.getByTestId('query-failure')).toContainText('SYNTAX_ERROR');
         await expect(assistant).toBeVisible();
         await expect(question).toHaveValue('Keep the AI panel open');
     } finally {

@@ -122,6 +122,8 @@ export function WorkspaceResultsPanel({
         staleResultReason,
         staleResultLabel,
         sourceDeleted,
+        failureError,
+        failureSql,
     } = viewState;
     const { resultsPanelRef } = panels;
 
@@ -132,13 +134,9 @@ export function WorkspaceResultsPanel({
     const executionSql = execution?.sql.replace(/\s+/g, ' ').trim();
     const executionSqlPreview = executionSql && executionSql.length > 180 ? `${executionSql.slice(0, 177).trimEnd()}…` : executionSql;
     const failedScriptStatement = script?.statements.find(statement => statement.status === 'failed' && statement.error);
-    const failureError = failedAttempt?.error ?? failedScriptStatement?.error ?? (run?.status === 'failed' ? run.error : undefined);
-    const failureSql = failedAttempt?.statementSql ?? failedScriptStatement?.sql ?? (run?.status === 'failed' ? run.sql : undefined);
     const previousSuccessfulResult = Boolean((failedAttempt || (failedScriptStatement && !failedScriptStatement.runId)) && run?.resultState === 'reopenable' && run.status !== 'failed');
     const resultProvenance = visibleResultsView !== 'sqlmap' && !execution
-        ? previousSuccessfulResult
-            ? { description: copy.common.previousResultsDescription, label: copy.common.previousResults }
-            : !failedAttempt && staleResult
+        ? !previousSuccessfulResult && !failedAttempt && staleResult
                 ? { description: staleResultReason, label: staleResultLabel, sourceDeleted }
                 : undefined
         : undefined;
@@ -150,6 +148,12 @@ export function WorkspaceResultsPanel({
         className={cx('results-surface', experience === 'expert' && 'results-expert', panels.resultsCollapsed && 'is-collapsed')}
         aria-label={resultsPanelLabel}
     >
+        {detached && failureError && visibleResultsView !== 'sqlmap' && !panels.resultsCollapsed && <QueryFailureNotice
+            key={`${failureError.code}:${failureError.message}:${failureSql}`}
+            error={failureError} sql={failureSql} copy={copy.common}
+            errorRange={viewState.editorErrorContext?.error === failureError ? viewState.editorErrorRange : undefined}
+            draftSql={active.sql}
+        />}
         <div className="results-header">
             <div className="results-title">
                 <span className="results-mark"><Icon name={visibleResultsView === 'sqlmap' || visibleResultsView === 'pipeline' || visibleResultsView === 'indexes' || visibleResultsView === 'runtime' ? 'pipeline' : 'chart'}/></span>
@@ -173,6 +177,7 @@ export function WorkspaceResultsPanel({
                     <strong>{resultProvenance.label}</strong>
                 </span>}
                 <div ref={setTableToolbar} className="results-table-tools" hidden={panels.resultsCollapsed}/>
+                {previousSuccessfulResult && visibleResultsView !== 'results' && !(visibleResultsView === 'chart' && snapshotChart?.config.kind === 'table') && <span className="result-previous-run" title={copy.common.previousResultsDescription}>{copy.common.previousRun}</span>}
                 {detached
                     ? <Button variant="ghost" className="panel-window-button" aria-label={copy.common.dockResultsPanel} title={copy.common.dockResultsPanel} onClick={actions.onDockDetached}><Icon name="dock"/></Button>
                     : !panels.compactViewport && <Button variant="ghost" className="panel-window-button" aria-label={copy.common.openResultsInNewWindow} title={copy.common.openResultsInNewWindow} onClick={actions.onOpenDetached}><Icon name="newWindow"/></Button>}
@@ -182,19 +187,13 @@ export function WorkspaceResultsPanel({
         <ScrollEdgeFrame<HTMLDivElement> className="results-content-frame" hidden={panels.resultsCollapsed}>{ref => <div id="query-results-content" ref={ref} className={cx('panel-content results-content', ['insights', 'indexes', 'plan', 'pipeline', 'runtime'].includes(visibleResultsView) && 'results-content-scrollable')} hidden={panels.resultsCollapsed}>
             {detached && !run && !execution && !failedAttempt && visibleResultsView !== 'sqlmap' && <div className="detached-results-empty"><Icon name="chart"/><span>{copy.common.detachedResultsEmpty}</span></div>}
             {visibleResultsView === 'sqlmap' && <SqlFlowView copy={copy.common} sql={sqlMapStatement?.sql ?? active.sql} sourceOffset={sqlMapStatement?.from ?? 0} parseResult={sqlMapParseStatement?.result} parserEnabled={nativeParserEnabled} parserStatus={nativeParserStatus} parseDurationMs={nativeParseSnapshot?.elapsedMs} connectionId={connection.id} parameters={active.parameters} analyzerAvailable={queryTreeAvailable} analyzerUnavailableReason={queryTreeUnavailableReason} onRevealRange={actions.onRevealRange}/>}
-            {failureError && visibleResultsView !== 'sqlmap' && <QueryFailureNotice
-                key={`${failureError.code}:${failureError.message}:${failureSql}`}
-                error={failureError} sql={failureSql} copy={copy.common}
-                errorRange={viewState.editorErrorContext?.error === failureError ? viewState.editorErrorRange : undefined}
-                draftSql={active.sql} onRevealRange={actions.onRevealRange}
-            />}
             {execution && visibleResultsView !== 'sqlmap' && <div className={cx('result-execution-progress', !showPreviousResult && 'is-initial')} aria-busy="true">
                 <div className="result-execution-heading"><span className="loading-orbit" aria-hidden="true"/><span role="status" aria-live="polite">{copy.common.statusRunning}</span><strong className="result-execution-query" title={active.name}>{active.name}</strong>{showPreviousResult && <span className="result-execution-previous">Previous result</span>}</div>
                 <pre className="result-execution-sql is-preview">{executionSqlPreview}</pre>
                 {execution.sql.length > 180 && <details className="result-execution-details"><summary>{copy.common.expandQuery}</summary><pre className="result-execution-sql is-full">{execution.sql}</pre></details>}
             </div>}
             {visibleResultsView === 'results' && script && <ScriptResults script={script} runs={history} activeRunId={run?.id} onSelectRun={actions.onSelectScriptRun} onCancel={actions.onCancel} cancelDisabled={cancelling} cancelAfterCurrentStatement={connection.id === CLICKHOUSE_CLOUD_CONNECTION_ID}/>}
-            {resultsRun && !(failureError && resultsRun.resultState !== 'reopenable') && visibleResultsView === 'results' && (!execution || showPreviousResult) && <ResultGrid key={resultsRun.id} run={resultsRun} page={resultsPage} pageIndex={resultsPageIndex} loading={!resultsPage && resultsRun.resultState === 'reopenable'} onPage={actions.onPage} showPagination={!showPreviousResult} obscured={showPreviousResult} toolbarContainer={tableToolbar}/>}
+            {resultsRun && !(failureError && resultsRun.resultState !== 'reopenable') && visibleResultsView === 'results' && (!execution || showPreviousResult) && <ResultGrid key={resultsRun.id} run={resultsRun} page={resultsPage} pageIndex={resultsPageIndex} loading={!resultsPage && resultsRun.resultState === 'reopenable'} onPage={actions.onPage} showPagination={!showPreviousResult} obscured={showPreviousResult} toolbarContainer={tableToolbar} previousRunLabel={previousSuccessfulResult ? copy.common.previousRun : undefined}/>}
             {run && visibleResultsView === 'indexes' && <ExplainIndexesView analysis={explainIndexAnalysis} loading={!retainedSnapshot && run.resultState === 'reopenable'} copy={copy.common}/>}
             {run && visibleResultsView === 'plan' && <ExplainPlanView plan={explainPlan} loading={!retainedSnapshot && run.resultState === 'reopenable'} copy={copy.common}/>}
             {run && visibleResultsView === 'pipeline' && (pipelineResult
@@ -202,7 +201,7 @@ export function WorkspaceResultsPanel({
                 : <div className="pipeline-graph-empty" role="status">{copy.common.pipelineNoOutput}</div>)}
             {run && visibleResultsView === 'runtime' && <ExplainAnalyzeView evidence={analyzeEvidence} loading={!retainedSnapshot && run.resultState === 'reopenable'} copy={copy.common}/>}
             {run && visibleResultsView === 'chart' && snapshotChart?.config.kind === 'table'
-                ? <div className="chart-table-fallback"><div className="chart-table-notice" role="status">{copy.chart.fallbackNoMeasure}</div><ResultGrid key={`${run.id}-chart-table`} run={run} page={resultPage} pageIndex={page} loading={!resultPage && run.resultState === 'reopenable'} onPage={actions.onPage} toolbarContainer={tableToolbar}/></div>
+                ? <div className="chart-table-fallback"><div className="chart-table-notice" role="status">{copy.chart.fallbackNoMeasure}</div><ResultGrid key={`${run.id}-chart-table`} run={run} page={resultPage} pageIndex={page} loading={!resultPage && run.resultState === 'reopenable'} onPage={actions.onPage} toolbarContainer={tableToolbar} previousRunLabel={previousSuccessfulResult ? copy.common.previousRun : undefined}/></div>
                 : run && visibleResultsView === 'chart' && <ChartView result={retainedSnapshot} loading={!retainedSnapshot && run.resultState === 'reopenable'} chart={active.chart} onChart={chart => actions.onPatch({ chart })} copy={copy} locale={locale}/>}
             {run && visibleResultsView === 'map' && <GeoView result={retainedSnapshot} loading={!retainedSnapshot && run.resultState === 'reopenable'} locale={locale}/>}
             {run && visibleResultsView === 'insights' && <InsightsView comparison={{ connectionId: connection.id, trusted, history, initialRun: run, profiles: profilesByRun, pipelines: pipelinesByRun, queryLogAvailable: connection.manifest?.queryLog.available === true }} run={run} profile={profile} pipeline={pipeline} pipelineAvailable={Boolean(trusted && connection.manifest?.pipeline.available)} flamegraph={flamegraph} flamegraphCapability={trusted ? connection.manifest?.traceLog : { available: false, reason: 'Trust this connection to inspect profiler samples.' }} onLoad={actions.onLoadProfile} onLoadPipeline={actions.onLoadPipeline} onLoadFlamegraph={actions.onLoadFlamegraph} loading={busy === 'save'}/>}

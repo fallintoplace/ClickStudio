@@ -95,7 +95,7 @@ function ResultColumnHeader({ name, type, group }: { name: string; type: string;
     </th>;
 }
 
-export function ResultGrid({ run, page, pageIndex, loading, onPage, showPagination = true, obscured = false, toolbarContainer }: { run: Run; page?: ResultPage; pageIndex: number; loading: boolean; onPage: (page: number) => void; showPagination?: boolean; obscured?: boolean; toolbarContainer?: HTMLElement | null }) {
+export function ResultGrid({ run, page, pageIndex, loading, onPage, showPagination = true, obscured = false, toolbarContainer, previousRunLabel }: { run: Run; page?: ResultPage; pageIndex: number; loading: boolean; onPage: (page: number) => void; showPagination?: boolean; obscured?: boolean; toolbarContainer?: HTMLElement | null; previousRunLabel?: string }) {
     const [filter, setFilter] = useState('');
     const [filterOpen, setFilterOpen] = useState(false);
     const filterId = useId();
@@ -127,7 +127,7 @@ export function ResultGrid({ run, page, pageIndex, loading, onPage, showPaginati
         ? `${visibleRows.length.toLocaleString()} of ${page.rows.length.toLocaleString()} rows${pageCount > 1 ? ' on this page' : ''}`
         : `${page.totalRows.toLocaleString()} ${pageCount > 1 ? 'retained ' : ''}${page.totalRows === 1 ? 'row' : 'rows'}`;
     const toolbar = (showPagination || page.completeness === 'truncated') && <div className="result-table-toolbar" inert={obscured || undefined}>
-        {showPagination && <span className="result-row-count" role="status" aria-live="polite">{rowCount}</span>}
+        {showPagination && <span className="result-row-count" role="status" aria-live="polite">{rowCount}{previousRunLabel && <> · {previousRunLabel}</>}</span>}
         {page.completeness === 'truncated' && <span className="result-completeness" title="Only the retained prefix is available. The query may have matched more rows."><span className="status-light is-warning"/>Retained prefix · truncated</span>}
         {showPagination && <div className="result-filter-controls">
             <button ref={filterButton} hidden={filterOpen} className="button-base button-secondary result-filter-toggle" type="button" aria-expanded={filterOpen} aria-controls={filterId} title="Filter the current page" onClick={() => setFilterOpen(true)}><Icon name="search"/>Filter</button>

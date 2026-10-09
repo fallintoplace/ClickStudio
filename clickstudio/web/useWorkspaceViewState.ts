@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { QueryDocument, Result, Run } from '../shared/types';
+import type { QueryDocument, Result, Run, Script } from '../shared/types';
 import { parseExplainPlan } from '../shared/explain-plan';
 import { parseExplainAnalyze } from '../shared/explain-analyze';
 import { parseExplainIndexAnalysis } from '../shared/explain-indexes';
@@ -31,6 +31,7 @@ export function useWorkspaceViewState({
     history,
     run,
     failedQueryError,
+    script,
     copy,
     experience,
     view,
@@ -48,6 +49,7 @@ export function useWorkspaceViewState({
     history: Run[];
     run?: Run;
     failedQueryError?: FailedQueryError;
+    script?: Script;
     copy: Copy;
     experience: ExperienceLevel;
     view: ResultsView;
@@ -64,6 +66,9 @@ export function useWorkspaceViewState({
         readError: documentsReadError,
     });
     const statementCount = safeStatementCount(active.sql);
+    const failedScriptStatement = script?.statements.find(statement => statement.status === 'failed' && statement.error);
+    const failureError = failedQueryError?.error ?? failedScriptStatement?.error ?? (run?.status === 'failed' ? run.error : undefined);
+    const failureSql = failedQueryError?.statementSql ?? failedScriptStatement?.sql ?? (run?.status === 'failed' ? run.sql : undefined);
     const selectedRunStatement = safeSelectedStatement(active.sql, active.from, active.to);
     const runErrorContext = run?.error && (run.sql === active.sql || run.sql === selectedRunStatement?.sql)
         ? { draftId: active.id, draftSql: active.sql, statementSql: run.sql, sourceFrom: run.sourceFrom ?? (run.sql === active.sql ? 0 : selectedRunStatement?.from ?? 0), error: run.error }
@@ -123,6 +128,8 @@ export function useWorkspaceViewState({
         savedDocument,
         saveStatus,
         statementCount,
+        failureError,
+        failureSql,
         editorErrorContext,
         editorErrorRange,
         staleResult,
