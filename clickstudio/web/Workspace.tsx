@@ -237,7 +237,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
     const [busy, setBusy] = useState<BusyAction>('');
     const [cancelling, setCancelling] = useState(false);
     const { error, setError, notice, setNotice } = useWorkspaceNotifications();
-    const executionFailureRef = useRef(false);
+    const executionFailureRef = useRef<string | undefined>(undefined);
     const executionInFlightRef = useRef(false);
     const { error: failedQueryError, clear: clearFailedQueryError, record: storeFailedQueryError } = useFailedQueryErrors(active.id);
     const [search, setSearch] = useState('');
@@ -344,8 +344,9 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         try { await task(); }
         catch (caught) {
             if (executionFailureRef.current) {
-                executionFailureRef.current = false;
-                setError(`${copy.common.statusFailed} · ${copy.common.queryResults}`);
+                const failedDraftId = executionFailureRef.current;
+                executionFailureRef.current = undefined;
+                if (workspaceRef.current.activeId !== failedDraftId) setError(copy.common.queryFailed);
             } else setError(message(caught));
         }
         finally { setBusy(''); }
@@ -368,7 +369,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         return true;
     };
     const recordFailedQueryError = (failure: FailedQueryError) => {
-        executionFailureRef.current = true;
+        executionFailureRef.current = failure.draftId;
         storeFailedQueryError(failure);
         if (workspaceRef.current.activeId !== failure.draftId) return;
         setViewForDraft(failure.draftId, 'results', true);
@@ -876,7 +877,10 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
             onSelectScriptRun: runId => { if (active.scriptId) scriptFollowRef.current = { scriptId: active.scriptId, enabled: false }; update(active.id, draft => ({ ...draft, activeRunId: runId })); setView('results'); },
             onOpenDetached: detachedResults.openResults, onDockDetached: detachedResults.dockResults, onCancel: () => void cancel(), onPage: setPage, onPatch: patch,
             onLoadProfile: () => void perform(loadProfile, 'save'), onLoadPipeline: () => void perform(loadPipeline, 'save'), onLoadFlamegraph: () => void perform(loadFlamegraph, 'save'),
-            onRevealRange: (from, to) => editor.current?.revealRange(from, to),
+            onRevealRange: (from, to) => {
+                panels.revealPanelTemporarily('query', active.id);
+                window.requestAnimationFrame(() => { editor.current?.revealRange(from, to); editor.current?.focus(); });
+            },
         }}
         panels={panels} viewState={viewState} detached={Boolean(detachedResults.detached)}
     />;

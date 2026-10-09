@@ -65,12 +65,20 @@
     .result-provenance-header { display: grid; min-width: 0; max-width: min(420px, 42vw); flex: 0 1 360px; grid-template-columns: 7px minmax(0, 1fr); align-items: start; gap: 2px 6px; margin-left: 5px; padding: 5px 8px; border: 1px solid color-mix(in srgb, var(--amber) 27%, var(--line)); border-radius: var(--radius-panel); background: color-mix(in srgb, var(--amber) 8%, color-mix(in srgb, var(--panel-raised) 78%, transparent)); color: var(--text-soft); }
     .result-provenance-header.is-source-deleted { border-color: color-mix(in srgb, var(--red) 38%, var(--line)); background: color-mix(in srgb, var(--red) 8%, color-mix(in srgb, var(--panel-raised) 78%, transparent)); }
     .result-provenance-header.is-source-deleted .status-light { background: var(--red); box-shadow: var(--status-ring); color: var(--red); }
-    .result-failure.callout-error { display: grid; flex: none; gap: 7px; margin: 8px 12px 0; padding: 9px 11px; border: 1px solid color-mix(in srgb, var(--red) 34%, var(--line)); border-radius: var(--radius-panel); background: linear-gradient(115deg, color-mix(in srgb, var(--red) 8%, color-mix(in srgb, var(--panel-raised) 78%, transparent)), color-mix(in srgb, var(--panel-raised) 80%, transparent)); color: var(--text-soft); box-shadow: none; backdrop-filter: blur(12px) saturate(130%); -webkit-backdrop-filter: blur(12px) saturate(130%); }
-    .result-failure-heading { display: grid; min-width: 0; grid-template-columns: 7px minmax(0, 1fr); align-items: start; gap: 8px; }
-    .result-failure-heading > .status-light { margin-top: 3px; }
-    .result-failure-heading > div { display: grid; min-width: 0; gap: 4px; }
-    .result-failure-heading strong { color: var(--red); font-size: 10px; font-weight: 720; }
-    .result-failure-heading > div > span { overflow-wrap: anywhere; font-size: 9px; line-height: 1.45; }
+    .result-provenance-header.is-failed-attempt { display: inline-flex; flex: none; max-width: none; align-items: center; gap: 6px; padding: 4px 7px; border-radius: var(--radius-label); background: transparent; }
+    .result-provenance-header.is-failed-attempt .status-light { margin-top: 0; }
+    .result-failure { flex: none; margin: 0; padding: 8px 12px; border-bottom: 1px solid color-mix(in srgb, var(--red) 30%, var(--line)); border-left: 2px solid var(--red); background: color-mix(in srgb, var(--red) 5%, var(--panel)); color: var(--text-soft); }
+    .result-failure-heading { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+    .result-failure-heading > .status-light { flex: none; }
+    .result-failure-heading > div:not(.result-failure-actions) { display: grid; min-width: 0; flex: 1 1 180px; gap: 3px; }
+    .result-failure-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+    .result-failure-title strong { color: var(--red); font-size: 11px; font-weight: 680; }
+    .result-failure-title > span { color: var(--muted); font-size: 10px; }
+    .result-failure-heading > div > span { overflow-wrap: anywhere; font-size: 11px; line-height: 1.45; }
+    .result-failure-actions { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: 4px; margin-left: auto; }
+    .result-failure-actions .button-base { min-height: 28px; padding: 4px 8px; font-size: 10px; }
+    .result-failure-diagnostics { max-height: min(50vh, 420px); overflow: auto; margin-top: 8px; }
+    .result-failure-code { color: var(--muted); font: 10px var(--font-mono); }
     .result-failure-detail { max-height: min(24vh, 220px); margin: 7px 0; padding: 8px; overflow: auto; border: 1px solid var(--line); border-radius: var(--radius-panel); background: color-mix(in srgb, var(--panel) 78%, transparent); color: var(--text-soft); font: 9px/1.5 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
     .result-failure-sql-label { display: block; margin: 8px 0 5px; color: var(--muted); font-size: 8px; letter-spacing: .08em; text-transform: uppercase; }
     .result-provenance-header .status-light { width: 7px; height: 7px; grid-row: 1 / span 2; margin-top: 2px; }

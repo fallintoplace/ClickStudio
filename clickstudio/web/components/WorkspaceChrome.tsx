@@ -90,7 +90,7 @@ export function ExecutionBar({ run, failedAttempt, eventState, onCancel, onOpenD
     return <footer className={cx('execution-bar', executionInProgress && 'is-running')} data-run-status={failedAttempt ? 'failed' : currentRun?.status ?? 'ready'} data-query-id={currentRun?.queryId}>
         <div className="execution-state">
             {failedAttempt
-                ? <span className="execution-ready-state" role="status"><span className="status-light is-error"/>{copy.statusFailed}</span>
+                ? <span className="execution-ready-state" role="status"><span className="status-light is-error"/>{copy.queryFailed}</span>
                 : currentRun
                 ? <Status run={currentRun} copy={copy}/>
                 : <span className="execution-ready-state"><span className="status-light is-trusted"/>{copy.statusReady}</span>}

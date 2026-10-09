@@ -481,7 +481,7 @@ test('The execution indicator clears when run submission fails', async ({ page }
     }
 });
 
-test('A failed query stays in Results beside the previous success until retry', async ({ page }) => {
+test('A failed query stays in Results beside the previous success until retry', async ({ page }, testInfo) => {
     await trust(page);
     const results = await runQuery(page);
     const failedTab = page.getByRole('tab').filter({ hasText: 'Getting started.sql' });
@@ -508,13 +508,25 @@ test('A failed query stays in Results beside the previous success until retry', 
         await expect(failure).toContainText('Syntax error at position 15');
         await expect(failure.locator('pre.result-execution-sql')).toHaveText(submittedSql);
         await expect(results.locator('.result-provenance-header')).toContainText('Previous result');
-        await expect(results.locator('.result-provenance-header')).toContainText('The latest attempt failed.');
+        await expect(results.locator('.result-provenance-header')).toHaveAttribute('title', 'The latest query failed. These results are from the last successful run.');
         await expect(results.getByRole('table', { name: 'Retained query rows' })).toBeVisible();
         await expect(page.locator('.execution-bar')).toHaveAttribute('data-run-status', 'failed');
         await expect(page.locator('.execution-bar')).not.toHaveAttribute('data-query-id');
 
-        await page.getByRole('button', { name: 'Dismiss error', exact: true }).click();
-        await expect(failure).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Dismiss error', exact: true })).toHaveCount(0);
+        await expect(page.locator('.execution-bar')).toContainText('Query failed');
+        const jump = failure.getByRole('button', { name: 'Go to error', exact: true });
+        await jump.click();
+        await expect(page.locator('.cm-content')).toBeFocused();
+        await expect(page.locator('.cm-sql-map-highlight')).toHaveText('i');
+        const details = failure.getByRole('button', { name: 'Details', exact: true });
+        await expect(details).toHaveAttribute('aria-expanded', 'false');
+        await details.click();
+        await expect(failure.locator('.result-failure-detail')).toBeVisible();
+        await expect(failure.locator('.result-execution-sql')).toBeVisible();
+        await details.click();
+        await expect(failure.locator('.result-failure-detail')).toBeHidden();
+        await page.screenshot({ path: testInfo.outputPath('previous-results.png') });
 
         await openBlankSql(page);
         await expect(page.locator('.execution-bar')).toHaveAttribute('data-run-status', 'ready');
@@ -523,6 +535,7 @@ test('A failed query stays in Results beside the previous success until retry', 
         await expect(failure).toBeVisible();
 
         await replaceSql(page, 'SELECT 1');
+        await expect(failure.getByRole('button', { name: 'Go to error', exact: true })).toHaveCount(0);
         const retryResponse = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/runs');
         await runButton(page).click();
         await retryResponse;
@@ -533,6 +546,71 @@ test('A failed query stays in Results beside the previous success until retry', 
         await page.unroute(runRoute);
     }
 });
+
+test('A query failure in another draft remains discoverable without showing its error in the active draft', async ({ page }) => {
+    await trust(page);
+    let release = () => {};
+    const pending = new Promise<void>(resolve => { release = resolve; });
+    await page.route(url => url.pathname === '/api/runs', async route => {
+        if (route.request().method() !== 'POST') return route.continue();
+        await pending;
+        await route.fulfill({ status: 400, json: { error: { code: 'SYNTAX_ERROR', message: 'Syntax error', position: 0 } } });
+    });
+    await replaceSql(page, 'SELECT broken');
+    const request = page.waitForRequest(request => request.method() === 'POST' && new URL(request.url()).pathname === '/api/runs');
+    await runButton(page).click();
+    await request;
+    await openBlankSql(page);
+    release();
+    await expect(page.locator('.toast-error')).toContainText('Query failed');
+    await expect(page.getByTestId('query-failure')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Dismiss error', exact: true }).click();
+    await page.getByRole('tab').filter({ hasText: 'Getting started.sql' }).click();
+    await expect(page.getByTestId('query-failure')).toBeVisible();
+});
+
+for (const theme of ['Dark', 'Light']) {
+    test(`Query failure is compact and recoverable in ${theme.toLowerCase()} mode`, async ({ page }, testInfo) => {
+        await trust(page);
+        await page.getByRole('radio', { name: `${theme} theme`, exact: true }).click();
+        const sql = 'SELECT 1\nGROUP BY';
+        const message = 'Syntax error: failed at position 10 (GROUP) (line 2, col 1): GROUP BY FORMAT JSONCompactStringsEachRowWithNamesAndTypes. Expected one of: token, expression, identifier.';
+        await page.route(url => url.pathname === '/api/runs', async route => {
+            if (route.request().method() === 'POST') return route.fulfill({ status: 400, json: { error: { code: 'CLICKHOUSE_62', message } } });
+            await route.continue();
+        });
+        await replaceSql(page, sql);
+        await runButton(page).click();
+        const results = page.getByRole('region', { name: 'Query results', exact: true });
+        const failure = results.getByTestId('query-failure');
+        await expect(failure).toBeVisible();
+        await expect(failure.locator('.result-failure-heading')).toContainText('Syntax error');
+        await expect(failure.locator('.result-failure-heading')).toContainText('Line 2, column 1');
+        await expect(failure.locator('.result-failure-heading')).toContainText('Error near GROUP.');
+        await expect(failure.locator('.result-failure-heading')).not.toContainText('Expected one of');
+        await expect(failure.locator('.result-failure-detail')).toBeHidden();
+        await expect(results).not.toContainText('No retained result');
+        await expect(page.locator('.toast-error')).toHaveCount(0);
+        await expect(results.locator('.result-provenance-header')).toHaveCount(0);
+        const bounds = await failure.boundingBox();
+        expect(bounds!.height).toBeLessThan(75);
+        await failure.getByRole('button', { name: 'Go to error', exact: true }).click();
+        await expect(page.locator('.cm-sql-map-highlight')).toHaveText('G');
+        await expect(page.locator('.cm-content')).toBeFocused();
+        await failure.getByRole('button', { name: 'Details', exact: true }).click();
+        await expect(failure.locator('.result-failure-detail')).toHaveText(message);
+        await expect(failure.locator('.result-execution-sql')).toHaveText(sql);
+        await failure.getByRole('button', { name: 'Details', exact: true }).click();
+        await page.screenshot({ path: testInfo.outputPath('error-desktop.png') });
+        await page.setViewportSize({ width: 390, height: 844 });
+        await expect(failure.getByRole('button', { name: 'Details', exact: true })).toBeInViewport();
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+        await page.screenshot({ path: testInfo.outputPath('error-mobile.png') });
+        await replaceSql(page, 'SELECT 2');
+        await expect(failure.getByRole('button', { name: 'Go to error', exact: true })).toHaveCount(0);
+        await expect(failure.locator('.result-failure-title')).not.toContainText('Line 2');
+    });
+}
 
 test('A failed saved run shows its error in Results', async ({ page }) => {
     await trust(page);
@@ -547,12 +625,12 @@ test('A failed saved run shows its error in Results', async ({ page }) => {
         if (route.request().method() !== 'POST') return route.continue();
         const response = await route.fetch();
         const run = await response.json() as Record<string, unknown>;
-        failedRun = { ...run, status: 'failed', resultState: 'unavailable', error: { code: 'SYNTAX_ERROR', message: 'Syntax error at position 15' } };
+        failedRun = { ...run, status: 'failed', resultState: 'unavailable', error: { code: 'SYNTAX_ERROR', message: 'Syntax error at position 15', position: Number(run.sourceFrom ?? 0) + 15 } };
         await route.fulfill({ response, json: failedRun });
     });
 
     try {
-        await replaceSql(page, 'SELECT * FROM missing_table');
+        await replaceSql(page, '\nSELECT * FROM missing_table');
         const submitted = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/runs');
         await runButton(page).click();
         await submitted;
@@ -561,6 +639,11 @@ test('A failed saved run shows its error in Results', async ({ page }) => {
         await expect(results.getByTestId('query-failure')).toContainText('SYNTAX_ERROR');
         await expect(results.getByTestId('query-failure')).toContainText('Syntax error at position 15');
         await expect(page.locator('.execution-bar')).toHaveAttribute('data-run-status', 'failed');
+        await expect(results).not.toContainText('No retained result');
+        await expect(results.locator('.result-provenance-header')).toHaveCount(0);
+        await expect(results.locator('.result-failure-title')).toContainText('Line 2, column 16');
+        await results.getByRole('button', { name: 'Go to error', exact: true }).click();
+        await expect(page.locator('.cm-sql-map-highlight')).toHaveText('i');
     } finally {
         await page.unroute(runRoute);
         await page.unroute(runDetailRoute);
@@ -1522,7 +1605,7 @@ test('Script errors without a statement run ID show the ClickHouse error and fai
         await expect(failure).toContainText(message);
         await expect(results.getByRole('button', { name: 'Statement 1: failed', exact: true })).toBeVisible();
         await expect(results.getByRole('button', { name: 'Statement 2: skipped', exact: true })).toBeVisible();
-        await failure.locator('details summary').click();
+        await failure.getByRole('button', { name: 'Details', exact: true }).click();
         await expect(failure.locator('.result-failure-detail')).toHaveText(message);
         await expect(failure.locator('.result-failure-heading')).not.toContainText('every parser hint');
         await expect(failure.locator('.result-execution-sql.is-full')).toHaveText('SELECT 1 AS value FORMAT JSONEachRow');

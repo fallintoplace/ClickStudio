@@ -74,7 +74,7 @@ export function useWorkspaceViewState({
     const requestErrorContext = failedQueryError?.draftId === active.id && failedQueryError.draftSql === active.sql ? failedQueryError : undefined;
     const editorErrorContext = requestErrorContext ?? runErrorContext;
     const editorErrorRange = editorErrorContext
-        ? sqlErrorRangeInDraft(active.sql, editorErrorContext.statementSql, editorErrorContext.sourceFrom, editorErrorContext.error)
+        ? sqlErrorRangeInDraft(active.sql, editorErrorContext.statementSql, editorErrorContext.sourceFrom, editorErrorContext.error, editorErrorContext === runErrorContext && run?.sourceFrom !== undefined ? 'draft' : 'statement')
         : undefined;
     const invalidatedSource = run && active.activeRunId === run.id && active.invalidatedSource?.runId === run.id
         ? active.invalidatedSource

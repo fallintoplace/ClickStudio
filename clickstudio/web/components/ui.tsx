@@ -72,7 +72,7 @@ export function Button({ variant = 'secondary', className = '', type = 'button',
 export function Status({ run, copy }: { run?: Run; copy?: Copy['common'] }) {
     const kind = terminal(run) ? run?.status === 'succeeded' ? 'is-trusted' : run?.status === 'truncated' ? 'is-warning' : 'is-error' : 'is-running';
     const statusCopy: Partial<Record<NonNullable<Run>['status'], keyof Copy['common']>> = {
-        queued: 'statusQueued', running: 'statusRunning', succeeded: 'statusSucceeded', truncated: 'statusTruncated', failed: 'statusFailed',
+        queued: 'statusQueued', running: 'statusRunning', succeeded: 'statusSucceeded', truncated: 'statusTruncated', failed: 'queryFailed',
         cancelled: 'statusCancelled', timed_out: 'statusTimedOut', interrupted: 'statusInterrupted',
     };
     const key = run ? statusCopy[run.status] : undefined;
