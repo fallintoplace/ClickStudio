@@ -63,7 +63,8 @@ test('Experimental mode uses the Standard right inspector layout', async ({ page
 test('One Run button and the explain actions stay visible in Experimental mode', async ({ page }) => {
     await trust(page);
     const actions = page.getByRole('group', { name: 'Run actions', exact: true });
-    const run = actions.getByRole('button', { name: 'Run', exact: true });
+    const run = page.locator('.editor-heading-actions').getByRole('button', { name: 'Run', exact: true });
+    await expect(page.getByRole('button', { name: 'Run', exact: true })).toHaveCount(1);
     await expect(run).toBeVisible();
     await expect(actions.getByRole('button', { name: 'Run script', exact: true })).toHaveCount(0);
     await expect(actions.getByRole('button', { name: 'EXPLAIN INDEXES', exact: true })).toBeVisible();

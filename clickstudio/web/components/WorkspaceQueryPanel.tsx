@@ -131,24 +131,15 @@ export function WorkspaceQueryPanel({
                     }
                 }}
             /></label></div>
-            {experience === 'expert' && <div className="editor-heading-tools">
-                {runButton}
-                {saveButton}
-            </div>}
             <div className="editor-heading-actions">
-                {experience === 'beginner' && <>
-                    <Button variant="ghost" className="sql-ai-button" data-testid="open-ai" aria-label={copy.common.askAi} aria-pressed={inspector === 'assistant'} onClick={actions.onOpenAssistant}><Icon name="assistant"/>{copy.common.askAi}</Button>
-                    <Button variant="ghost" className="toolbar-small standard-format-button" data-testid="format-sql" aria-label={copy.common.formatSql} title={copy.common.formatSql} onClick={() => void actions.onFormat(standardFormatter)}>{copy.common.format}</Button>
-                    {saveButton}
-                    {runButton}
+                {experience === 'beginner' && <Button variant="ghost" className="sql-ai-button" data-testid="open-ai" aria-label={copy.common.askAi} aria-pressed={inspector === 'assistant'} onClick={actions.onOpenAssistant}><Icon name="assistant"/>{copy.common.askAi}</Button>}
+                {experience === 'expert' && nativeParserEnabled && nativeParserStatus === 'unavailable' && <>
+                    <span className="toolbar-small" role="status" title="Formatting remains available while the native parser is unavailable.">{copy.common.parserUnavailable}</span>
+                    <Button variant="ghost" className="toolbar-small" onClick={() => editorRef.current?.retryNativeParser()}>{copy.common.retryParser}</Button>
                 </>}
-                {experience === 'expert' && <>
-                    {nativeParserEnabled && nativeParserStatus === 'unavailable' && <>
-                        <span className="toolbar-small" role="status" title="Formatting remains available while the native parser is unavailable.">{copy.common.parserUnavailable}</span>
-                        <Button variant="ghost" className="toolbar-small" onClick={() => editorRef.current?.retryNativeParser()}>{copy.common.retryParser}</Button>
-                    </>}
-                    <Button variant="ghost" className="toolbar-small standard-format-button" data-testid="format-sql" aria-label={copy.common.formatSql} title={copy.common.formatSql} onClick={() => void actions.onFormat(standardFormatter)}>{copy.common.format}</Button>
-                </>}
+                <Button variant="ghost" className="toolbar-small standard-format-button" data-testid="format-sql" aria-label={copy.common.formatSql} title={copy.common.formatSql} onClick={() => void actions.onFormat(standardFormatter)}>{copy.common.format}</Button>
+                {saveButton}
+                {runButton}
                 {detached
                     ? <Button variant="ghost" className="panel-window-button" aria-label={copy.common.dockQueryEditor} title={copy.common.dockQueryEditor} onClick={actions.onDockDetached}><Icon name="dock"/></Button>
                     : !panels.compactViewport && <Button variant="ghost" className="panel-window-button" aria-label={copy.common.openQueryInNewWindow} title={copy.common.openQueryInNewWindow} onClick={actions.onOpenDetached}><Icon name="newWindow"/></Button>}

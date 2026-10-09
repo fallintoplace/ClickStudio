@@ -54,8 +54,6 @@
     .editor-heading-actions { padding-right: 42px; }
     .editor-heading .panel-collapse-button { position: absolute; z-index: 1; top: 50%; right: 12px; flex: none; translate: 0 -50%; }
     .editor-heading-tools { display: flex; min-width: 0; align-items: center; gap: 2px; margin-inline: auto; padding: 2px; border: 1px solid var(--line); border-radius: var(--radius-control); background: color-mix(in srgb, var(--panel-raised) 58%, transparent); }
-    .editor-heading-tools > .button-base { min-height: 30px; padding-inline: 9px; }
-    .editor-heading-tools > .save-revision-button { min-height: 30px; }
     .editor-workspace-layout { display: grid; min-width: 0; min-height: 0; flex: 1; grid-template-columns: minmax(0, 1fr) 184px; overflow: hidden; }
     .workspace-root.is-beginner .editor-workspace-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
     .editor-main-column { display: flex; min-width: 0; min-height: 0; flex-direction: column; overflow: auto; }

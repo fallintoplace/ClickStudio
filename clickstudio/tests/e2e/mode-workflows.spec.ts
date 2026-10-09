@@ -467,22 +467,38 @@ test('Experimental insights and AI requests do not execute SQL', async ({ page }
     await expect(page.locator('.execution-bar')).toHaveAttribute('data-query-id', queryId);
 });
 
-for (const theme of ['Dark', 'Light']) test(`Experimental puts Run first in the header and opens SQL map after execution in ${theme} mode`, async ({ page }) => {
+for (const theme of ['Dark', 'Light']) test(`Experimental matches Standard query actions and opens SQL map after execution in ${theme} mode`, async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
     await trust(page);
     await useAdvancedMode(page);
     await page.getByRole('radio', { name: `${theme} theme`, exact: true }).click();
     const run = page.getByTestId('run-button');
-    const header = page.locator('.editor-heading-tools');
+    const header = page.locator('.editor-heading-actions');
     await expect(run).toHaveCount(1);
+    await expect(page.getByTestId('save-query')).toHaveCount(1);
+    await expect(page.locator('.editor-heading-tools')).toHaveCount(0);
     await expect(header.getByTestId('run-button')).toBeVisible();
-    await expect(header.getByRole('button').first()).toHaveAttribute('data-testid', 'run-button');
+    await expect(header.getByRole('button').nth(0)).toHaveAttribute('data-testid', 'format-sql');
+    await expect(header.getByRole('button').nth(1)).toHaveAttribute('data-testid', 'save-query');
+    await expect(header.getByRole('button').nth(2)).toHaveAttribute('data-testid', 'run-button');
     await expect(page.getByRole('button', { name: 'Visualize SQL structure', exact: true })).toHaveCount(0);
     await expect(page.getByRole('tab', { name: 'SQL map', exact: true })).toHaveCount(0);
     for (const width of [1440, 720, 390]) {
         await page.setViewportSize({ width, height: 900 });
+        const readActionStyles = () => header.locator('[data-testid="save-query"], [data-testid="run-button"]').evaluateAll(elements => elements.map(element => {
+            const style = getComputedStyle(element);
+            const bounds = element.getBoundingClientRect();
+            return { width: bounds.width, height: bounds.height, fontSize: style.fontSize, padding: style.padding, gap: style.gap, borderRadius: style.borderRadius, color: style.color, background: style.background, shadow: style.boxShadow };
+        }));
+        const experimentalStyles = await readActionStyles();
+        await page.getByText('Standard', { exact: true }).click();
+        await expect(page.locator('.workspace-root')).toHaveClass(/is-beginner/);
+        expect(await readActionStyles()).toEqual(experimentalStyles);
+        await useAdvancedMode(page);
         await expect(run).toBeVisible();
         await expect(run).toHaveText('Run');
-        await expect(run).toHaveCSS('font-size', '11px');
+        await expect(page.getByTestId('save-query')).toBeVisible();
+        await expect(page.getByTestId('save-query')).toHaveText('Save');
         const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
         expect(overflow).toBeLessThanOrEqual(1);
     }

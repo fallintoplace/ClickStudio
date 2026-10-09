@@ -23,9 +23,6 @@
 @media (max-width: 1120px) {
     .topbar { gap: 12px; padding: 0 14px; }
     .topbar-preferences .select-control > span { display: none; }
-    .editor-heading-tools > .button-base { width: 32px; min-width: 32px; padding-inline: 0; font-size: 0; }
-    .editor-heading-tools > .button-base svg { width: 15px; height: 15px; }
-    .editor-heading-tools > .run-query-button { width: auto; min-width: 70px; padding-inline: 12px; font-size: 11px; }
     .execution-bar { gap: 9px; }
     .execution-link-state { display: none; }
     .execution-telemetry { gap: 8px; }
@@ -173,9 +170,7 @@
     .run-explain-label { grid-column: 1 / -1; }
     .sql-ai-button, .save-revision-button { width: 31px; min-width: 31px; padding: 0; font-size: 0; }
     .sql-ai-button svg, .save-revision-button svg { width: 15px; height: 15px; }
-    .workspace-root.is-beginner .sql-ai-button, .workspace-root.is-beginner .save-revision-button { width: auto; min-width: 0; padding: 0 8px; font-size: 8px; }
-    .editor-heading-tools .sql-ai-button, .editor-heading-tools .save-revision-button { width: 32px; min-width: 32px; padding: 0; font-size: 0; }
-    .editor-heading-tools .sql-ai-button svg, .editor-heading-tools .save-revision-button svg { width: 15px; height: 15px; }
+    .editor-heading-actions .sql-ai-button, .editor-heading-actions .save-revision-button { width: auto; min-width: 0; padding: 0 8px; font-size: 8px; }
     .run-action-group { gap: 4px; }
     .run-action-group .run-query-button { min-width: 70px; padding: 0 8px; }
     .run-option-button { min-height: 30px; padding: 0 7px; font-size: 8px; }

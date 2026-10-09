@@ -781,7 +781,20 @@ test('Native parser can be retried after a temporary worker failure', async ({ p
     await trust(page);
     const retry = page.getByRole('button', { name: 'Retry parser', exact: true });
     await expect(retry).toBeVisible();
+    await page.setViewportSize({ width: 390, height: 900 });
+    const header = page.locator('.editor-heading');
+    const bounds = await header.boundingBox();
+    expect(bounds).not.toBeNull();
+    for (const button of [retry, page.getByTestId('format-sql'), page.getByTestId('save-query'), runButton(page)]) {
+        await expect(button).toBeVisible();
+        const buttonBounds = await button.boundingBox();
+        expect(buttonBounds).not.toBeNull();
+        expect(buttonBounds!.x).toBeGreaterThanOrEqual(bounds!.x);
+        expect(buttonBounds!.x + buttonBounds!.width).toBeLessThanOrEqual(bounds!.x + bounds!.width);
+        await button.click({ trial: true });
+    }
     await retry.click();
+    await page.setViewportSize({ width: 1440, height: 900 });
     await openWorkspacePanel(page, 'parser');
     await expect(page.getByText('Ready · local WebAssembly', { exact: true })).toBeVisible();
     await expect.poll(() => page.evaluate(() => Number(window.__parserParseCount ?? 0))).toBeGreaterThan(0);
