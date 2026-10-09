@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { displayValue, filterRows } from '../../shared/results';
 import type { ResultPage, Run } from '../../shared/types';
@@ -27,6 +27,72 @@ function resultTypeGroup(type: string): ResultTypeGroup {
     if (/^(?:String|FixedString|Enum8|Enum16|UUID|IPv4|IPv6)\b/i.test(baseType)) return 'text';
     if (/^(?:Array|Map|Tuple|Nested|JSON|Object|Dynamic|Variant|AggregateFunction)\b/i.test(baseType)) return 'complex';
     return 'other';
+}
+
+function ResultColumnHeader({ name, type, group }: { name: string; type: string; group: ResultTypeGroup }) {
+    const header = useRef<HTMLTableCellElement>(null);
+    const details = useRef<HTMLDivElement>(null);
+    const closeTimer = useRef<number | undefined>(undefined);
+    const detailsId = useId();
+    const [position, setPosition] = useState<{ left: number; top: number; width: number; maxHeight: number }>();
+    const showDetails = useCallback(() => {
+        window.clearTimeout(closeTimer.current);
+        const element = header.current;
+        if (!element) return;
+        const rect = element.getBoundingClientRect();
+        const width = Math.min(420, window.innerWidth - 16);
+        const top = Math.min(rect.bottom + 6, window.innerHeight - 48);
+        setPosition({ left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)), top, width, maxHeight: window.innerHeight - top - 8 });
+    }, []);
+    const hideDetails = () => {
+        window.clearTimeout(closeTimer.current);
+        closeTimer.current = window.setTimeout(() => {
+            if (document.activeElement !== header.current) setPosition(undefined);
+        }, 120);
+    };
+    useEffect(() => () => window.clearTimeout(closeTimer.current), []);
+    const open = Boolean(position);
+    useEffect(() => {
+        if (!open) return;
+        const close = (event: Event) => {
+            if (event.target instanceof Node && details.current?.contains(event.target)) return;
+            if (document.activeElement === header.current) showDetails();
+            else setPosition(undefined);
+        };
+        const dismiss = (event: KeyboardEvent) => {
+            if (event.key !== 'Escape') return;
+            event.preventDefault();
+            event.stopPropagation();
+            setPosition(undefined);
+        };
+        window.addEventListener('resize', close);
+        document.addEventListener('scroll', close, true);
+        document.addEventListener('keydown', dismiss, true);
+        return () => {
+            window.removeEventListener('resize', close);
+            document.removeEventListener('scroll', close, true);
+            document.removeEventListener('keydown', dismiss, true);
+        };
+    }, [open, showDetails]);
+    return <th ref={header} scope="col" tabIndex={0} data-type-group={group} aria-describedby={position ? detailsId : undefined}
+        onMouseEnter={showDetails} onFocus={showDetails}
+        onMouseLeave={hideDetails}
+        onBlur={() => setPosition(undefined)}
+        onKeyDown={event => {
+            if (event.key === 'Escape' && position) {
+                event.stopPropagation();
+                setPosition(undefined);
+            } else if (position && details.current && ['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp'].includes(event.key)) {
+                event.preventDefault();
+                event.stopPropagation();
+                const step = event.key.startsWith('Page') ? details.current.clientHeight : 24;
+                details.current.scrollTop += event.key.endsWith('Up') ? -step : step;
+            }
+        }}>
+        <div className="result-column-heading"><span>{name}</span><small>{type}</small></div>
+        {position && createPortal(<div ref={details} id={detailsId} role="tooltip" className="result-column-details" style={position}
+            onMouseEnter={() => window.clearTimeout(closeTimer.current)} onMouseLeave={hideDetails}><strong>{name}</strong><div>{type}</div></div>, document.body)}
+    </th>;
 }
 
 export function ResultGrid({ run, page, pageIndex, loading, onPage, showPagination = true, obscured = false, toolbarContainer }: { run: Run; page?: ResultPage; pageIndex: number; loading: boolean; onPage: (page: number) => void; showPagination?: boolean; obscured?: boolean; toolbarContainer?: HTMLElement | null }) {
@@ -87,7 +153,7 @@ export function ResultGrid({ run, page, pageIndex, loading, onPage, showPaginati
         {toolbarContainer ? createPortal(toolbar, toolbarContainer) : toolbar}
         <ScrollEdgeFrame<HTMLDivElement> className="data-table-scroll-frame">{(ref, edges) => <div ref={ref} className="data-table-scroll" role="region" aria-label={edges.left || edges.right ? 'Retained query rows. Scroll horizontally to view all columns.' : 'Retained query rows'} tabIndex={edges.left || edges.right ? 0 : undefined}>
                 <table className="data-table" aria-label="Retained query rows">
-                    <thead><tr><th className="row-number">#</th>{page.columns.map((column, index) => <th key={`${column.name}-${index}`} data-type-group={columnGroups[index] ?? 'other'}><span>{column.name}</span><small>{column.type}</small></th>)}</tr></thead>
+                    <thead><tr><th className="row-number" scope="col">#</th>{page.columns.map((column, index) => <ResultColumnHeader key={`${column.name}-${index}`} name={column.name} type={column.type} group={columnGroups[index] ?? 'other'}/>)}</tr></thead>
                     <tbody>{visibleRows.map(({ row, index: rowIndex }) => <tr key={`${page.offset}-${rowIndex}`} style={{ animationDelay: `${Math.min(rowIndex, 12) * 16}ms` }}><td className="row-number">{page.offset + rowIndex + 1}</td>{row.map((value, index) => <td key={index} title={displayValue(value)} data-type-group={columnGroups[index] ?? 'other'} className={value === null ? 'cell-null' : ''}>{displayValue(value)}</td>)}</tr>)}</tbody>
                 </table>
                 {page.rows.length === 0 ? <div className="no-rows" role="status">{emptyRowsMessage}</div> : visibleRows.length === 0 && <div className="no-rows">No rows match on this page.</div>}
