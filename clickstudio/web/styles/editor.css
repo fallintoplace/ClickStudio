@@ -80,6 +80,8 @@
     .button-primary { border-color: color-mix(in srgb, var(--accent-action) 72%, white 4%); background: linear-gradient(140deg, var(--accent-strong), var(--accent-action)); color: var(--accent-ink); box-shadow: var(--shadow-inset); }
     .button-primary:hover:not(:disabled) { box-shadow: var(--shadow-inset); }
     .button-primary:disabled { border-color: var(--line-bright); background: color-mix(in srgb, var(--accent-action) 34%, var(--panel-raised)); color: var(--text-soft); box-shadow: none; opacity: 1; }
+    :root[data-theme="click-light"][data-accent="clickhouse-yellow"] .button-primary:not(:disabled) { background: var(--accent-action); }
+    :root[data-theme="click-light"][data-accent="clickhouse-yellow"] .button-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--accent-action) 92%, var(--accent-ink)); }
     .button-secondary { border-color: var(--line); background: var(--panel); color: var(--text-soft); box-shadow: var(--shadow-inset); }
     .button-secondary:hover:not(:disabled) { border-color: var(--line-bright); background: var(--control-hover); color: var(--text); }
     .button-ghost { border-color: transparent; background: transparent; color: var(--muted); }

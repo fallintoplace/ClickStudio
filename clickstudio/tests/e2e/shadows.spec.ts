@@ -29,7 +29,9 @@ async function expectNeutralWorkspace(page: Page) {
     await expect(page.locator('.inspector-header')).toHaveCSS('background-color', header);
     await expect(page.locator('.inspector-pane')).toHaveCSS('background-color', panel);
     const accent = await runButton(page).evaluate(element => getComputedStyle(element).backgroundImage);
-    expect(accent).toContain('linear-gradient');
+    const flatYellow = await page.locator('html').evaluate(element => element.dataset.theme === 'click-light' && element.dataset.accent === 'clickhouse-yellow');
+    if (flatYellow) expect(accent).toBe('none');
+    else expect(accent).toContain('linear-gradient');
     const selected = await page.locator('.document-tab.is-active').evaluate(element => getComputedStyle(element).boxShadow);
     expect(selected).not.toBe('none');
     for (const control of [page.getByTestId('save-query'), page.locator('.panel-window-button').first(), page.locator('.panel-collapse-button').first()]) {

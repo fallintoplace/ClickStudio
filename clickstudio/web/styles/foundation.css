@@ -133,7 +133,7 @@
     --accent-cyan-ink: #ffffff;
     --accent-clickhouse-yellow: #6b6c00;
     --accent-clickhouse-yellow-strong: #626700;
-    --accent-clickhouse-yellow-action: #faff69;
+    --accent-clickhouse-yellow-action: #f5e36a;
     --accent-clickhouse-yellow-ink: #15191a;
     --accent: var(--accent-cyan);
     --accent-strong: var(--accent-cyan-strong);

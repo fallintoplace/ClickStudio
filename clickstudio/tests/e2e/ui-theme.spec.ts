@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { runButton, trust } from './helpers.js';
 
 const themes = [
     {
@@ -21,7 +22,7 @@ const themes = [
         accent: '#08758d',
         action: '#08758d',
         yellowAccent: '#6b6c00',
-        yellowAction: '#faff69',
+        yellowAction: '#f5e36a',
         chrome: '#ffffff',
         logoColor: '#161616',
     },
@@ -93,6 +94,54 @@ for (const theme of themes) test(`${theme.value} supports the ClickHouse yellow 
     await expect(themeOption(page, theme.value)).toBeChecked();
     await expect(accentOption(page, 'clickhouse-yellow')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('html')).toHaveAttribute('data-accent', 'clickhouse-yellow');
+});
+
+for (const mode of ['Standard', 'Experimental']) test(`${mode} keeps light yellow Run flat and readable across interaction states`, async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await trust(page);
+    await page.getByText(mode, { exact: true }).click();
+    await themeOption(page, 'click-light').click();
+    await accentOption(page, 'clickhouse-yellow').click();
+    const run = runButton(page);
+    await expect(run).toHaveCSS('background-image', 'none');
+    await expect(run).toHaveCSS('background-color', 'rgb(245, 227, 106)');
+    for (const state of ['normal', 'hover', 'focus']) {
+        if (state === 'hover') await run.hover();
+        if (state === 'focus') {
+            await page.mouse.move(0, 0);
+            await page.keyboard.press('Tab');
+            await run.focus();
+            await expect(run).toHaveCSS('outline-style', 'solid');
+        }
+        await expect(run).toHaveCSS('background-image', 'none');
+        const contrast = await run.evaluate(element => {
+            const style = getComputedStyle(element);
+            const canvas = document.createElement('canvas');
+            canvas.width = canvas.height = 1;
+            const context = canvas.getContext('2d')!;
+            const luminance = (color: string) => {
+                context.fillStyle = color;
+                context.fillRect(0, 0, 1, 1);
+                return [...context.getImageData(0, 0, 1, 1).data].slice(0, 3).map(value => {
+                    const channel = value / 255;
+                    return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+                }).reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index]!, 0);
+            };
+            const text = luminance(style.color);
+            const fill = luminance(style.backgroundColor);
+            return (Math.max(text, fill) + 0.05) / (Math.min(text, fill) + 0.05);
+        });
+        expect(contrast, `${mode} ${state} Run text contrast`).toBeGreaterThanOrEqual(7);
+    }
+    await themeOption(page, 'click-dark').click();
+    await expect(run).toHaveCSS('background-image', /linear-gradient/);
+    await themeOption(page, 'click-light').click();
+    await accentOption(page, 'cyan').click();
+    await expect(run).toHaveCSS('background-image', /linear-gradient/);
+    await accentOption(page, 'clickhouse-yellow').click();
+    await page.reload();
+    await expect(run).toHaveCSS('background-image', 'none');
+    await expect(run).toHaveCSS('background-color', 'rgb(245, 227, 106)');
 });
 
 test('an unknown saved theme falls back to ClickDark', async ({ page }) => {
