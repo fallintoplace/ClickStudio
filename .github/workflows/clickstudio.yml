@@ -6,9 +6,9 @@ concurrency:
 
 on:
   push:
-    paths: ["clickstudio/**", "package.json", "src/index.ts", ".github/workflows/clickstudio.yml"]
+    paths: ["clickstudio/**", "package.json", ".github/workflows/clickstudio.yml"]
   pull_request:
-    paths: ["clickstudio/**", "package.json", "src/index.ts", ".github/workflows/clickstudio.yml"]
+    paths: ["clickstudio/**", "package.json", ".github/workflows/clickstudio.yml"]
   workflow_dispatch:
 
 permissions:
