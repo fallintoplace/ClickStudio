@@ -244,6 +244,7 @@ export function ImportWizard({ onImportQuery, importCopy, ...controllerProps }: 
             ref={dialogRef}
             aria-labelledby="import-wizard-title"
             onCancel={event => {
+                if (event.target !== event.currentTarget) return;
                 event.preventDefault();
                 if (openingQuery) return;
                 if (importKind === 'query') closeQueryMode();
