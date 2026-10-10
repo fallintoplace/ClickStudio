@@ -80,17 +80,24 @@ test('An unconfirmed cancellation warns without claiming the query stopped', asy
     await expect(toast).toHaveCount(0);
 });
 
-test('Trust, saving, and script completion use their existing inline feedback', async ({
-    page,
-}) => {
+test('Trust, saving, and script completion stay quiet', async ({ page }) => {
     await trust(page);
     await expect(page.locator('.toast')).toHaveCount(0);
     await replaceSql(page, 'SELECT 101');
+    const saved = page.waitForResponse(
+        response =>
+            response.request().method() === 'POST' &&
+            new URL(response.url()).pathname === '/api/documents',
+    );
     await page.getByTestId('save-query').click();
-    await expect(page.locator('.save-inline-status')).toHaveText('Saved');
+    expect((await saved).ok()).toBeTruthy();
+    await expect(page.locator('.tab-unsaved')).toHaveCount(0);
+    await expect(page.locator('.editor-surface').getByText('Saved', { exact: true })).toHaveCount(
+        0,
+    );
     await expect(page.locator('.toast')).toHaveCount(0);
     await replaceSql(page, 'SELECT 102');
-    await expect(page.locator('.save-inline-status')).toHaveCount(0);
+    await expect(page.locator('.tab-unsaved')).toHaveCount(1);
     await replaceSql(page, 'SELECT 1; SELECT 2');
     await runButton(page).click();
     await expect(page.locator('.script-results-summary')).toContainText('succeeded');

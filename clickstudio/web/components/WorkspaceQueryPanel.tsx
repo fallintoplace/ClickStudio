@@ -39,7 +39,6 @@ export type WorkspaceQueryPanelState = Readonly<{
     executionPending: boolean;
     cancelling: boolean;
     draftFeedback?: WorkspaceFeedback;
-    saveStatus: WorkspaceViewState['saveStatus'];
 }>;
 
 export type WorkspaceQueryPanelActions = Readonly<{
@@ -137,26 +136,19 @@ export function WorkspaceQueryPanel({
         </Button>
     );
     const saveButton = (
-        <>
-            {state.saveStatus.state === 'saved' && (
-                <span className="save-inline-status" role="status">
-                    Saved
-                </span>
-            )}
-            <Button
-                variant="secondary"
-                className="save-revision-button standard-save-button"
-                data-testid="save-query"
-                aria-label={copy.common.save}
-                aria-keyshortcuts="Control+S Meta+S"
-                title={`${copy.common.save} (Ctrl/Cmd+S)`}
-                onClick={() => void actions.onSave(active)}
-                disabled={Boolean(busy) || !active.name.trim()}
-            >
-                <Icon name="documents" />
-                {copy.common.save}
-            </Button>
-        </>
+        <Button
+            variant="secondary"
+            className="save-revision-button standard-save-button"
+            data-testid="save-query"
+            aria-label={copy.common.save}
+            aria-keyshortcuts="Control+S Meta+S"
+            title={`${copy.common.save} (Ctrl/Cmd+S)`}
+            onClick={() => void actions.onSave(active)}
+            disabled={Boolean(busy) || !active.name.trim()}
+        >
+            <Icon name="documents" />
+            {copy.common.save}
+        </Button>
     );
     const getTrustDescription = () => {
         if (demoMode) {

@@ -2891,10 +2891,6 @@
   .workspace-inline-notice > button {
     flex: none;
   }
-  .save-inline-status {
-    color: var(--muted);
-    font-size: 10px;
-  }
   .toast > button:hover {
     background: var(--panel-hover);
     color: var(--text);

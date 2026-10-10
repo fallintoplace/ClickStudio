@@ -210,7 +210,6 @@ export function Workspace({
                 executionPending: Boolean(pendingExecution.execution),
                 cancelling,
                 draftFeedback: model.draftFeedback,
-                saveStatus: model.saveStatus,
             }}
             actions={{
                 onPatch: patch,
