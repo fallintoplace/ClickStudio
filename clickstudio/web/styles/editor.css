@@ -526,12 +526,11 @@
     box-shadow: none;
     opacity: 1;
   }
-  :root[data-theme="click-light"][data-accent="clickhouse-yellow"]
-    .button-primary:not(:disabled) {
+  :root[data-theme="click-light"] .button-primary:not(:disabled) {
+    border-color: var(--accent);
     background: var(--accent-action);
   }
-  :root[data-theme="click-light"][data-accent="clickhouse-yellow"]
-    .button-primary:hover:not(:disabled) {
+  :root[data-theme="click-light"] .button-primary:hover:not(:disabled) {
     background: color-mix(in srgb, var(--accent-action) 92%, var(--accent-ink));
   }
   .button-secondary {
@@ -707,23 +706,23 @@
   }
   .sql-editor .cm-native-function {
     /* stylelint-disable-next-line declaration-no-important -- Override CodeMirror runtime styles outside the component layer. */
-    color: var(--accent) !important;
+    color: var(--editor-function) !important;
     font-weight: 650;
   }
   .sql-editor .cm-native-alias {
     /* stylelint-disable-next-line declaration-no-important -- Override CodeMirror runtime styles outside the component layer. */
-    color: var(--green) !important;
+    color: var(--editor-alias) !important;
     font-weight: 560;
   }
   .sql-editor .cm-native-substitution {
     /* stylelint-disable-next-line declaration-no-important -- Override CodeMirror runtime styles outside the component layer. */
-    color: var(--violet) !important;
+    color: var(--editor-parameter) !important;
     font-weight: 600;
   }
   .sql-editor .cm-native-string-escape,
   .sql-editor .cm-native-string-metacharacter {
     /* stylelint-disable-next-line declaration-no-important -- Override CodeMirror runtime styles outside the component layer. */
-    color: var(--amber) !important;
+    color: var(--editor-string) !important;
     font-weight: 650;
   }
   .sql-editor .cm-sql-map-highlight {
@@ -741,10 +740,10 @@
     padding: 0 8px 0 4px;
   }
   .sql-editor .cm-activeLine {
-    background: color-mix(in srgb, var(--accent) 3%, transparent);
+    background: var(--editor-active-line);
   }
   .sql-editor .cm-activeLineGutter {
-    background: color-mix(in srgb, var(--accent) 4%, transparent);
+    background: var(--editor-active-gutter);
   }
   .sql-editor .cm-focused {
     outline: none;

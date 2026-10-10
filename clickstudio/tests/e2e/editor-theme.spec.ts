@@ -1,8 +1,9 @@
 import { test, expect, type Page } from '@playwright/test';
+import { PNG } from 'pngjs';
 import { replaceSql } from './helpers.js';
 
-const sql = "SELECT /* aggregate */ quantile(0.50)(number) AS p50_ms, 1000000, -2, 'frontend', 'it''s', true, NULL, {limit:UInt64}, \"quoted name\" FROM numbers(7) -- latency";
-const tokens = ['SELECT', '/* aggregate */', 'quantile', 'p50_ms', '0.50', '1000000', '-2', "'frontend'", "'it''s'", 'true', 'NULL', '{limit:UInt64}', 'quoted name', 'FROM', 'numbers', '-- latency'];
+const sql = "SELECT /* aggregate */ quantile(0.50)(number) AS p50_ms, 1000000, -2, 'frontend', 'it''s', true, NULL, {limit:UInt64}, \"quoted name\", `FROM`, `toDate`, `UInt64`, \"SELECT\" FROM numbers(7) -- latency";
+const tokens = ['SELECT', '/* aggregate */', 'quantile', 'p50_ms', '0.50', '1000000', '-2', "'frontend'", "'it''s'", 'true', 'NULL', '{limit:UInt64}', 'quoted name', '`FROM`', '`toDate`', '`UInt64`', '"SELECT"', 'FROM', 'numbers', '-- latency'];
 
 async function tokenContrast(page: Page, selected: boolean) {
     return page.locator('.cm-content').evaluate((content, { tokens, selected }) => {
@@ -41,8 +42,9 @@ async function tokenContrast(page: Page, selected: boolean) {
                     const element = node.parentElement!;
                     const foreground = rgba(getComputedStyle(element).color);
                     const line = element.closest('.cm-line')!;
-                    let background = blend(rgba(getComputedStyle(line).backgroundColor), panel);
+                    let background = panel;
                     if (selected) background = blend(rgba(getComputedStyle(selection!).backgroundColor), background);
+                    background = blend(rgba(getComputedStyle(line).backgroundColor), background);
                     const light = luminance(foreground);
                     const dark = luminance(background);
                     ratios.push((Math.max(light, dark) + 0.05) / (Math.min(light, dark) + 0.05));
@@ -65,6 +67,15 @@ for (const parser of ['wasm', 'basic']) {
 
         for (const theme of ['Dark', 'Light']) {
             await page.getByRole('radio', { name: `${theme} theme`, exact: true }).click();
+            for (const token of ['`FROM`', '`toDate`', '`UInt64`', '"SELECT"']) {
+                await expect(page.locator('.cm-content span').filter({ hasText: token }).last()).toHaveCSS('color', theme === 'Light' ? 'rgb(31, 31, 31)' : 'rgb(239, 248, 250)');
+            }
+            await expect(page.locator('.cm-content span').filter({ hasText: /^NULL$/ }).last()).toHaveCSS('color', theme === 'Light' ? 'rgb(0, 0, 255)' : 'rgb(197, 152, 255)');
+            if (theme === 'Light') {
+                for (const [token, color] of [['SELECT', 'rgb(0, 0, 255)'], ["'frontend'", 'rgb(163, 21, 21)'], ['0.50', 'rgb(8, 118, 69)'], ['/* aggregate */', 'rgb(0, 112, 0)'], ['quantile', 'rgb(121, 94, 38)']] as const) {
+                    await expect(page.locator('.cm-content span').filter({ hasText: new RegExp(`^${token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`) }).last()).toHaveCSS('color', color);
+                }
+            }
             for (const accent of ['Cyan accent', 'ClickHouse yellow accent']) {
                 await page.getByRole('button', { name: accent, exact: true }).click();
                 for (const state of ['normal', 'active', 'selected']) {
@@ -88,6 +99,30 @@ for (const parser of ['wasm', 'basic']) {
         }
     });
 }
+
+test('Light editor selections stay visible over the active line with both accents', async ({ page }, info) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/');
+    await replaceSql(page, `SELECT${' '.repeat(20)}1`);
+    await page.getByRole('radio', { name: 'Light theme', exact: true }).click();
+    const editor = page.locator('.cm-content');
+    for (const accent of ['Cyan accent', 'ClickHouse yellow accent']) {
+        await page.getByRole('button', { name: accent, exact: true }).click();
+        await editor.focus();
+        await page.keyboard.press('ControlOrMeta+End');
+        const before = PNG.sync.read(await page.screenshot({ caret: 'hide' }));
+        await page.keyboard.press('ControlOrMeta+a');
+        const selection = page.locator('.cm-selectionBackground');
+        await expect(selection).toBeVisible();
+        const bounds = (await selection.boundingBox())!;
+        const after = PNG.sync.read(await page.screenshot({ caret: 'hide', path: info.outputPath(`${accent}-selection.png`) }));
+        const x = Math.floor(bounds.x + bounds.width / 2), y = Math.floor(bounds.y + bounds.height / 2);
+        const offset = (y * after.width + x) * 4;
+        const change = [0, 1, 2].reduce((sum, channel) => sum + Math.abs(after.data[offset + channel]! - before.data[offset + channel]!), 0);
+        expect(change, `${accent}: selected whitespace must visibly differ from the active line`).toBeGreaterThan(30);
+        await page.keyboard.press('ArrowRight');
+    }
+});
 
 test('Switching the editor theme preserves the cursor and undo history', async ({ page }) => {
     await page.goto('/');

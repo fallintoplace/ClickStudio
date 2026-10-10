@@ -18,16 +18,18 @@ import { appendSqlSnippet, clickhouseSnippetCompletions, sqlEditorTools, sqlStat
 import { clickHouseNativeParser } from '../clickhouse-native-parser';
 import { ScrollEdgeFrame } from './ScrollEdgeShadows';
 const sqlHighlightStyle = HighlightStyle.define([
-    { tag: tags.keyword, color: 'var(--text)', fontWeight: '600' },
-    { tag: [tags.number, tags.bool, tags.null], color: 'var(--violet)' },
-    { tag: [tags.string, tags.escape], color: 'var(--amber)' },
+    { tag: tags.keyword, color: 'var(--editor-keyword)', fontWeight: '600' },
+    { tag: tags.number, color: 'var(--editor-number)' },
+    { tag: [tags.bool, tags.null], color: 'var(--editor-literal)' },
+    { tag: [tags.string, tags.escape], color: 'var(--editor-string)' },
     { tag: tags.special(tags.string), color: 'var(--text)' },
-    { tag: tags.standard(tags.name), color: 'var(--accent)' },
-    { tag: tags.comment, color: 'var(--muted)' },
-    { tag: [tags.operator, tags.punctuation, tags.typeName], color: 'var(--text-soft)' },
+    { tag: tags.standard(tags.name), color: 'var(--editor-function)' },
+    { tag: tags.comment, color: 'var(--editor-comment)' },
+    { tag: tags.typeName, color: 'var(--editor-type)' },
+    { tag: [tags.operator, tags.punctuation], color: 'var(--text-soft)' },
 ]);
 const keywordCompletions = [...new Set(CLICKHOUSE_KEYWORDS.split(' '))].map(label => ({ label, type: 'keyword' }));
-const clickhouse = SQLDialect.define({ keywords: CLICKHOUSE_KEYWORDS, types: 'String Bool UInt8 UInt16 UInt32 UInt64 UInt128 UInt256 Int8 Int16 Int32 Int64 Int128 Int256 Float32 Float64 Date Date32 DateTime DateTime64 Nullable Array Tuple Map Decimal LowCardinality UUID JSON', builtin: 'count sum avg min max uniq uniqExact quantile median toDate toDateTime toStartOfDay toStartOfHour now today numbers arrayJoin arrayMap arrayFilter multiIf ifNull coalesce', doubleQuotedStrings: false, hashComments: true });
+const clickhouse = SQLDialect.define({ keywords: CLICKHOUSE_KEYWORDS.toLowerCase().replace(/\bnull\b/g, ''), types: 'String Bool UInt8 UInt16 UInt32 UInt64 UInt128 UInt256 Int8 Int16 Int32 Int64 Int128 Int256 Float32 Float64 Date Date32 DateTime DateTime64 Nullable Array Tuple Map Decimal LowCardinality UUID JSON'.toLowerCase(), builtin: 'count sum avg min max uniq uniqExact quantile median toDate toDateTime toStartOfDay toStartOfHour now today numbers arrayJoin arrayMap arrayFilter multiIf ifNull coalesce'.toLowerCase(), doubleQuotedStrings: false, identifierQuotes: '`"', hashComments: true });
 const clickhouseFunctions = [
     ['count', 'Aggregate count of rows'], ['sum', 'Aggregate numeric values'], ['avg', 'Average numeric values'], ['uniqExact', 'Exact distinct count'],
     ['quantile', 'Approximate quantile aggregate'], ['median', 'Median aggregate'], ['toDate', 'Convert a value to Date'], ['toDateTime', 'Convert a value to DateTime'],
@@ -214,7 +216,7 @@ export const SqlEditor = forwardRef<EditorHandle, SqlEditorProps>(function SqlEd
     }, []);
     const languageExtension = useCallback(() => sql({ dialect: clickhouse, schema: schemaIndexRef.current.codeMirror }), []);
     const invalidateNativeValidation = useCallback(() => { validationRevision.current++; }, []);
-    const themeExtension = () => EditorView.theme({ '&': { height: '100%', backgroundColor: 'var(--panel)', color: 'var(--text)' }, '.cm-scroller': { fontFamily: 'var(--font-mono)', fontSize: '13px', lineHeight: '1.55', fontVariantLigatures: 'none', fontVariantNumeric: 'tabular-nums' }, '.cm-gutters': { backgroundColor: 'var(--panel)', color: 'var(--muted)', border: 'none', fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }, '.cm-content': { minHeight: '220px' }, '.cm-activeLine': { backgroundColor: 'color-mix(in srgb, var(--accent) 3%, transparent)' }, '.cm-activeLineGutter': { backgroundColor: 'color-mix(in srgb, var(--accent) 4%, transparent)' }, '.cm-cursor': { borderLeftColor: 'var(--text)' }, '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': { backgroundColor: 'var(--editor-selection)' } }, { dark: current.current.dark });
+    const themeExtension = () => EditorView.theme({ '&': { height: '100%', backgroundColor: 'var(--panel)', color: 'var(--text)' }, '.cm-scroller': { fontFamily: 'var(--font-mono)', fontSize: '13px', lineHeight: '1.55', fontVariantLigatures: 'none', fontVariantNumeric: 'tabular-nums' }, '.cm-gutters': { backgroundColor: 'var(--panel)', color: 'var(--muted)', border: 'none', fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }, '.cm-content': { minHeight: '220px' }, '.cm-activeLine': { backgroundColor: 'var(--editor-active-line)' }, '.cm-activeLineGutter': { backgroundColor: 'var(--editor-active-gutter)' }, '.cm-cursor': { borderLeftColor: 'var(--text)' }, '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': { backgroundColor: 'var(--editor-selection)' } }, { dark: current.current.dark });
     useEffect(() => { if (!element.current)
         return; const p = current.current; const editor = new EditorView({ parent: element.current, state: EditorState.create({ doc: p.value, selection: { anchor: Math.min(p.from, p.value.length), head: Math.min(p.to, p.value.length) }, extensions: [sqlEditorTools(), nativeDecorations, serverErrorDecorations, sqlMapHighlight, lineNumbers(), lintGutter(), history(), drawSelection(), highlightActiveLine(), rectangularSelection(), bracketMatching(), foldGutter(), highlightSelectionMatches(), syntaxHighlighting(sqlHighlightStyle), autocompletion({ override: [ifNotIn(['QuotedIdentifier', 'String', 'LineComment', 'BlockComment'], context => completionSource(context, schemaIndexRef.current))] }), hoverTooltip((view, pos) => { const word = view.state.wordAt(pos); if (!word)
                 return null; const label = view.state.sliceDoc(word.from, word.to), info = hoverInfo(schemaIndexRef.current, current.current.value, label); if (!info)

@@ -52,6 +52,7 @@
   --accent-strong: var(--accent-cyan-strong);
   --accent-action: var(--accent-cyan-action);
   --accent-ink: var(--accent-cyan-ink);
+  --accent-mark: var(--accent);
   --green: #35e978;
   --signal-accent: var(--accent);
   --scrollbar-thumb: color-mix(in srgb, var(--accent) 35%, var(--muted));
@@ -62,6 +63,17 @@
   --red: #ff6b75;
   --violet: #c598ff;
   --editor-selection: color-mix(in srgb, var(--accent) 8%, transparent);
+  --editor-keyword: var(--text);
+  --editor-number: var(--violet);
+  --editor-literal: var(--violet);
+  --editor-string: var(--amber);
+  --editor-function: var(--accent);
+  --editor-alias: var(--green);
+  --editor-parameter: var(--violet);
+  --editor-comment: var(--muted);
+  --editor-type: var(--text-soft);
+  --editor-active-line: color-mix(in srgb, var(--accent) 3%, transparent);
+  --editor-active-gutter: color-mix(in srgb, var(--accent) 4%, transparent);
   --shadow-popover: 0 4px 12px #00000038, 0 12px 28px #0000002e;
   --shadow-dialog: 0 8px 24px #00000042, 0 24px 56px #0000003d;
   --shadow-inset: inset 0 1px color-mix(in srgb, var(--text) 4%, transparent);
@@ -126,22 +138,22 @@
 
 :root[data-theme="click-light"] {
   color-scheme: light;
-  --page: #f3f4f6;
+  --page: #f8f8f8;
   --page-raised: #ffffff;
-  --canvas: #eef0f3;
+  --canvas: #f8f8f8;
   --geo-land: #e6e9ee;
   --geo-border: #9ba3af;
   --panel: #ffffff;
-  --panel-raised: #f7f8fa;
-  --panel-hover: #eceff3;
-  --line: #d9dde4;
-  --line-bright: #b0b8c4;
-  --control-border: #858e9c;
-  --text: #20242c;
-  --text-soft: #454d5b;
-  --muted: #5f6876;
-  --scrollbar-thumb: #9ba3af;
-  --scrollbar-thumb-hover: #737d8c;
+  --panel-raised: #f8f8f8;
+  --panel-hover: #f2f2f2;
+  --line: #e5e5e5;
+  --line-bright: #c4c4c4;
+  --control-border: #858585;
+  --text: #1f1f1f;
+  --text-soft: #3b3b3b;
+  --muted: #616161;
+  --scrollbar-thumb: #a3a3a3;
+  --scrollbar-thumb-hover: #757575;
   --scroll-edge-shadow-color: #20242c14;
   --accent-cyan: #006c83;
   --accent-cyan-strong: #005c70;
@@ -149,22 +161,34 @@
   --accent-cyan-ink: #ffffff;
   --accent-clickhouse-yellow: #6b5d00;
   --accent-clickhouse-yellow-strong: #5c5000;
-  --accent-clickhouse-yellow-action: #f4df50;
+  --accent-clickhouse-yellow-action: #faff69;
   --accent-clickhouse-yellow-ink: #15191a;
   --accent: var(--accent-cyan);
   --accent-strong: var(--accent-cyan-strong);
   --accent-action: var(--accent-cyan-action);
   --accent-ink: var(--accent-cyan-ink);
+  --accent-mark: var(--accent-action);
   --green: #146c43;
   --signal-accent: var(--accent);
   --amber: #945000;
   --red: #b33043;
   --violet: #7140a0;
-  --active-surface: var(--panel-hover);
+  --active-surface: color-mix(in srgb, var(--accent-action) 16%, var(--panel));
   --active-border: var(--control-border);
-  --active-inset: inset 0 0 0 1px var(--line);
+  --active-inset: inset 0 0 0 1px var(--active-border);
   --focus-color: var(--accent);
-  --editor-selection: color-mix(in srgb, var(--accent) 6%, transparent);
+  --editor-selection: #e2eeff;
+  --editor-keyword: #0000ff;
+  --editor-number: #087645;
+  --editor-literal: #0000ff;
+  --editor-string: #a31515;
+  --editor-function: #795e26;
+  --editor-alias: #001080;
+  --editor-parameter: #001080;
+  --editor-comment: #007000;
+  --editor-type: #226f85;
+  --editor-active-line: #00000006;
+  --editor-active-gutter: #0000000a;
   --shadow-popover: 0 2px 6px #20242c0d, 0 8px 20px #20242c1a;
   --shadow-dialog: 0 4px 12px #20242c0d, 0 18px 44px #20242c24;
   --shadow-inset: inset 0 1px color-mix(in srgb, var(--text) 3%, transparent);
@@ -186,6 +210,10 @@
   --accent-strong: var(--accent-clickhouse-yellow-strong);
   --accent-action: var(--accent-clickhouse-yellow-action);
   --accent-ink: var(--accent-clickhouse-yellow-ink);
+}
+
+:root[data-theme="click-light"][data-accent="clickhouse-yellow"] {
+  --editor-selection: color-mix(in srgb, var(--accent-action) 55%, transparent);
 }
 
 :root[data-theme="click-dark"] .application,

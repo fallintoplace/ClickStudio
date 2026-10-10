@@ -191,7 +191,7 @@ test('Mounted candlesticks update their marks and labels when theme or accent ch
     await page.getByRole('radio', { name: 'Light theme', exact: true }).click();
     await expect(up).toHaveCSS('fill', 'rgb(20, 108, 67)');
     await expect(down).toHaveCSS('fill', 'rgb(179, 48, 67)');
-    await expect(page.locator('.market-axis text').first()).toHaveCSS('fill', 'rgb(95, 104, 118)');
+    await expect(page.locator('.market-axis text').first()).toHaveCSS('fill', 'rgb(97, 97, 97)');
     await page.getByRole('button', { name: 'ClickHouse yellow accent', exact: true }).click();
     await expect(page.locator('.market-bid-line')).toHaveCSS('stroke', 'rgb(107, 93, 0)');
     await page.getByRole('radio', { name: 'Dark theme', exact: true }).click();

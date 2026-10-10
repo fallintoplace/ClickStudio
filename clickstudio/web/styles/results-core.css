@@ -1094,6 +1094,18 @@
   background: var(--panel-raised);
 }
 
+:root[data-theme="click-light"] .data-table-scroll {
+  background: var(--panel);
+}
+
+:root[data-theme="click-light"] .data-table tbody tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--panel-hover) 50%, var(--panel));
+}
+
+:root[data-theme="click-light"] .data-table tbody tr:hover td {
+  background: var(--active-surface);
+}
+
 /* Responsive and motion states */
 
 @media (max-height: 860px) and (min-width: 851px) {
