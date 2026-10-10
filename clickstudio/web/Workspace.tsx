@@ -948,7 +948,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
                         clearFailedQueryError(draftId);
                     }}
                     actions={<>
-                    <button className={cx('new-tab-button', experience === 'expert' && 'new-tab-labeled')} data-testid="new-sql" type="button" aria-label={copy.common.newSql} title={copy.common.newSql} aria-haspopup="dialog" aria-expanded={helpPanelOpen} aria-controls="workspace-help-panel" onClick={event => openExamples(event.currentTarget)}><Icon name="plus"/>{experience === 'expert' && <span>{copy.common.newSql}</span>}</button>
+                    <button className="new-tab-button" data-testid="new-sql" type="button" aria-label={copy.common.newSql} title={copy.common.newSql} aria-haspopup="dialog" aria-expanded={helpPanelOpen} aria-controls="workspace-help-panel" onClick={event => openExamples(event.currentTarget)}><Icon name="plus"/></button>
                         <WorkspaceHelpPanel
                             open={helpPanelOpen}
                             section={helpPanelSection}
