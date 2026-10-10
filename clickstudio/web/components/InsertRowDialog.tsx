@@ -742,6 +742,61 @@ async function retryUnknownInsert({
     let retryQueryId: string | undefined;
     let retryDeduplicationToken: string | undefined;
     let writeStarted = false;
+    const recoverRetry = async (caught: unknown) => {
+        if (
+            writeStarted &&
+            cloudConnection &&
+            caught instanceof CloudRequestError &&
+            caught.status < 500
+        ) {
+            setJob(job);
+            setRetryAttempted(false);
+            setError(message(caught));
+        } else if (
+            writeStarted &&
+            !cloudConnection &&
+            caught instanceof RequestError &&
+            caught.status < 500
+        ) {
+            setJob(job);
+            setRetryAttempted(false);
+            setError(message(caught));
+        } else if (writeStarted && retryQueryId) {
+            try {
+                const recovered = await checkClickHouseCloudImport(
+                    retryQueryId,
+                    name,
+                    1,
+                    retryDeduplicationToken,
+                );
+                setJob(recovered);
+                if (recovered.status === 'succeeded') reportSuccess();
+            } catch {
+                setJob({
+                    id: retryMapping.id,
+                    table: name,
+                    rows: 1,
+                    queryId: retryQueryId,
+                    deduplicationToken: retryDeduplicationToken,
+                    connectionId,
+                    status: 'unknown',
+                });
+            }
+        } else if (writeStarted) {
+            try {
+                const recovered = await api<ImportJob>(
+                    `/imports/${encodeURIComponent(retryMapping.id)}`,
+                );
+                setJob(recovered);
+                if (recovered.status === 'succeeded') reportSuccess();
+            } catch {
+                setJob({ id: retryMapping.id, table: name, rows: 1, status: 'unknown' });
+            }
+        } else {
+            setJob(job);
+            setError(message(caught));
+        }
+    };
     try {
         const checked = job.queryId
             ? await checkClickHouseCloudImport(
@@ -820,59 +875,7 @@ async function retryUnknownInsert({
         setJob(next);
         if (next.status === 'succeeded') reportSuccess();
     } catch (caught) {
-        if (
-            writeStarted &&
-            cloudConnection &&
-            caught instanceof CloudRequestError &&
-            caught.status < 500
-        ) {
-            setJob(job);
-            setRetryAttempted(false);
-            setError(message(caught));
-        } else if (
-            writeStarted &&
-            !cloudConnection &&
-            caught instanceof RequestError &&
-            caught.status < 500
-        ) {
-            setJob(job);
-            setRetryAttempted(false);
-            setError(message(caught));
-        } else if (writeStarted && retryQueryId) {
-            try {
-                const recovered = await checkClickHouseCloudImport(
-                    retryQueryId,
-                    name,
-                    1,
-                    retryDeduplicationToken,
-                );
-                setJob(recovered);
-                if (recovered.status === 'succeeded') reportSuccess();
-            } catch {
-                setJob({
-                    id: retryMapping.id,
-                    table: name,
-                    rows: 1,
-                    queryId: retryQueryId,
-                    deduplicationToken: retryDeduplicationToken,
-                    connectionId,
-                    status: 'unknown',
-                });
-            }
-        } else if (writeStarted) {
-            try {
-                const recovered = await api<ImportJob>(
-                    `/imports/${encodeURIComponent(retryMapping.id)}`,
-                );
-                setJob(recovered);
-                if (recovered.status === 'succeeded') reportSuccess();
-            } catch {
-                setJob({ id: retryMapping.id, table: name, rows: 1, status: 'unknown' });
-            }
-        } else {
-            setJob(job);
-            setError(message(caught));
-        }
+        await recoverRetry(caught);
     } finally {
         setBusy(false);
     }

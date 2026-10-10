@@ -118,6 +118,28 @@ function dropOldestConversationTurn(
     return messages.slice(remove);
 }
 
+function responseSources(response: OpenAI.Responses.Response): AssistantSource[] {
+    const sourceMap = new Map<string, AssistantSource>();
+    for (const item of response.output) {
+        if (item.type !== 'message') continue;
+        for (const part of item.content) {
+            if (part.type !== 'output_text') continue;
+            for (const annotation of part.annotations) {
+                if (
+                    annotation.type === 'url_citation' &&
+                    !sourceMap.has(annotation.url) &&
+                    sourceMap.size < 20
+                )
+                    sourceMap.set(annotation.url, {
+                        title: annotation.title,
+                        url: annotation.url,
+                    });
+            }
+        }
+    }
+    return [...sourceMap.values()];
+}
+
 export class OpenAIDriver implements AssistantDriver {
     readonly available: boolean;
     readonly model: string;
@@ -271,25 +293,7 @@ export class OpenAIDriver implements AssistantDriver {
                 }
                 throw new AppError(502, 'AI_INCOMPLETE', message);
             }
-            const sourceMap = new Map<string, AssistantSource>();
-            for (const item of response.output) {
-                if (item.type !== 'message') continue;
-                for (const part of item.content) {
-                    if (part.type !== 'output_text') continue;
-                    for (const annotation of part.annotations) {
-                        if (
-                            annotation.type === 'url_citation' &&
-                            !sourceMap.has(annotation.url) &&
-                            sourceMap.size < 20
-                        )
-                            sourceMap.set(annotation.url, {
-                                title: annotation.title,
-                                url: annotation.url,
-                            });
-                    }
-                }
-            }
-            const sources = [...sourceMap.values()];
+            const sources = responseSources(response);
             return {
                 content: validateProposal({
                     ...JSON.parse(response.output_text),

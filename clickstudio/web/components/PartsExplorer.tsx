@@ -852,6 +852,84 @@ function renderPartsGraph({
     keyCell: (event: KeyboardEvent<SVGElement>, id: string, part?: MergeTreePart) => void;
     showingText: string | undefined;
 }) {
+    const renderTreemapCell = (
+        node: (typeof layoutNodes)[number],
+        depth: number,
+        color: string,
+        part: MergeTreePart | undefined,
+        selected: boolean | undefined,
+    ) => {
+        const rect = node as HierarchyRectangularNode<Cell>;
+        const cellWidth = Math.max(0, rect.x1 - rect.x0),
+            cellHeight = Math.max(0, rect.y1 - rect.y0);
+        const label = part?.name ?? node.data.label;
+        const labelLimit = Math.max(3, Math.floor((cellWidth - 14) / 7));
+        return (
+            <g
+                key={node.data.id}
+                role={depth === 1 ? undefined : 'button'}
+                tabIndex={depth === 1 ? undefined : 0}
+                aria-label={part ? tooltip(part) : undefined}
+                className={`parts-map-cell${depth === 1 ? ' is-partition-cell' : ' is-part-cell'}${selected ? ' is-selected' : ''}`}
+                onClick={depth === 1 ? undefined : () => handleCell(node.data.id, part)}
+                onKeyDown={depth === 1 ? undefined : event => keyCell(event, node.data.id, part)}
+            >
+                <title>{part ? tooltip(part) : node.data.label}</title>
+                <rect
+                    x={rect.x0}
+                    y={rect.y0}
+                    width={cellWidth}
+                    height={cellHeight}
+                    rx={depth === 1 ? 10 : 4}
+                    style={
+                        {
+                            '--part-color': color,
+                        } as CSSProperties
+                    }
+                />
+                {part && cellWidth > 82 && cellHeight > 28 && (
+                    <text
+                        className="parts-cell-label"
+                        x={rect.x0 + 7}
+                        y={rect.y0 + Math.min(cellHeight - 7, 22)}
+                    >
+                        {label.length > labelLimit ? `${label.slice(0, labelLimit - 1)}…` : label}
+                    </text>
+                )}
+            </g>
+        );
+    };
+    const renderGalaxyCell = (
+        node: (typeof layoutNodes)[number],
+        depth: number,
+        color: string,
+        part: MergeTreePart | undefined,
+        selected: boolean | undefined,
+    ) => {
+        const circle = node as HierarchyCircularNode<Cell>;
+        const radius = circle.r;
+        return (
+            <g
+                key={node.data.id}
+                role={depth === 1 ? undefined : 'button'}
+                tabIndex={depth === 1 ? undefined : 0}
+                aria-label={part ? tooltip(part) : undefined}
+                className={`parts-galaxy-cell${depth === 1 ? ' is-partition-cell' : ' is-part-cell'}${selected ? ' is-selected' : ''}`}
+                transform={`translate(${circle.x},${circle.y})`}
+                onClick={depth === 1 ? undefined : () => handleCell(node.data.id, part)}
+                onKeyDown={depth === 1 ? undefined : event => keyCell(event, node.data.id, part)}
+            >
+                <title>{part ? tooltip(part) : node.data.label}</title>
+                <circle r={radius} style={{ '--part-color': color } as CSSProperties} />
+                {part && radius > 22 && (
+                    <text className="parts-cell-label" y="3">
+                        {part.name.length > 20 ? `${part.name.slice(0, 19)}…` : part.name}
+                    </text>
+                )}
+            </g>
+        );
+    };
+
     return (
         <div className={`parts-graph-viewport is-${layoutMode}`}>
             {layoutMode === 'map' ? (
@@ -958,91 +1036,9 @@ function renderPartsGraph({
                                 selectedPart.partition === part.partition &&
                                 selectedPart.active === part.active;
                             if (layoutMode === 'treemap') {
-                                const rect = node as HierarchyRectangularNode<Cell>;
-                                const cellWidth = Math.max(0, rect.x1 - rect.x0),
-                                    cellHeight = Math.max(0, rect.y1 - rect.y0);
-                                const label = part?.name ?? node.data.label;
-                                const labelLimit = Math.max(3, Math.floor((cellWidth - 14) / 7));
-                                return (
-                                    <g
-                                        key={node.data.id}
-                                        role={depth === 1 ? undefined : 'button'}
-                                        tabIndex={depth === 1 ? undefined : 0}
-                                        aria-label={part ? tooltip(part) : undefined}
-                                        className={`parts-map-cell${depth === 1 ? ' is-partition-cell' : ' is-part-cell'}${selected ? ' is-selected' : ''}`}
-                                        onClick={
-                                            depth === 1
-                                                ? undefined
-                                                : () => handleCell(node.data.id, part)
-                                        }
-                                        onKeyDown={
-                                            depth === 1
-                                                ? undefined
-                                                : event => keyCell(event, node.data.id, part)
-                                        }
-                                    >
-                                        <title>{part ? tooltip(part) : node.data.label}</title>
-                                        <rect
-                                            x={rect.x0}
-                                            y={rect.y0}
-                                            width={cellWidth}
-                                            height={cellHeight}
-                                            rx={depth === 1 ? 10 : 4}
-                                            style={
-                                                {
-                                                    '--part-color': color,
-                                                } as CSSProperties
-                                            }
-                                        />
-                                        {part && cellWidth > 82 && cellHeight > 28 && (
-                                            <text
-                                                className="parts-cell-label"
-                                                x={rect.x0 + 7}
-                                                y={rect.y0 + Math.min(cellHeight - 7, 22)}
-                                            >
-                                                {label.length > labelLimit
-                                                    ? `${label.slice(0, labelLimit - 1)}…`
-                                                    : label}
-                                            </text>
-                                        )}
-                                    </g>
-                                );
+                                return renderTreemapCell(node, depth, color, part, selected);
                             }
-                            const circle = node as HierarchyCircularNode<Cell>;
-                            const radius = circle.r;
-                            return (
-                                <g
-                                    key={node.data.id}
-                                    role={depth === 1 ? undefined : 'button'}
-                                    tabIndex={depth === 1 ? undefined : 0}
-                                    aria-label={part ? tooltip(part) : undefined}
-                                    className={`parts-galaxy-cell${depth === 1 ? ' is-partition-cell' : ' is-part-cell'}${selected ? ' is-selected' : ''}`}
-                                    transform={`translate(${circle.x},${circle.y})`}
-                                    onClick={
-                                        depth === 1
-                                            ? undefined
-                                            : () => handleCell(node.data.id, part)
-                                    }
-                                    onKeyDown={
-                                        depth === 1
-                                            ? undefined
-                                            : event => keyCell(event, node.data.id, part)
-                                    }
-                                >
-                                    <title>{part ? tooltip(part) : node.data.label}</title>
-                                    <circle
-                                        r={radius}
-                                        style={{ '--part-color': color } as CSSProperties}
-                                    />
-                                    {part && radius > 22 && (
-                                        <text className="parts-cell-label" y="3">
-                                            {part.name.length > 20
-                                                ? `${part.name.slice(0, 19)}…`
-                                                : part.name}
-                                        </text>
-                                    )}
-                                </g>
-                            );
+                            return renderGalaxyCell(node, depth, color, part, selected);
                         })}
                         {layoutNodes
                             .filter(node => node.depth === 1)

@@ -166,47 +166,52 @@ function registerAssistantSqlRoute(
                         ? reportedServerVersion
                         : connection.manifest?.serverVersion;
             }
-            let run: Run | undefined;
-            let result: Result | undefined;
-            let evidenceSql: string | undefined;
-            let errorMessage: string | undefined;
-            if (v.includeRun === true && !repair) {
-                requireThat(
-                    Boolean(v.runId),
-                    400,
-                    'RUN_REQUIRED',
-                    'Select a completed run before including its context',
-                );
-                const runId = identifier(v.runId, 'runId');
-                if (browserCloud) {
-                    result = assistantResultFrom(v.result);
+            const selectedRunEvidence = () => {
+                let run: Run | undefined;
+                let result: Result | undefined;
+                let evidenceSql: string | undefined;
+                let errorMessage: string | undefined;
+                if (v.includeRun === true && !repair) {
                     requireThat(
-                        !result || result.runId === runId,
-                        409,
-                        'CONNECTION_MISMATCH',
-                        'Selected result belongs to another run',
+                        Boolean(v.runId),
+                        400,
+                        'RUN_REQUIRED',
+                        'Select a completed run before including its context',
                     );
-                    evidenceSql =
-                        v.evidenceSql === undefined
-                            ? undefined
-                            : text(v.evidenceSql, 'Selected run SQL', MAX_SQL_CHARS, true);
-                    errorMessage =
-                        v.error === undefined
-                            ? undefined
-                            : text(v.error, 'Selected run error', 3000, true);
-                } else {
-                    run = runs.get(p, runId);
-                    requireThat(
-                        run.connectionId === connectionId,
-                        409,
-                        'CONNECTION_MISMATCH',
-                        'Selected evidence belongs to another connection',
-                    );
-                    result = run.resultState === 'reopenable' ? runs.result(p, run.id) : undefined;
-                    evidenceSql = run.sql;
-                    errorMessage = run.error?.message;
+                    const runId = identifier(v.runId, 'runId');
+                    if (browserCloud) {
+                        result = assistantResultFrom(v.result);
+                        requireThat(
+                            !result || result.runId === runId,
+                            409,
+                            'CONNECTION_MISMATCH',
+                            'Selected result belongs to another run',
+                        );
+                        evidenceSql =
+                            v.evidenceSql === undefined
+                                ? undefined
+                                : text(v.evidenceSql, 'Selected run SQL', MAX_SQL_CHARS, true);
+                        errorMessage =
+                            v.error === undefined
+                                ? undefined
+                                : text(v.error, 'Selected run error', 3000, true);
+                    } else {
+                        run = runs.get(p, runId);
+                        requireThat(
+                            run.connectionId === connectionId,
+                            409,
+                            'CONNECTION_MISMATCH',
+                            'Selected evidence belongs to another connection',
+                        );
+                        result =
+                            run.resultState === 'reopenable' ? runs.result(p, run.id) : undefined;
+                        evidenceSql = run.sql;
+                        errorMessage = run.error?.message;
+                    }
                 }
-            }
+                return { result, evidenceSql, errorMessage };
+            };
+            const { result, evidenceSql, errorMessage } = selectedRunEvidence();
             const documentation = browserCloud
                 ? selectAssistantReferenceDocs(question, sql, { schema, database })
                 : await assistantReferenceDocs(

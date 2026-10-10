@@ -3,6 +3,7 @@ import stylistic from '@stylistic/eslint-plugin';
 import { defineConfig } from 'eslint/config';
 import reactHooks from 'eslint-plugin-react-hooks';
 import globals from 'globals';
+import sonarjs from 'eslint-plugin-sonarjs';
 import tseslint from 'typescript-eslint';
 
 export default defineConfig([
@@ -28,6 +29,7 @@ export default defineConfig([
         extends: [js.configs.recommended, tseslint.configs.recommended],
         plugins: {
             '@stylistic': stylistic,
+            sonarjs,
         },
         languageOptions: {
             globals: {
@@ -51,6 +53,7 @@ export default defineConfig([
             'max-params': ['error', 8],
             'no-empty': ['error', { allowEmptyCatch: true }],
             'no-nested-ternary': 'error',
+            'sonarjs/cognitive-complexity': ['error', 25],
             'no-useless-escape': 'off',
             'prefer-const': 'off',
             '@typescript-eslint/no-unused-vars': [

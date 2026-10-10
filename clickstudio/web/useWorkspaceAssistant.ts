@@ -385,31 +385,38 @@ export function useWorkspaceAssistant({
             const currentSchema = schema ?? (await options?.loadSchema?.());
             controller.signal.throwIfAborted();
             if (!currentSchema) throw new Error('Could not load the ClickHouse schema. Try again.');
-            let runContext;
+            const prepareRunContext = async () => {
+                let runContext;
 
-            if (repair) {
-                runContext = { evidenceSql: repair.sql, error: repair.error };
-            } else if (requestIncludesRun) {
-                runContext = await loadRunContext?.(controller.signal);
-            } else {
-                runContext = undefined;
-            }
+                if (repair) {
+                    runContext = { evidenceSql: repair.sql, error: repair.error };
+                } else if (requestIncludesRun) {
+                    runContext = await loadRunContext?.(controller.signal);
+                } else {
+                    runContext = undefined;
+                }
+                controller.signal.throwIfAborted();
+                if (requestIncludesRun && !runContext)
+                    throw new Error('Could not load the selected run context. Try again.');
+                const storedRunContext = runContext
+                    ? {
+                          ...(runContext.result
+                              ? { result: boundedAssistantResult(runContext.result) }
+                              : {}),
+                          ...(runContext.evidenceSql
+                              ? { evidenceSql: runContext.evidenceSql }
+                              : {}),
+                          ...(runContext.error ? { error: runContext.error } : {}),
+                      }
+                    : undefined;
+                if (storedRunContext && JSON.stringify(storedRunContext).length > 60_000)
+                    throw new Error(
+                        'The selected run context is too large to keep in this chat. Start a new chat or select a smaller run.',
+                    );
+                return storedRunContext;
+            };
+            const storedRunContext = await prepareRunContext();
             controller.signal.throwIfAborted();
-            if (requestIncludesRun && !runContext)
-                throw new Error('Could not load the selected run context. Try again.');
-            const storedRunContext = runContext
-                ? {
-                      ...(runContext.result
-                          ? { result: boundedAssistantResult(runContext.result) }
-                          : {}),
-                      ...(runContext.evidenceSql ? { evidenceSql: runContext.evidenceSql } : {}),
-                      ...(runContext.error ? { error: runContext.error } : {}),
-                  }
-                : undefined;
-            if (storedRunContext && JSON.stringify(storedRunContext).length > 60_000)
-                throw new Error(
-                    'The selected run context is too large to keep in this chat. Start a new chat or select a smaller run.',
-                );
             if (storedRunContext)
                 updateChat(chatId, chat => ({
                     ...chat,

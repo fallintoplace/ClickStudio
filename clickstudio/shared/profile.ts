@@ -160,6 +160,20 @@ function decodeDotEscape(escaped: string): string {
     }
 }
 
+function readDotQuotedValue(input: string, index: number) {
+    index++;
+    let value = '';
+    while (index < input.length && input[index] !== '"') {
+        if (input[index] === '\\' && index + 1 < input.length) {
+            const escaped = input[index + 1]!;
+            value += decodeDotEscape(escaped);
+            index += 2;
+        } else value += input[index++]!;
+    }
+    if (input[index] === '"') index++;
+    return { value, index };
+}
+
 function tokenizeDot(source: string): { tokens: DotToken[]; truncated: boolean } {
     const input = source.slice(0, MAX_PIPELINE_DOT_CHARS);
     const tokens: DotToken[] = [];
@@ -186,16 +200,9 @@ function tokenizeDot(source: string): { tokens: DotToken[]; truncated: boolean }
             continue;
         }
         if (char === '"') {
-            index++;
-            let value = '';
-            while (index < input.length && input[index] !== '"') {
-                if (input[index] === '\\' && index + 1 < input.length) {
-                    const escaped = input[index + 1]!;
-                    value += decodeDotEscape(escaped);
-                    index += 2;
-                } else value += input[index++]!;
-            }
-            if (input[index] === '"') index++;
+            const quoted = readDotQuotedValue(input, index);
+            index = quoted.index;
+            const value = quoted.value;
             tokens.push({ kind: 'value', value });
             continue;
         }
@@ -303,45 +310,73 @@ function parsePipelineDot(
         return node;
     };
 
-    while (i < tokens.length && depth > 0) {
-        const token = tokens[i]!;
-        if (token.value === '{') {
-            depth++;
-            i++;
-            continue;
-        }
-        if (token.value === '}') {
-            depth--;
-            i++;
-            continue;
-        }
-        if (token.value === ';' || token.value === ',') {
-            i++;
-            continue;
-        }
-        if (token.kind !== 'value') {
-            i++;
-            continue;
-        }
-        const first = token.value;
+    const skipDotStatement = (first: string) => {
         if (
             ['graph', 'node', 'edge'].includes(first.toLowerCase()) &&
             tokens[i + 1]?.value === '['
         ) {
             i++;
             readAttributes();
-            continue;
+            return true;
         }
         if (tokens[i + 1]?.value === '=') {
             i += 2;
             while (i < tokens.length && tokens[i]?.value !== ';' && tokens[i]?.value !== '}') i++;
-            continue;
+            return true;
         }
         if (first.toLowerCase() === 'subgraph') {
             i++;
             if (tokens[i]?.kind === 'value') i++;
+            return true;
+        }
+
+        return false;
+    };
+
+    const addDotEdges = (
+        sourceId: string,
+        targets: string[],
+        attributes: Record<string, string>,
+    ) => {
+        let previous = sourceId;
+        ensureNode(sourceId);
+        for (const target of targets) {
+            ensureNode(target);
+            if (edges.length < MAX_PIPELINE_GRAPH_EDGES && nodes.has(previous) && nodes.has(target))
+                edges.push({
+                    source: previous,
+                    target,
+                    ...(attributes.label
+                        ? { label: attributes.label.replace(/\s+/g, ' ').trim() }
+                        : {}),
+                });
+            else if (edges.length >= MAX_PIPELINE_GRAPH_EDGES) capped = true;
+            previous = target;
+        }
+    };
+
+    while (i < tokens.length && depth > 0) {
+        const token = tokens[i]!;
+        switch (token.value) {
+            case '{':
+                depth++;
+                i++;
+                continue;
+            case '}':
+                depth--;
+                i++;
+                continue;
+            case ';':
+            case ',':
+                i++;
+                continue;
+        }
+        if (token.kind !== 'value') {
+            i++;
             continue;
         }
+        const first = token.value;
+        if (skipDotStatement(first)) continue;
 
         const sourceId = readEndpoint();
         if (!sourceId) {
@@ -356,25 +391,7 @@ function parsePipelineDot(
         }
         const attributes = readAttributes();
         if (targets.length) {
-            let previous = sourceId;
-            ensureNode(sourceId);
-            for (const target of targets) {
-                ensureNode(target);
-                if (
-                    edges.length < MAX_PIPELINE_GRAPH_EDGES &&
-                    nodes.has(previous) &&
-                    nodes.has(target)
-                )
-                    edges.push({
-                        source: previous,
-                        target,
-                        ...(attributes.label
-                            ? { label: attributes.label.replace(/\s+/g, ' ').trim() }
-                            : {}),
-                    });
-                else if (edges.length >= MAX_PIPELINE_GRAPH_EDGES) capped = true;
-                previous = target;
-            }
+            addDotEdges(sourceId, targets, attributes);
         } else if (attributes.label !== undefined) ensureNode(sourceId, attributes.label);
         else ensureNode(sourceId);
     }

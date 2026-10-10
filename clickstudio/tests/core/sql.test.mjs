@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
     splitSql,
+    lexSql,
     selectedStatement,
     parameterNames,
     quoteIdentifier,
@@ -207,3 +208,32 @@ for (const experience of ['beginner', 'expert'])
             }).tags.experience,
             experience,
         ));
+
+test('SQL token ranges preserve doubled quotes, escapes, heredocs, and nested comments', () => {
+    const sql =
+        "/* outer /* inner */ done */ SELECT 'it''s', `a``b`, \"c\\\"d\", $tag$a;b$tag$; SELECT 2";
+    const tokens = lexSql(sql);
+    for (const token of tokens) assert.equal(sql.slice(token.from, token.to), token.text);
+    assert.deepEqual(
+        tokens.filter(token => token.kind === 'quoted').map(token => token.text),
+        ["'it''s'", '`a``b`', '"c\\"d"', '$tag$a;b$tag$'],
+    );
+    assert.equal(splitSql(sql).length, 2);
+});
+
+for (const [suffix, message] of [
+    ["'unfinished\\", 'Unclosed quoted value or identifier'],
+    ['"unfinished""', 'Unclosed quoted value or identifier'],
+    ['`unfinished\\', 'Unclosed quoted value or identifier'],
+    ['/* outer /* inner */', 'Unclosed block comment'],
+    ['$tag$unfinished', 'Unclosed heredoc'],
+]) {
+    test(`Strict SQL scanning rejects ${suffix} while formatting preserves the draft`, () => {
+        const prefix = 'select 1 from events where note = ';
+        assert.throws(() => lexSql(prefix + suffix), {
+            message,
+            position: prefix.length,
+        });
+        assert.ok(formatSql(prefix + suffix).endsWith(suffix));
+    });
+}

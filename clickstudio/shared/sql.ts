@@ -18,76 +18,94 @@ export class SqlSyntaxError extends Error {
     }
 }
 export const EXPLORATION_FORMAT_ERROR = 'FORMAT is not allowed in exploration SQL';
+function scanBlockComment(sql: string, start: number) {
+    let end = start + 2;
+    let depth = 1;
+    while (end < sql.length && depth) {
+        if (sql.startsWith('/*', end)) {
+            depth++;
+            end += 2;
+        } else if (sql.startsWith('*/', end)) {
+            depth--;
+            end += 2;
+        } else end++;
+    }
+    return { end, depth };
+}
+
+function scanQuotedValue(sql: string, start: number, clampEscape = false) {
+    const quote = sql[start];
+    let end = start + 1;
+    while (end < sql.length) {
+        if (sql[end] === '\\') {
+            end = clampEscape ? Math.min(sql.length, end + 2) : end + 2;
+            continue;
+        }
+        if (sql[end] === quote) {
+            if (sql[end + 1] === quote) {
+                end += 2;
+                continue;
+            }
+            return { end: end + 1, closed: true };
+        }
+        end++;
+    }
+    return { end, closed: false };
+}
+
+function readSqlToken(sql: string, start: number): { end: number; token?: Token } {
+    let i = start;
+    const ch = sql[i]!;
+    if (/\s/.test(ch)) return { end: i + 1 };
+    if (sql.startsWith('--', i) || ch === '#') {
+        while (i < sql.length && sql[i] !== '\n') i++;
+        return { end: i };
+    }
+    if (sql.startsWith('/*', i)) {
+        const comment = scanBlockComment(sql, start);
+        if (comment.depth) throw new SqlSyntaxError('Unclosed block comment', start);
+        return { end: comment.end };
+    }
+    if (ch === "'" || ch === '"' || ch === '`') {
+        const quoted = scanQuotedValue(sql, start);
+        if (!quoted.closed) throw new SqlSyntaxError('Unclosed quoted value or identifier', start);
+        return {
+            end: quoted.end,
+            token: {
+                text: sql.slice(start, quoted.end),
+                from: start,
+                to: quoted.end,
+                kind: 'quoted',
+            },
+        };
+    }
+    if (ch === '$') {
+        const marker = /^\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$/.exec(sql.slice(i))?.[0];
+        if (marker) {
+            const end = sql.indexOf(marker, i + marker.length);
+            if (end < 0) throw new SqlSyntaxError('Unclosed heredoc', start);
+            i = end + marker.length;
+            return {
+                end: i,
+                token: { text: sql.slice(start, i), from: start, to: i, kind: 'quoted' },
+            };
+        }
+    }
+    if (/[A-Za-z_]/.test(ch)) {
+        i++;
+        while (i < sql.length && /[A-Za-z0-9_$]/.test(sql[i]!)) i++;
+        return { end: i, token: { text: sql.slice(start, i), from: start, to: i, kind: 'word' } };
+    }
+    return { end: i + 1, token: { text: ch, from: start, to: i + 1, kind: 'symbol' } };
+}
+
 /** A boundary lexer, not a SQL parser or an authorization boundary. */
 export function lexSql(sql: string): Token[] {
     const out: Token[] = [];
     for (let i = 0; i < sql.length;) {
-        const start = i,
-            ch = sql[i]!;
-        if (/\s/.test(ch)) {
-            i++;
-            continue;
-        }
-        if (sql.startsWith('--', i) || ch === '#') {
-            while (i < sql.length && sql[i] !== '\n') i++;
-            continue;
-        }
-        if (sql.startsWith('/*', i)) {
-            i += 2;
-            let depth = 1;
-            while (i < sql.length && depth) {
-                if (sql.startsWith('/*', i)) {
-                    depth++;
-                    i += 2;
-                } else if (sql.startsWith('*/', i)) {
-                    depth--;
-                    i += 2;
-                } else i++;
-            }
-            if (depth) throw new SqlSyntaxError('Unclosed block comment', start);
-            continue;
-        }
-        if (ch === "'" || ch === '"' || ch === '`') {
-            i++;
-            let closed = false;
-            while (i < sql.length) {
-                if (sql[i] === '\\') {
-                    i += 2;
-                    continue;
-                }
-                if (sql[i] === ch) {
-                    if (sql[i + 1] === ch) {
-                        i += 2;
-                        continue;
-                    }
-                    i++;
-                    closed = true;
-                    break;
-                }
-                i++;
-            }
-            if (!closed) throw new SqlSyntaxError('Unclosed quoted value or identifier', start);
-            out.push({ text: sql.slice(start, i), from: start, to: i, kind: 'quoted' });
-            continue;
-        }
-        if (ch === '$') {
-            const marker = /^\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$/.exec(sql.slice(i))?.[0];
-            if (marker) {
-                const end = sql.indexOf(marker, i + marker.length);
-                if (end < 0) throw new SqlSyntaxError('Unclosed heredoc', start);
-                i = end + marker.length;
-                out.push({ text: sql.slice(start, i), from: start, to: i, kind: 'quoted' });
-                continue;
-            }
-        }
-        if (/[A-Za-z_]/.test(ch)) {
-            i++;
-            while (i < sql.length && /[A-Za-z0-9_$]/.test(sql[i]!)) i++;
-            out.push({ text: sql.slice(start, i), from: start, to: i, kind: 'word' });
-        } else {
-            i++;
-            out.push({ text: ch, from: start, to: i, kind: 'symbol' });
-        }
+        const { token, end } = readSqlToken(sql, i);
+        if (token) out.push(token);
+        i = end;
     }
     return out;
 }
@@ -161,34 +179,9 @@ function protectedSqlRanges(sql: string): Array<{ from: number; to: number }> {
             const newline = sql.indexOf('\n', i);
             i = newline < 0 ? sql.length : newline;
         } else if (sql.startsWith('/*', i)) {
-            i += 2;
-            let depth = 1;
-            while (i < sql.length && depth) {
-                if (sql.startsWith('/*', i)) {
-                    depth++;
-                    i += 2;
-                } else if (sql.startsWith('*/', i)) {
-                    depth--;
-                    i += 2;
-                } else i++;
-            }
+            i = scanBlockComment(sql, from).end;
         } else if (ch === "'" || ch === '"' || ch === '`') {
-            i++;
-            while (i < sql.length) {
-                if (sql[i] === '\\') {
-                    i = Math.min(sql.length, i + 2);
-                    continue;
-                }
-                if (sql[i] === ch) {
-                    if (sql[i + 1] === ch) {
-                        i += 2;
-                        continue;
-                    }
-                    i++;
-                    break;
-                }
-                i++;
-            }
+            i = scanQuotedValue(sql, from, true).end;
         } else if (ch === '$') {
             const marker = /^\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$/.exec(sql.slice(i))?.[0];
             if (marker) {

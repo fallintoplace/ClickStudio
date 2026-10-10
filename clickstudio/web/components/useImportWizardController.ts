@@ -622,6 +622,213 @@ async function runCommitImport(
     setStep('status');
     setBusy('commit');
     setError('');
+    const refreshCloudMapping = async (caught: CloudRequestError) => {
+        if (caught.code === 'TABLE_EXISTS' && creatingTable) {
+            setMapping(undefined);
+            setStep('mapping');
+            try {
+                const [nextTargets, nextSchema] = await loadConnectionImportSetup(
+                    importConnectionId,
+                    true,
+                );
+                setTargets(nextTargets);
+                setSchema(nextSchema);
+                setError('');
+            } catch (refreshError) {
+                setError(
+                    `Table ${mapping.table} already exists. Change the table name or choose Add to a table. Could not refresh the table list: ${message(refreshError)}`,
+                );
+            }
+        } else if (caught.code === 'SCHEMA_CHANGED') {
+            setMapping(undefined);
+            setStep('mapping');
+            try {
+                const [nextTargets, nextSchema] = await loadConnectionImportSetup(
+                    importConnectionId,
+                    true,
+                );
+                setTargets(nextTargets);
+                setSchema(nextSchema);
+                let nextTarget: string;
+
+                if (nextTargets.includes(mapping.table)) {
+                    nextTarget = mapping.table;
+                } else if (creatingTable) {
+                    nextTarget = CREATE_CLOUD_TABLE_TARGET;
+                } else {
+                    nextTarget = '';
+                }
+                setTarget(nextTarget);
+                setLastExistingTarget(
+                    nextTarget && nextTarget !== CREATE_CLOUD_TABLE_TARGET ? nextTarget : '',
+                );
+                if (nextTarget !== CREATE_CLOUD_TABLE_TARGET)
+                    setFields(
+                        initialFields(
+                            preview?.columns ?? [],
+                            writableColumns(nextSchema, nextTarget),
+                        ),
+                    );
+                setError(
+                    'The destination schema changed. Review the updated mapping before importing.',
+                );
+            } catch (refreshError) {
+                setError(
+                    `The destination schema changed. Refresh failed: ${message(refreshError)}`,
+                );
+            }
+        } else setError(message(caught));
+    };
+    const recoverCloudImport = async (caught: unknown, queryId: string) => {
+        if (caught instanceof CloudRequestError && caught.code === 'CLICKHOUSE_ERROR') {
+            setJob(undefined);
+            clearPendingImport();
+            setMapping(undefined);
+            setStep('mapping');
+            setError(importFailureMessage(caught));
+            return;
+        }
+        if (caught instanceof CloudRequestError && caught.status < 500) {
+            setJob(undefined);
+            clearPendingImport();
+            setStep('review');
+            await refreshCloudMapping(caught);
+            return;
+        }
+        try {
+            const status = await checkClickHouseCloudImport(
+                queryId,
+                mapping.table,
+                mapping.rowCount,
+                deduplicationToken,
+            );
+            rememberJob(status);
+        } catch {
+            rememberJob({
+                id: mapping.id,
+                connectionId: importConnectionId,
+                table: mapping.table,
+                rows: mapping.rowCount,
+                queryId,
+                ...(deduplicationToken ? { deduplicationToken } : {}),
+                status: 'unknown',
+                error: 'ClickHouse could not confirm the import. The rows may already be there.',
+            });
+        }
+        return;
+    };
+    const refreshServerMapping = async () => {
+        setJob(undefined);
+        clearPendingImport();
+        setMapping(undefined);
+        setStep('mapping');
+        try {
+            const [nextTargets, nextSchema] = await Promise.all([
+                api<string[]>(
+                    `/connections/${encodeURIComponent(importConnectionId)}/import-targets`,
+                ),
+                api<Schema>(`/connections/${encodeURIComponent(importConnectionId)}/schema`),
+            ]);
+            setTargets(nextTargets);
+            setSchema(nextSchema);
+            const nextTarget =
+                nextTargets.find(
+                    table =>
+                        table === mapping.table &&
+                        nextSchema.tables.some(item => `${item.database}.${item.name}` === table),
+                ) ?? '';
+            setTarget(nextTarget);
+            setLastExistingTarget(nextTarget);
+            setFields(
+                initialFields(preview?.columns ?? [], writableColumns(nextSchema, nextTarget)),
+            );
+            setError(
+                'The destination schema changed. Review the updated mapping before importing.',
+            );
+        } catch (refreshError) {
+            setError(`The destination schema changed. Refresh failed: ${message(refreshError)}`);
+        }
+        return;
+    };
+    const recoverUnresolvedImport = async (caught: RequestError) => {
+        setBusy('recover');
+        try {
+            const jobs = await api<ImportJob[]>(
+                `/imports?connectionId=${encodeURIComponent(importConnectionId)}&recoverable=true`,
+            );
+            setRecoverableJobs(jobs);
+            const unresolved = jobs[0];
+            if (unresolved) {
+                const pending = {
+                    id: unresolved.id,
+                    table: unresolved.table,
+                    rows: unresolved.rows,
+                    name: 'Previous import',
+                    ...(unresolved.deduplicationToken
+                        ? { deduplicationToken: unresolved.deduplicationToken }
+                        : {}),
+                };
+                setJob(unresolved);
+                setPendingImport(pending);
+                setStep('status');
+                try {
+                    localStorage.setItem(
+                        importStateKey(importConnectionId),
+                        JSON.stringify(pending),
+                    );
+                } catch {}
+            } else {
+                setStep('review');
+                setError(message(caught));
+            }
+        } catch (recoveryError) {
+            setRecoveryState('failed');
+            setError(`Could not check for unresolved imports: ${message(recoveryError)}`);
+        }
+        return;
+    };
+    const recoverCommit = async (caught: unknown) => {
+        if (browserCloudImport && queryId) {
+            await recoverCloudImport(caught, queryId);
+            return;
+        }
+        if (browserDemoImport) {
+            setJob(undefined);
+            clearPendingImport();
+            setStep('review');
+            setError(message(caught));
+            return;
+        }
+        if (caught instanceof RequestError && caught.detail.code === 'SCHEMA_CHANGED') {
+            await refreshServerMapping();
+            return;
+        }
+        if (caught instanceof RequestError && caught.detail.code === 'IMPORT_UNRESOLVED') {
+            await recoverUnresolvedImport(caught);
+            return;
+        }
+        if (caught instanceof RequestError && caught.status < 500) {
+            setJob(undefined);
+            clearPendingImport();
+            setStep('review');
+            setError(message(caught));
+            return;
+        }
+        setError('The response was interrupted. Checking the saved import status…');
+        try {
+            const next = await api<ImportJob>(`/imports/${encodeURIComponent(mapping.id)}`);
+            rememberJob(next);
+        } catch {
+            rememberJob({
+                id: mapping.id,
+                table: mapping.table,
+                rows: mapping.rowCount,
+                status: 'unknown',
+                reconciliationRequired: true,
+                error: 'The server could not confirm this insert. Check for the saved import job before starting another write.',
+            });
+        }
+    };
     try {
         let next: ImportJob;
         if (browserCloudImport) {
@@ -656,202 +863,7 @@ async function runCommitImport(
         }
         rememberJob(next);
     } catch (caught) {
-        if (browserCloudImport && queryId) {
-            if (caught instanceof CloudRequestError && caught.code === 'CLICKHOUSE_ERROR') {
-                setJob(undefined);
-                clearPendingImport();
-                setMapping(undefined);
-                setStep('mapping');
-                setError(importFailureMessage(caught));
-                return;
-            }
-            if (caught instanceof CloudRequestError && caught.status < 500) {
-                setJob(undefined);
-                clearPendingImport();
-                setStep('review');
-                if (caught.code === 'TABLE_EXISTS' && creatingTable) {
-                    setMapping(undefined);
-                    setStep('mapping');
-                    try {
-                        const [nextTargets, nextSchema] = await loadConnectionImportSetup(
-                            importConnectionId,
-                            true,
-                        );
-                        setTargets(nextTargets);
-                        setSchema(nextSchema);
-                        setError('');
-                    } catch (refreshError) {
-                        setError(
-                            `Table ${mapping.table} already exists. Change the table name or choose Add to a table. Could not refresh the table list: ${message(refreshError)}`,
-                        );
-                    }
-                } else if (caught.code === 'SCHEMA_CHANGED') {
-                    setMapping(undefined);
-                    setStep('mapping');
-                    try {
-                        const [nextTargets, nextSchema] = await loadConnectionImportSetup(
-                            importConnectionId,
-                            true,
-                        );
-                        setTargets(nextTargets);
-                        setSchema(nextSchema);
-                        let nextTarget: string;
-
-                        if (nextTargets.includes(mapping.table)) {
-                            nextTarget = mapping.table;
-                        } else if (creatingTable) {
-                            nextTarget = CREATE_CLOUD_TABLE_TARGET;
-                        } else {
-                            nextTarget = '';
-                        }
-                        setTarget(nextTarget);
-                        setLastExistingTarget(
-                            nextTarget && nextTarget !== CREATE_CLOUD_TABLE_TARGET
-                                ? nextTarget
-                                : '',
-                        );
-                        if (nextTarget !== CREATE_CLOUD_TABLE_TARGET)
-                            setFields(
-                                initialFields(
-                                    preview?.columns ?? [],
-                                    writableColumns(nextSchema, nextTarget),
-                                ),
-                            );
-                        setError(
-                            'The destination schema changed. Review the updated mapping before importing.',
-                        );
-                    } catch (refreshError) {
-                        setError(
-                            `The destination schema changed. Refresh failed: ${message(refreshError)}`,
-                        );
-                    }
-                } else setError(message(caught));
-                return;
-            }
-            try {
-                const status = await checkClickHouseCloudImport(
-                    queryId,
-                    mapping.table,
-                    mapping.rowCount,
-                    deduplicationToken,
-                );
-                rememberJob(status);
-            } catch {
-                rememberJob({
-                    id: mapping.id,
-                    connectionId: importConnectionId,
-                    table: mapping.table,
-                    rows: mapping.rowCount,
-                    queryId,
-                    ...(deduplicationToken ? { deduplicationToken } : {}),
-                    status: 'unknown',
-                    error: 'ClickHouse could not confirm the import. The rows may already be there.',
-                });
-            }
-            return;
-        }
-        if (browserDemoImport) {
-            setJob(undefined);
-            clearPendingImport();
-            setStep('review');
-            setError(message(caught));
-            return;
-        }
-        if (caught instanceof RequestError && caught.detail.code === 'SCHEMA_CHANGED') {
-            setJob(undefined);
-            clearPendingImport();
-            setMapping(undefined);
-            setStep('mapping');
-            try {
-                const [nextTargets, nextSchema] = await Promise.all([
-                    api<string[]>(
-                        `/connections/${encodeURIComponent(importConnectionId)}/import-targets`,
-                    ),
-                    api<Schema>(`/connections/${encodeURIComponent(importConnectionId)}/schema`),
-                ]);
-                setTargets(nextTargets);
-                setSchema(nextSchema);
-                const nextTarget =
-                    nextTargets.find(
-                        table =>
-                            table === mapping.table &&
-                            nextSchema.tables.some(
-                                item => `${item.database}.${item.name}` === table,
-                            ),
-                    ) ?? '';
-                setTarget(nextTarget);
-                setLastExistingTarget(nextTarget);
-                setFields(
-                    initialFields(preview?.columns ?? [], writableColumns(nextSchema, nextTarget)),
-                );
-                setError(
-                    'The destination schema changed. Review the updated mapping before importing.',
-                );
-            } catch (refreshError) {
-                setError(
-                    `The destination schema changed. Refresh failed: ${message(refreshError)}`,
-                );
-            }
-            return;
-        }
-        if (caught instanceof RequestError && caught.detail.code === 'IMPORT_UNRESOLVED') {
-            setBusy('recover');
-            try {
-                const jobs = await api<ImportJob[]>(
-                    `/imports?connectionId=${encodeURIComponent(importConnectionId)}&recoverable=true`,
-                );
-                setRecoverableJobs(jobs);
-                const unresolved = jobs[0];
-                if (unresolved) {
-                    const pending = {
-                        id: unresolved.id,
-                        table: unresolved.table,
-                        rows: unresolved.rows,
-                        name: 'Previous import',
-                        ...(unresolved.deduplicationToken
-                            ? { deduplicationToken: unresolved.deduplicationToken }
-                            : {}),
-                    };
-                    setJob(unresolved);
-                    setPendingImport(pending);
-                    setStep('status');
-                    try {
-                        localStorage.setItem(
-                            importStateKey(importConnectionId),
-                            JSON.stringify(pending),
-                        );
-                    } catch {}
-                } else {
-                    setStep('review');
-                    setError(message(caught));
-                }
-            } catch (recoveryError) {
-                setRecoveryState('failed');
-                setError(`Could not check for unresolved imports: ${message(recoveryError)}`);
-            }
-            return;
-        }
-        if (caught instanceof RequestError && caught.status < 500) {
-            setJob(undefined);
-            clearPendingImport();
-            setStep('review');
-            setError(message(caught));
-            return;
-        }
-        setError('The response was interrupted. Checking the saved import status…');
-        try {
-            const next = await api<ImportJob>(`/imports/${encodeURIComponent(mapping.id)}`);
-            rememberJob(next);
-        } catch {
-            rememberJob({
-                id: mapping.id,
-                table: mapping.table,
-                rows: mapping.rowCount,
-                status: 'unknown',
-                reconciliationRequired: true,
-                error: 'The server could not confirm this insert. Check for the saved import job before starting another write.',
-            });
-        }
+        await recoverCommit(caught);
     } finally {
         setBusy('');
     }

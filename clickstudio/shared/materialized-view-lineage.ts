@@ -153,6 +153,31 @@ export function buildMaterializedViewLineage(
         if (!source || !target || source === target) return;
         edges.set(JSON.stringify([source, target, kind]), { source, target, kind });
     };
+    const addCatalogDependencies = (
+        row: MetadataRow,
+        from: TableReference,
+        parsed: MaterializedViewDefinition,
+        target: TableReference | undefined,
+    ) => {
+        for (const dependency of pairedReferences(
+            row,
+            'loading_dependencies_database',
+            'loading_dependencies_table',
+        )) {
+            const sourceId = tableReferenceId(dependency.database, dependency.table),
+                targetId = tableReferenceId(from.database, from.table);
+            if (target && sourceId === tableReferenceId(target.database, target.table)) continue;
+            if (
+                parsed.dependsOn.some(
+                    item =>
+                        item.database === dependency.database && item.table === dependency.table,
+                )
+            )
+                continue;
+            if (edges.has(JSON.stringify([sourceId, targetId, 'insert-trigger']))) continue;
+            addEdge(dependency, from, 'catalog-dependency');
+        }
+    };
     for (const row of sourceRows) {
         const from = { database: metadataText(row.database), table: metadataText(row.name) };
         if (!from.table) continue;
@@ -173,24 +198,7 @@ export function buildMaterializedViewLineage(
             : parsed.target;
         if (target) addEdge(from, target, 'writes-to');
         for (const dependency of parsed.dependsOn) addEdge(dependency, from, 'refresh-dependency');
-        for (const dependency of pairedReferences(
-            row,
-            'loading_dependencies_database',
-            'loading_dependencies_table',
-        )) {
-            const sourceId = tableReferenceId(dependency.database, dependency.table),
-                targetId = tableReferenceId(from.database, from.table);
-            if (target && sourceId === tableReferenceId(target.database, target.table)) continue;
-            if (
-                parsed.dependsOn.some(
-                    item =>
-                        item.database === dependency.database && item.table === dependency.table,
-                )
-            )
-                continue;
-            if (edges.has(JSON.stringify([sourceId, targetId, 'insert-trigger']))) continue;
-            addEdge(dependency, from, 'catalog-dependency');
-        }
+        addCatalogDependencies(row, from, parsed, target);
     }
     // A source may sort after its view: prefer the stronger insert-trigger relationship.
     for (const [key, edge] of edges)

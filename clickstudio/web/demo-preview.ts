@@ -241,56 +241,8 @@ export class DemoPreviewApi {
                 state.sequence >= 0
             )
                 this.sequence = state.sequence;
-            if (Array.isArray(state.runs))
-                for (const value of state.runs) {
-                    if (isRun(value)) this.runs.set(value.id, value);
-                }
-            if (Array.isArray(state.results))
-                for (const value of state.results) {
-                    if (!isResult(value)) continue;
-                    const run = this.runs.get(value.runId);
-                    const expiredPlaygroundResult =
-                        run?.connectionId === PLAYGROUND_CONNECTION_ID &&
-                        Date.parse(value.expiresAt) <= Date.now();
-                    if (!expiredPlaygroundResult) this.results.set(value.runId, value);
-                }
-            if (Array.isArray(state.scripts))
-                for (const value of state.scripts) {
-                    const script = record(value);
-                    if (typeof script.id === 'string' && typeof script.sql === 'string')
-                        this.scripts.set(script.id, value as Script);
-                }
-            if (Array.isArray(state.documents))
-                for (const value of state.documents) {
-                    const document = record(value);
-                    if (
-                        typeof document.id === 'string' &&
-                        typeof document.sql === 'string' &&
-                        typeof document.name === 'string'
-                    )
-                        this.documents.set(document.id, value as QueryDocument);
-                }
-            if (Array.isArray(state.revisions))
-                for (const entry of state.revisions) {
-                    if (
-                        !Array.isArray(entry) ||
-                        typeof entry[0] !== 'string' ||
-                        !Array.isArray(entry[1])
-                    )
-                        continue;
-                    const versions = entry[1].filter((value): value is QueryDocument => {
-                        const revision = record(value);
-                        return (
-                            typeof revision.id === 'string' &&
-                            typeof revision.name === 'string' &&
-                            typeof revision.sql === 'string' &&
-                            typeof revision.revision === 'number' &&
-                            Number.isSafeInteger(revision.revision) &&
-                            revision.revision > 0
-                        );
-                    });
-                    if (versions.length) this.revisions.set(entry[0], versions);
-                }
+            this.restoreExecutionState(state);
+            this.restoreDocumentState(state);
             for (const run of this.runs.values()) {
                 if (
                     run.connectionId === PLAYGROUND_CONNECTION_ID &&
@@ -309,6 +261,62 @@ export class DemoPreviewApi {
             this.revisions.clear();
             this.sequence = 0;
         }
+    }
+
+    private restoreExecutionState(state: ReturnType<typeof record>) {
+        if (Array.isArray(state.runs))
+            for (const value of state.runs) {
+                if (isRun(value)) this.runs.set(value.id, value);
+            }
+        if (Array.isArray(state.results))
+            for (const value of state.results) {
+                if (!isResult(value)) continue;
+                const run = this.runs.get(value.runId);
+                const expiredPlaygroundResult =
+                    run?.connectionId === PLAYGROUND_CONNECTION_ID &&
+                    Date.parse(value.expiresAt) <= Date.now();
+                if (!expiredPlaygroundResult) this.results.set(value.runId, value);
+            }
+        if (Array.isArray(state.scripts))
+            for (const value of state.scripts) {
+                const script = record(value);
+                if (typeof script.id === 'string' && typeof script.sql === 'string')
+                    this.scripts.set(script.id, value as Script);
+            }
+    }
+
+    private restoreDocumentState(state: ReturnType<typeof record>) {
+        if (Array.isArray(state.documents))
+            for (const value of state.documents) {
+                const document = record(value);
+                if (
+                    typeof document.id === 'string' &&
+                    typeof document.sql === 'string' &&
+                    typeof document.name === 'string'
+                )
+                    this.documents.set(document.id, value as QueryDocument);
+            }
+        if (Array.isArray(state.revisions))
+            for (const entry of state.revisions) {
+                if (
+                    !Array.isArray(entry) ||
+                    typeof entry[0] !== 'string' ||
+                    !Array.isArray(entry[1])
+                )
+                    continue;
+                const versions = entry[1].filter((value): value is QueryDocument => {
+                    const revision = record(value);
+                    return (
+                        typeof revision.id === 'string' &&
+                        typeof revision.name === 'string' &&
+                        typeof revision.sql === 'string' &&
+                        typeof revision.revision === 'number' &&
+                        Number.isSafeInteger(revision.revision) &&
+                        revision.revision > 0
+                    );
+                });
+                if (versions.length) this.revisions.set(entry[0], versions);
+            }
     }
 
     private interruptRestoredCloudScripts() {
@@ -718,54 +726,15 @@ export class DemoPreviewApi {
                 this.scripts.set(scriptId, { ...current, statements });
                 this.persist();
             } catch (caught) {
-                const current = this.scripts.get(scriptId);
-                if (!current) return;
-                const error: ApiError =
-                    caught instanceof CloudRequestError
-                        ? { code: caught.code, message: caught.message }
-                        : {
-                              code: 'CLOUD_SCRIPT_STATEMENT',
-                              message:
-                                  caught instanceof Error
-                                      ? caught.message
-                                      : 'ClickHouse could not run this statement.',
-                          };
-                const statements = [...current.statements];
-                statements[index] = { ...statements[index]!, status: 'failed', error };
-                if (current.stopOnError)
-                    for (let later = index + 1; later < statements.length; later++)
-                        if (statements[later]!.status === 'pending')
-                            statements[later] = { ...statements[later]!, status: 'skipped' };
-                const successes = statements.filter(
-                    item => item.status === 'succeeded' || item.status === 'truncated',
-                ).length;
-                const hasPending = statements.some(item => item.status === 'pending');
-                const getInterruptedScriptStatus = () => {
-                    if (current.cancelled) {
-                        return 'cancelled';
-                    }
-
-                    if (hasPending) {
-                        return 'running';
-                    }
-
-                    if (successes) {
-                        return 'partial';
-                    }
-
-                    return 'failed';
-                };
-                this.scripts.set(scriptId, {
-                    ...current,
-                    status: getInterruptedScriptStatus(),
-                    statements,
-                });
-                this.persist();
-                if (current.stopOnError) return;
+                if (this.recordCloudScriptFailure(scriptId, index, caught)) return;
             }
         }
 
-        script = this.scripts.get(scriptId);
+        this.finishCloudScript(scriptId);
+    }
+
+    private finishCloudScript(scriptId: string) {
+        const script = this.scripts.get(scriptId);
         if (!script) return;
         const successes = script.statements.filter(
             item => item.status === 'succeeded' || item.status === 'truncated',
@@ -798,6 +767,53 @@ export class DemoPreviewApi {
         this.persist();
     }
 
+    private recordCloudScriptFailure(scriptId: string, index: number, caught: unknown): boolean {
+        const current = this.scripts.get(scriptId);
+        if (!current) return true;
+        const error: ApiError =
+            caught instanceof CloudRequestError
+                ? { code: caught.code, message: caught.message }
+                : {
+                      code: 'CLOUD_SCRIPT_STATEMENT',
+                      message:
+                          caught instanceof Error
+                              ? caught.message
+                              : 'ClickHouse could not run this statement.',
+                  };
+        const statements = [...current.statements];
+        statements[index] = { ...statements[index]!, status: 'failed', error };
+        if (current.stopOnError)
+            for (let later = index + 1; later < statements.length; later++)
+                if (statements[later]!.status === 'pending')
+                    statements[later] = { ...statements[later]!, status: 'skipped' };
+        const successes = statements.filter(
+            item => item.status === 'succeeded' || item.status === 'truncated',
+        ).length;
+        const hasPending = statements.some(item => item.status === 'pending');
+        const getInterruptedScriptStatus = () => {
+            if (current.cancelled) {
+                return 'cancelled';
+            }
+
+            if (hasPending) {
+                return 'running';
+            }
+
+            if (successes) {
+                return 'partial';
+            }
+
+            return 'failed';
+        };
+        this.scripts.set(scriptId, {
+            ...current,
+            status: getInterruptedScriptStatus(),
+            statements,
+        });
+        this.persist();
+        return current.stopOnError;
+    }
+
     private demoSchema(): Schema {
         const importedBytes = JSON.stringify(this.demoImportRows).length;
         return {
@@ -822,26 +838,9 @@ export class DemoPreviewApi {
         parts: string[],
         method: string,
         body: Record<string, unknown>,
-        url: URL,
     ): Promise<unknown> {
         if (parts.length === 1 && method === 'GET') return [];
-        if (parts[1] === 'preview' && method === 'POST') {
-            const format = IMPORT_FORMATS.find(format => format === body.format);
-            if (!format) throw new Error('Use CSV, JSON, or NDJSON');
-            if (typeof body.source !== 'string' || typeof body.name !== 'string')
-                throw new Error('Choose a file to preview');
-            const parsed = parseDemoImport(body.source, format);
-            if (!parsed.rows.length) throw new Error('The input contains no data rows');
-            const id = crypto.randomUUID();
-            const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-            const input = { id, name: body.name.slice(0, 128), format, ...parsed, expiresAt };
-            this.demoImportInputs.set(id, input);
-            return {
-                ...input,
-                rows: input.rows.slice(0, IMPORT_PREVIEW_ROWS),
-                rowCount: input.rows.length,
-            };
-        }
+        if (parts[1] === 'preview' && method === 'POST') return this.previewDemoImport(body);
         const id = parts[1];
         if (!id) throw new Error('Import request is incomplete');
         if (parts.length === 2 && method === 'DELETE') {
@@ -850,77 +849,8 @@ export class DemoPreviewApi {
                 if (mapping.inputId === id) this.demoImportMappings.delete(mappingId);
             return { ok: true };
         }
-        if (parts[2] === 'mapping' && method === 'POST') {
-            const input = this.demoImportInputs.get(id);
-            if (!input || Date.parse(input.expiresAt) <= Date.now())
-                throw new Error('This preview expired; upload the file again');
-            if (body.connectionId !== 'demo' || body.table !== DEMO_IMPORT_TARGET)
-                throw new Error('Choose the browser demo table as the destination');
-            const fields = record(body.fields) as Record<string, unknown>;
-            const destinations = Object.values(fields);
-            const allowed = ['day', 'region', 'channel', 'events', 'revenue'];
-            if (
-                !destinations.length ||
-                destinations.some(value => typeof value !== 'string' || !allowed.includes(value)) ||
-                new Set(destinations).size !== destinations.length
-            )
-                throw new Error('Each destination column must be mapped once');
-            const mappedRows = input.rows.map(row => {
-                const mapped = Object.create(null) as DemoImportRow;
-                for (const [source, destination] of Object.entries(fields)) {
-                    if (
-                        !input.columns.includes(source) ||
-                        typeof destination !== 'string' ||
-                        !allowed.includes(destination) ||
-                        !Object.hasOwn(row, source)
-                    )
-                        throw new Error(
-                            'Mapping references an unknown source or destination column',
-                        );
-                    mapped[destination] = row[source]!;
-                }
-                return mapped;
-            });
-            const mapping = {
-                id: crypto.randomUUID(),
-                inputId: id,
-                connectionId: 'demo',
-                table: DEMO_IMPORT_TARGET,
-                fields: fields as Record<string, string>,
-                rows: mappedRows,
-            };
-            this.demoImportMappings.set(mapping.id, mapping);
-            return {
-                ...mapping,
-                rows: mappedRows.slice(0, IMPORT_PREVIEW_ROWS),
-                rowCount: mappedRows.length,
-            };
-        }
-        if (parts[2] === 'commit' && method === 'POST') {
-            const mapping = this.demoImportMappings.get(id);
-            if (!mapping) throw new Error('Mapping not found; review the columns again');
-            if (this.demoImportJobs.has(id)) return this.demoImportJobs.get(id);
-            const rows = [...this.demoImportRows, ...mapping.rows];
-            let demoPersisted = true;
-            try {
-                await saveDemoImportRows(rows);
-            } catch {
-                demoPersisted = false;
-            }
-            this.demoImportRows = rows;
-            const job = {
-                id,
-                connectionId: 'demo',
-                table: mapping.table,
-                rows: mapping.rows.length,
-                createdAt: now(),
-                status: 'succeeded' as const,
-                demoRows: mapping.rows.slice(0, 8),
-                demoPersisted,
-            };
-            this.demoImportJobs.set(id, job);
-            return job;
-        }
+        if (parts[2] === 'mapping' && method === 'POST') return this.mapDemoImport(id, body);
+        if (parts[2] === 'commit' && method === 'POST') return this.commitDemoImport(id);
         if (parts.length === 2 && method === 'GET') {
             const job = this.demoImportJobs.get(id);
             if (!job) throw new Error('Import job not found');
@@ -931,9 +861,96 @@ export class DemoPreviewApi {
             if (!job) throw new Error('Import job not found');
             return job;
         }
-        const connectionId = url.searchParams.get('connectionId');
-        if (parts.length === 1 && method === 'GET' && connectionId === 'demo') return [];
         throw new Error('Unknown browser demo import action');
+    }
+
+    private previewDemoImport(body: Record<string, unknown>) {
+        const format = IMPORT_FORMATS.find(format => format === body.format);
+        if (!format) throw new Error('Use CSV, JSON, or NDJSON');
+        if (typeof body.source !== 'string' || typeof body.name !== 'string')
+            throw new Error('Choose a file to preview');
+        const parsed = parseDemoImport(body.source, format);
+        if (!parsed.rows.length) throw new Error('The input contains no data rows');
+        const id = crypto.randomUUID();
+        const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+        const input = { id, name: body.name.slice(0, 128), format, ...parsed, expiresAt };
+        this.demoImportInputs.set(id, input);
+        return {
+            ...input,
+            rows: input.rows.slice(0, IMPORT_PREVIEW_ROWS),
+            rowCount: input.rows.length,
+        };
+    }
+
+    private mapDemoImport(id: string, body: Record<string, unknown>) {
+        const input = this.demoImportInputs.get(id);
+        if (!input || Date.parse(input.expiresAt) <= Date.now())
+            throw new Error('This preview expired; upload the file again');
+        if (body.connectionId !== 'demo' || body.table !== DEMO_IMPORT_TARGET)
+            throw new Error('Choose the browser demo table as the destination');
+        const fields = record(body.fields) as Record<string, unknown>;
+        const destinations = Object.values(fields);
+        const allowed = ['day', 'region', 'channel', 'events', 'revenue'];
+        if (
+            !destinations.length ||
+            destinations.some(value => typeof value !== 'string' || !allowed.includes(value)) ||
+            new Set(destinations).size !== destinations.length
+        )
+            throw new Error('Each destination column must be mapped once');
+        const mappedRows = input.rows.map(row => {
+            const mapped = Object.create(null) as DemoImportRow;
+            for (const [source, destination] of Object.entries(fields)) {
+                if (
+                    !input.columns.includes(source) ||
+                    typeof destination !== 'string' ||
+                    !allowed.includes(destination) ||
+                    !Object.hasOwn(row, source)
+                )
+                    throw new Error('Mapping references an unknown source or destination column');
+                mapped[destination] = row[source]!;
+            }
+            return mapped;
+        });
+        const mapping = {
+            id: crypto.randomUUID(),
+            inputId: id,
+            connectionId: 'demo',
+            table: DEMO_IMPORT_TARGET,
+            fields: fields as Record<string, string>,
+            rows: mappedRows,
+        };
+        this.demoImportMappings.set(mapping.id, mapping);
+        return {
+            ...mapping,
+            rows: mappedRows.slice(0, IMPORT_PREVIEW_ROWS),
+            rowCount: mappedRows.length,
+        };
+    }
+
+    private async commitDemoImport(id: string) {
+        const mapping = this.demoImportMappings.get(id);
+        if (!mapping) throw new Error('Mapping not found; review the columns again');
+        if (this.demoImportJobs.has(id)) return this.demoImportJobs.get(id);
+        const rows = [...this.demoImportRows, ...mapping.rows];
+        let demoPersisted = true;
+        try {
+            await saveDemoImportRows(rows);
+        } catch {
+            demoPersisted = false;
+        }
+        this.demoImportRows = rows;
+        const job = {
+            id,
+            connectionId: 'demo',
+            table: mapping.table,
+            rows: mapping.rows.length,
+            createdAt: now(),
+            status: 'succeeded' as const,
+            demoRows: mapping.rows.slice(0, 8),
+            demoPersisted,
+        };
+        this.demoImportJobs.set(id, job);
+        return job;
     }
 
     private getRun(id: string) {
@@ -1015,163 +1032,46 @@ export class DemoPreviewApi {
             .map(part => decodeURIComponent(part));
         const body = record(options.body);
 
-        if (pathname === '/session')
-            return { principal: { id: owner, role: 'owner' }, requiresLogin: false, demo: true };
-        if (pathname === '/connections' && method === 'GET') {
-            const cloud = getClickHouseCloudConnection();
-            return [connection(this.trusted), PLAYGROUND_CONNECTION, ...(cloud ? [cloud] : [])];
-        }
-        if (
-            parts[0] === 'connections' &&
-            parts[1] === CLICKHOUSE_CLOUD_CONNECTION_ID &&
-            parts[2] === 'schema' &&
-            method === 'GET'
-        )
-            return await loadClickHouseCloudSchema({
-                databaseOffset: Number(url.searchParams.get('databaseOffset') ?? 0),
-                tableOffset: Number(url.searchParams.get('tableOffset') ?? 0),
-                columnOffset: Number(url.searchParams.get('columnOffset') ?? 0),
-            });
-        if (
-            parts[0] === 'connections' &&
-            parts[1] === CLICKHOUSE_CLOUD_CONNECTION_ID &&
-            parts[2] === 'documentation' &&
-            method === 'GET'
-        ) {
-            const cloud = getClickHouseCloudConnection();
-            if (!cloud)
-                throw new CloudRequestError(
-                    'CLOUD_DISCONNECTED',
-                    'Reconnect to ClickHouse Cloud before opening reference docs.',
-                    401,
-                );
-            if (parts[3] === 'search')
-                return await searchClickHouseCloudDocumentation(
-                    url.searchParams.get('query') ?? '',
-                    url.searchParams.get('category') ?? 'all',
-                    options.signal,
-                );
-            if (parts[3] === 'entry') {
-                const entry = await loadClickHouseCloudDocumentationEntry(
-                    url.searchParams.get('name') ?? '',
-                    url.searchParams.get('type') ?? '',
-                    options.signal,
-                );
-                if (!entry) throw new Error('ClickHouse returned no documentation for this entry.');
-                return entry satisfies ClickHouseDocumentationEntry;
-            }
-            const name = url.searchParams.get('name') ?? '';
-            const entry = await loadClickHouseCloudDocumentationEntry(
-                name,
-                'System Table',
-                options.signal,
-            );
-            if (!entry) throw new Error(`ClickHouse returned no documentation for system.${name}.`);
-            return entry satisfies ClickHouseDocumentationEntry;
-        }
-        if (parts[0] === 'connections' && parts[1] === 'demo' && parts[2] === 'schema')
-            return this.demoSchema();
-        if (
-            parts[0] === 'connections' &&
-            parts[1] === 'demo' &&
-            parts[2] === 'native-explorer' &&
-            method === 'POST'
-        ) {
-            if (!this.trusted)
-                throw new Error('Trust this connection before inspecting native metadata.');
-            if (typeof body.database !== 'string') throw new Error('A database is required.');
-            if (body.kind === 'lineage')
-                return nativeExplorerFixture({ kind: 'lineage', database: body.database });
-            if (
-                (body.kind === 'merges' || body.kind === 'mutations') &&
-                typeof body.table === 'string'
-            )
-                return nativeExplorerFixture({
-                    kind: body.kind,
-                    database: body.database,
-                    table: body.table,
-                });
-            throw new Error('Unknown native explorer request.');
-        }
-        if (parts[0] === 'connections' && parts[1] === 'demo' && parts[2] === 'workload') {
-            if (!this.trusted)
-                throw new Error('Trust this connection before inspecting workload history.');
-            const rawMinutes = url.searchParams.get('minutes') ?? '60';
-            if (!WORKLOAD_WINDOWS.some(minutes => String(minutes) === rawMinutes))
-                throw new Error('minutes must be 15, 60, 360, or 1440.');
-            return demoWorkload('demo', Number(rawMinutes) as WorkloadWindow);
-        }
-        if (parts[0] === 'connections' && parts[1] === 'demo' && parts[2] === 'replication') {
-            if (!this.trusted)
-                throw new Error('Trust this connection before inspecting replication health.');
-            return demoReplication('demo');
-        }
-        if (
-            parts[0] === 'connections' &&
-            parts[1] === PLAYGROUND_CONNECTION_ID &&
-            (parts[2] === 'workload' || parts[2] === 'replication')
-        )
-            throw new Error(
-                'Observability system-table access is unavailable in the public Playground browser preview.',
-            );
-        if (
-            parts[0] === 'connections' &&
-            parts[1] === 'demo' &&
-            parts[2] === 'table-parts' &&
-            method === 'POST'
-        ) {
-            if (body.database !== 'demo' || body.table !== 'events')
-                throw new Error('The selected table is not available in this sample.');
-            return parseMergeTreeParts('demo', 'events', demoMergeTreePartRows());
-        }
-        if (
-            parts[0] === 'connections' &&
-            parts[1] === PLAYGROUND_CONNECTION_ID &&
-            parts[2] === 'schema'
-        )
-            return loadPlaygroundSchema(options.signal, url.searchParams.get('refresh') === 'true');
-        if (
-            parts[0] === 'connections' &&
-            parts[1] === 'demo' &&
-            parts[2] === 'trust' &&
-            method === 'POST'
-        ) {
-            this.trusted = body.trusted === true;
-            this.persist();
-            return { trusted: this.trusted };
-        }
-        if (parts[0] === 'connections' && parts[1] === 'demo' && parts[2] === 'import-targets')
-            return [DEMO_IMPORT_TARGET];
-        if (
-            parts[0] === 'connections' &&
-            parts[1] === PLAYGROUND_CONNECTION_ID &&
-            parts[2] === 'import-targets'
-        )
-            return [];
-        if (parts[0] === 'imports') return this.importRequest(parts, method, body, url);
-        if (parts[0] === 'connections' && parts[2] === 'query-tree' && method === 'POST') {
-            const sql = typeof body.sql === 'string' ? body.sql : '';
-            const parameters = record(body.parameters) as Record<string, string>;
-            if (parts[1] === PLAYGROUND_CONNECTION_ID) {
-                if (Object.keys(parameters).length)
-                    throw new Error(
-                        'Remove query parameters before inspecting SQL on ClickHouse Playground.',
+        switch (parts[0]) {
+            case 'connections':
+                if (pathname === '/connections' && method === 'GET') {
+                    const cloud = getClickHouseCloudConnection();
+                    return [
+                        connection(this.trusted),
+                        PLAYGROUND_CONNECTION,
+                        ...(cloud ? [cloud] : []),
+                    ];
+                }
+                return this.requestConnection(parts, method, body, url, options);
+            case 'imports':
+                return this.importRequest(parts, method, body);
+            case 'runs':
+                return this.requestRuns(pathname, parts, method, body, url, options);
+            case 'scripts':
+                if (pathname === '/scripts' && method === 'POST') return this.submitScript(body);
+                if (parts[1]) return this.requestScript(parts[1], parts[2], method);
+                break;
+            case 'documents':
+                if (pathname === '/documents' && method === 'GET')
+                    return this.documentsFor(
+                        url.searchParams.get('trash') === 'true',
+                        url.searchParams.get('connectionId'),
                     );
-                const response = await queryPlaygroundQueryTree(sql, options.signal);
-                return response.rows.map(row => String(row[0] ?? '')).filter(Boolean);
-            }
-            if (parts[1] === CLICKHOUSE_CLOUD_CONNECTION_ID) {
-                if (!getClickHouseCloudConnection())
-                    throw new CloudRequestError(
-                        'CLOUD_DISCONNECTED',
-                        'Reconnect to ClickHouse Cloud before analyzing SQL.',
-                        401,
-                    );
-                return await loadClickHouseCloudQueryTree(sql, parameters, options.signal);
-            }
-            if (parts[1] === 'demo') return [...demoQueryTree];
+                if (pathname === '/documents' && method === 'POST') return this.saveDocument(body);
+                if (parts[1]) return this.requestDocument(parts[1], parts, method, body);
+                break;
         }
+        return this.requestStaticPath(pathname, method);
+    }
 
+    private requestRuns(
+        pathname: string,
+        parts: string[],
+        method: string,
+        body: ReturnType<typeof record>,
+        url: URL,
+        options: RequestOptions,
+    ): unknown {
         if (pathname === '/runs' && method === 'POST') return this.submitRun(body, options);
         if (pathname === '/runs' && method === 'GET') {
             const connectionId = url.searchParams.get('connectionId');
@@ -1183,191 +1083,13 @@ export class DemoPreviewApi {
                         right.sequence - left.sequence,
                 );
         }
-        if (parts[0] === 'runs' && parts[1]) return this.requestRun(parts, method, url);
+        if (parts[1]) return this.requestRun(parts, method, url);
+        return {};
+    }
 
-        if (pathname === '/scripts' && method === 'POST') {
-            if (body.connectionId === PLAYGROUND_CONNECTION_ID)
-                throw new Error('Run one statement at a time on ClickHouse Playground.');
-            let sql: string;
-
-            if (typeof body.sql === 'string') {
-                sql = body.sql;
-            } else if (body.connectionId === CLICKHOUSE_CLOUD_CONNECTION_ID) {
-                sql = '';
-            } else {
-                sql = DEMO_PREVIEW_SQL;
-            }
-            const id = crypto.randomUUID();
-            const statements = splitSql(sql);
-            if (body.connectionId === CLICKHOUSE_CLOUD_CONNECTION_ID) {
-                if (!getClickHouseCloudConnection())
-                    throw new CloudRequestError(
-                        'CLOUD_DISCONNECTED',
-                        'Reconnect to ClickHouse Cloud before running a script.',
-                        401,
-                    );
-                if (!sql.trim() || sql.length > MAX_SQL_CHARS)
-                    throw new Error(
-                        `Enter a script under ${MAX_SQL_CHARS.toLocaleString()} characters.`,
-                    );
-                if (statements.length === 0 || statements.length > MAX_SCRIPT_STATEMENTS)
-                    throw new Error(
-                        `A script must contain 1–${MAX_SCRIPT_STATEMENTS} SQL statements.`,
-                    );
-                if (Object.keys(record(body.parameters)).length)
-                    throw new Error(
-                        'Remove query parameters before running a script on ClickHouse Cloud.',
-                    );
-                const script: Script = {
-                    id,
-                    owner,
-                    connectionId: CLICKHOUSE_CLOUD_CONNECTION_ID,
-                    sql,
-                    createdAt: now(),
-                    status: 'running',
-                    stopOnError: body.stopOnError !== false,
-                    cancelled: false,
-                    statements: statements.map(statement => ({ ...statement, status: 'pending' })),
-                };
-                this.scripts.set(id, script);
-                this.persist();
-                void this.executeCloudScript(id);
-                return script;
-            }
-            const items = statements.map(statement => {
-                const run = this.addRun(
-                    crypto.randomUUID(),
-                    statement.sql,
-                    'query',
-                    record(body.parameters) as Record<string, string>,
-                );
-                return { ...statement, runId: run.id, status: 'succeeded' as const };
-            });
-            const script: Script = {
-                id,
-                owner,
-                connectionId: 'demo',
-                sql,
-                createdAt: now(),
-                status: 'succeeded',
-                stopOnError: body.stopOnError !== false,
-                cancelled: false,
-                statements: items,
-            };
-            this.scripts.set(id, script);
-            this.persist();
-            return script;
-        }
-        if (parts[0] === 'scripts' && parts[1]) {
-            const script = this.scripts.get(parts[1]);
-            if (parts[2] === 'cancel' && method === 'POST') {
-                if (!script) throw new Error('This script is no longer available in this browser.');
-                if (
-                    script.connectionId !== CLICKHOUSE_CLOUD_CONNECTION_ID ||
-                    script.status !== 'running' ||
-                    script.cancelled
-                )
-                    return script;
-                const stopping = { ...script, cancelled: true };
-                this.scripts.set(script.id, stopping);
-                this.persist();
-                return stopping;
-            }
-            return (
-                script ??
-                ({
-                    id: parts[1],
-                    owner,
-                    connectionId: 'demo',
-                    sql: DEMO_PREVIEW_SQL,
-                    createdAt: now(),
-                    status: 'succeeded',
-                    stopOnError: true,
-                    cancelled: false,
-                    statements: [],
-                } satisfies Script)
-            );
-        }
-
-        if (pathname === '/documents' && method === 'GET')
-            return this.documentsFor(
-                url.searchParams.get('trash') === 'true',
-                url.searchParams.get('connectionId'),
-            );
-        if (pathname === '/documents' && method === 'POST') return this.saveDocument(body);
-        if (parts[0] === 'documents' && parts[1]) {
-            const id = parts[1];
-            if (parts.length === 2 && method === 'PUT') return this.saveDocument(body, id);
-            if (parts[2] === 'revisions' && method === 'GET') {
-                const current = this.documents.get(id);
-                if (!current) throw new Error('Sample document not found.');
-                return [...(this.revisions.get(id) ?? [current])].sort(
-                    (left, right) => right.revision - left.revision,
-                );
-            }
-            if (parts[2] === 'restore-revision' && method === 'POST') {
-                const current = this.documents.get(id);
-                if (!current) throw new Error('Sample document not found.');
-                const revisionNumber =
-                    typeof body.revision === 'number' ? body.revision : Number(body.revision);
-                const baseRevision =
-                    typeof body.baseRevision === 'number'
-                        ? body.baseRevision
-                        : Number(body.baseRevision);
-                if (
-                    !Number.isSafeInteger(revisionNumber) ||
-                    revisionNumber < 1 ||
-                    !Number.isSafeInteger(baseRevision) ||
-                    baseRevision < 1
-                )
-                    throw new Error('Choose a valid saved version to restore.');
-                if (current.revision !== baseRevision)
-                    throw new Error(
-                        'A newer version exists. Refresh version history and try again.',
-                    );
-                const historical = this.revisions
-                    .get(id)
-                    ?.find(version => version.revision === revisionNumber);
-                if (!historical)
-                    throw new Error(
-                        'This saved version is no longer available. Refresh version history and try again.',
-                    );
-                const restored: QueryDocument = {
-                    ...historical,
-                    revision: current.revision + 1,
-                    updatedAt: now(),
-                    runId: undefined,
-                };
-                this.documents.set(id, restored);
-                this.revisions.set(id, [...(this.revisions.get(id) ?? [current]), restored]);
-                this.persist();
-                return restored;
-            }
-            if (parts.length === 2 && method === 'DELETE') {
-                const document = this.documents.get(id);
-                if (document) {
-                    this.documents.set(id, { ...document, deletedAt: now() });
-                    this.persist();
-                }
-                return { ok: true };
-            }
-            if (parts[2] === 'restore' && method === 'POST') {
-                const document = this.documents.get(id);
-                if (document) {
-                    const { deletedAt: _deletedAt, ...restored } = document;
-                    this.documents.set(id, restored);
-                    this.persist();
-                    return restored;
-                }
-            }
-            if (parts.length === 2)
-                return (
-                    this.documents.get(id) ?? {
-                        error: { code: 'NOT_FOUND', message: 'Sample document not found.' },
-                    }
-                );
-        }
-
+    private requestStaticPath(pathname: string, method: string): unknown {
+        if (pathname === '/session')
+            return { principal: { id: owner, role: 'owner' }, requiresLogin: false, demo: true };
         if (pathname === '/assistant/status')
             return {
                 available: false,
@@ -1396,6 +1118,359 @@ export class DemoPreviewApi {
             return [];
         if (pathname === '/health') return { ok: true, demo: true, version: '0.1.0' };
         return {};
+    }
+
+    private async requestConnection(
+        parts: string[],
+        method: string,
+        body: ReturnType<typeof record>,
+        url: URL,
+        options: RequestOptions,
+    ): Promise<unknown> {
+        switch (parts[2]) {
+            case 'schema':
+                switch (parts[1]) {
+                    case 'demo':
+                        return this.demoSchema();
+                    case PLAYGROUND_CONNECTION_ID:
+                        return loadPlaygroundSchema(
+                            options.signal,
+                            url.searchParams.get('refresh') === 'true',
+                        );
+                    case CLICKHOUSE_CLOUD_CONNECTION_ID:
+                        if (method === 'GET')
+                            return loadClickHouseCloudSchema({
+                                databaseOffset: Number(url.searchParams.get('databaseOffset') ?? 0),
+                                tableOffset: Number(url.searchParams.get('tableOffset') ?? 0),
+                                columnOffset: Number(url.searchParams.get('columnOffset') ?? 0),
+                            });
+                }
+                break;
+            case 'documentation':
+                if (parts[1] === CLICKHOUSE_CLOUD_CONNECTION_ID && method === 'GET')
+                    return this.requestCloudDocumentation(parts, url, options);
+                break;
+            case 'query-tree':
+                if (method === 'POST') return this.requestQueryTree(parts, body, options);
+                break;
+            default:
+                return this.requestConnectionMetadata(parts, method, body, url);
+        }
+        return {};
+    }
+
+    private requestConnectionMetadata(
+        parts: string[],
+        method: string,
+        body: ReturnType<typeof record>,
+        url: URL,
+    ): unknown {
+        if (parts[1] === PLAYGROUND_CONNECTION_ID) {
+            switch (parts[2]) {
+                case 'workload':
+                case 'replication':
+                    throw new Error(
+                        'Observability system-table access is unavailable in the public Playground browser preview.',
+                    );
+                case 'import-targets':
+                    return [];
+            }
+        }
+        if (parts[1] !== 'demo') return {};
+        switch (parts[2]) {
+            case 'native-explorer':
+                if (method === 'POST') return this.requestDemoNativeExplorer(body);
+                break;
+            case 'workload': {
+                if (!this.trusted)
+                    throw new Error('Trust this connection before inspecting workload history.');
+                const rawMinutes = url.searchParams.get('minutes') ?? '60';
+                if (!WORKLOAD_WINDOWS.some(minutes => String(minutes) === rawMinutes))
+                    throw new Error('minutes must be 15, 60, 360, or 1440.');
+                return demoWorkload('demo', Number(rawMinutes) as WorkloadWindow);
+            }
+            case 'replication':
+                if (!this.trusted)
+                    throw new Error('Trust this connection before inspecting replication health.');
+                return demoReplication('demo');
+            case 'table-parts':
+                if (method === 'POST') {
+                    if (body.database !== 'demo' || body.table !== 'events')
+                        throw new Error('The selected table is not available in this sample.');
+                    return parseMergeTreeParts('demo', 'events', demoMergeTreePartRows());
+                }
+                break;
+            case 'trust':
+                if (method === 'POST') {
+                    this.trusted = body.trusted === true;
+                    this.persist();
+                    return { trusted: this.trusted };
+                }
+                break;
+            case 'import-targets':
+                return [DEMO_IMPORT_TARGET];
+        }
+        return {};
+    }
+
+    private async requestCloudDocumentation(
+        parts: string[],
+        url: URL,
+        options: RequestOptions,
+    ): Promise<unknown> {
+        const cloud = getClickHouseCloudConnection();
+        if (!cloud)
+            throw new CloudRequestError(
+                'CLOUD_DISCONNECTED',
+                'Reconnect to ClickHouse Cloud before opening reference docs.',
+                401,
+            );
+        if (parts[3] === 'search')
+            return await searchClickHouseCloudDocumentation(
+                url.searchParams.get('query') ?? '',
+                url.searchParams.get('category') ?? 'all',
+                options.signal,
+            );
+        if (parts[3] === 'entry') {
+            const entry = await loadClickHouseCloudDocumentationEntry(
+                url.searchParams.get('name') ?? '',
+                url.searchParams.get('type') ?? '',
+                options.signal,
+            );
+            if (!entry) throw new Error('ClickHouse returned no documentation for this entry.');
+            return entry satisfies ClickHouseDocumentationEntry;
+        }
+        const name = url.searchParams.get('name') ?? '';
+        const entry = await loadClickHouseCloudDocumentationEntry(
+            name,
+            'System Table',
+            options.signal,
+        );
+        if (!entry) throw new Error(`ClickHouse returned no documentation for system.${name}.`);
+        return entry satisfies ClickHouseDocumentationEntry;
+    }
+
+    private requestDemoNativeExplorer(body: ReturnType<typeof record>): unknown {
+        if (!this.trusted)
+            throw new Error('Trust this connection before inspecting native metadata.');
+        if (typeof body.database !== 'string') throw new Error('A database is required.');
+        if (body.kind === 'lineage')
+            return nativeExplorerFixture({ kind: 'lineage', database: body.database });
+        if ((body.kind === 'merges' || body.kind === 'mutations') && typeof body.table === 'string')
+            return nativeExplorerFixture({
+                kind: body.kind,
+                database: body.database,
+                table: body.table,
+            });
+        throw new Error('Unknown native explorer request.');
+    }
+
+    private async requestQueryTree(
+        parts: string[],
+        body: ReturnType<typeof record>,
+        options: RequestOptions,
+    ): Promise<unknown> {
+        const sql = typeof body.sql === 'string' ? body.sql : '';
+        const parameters = record(body.parameters) as Record<string, string>;
+        if (parts[1] === PLAYGROUND_CONNECTION_ID) {
+            if (Object.keys(parameters).length)
+                throw new Error(
+                    'Remove query parameters before inspecting SQL on ClickHouse Playground.',
+                );
+            const response = await queryPlaygroundQueryTree(sql, options.signal);
+            return response.rows.map(row => String(row[0] ?? '')).filter(Boolean);
+        }
+        if (parts[1] === CLICKHOUSE_CLOUD_CONNECTION_ID) {
+            if (!getClickHouseCloudConnection())
+                throw new CloudRequestError(
+                    'CLOUD_DISCONNECTED',
+                    'Reconnect to ClickHouse Cloud before analyzing SQL.',
+                    401,
+                );
+            return await loadClickHouseCloudQueryTree(sql, parameters, options.signal);
+        }
+        if (parts[1] === 'demo') return [...demoQueryTree];
+        return {};
+    }
+
+    private submitScript(body: ReturnType<typeof record>): Script {
+        if (body.connectionId === PLAYGROUND_CONNECTION_ID)
+            throw new Error('Run one statement at a time on ClickHouse Playground.');
+        let sql: string;
+
+        if (typeof body.sql === 'string') {
+            sql = body.sql;
+        } else if (body.connectionId === CLICKHOUSE_CLOUD_CONNECTION_ID) {
+            sql = '';
+        } else {
+            sql = DEMO_PREVIEW_SQL;
+        }
+        const id = crypto.randomUUID();
+        const statements = splitSql(sql);
+        if (body.connectionId === CLICKHOUSE_CLOUD_CONNECTION_ID) {
+            if (!getClickHouseCloudConnection())
+                throw new CloudRequestError(
+                    'CLOUD_DISCONNECTED',
+                    'Reconnect to ClickHouse Cloud before running a script.',
+                    401,
+                );
+            if (!sql.trim() || sql.length > MAX_SQL_CHARS)
+                throw new Error(
+                    `Enter a script under ${MAX_SQL_CHARS.toLocaleString()} characters.`,
+                );
+            if (statements.length === 0 || statements.length > MAX_SCRIPT_STATEMENTS)
+                throw new Error(`A script must contain 1–${MAX_SCRIPT_STATEMENTS} SQL statements.`);
+            if (Object.keys(record(body.parameters)).length)
+                throw new Error(
+                    'Remove query parameters before running a script on ClickHouse Cloud.',
+                );
+            const script: Script = {
+                id,
+                owner,
+                connectionId: CLICKHOUSE_CLOUD_CONNECTION_ID,
+                sql,
+                createdAt: now(),
+                status: 'running',
+                stopOnError: body.stopOnError !== false,
+                cancelled: false,
+                statements: statements.map(statement => ({ ...statement, status: 'pending' })),
+            };
+            this.scripts.set(id, script);
+            this.persist();
+            void this.executeCloudScript(id);
+            return script;
+        }
+        const items = statements.map(statement => {
+            const run = this.addRun(
+                crypto.randomUUID(),
+                statement.sql,
+                'query',
+                record(body.parameters) as Record<string, string>,
+            );
+            return { ...statement, runId: run.id, status: 'succeeded' as const };
+        });
+        const script: Script = {
+            id,
+            owner,
+            connectionId: 'demo',
+            sql,
+            createdAt: now(),
+            status: 'succeeded',
+            stopOnError: body.stopOnError !== false,
+            cancelled: false,
+            statements: items,
+        };
+        this.scripts.set(id, script);
+        this.persist();
+        return script;
+    }
+
+    private requestScript(id: string, action: string | undefined, method: string): Script {
+        const script = this.scripts.get(id);
+        if (action === 'cancel' && method === 'POST') {
+            if (!script) throw new Error('This script is no longer available in this browser.');
+            if (
+                script.connectionId !== CLICKHOUSE_CLOUD_CONNECTION_ID ||
+                script.status !== 'running' ||
+                script.cancelled
+            )
+                return script;
+            const stopping = { ...script, cancelled: true };
+            this.scripts.set(script.id, stopping);
+            this.persist();
+            return stopping;
+        }
+        return (
+            script ??
+            ({
+                id,
+                owner,
+                connectionId: 'demo',
+                sql: DEMO_PREVIEW_SQL,
+                createdAt: now(),
+                status: 'succeeded',
+                stopOnError: true,
+                cancelled: false,
+                statements: [],
+            } satisfies Script)
+        );
+    }
+
+    private requestDocument(
+        id: string,
+        parts: string[],
+        method: string,
+        body: ReturnType<typeof record>,
+    ): unknown {
+        if (parts.length === 2 && method === 'PUT') return this.saveDocument(body, id);
+        if (parts[2] === 'revisions' && method === 'GET') {
+            const current = this.documents.get(id);
+            if (!current) throw new Error('Sample document not found.');
+            return [...(this.revisions.get(id) ?? [current])].sort(
+                (left, right) => right.revision - left.revision,
+            );
+        }
+        if (parts[2] === 'restore-revision' && method === 'POST')
+            return this.restoreDocumentRevision(id, body);
+        if (parts.length === 2 && method === 'DELETE') {
+            const document = this.documents.get(id);
+            if (document) {
+                this.documents.set(id, { ...document, deletedAt: now() });
+                this.persist();
+            }
+            return { ok: true };
+        }
+        if (parts[2] === 'restore' && method === 'POST') {
+            const document = this.documents.get(id);
+            if (document) {
+                const { deletedAt: _deletedAt, ...restored } = document;
+                this.documents.set(id, restored);
+                this.persist();
+                return restored;
+            }
+        }
+        if (parts.length === 2)
+            return (
+                this.documents.get(id) ?? {
+                    error: { code: 'NOT_FOUND', message: 'Sample document not found.' },
+                }
+            );
+        return {};
+    }
+
+    private restoreDocumentRevision(id: string, body: ReturnType<typeof record>): QueryDocument {
+        const current = this.documents.get(id);
+        if (!current) throw new Error('Sample document not found.');
+        const revisionNumber =
+            typeof body.revision === 'number' ? body.revision : Number(body.revision);
+        const baseRevision =
+            typeof body.baseRevision === 'number' ? body.baseRevision : Number(body.baseRevision);
+        if (
+            !Number.isSafeInteger(revisionNumber) ||
+            revisionNumber < 1 ||
+            !Number.isSafeInteger(baseRevision) ||
+            baseRevision < 1
+        )
+            throw new Error('Choose a valid saved version to restore.');
+        if (current.revision !== baseRevision)
+            throw new Error('A newer version exists. Refresh version history and try again.');
+        const historical = this.revisions
+            .get(id)
+            ?.find(version => version.revision === revisionNumber);
+        if (!historical)
+            throw new Error(
+                'This saved version is no longer available. Refresh version history and try again.',
+            );
+        const restored: QueryDocument = {
+            ...historical,
+            revision: current.revision + 1,
+            updatedAt: now(),
+            runId: undefined,
+        };
+        this.documents.set(id, restored);
+        this.revisions.set(id, [...(this.revisions.get(id) ?? [current]), restored]);
+        this.persist();
+        return restored;
     }
 
     private async requestRun(parts: string[], method: string, url: URL): Promise<unknown> {
@@ -1482,65 +1557,8 @@ export class DemoPreviewApi {
             throw new Error(
                 'Query-log and pipeline profiling are unavailable on ClickHouse Playground.',
             );
-        if (run.connectionId === CLICKHOUSE_CLOUD_CONNECTION_ID) {
-            const cloud = getClickHouseCloudConnection();
-            if (!cloud)
-                throw new CloudRequestError(
-                    'CLOUD_DISCONNECTED',
-                    'Reconnect to ClickHouse Cloud before inspecting the query.',
-                    401,
-                );
-            if (view === 'flamegraph') {
-                if (!cloud.manifest?.traceLog?.available)
-                    throw new CloudRequestError(
-                        'CAPABILITY_UNAVAILABLE',
-                        cloud.manifest?.traceLog?.reason ?? 'Profiler samples are unavailable.',
-                        409,
-                    );
-                if (run.status === 'running' || run.status === 'queued')
-                    throw new Error('Wait for the query to finish before loading its flamegraph.');
-                return await loadClickHouseCloudFlamegraph(
-                    run.queryId,
-                    run.createdAt,
-                    run.finishedAt,
-                );
-            }
-            if (view === 'pipeline') {
-                if (!cloud.manifest?.pipeline.available)
-                    throw new CloudRequestError(
-                        'CAPABILITY_UNAVAILABLE',
-                        cloud.manifest?.pipeline.reason ??
-                            'ClickHouse pipeline evidence is unavailable.',
-                        409,
-                    );
-                const prefix = sqlForRunKind('', run.kind);
-                const sql =
-                    run.kind !== 'query' && run.sql.startsWith(prefix)
-                        ? run.sql.slice(explainPrefixLength(run.kind))
-                        : run.sql;
-                const raw = await loadClickHouseCloudPipeline(sql, run.parameters);
-                const parsed = parsePipelineResult(raw);
-                if (!parsed)
-                    throw new Error(
-                        'ClickHouse returned no structured EXPLAIN PIPELINE graph for this query.',
-                    );
-                return parsed satisfies ProfilePipeline;
-            }
-            const queryLogAvailable = Boolean(
-                cloud.manifest?.queryLog.available && cloud.manifest.queryLogSource,
-            );
-            const evidence = queryLogAvailable
-                ? await loadClickHouseCloudProfileEvidence(run.queryId).catch(() => [])
-                : [];
-            return buildQueryProfile(run, evidence, {
-                queryLogAvailable,
-                pipelineAvailable: Boolean(cloud.manifest?.pipeline.available),
-                notice: queryLogAvailable
-                    ? 'ClickHouse query-log rows may arrive after a server flush interval. Missing rows are shown as unavailable, not estimated.'
-                    : (cloud.manifest?.queryLog.reason ??
-                      'Query-log access is unavailable. Only retained run metrics are shown.'),
-            }) satisfies QueryProfile;
-        }
+        if (run.connectionId === CLICKHOUSE_CLOUD_CONNECTION_ID)
+            return this.requestCloudRunProfile(run, view);
         if (view === 'flamegraph') {
             if (!this.trusted)
                 throw new Error('Trust this connection before inspecting profiler samples.');
@@ -1592,6 +1610,62 @@ export class DemoPreviewApi {
             evidence: [],
             notice: 'Generated preview data only. This is not a ClickHouse profile.',
         };
+    }
+
+    private async requestCloudRunProfile(run: Run, view?: string): Promise<unknown> {
+        const cloud = getClickHouseCloudConnection();
+        if (!cloud)
+            throw new CloudRequestError(
+                'CLOUD_DISCONNECTED',
+                'Reconnect to ClickHouse Cloud before inspecting the query.',
+                401,
+            );
+        if (view === 'flamegraph') {
+            if (!cloud.manifest?.traceLog?.available)
+                throw new CloudRequestError(
+                    'CAPABILITY_UNAVAILABLE',
+                    cloud.manifest?.traceLog?.reason ?? 'Profiler samples are unavailable.',
+                    409,
+                );
+            if (run.status === 'running' || run.status === 'queued')
+                throw new Error('Wait for the query to finish before loading its flamegraph.');
+            return await loadClickHouseCloudFlamegraph(run.queryId, run.createdAt, run.finishedAt);
+        }
+        if (view === 'pipeline') {
+            if (!cloud.manifest?.pipeline.available)
+                throw new CloudRequestError(
+                    'CAPABILITY_UNAVAILABLE',
+                    cloud.manifest?.pipeline.reason ??
+                        'ClickHouse pipeline evidence is unavailable.',
+                    409,
+                );
+            const prefix = sqlForRunKind('', run.kind);
+            const sql =
+                run.kind !== 'query' && run.sql.startsWith(prefix)
+                    ? run.sql.slice(explainPrefixLength(run.kind))
+                    : run.sql;
+            const raw = await loadClickHouseCloudPipeline(sql, run.parameters);
+            const parsed = parsePipelineResult(raw);
+            if (!parsed)
+                throw new Error(
+                    'ClickHouse returned no structured EXPLAIN PIPELINE graph for this query.',
+                );
+            return parsed satisfies ProfilePipeline;
+        }
+        const queryLogAvailable = Boolean(
+            cloud.manifest?.queryLog.available && cloud.manifest.queryLogSource,
+        );
+        const evidence = queryLogAvailable
+            ? await loadClickHouseCloudProfileEvidence(run.queryId).catch(() => [])
+            : [];
+        return buildQueryProfile(run, evidence, {
+            queryLogAvailable,
+            pipelineAvailable: Boolean(cloud.manifest?.pipeline.available),
+            notice: queryLogAvailable
+                ? 'ClickHouse query-log rows may arrive after a server flush interval. Missing rows are shown as unavailable, not estimated.'
+                : (cloud.manifest?.queryLog.reason ??
+                  'Query-log access is unavailable. Only retained run metrics are shown.'),
+        }) satisfies QueryProfile;
     }
 
     private async submitRun(body: ReturnType<typeof record>, options: RequestOptions) {

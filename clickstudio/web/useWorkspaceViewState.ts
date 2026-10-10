@@ -21,56 +21,40 @@ import {
     type FailedQueryError,
 } from './workspace-helpers';
 
-export function useWorkspaceViewState({
-    active,
-    connection,
-    documents,
-    documentsLoaded,
-    documentsReadError,
-    savingDraftIds,
-    history,
-    run,
-    failedQueryError,
-    script,
-    scriptResultSelected = false,
-    copy,
-    experience,
-    view,
-    trusted,
-    unsupportedParameters,
-    nativeParseSnapshot,
-    snapshot,
-}: {
-    active: Draft;
-    connection: Connected;
-    documents: QueryDocument[];
-    documentsLoaded: boolean;
-    documentsReadError: boolean;
-    savingDraftIds: Record<string, boolean>;
-    history: Run[];
-    run?: Run;
-    failedQueryError?: FailedQueryError;
-    script?: Script;
-    scriptResultSelected?: boolean;
-    copy: Copy;
-    experience: ExperienceLevel;
-    view: ResultsView;
-    trusted: boolean;
-    unsupportedParameters: boolean;
-    nativeParseSnapshot?: NativeParseSnapshot;
-    snapshot?: Result;
-}) {
-    const sortedHistory = useMemo(
-        () => [...history].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-        [history],
-    );
-    const savedDocument = documents.find(document => document.id === active.serverId);
-    const saveStatus = draftSaveStatus(active, connection.id, savedDocument, {
-        saving: Boolean(savingDraftIds[active.id]),
-        pending: !documentsLoaded,
-        readError: documentsReadError,
-    });
-    const statementCount = safeStatementCount(active.sql);
+function failureErrorLocation(
+    failureSql: string | undefined,
+    failureRange: ReturnType<typeof sqlErrorRange>,
+    submittedDraft: string | undefined,
+    submittedOffset: number,
+) {
+    let failureLocation;
+
+    if (failureSql && failureRange) {
+        if (
+            submittedDraft &&
+            submittedDraft.slice(submittedOffset, submittedOffset + failureSql.length) ===
+                failureSql
+        ) {
+            failureLocation = sqlErrorLineColumn(
+                submittedDraft,
+                submittedOffset + failureRange.from,
+            );
+        } else {
+            failureLocation = sqlErrorLineColumn(failureSql, failureRange.from);
+        }
+    } else {
+        failureLocation = undefined;
+    }
+    return failureLocation;
+}
+
+function workspaceFailureState(
+    active: Draft,
+    run: Run | undefined,
+    script: Script | undefined,
+    scriptResultSelected: boolean,
+    failedQueryError: FailedQueryError | undefined,
+) {
     const failedScriptStatement = script?.statements.find(
         statement => statement.status === 'failed' && statement.error,
     );
@@ -131,40 +115,27 @@ export function useWorkspaceViewState({
         : undefined;
     const submittedDraft = failedQueryError?.draftSql ?? runErrorContext?.draftSql;
     const submittedOffset = failedQueryError?.sourceFrom ?? runErrorContext?.sourceFrom ?? 0;
-    let failureLocation;
-
-    if (failureSql && failureRange) {
-        if (
-            submittedDraft &&
-            submittedDraft.slice(submittedOffset, submittedOffset + failureSql.length) ===
-                failureSql
-        ) {
-            failureLocation = sqlErrorLineColumn(
-                submittedDraft,
-                submittedOffset + failureRange.from,
-            );
-        } else {
-            failureLocation = sqlErrorLineColumn(failureSql, failureRange.from);
-        }
-    } else {
-        failureLocation = undefined;
-    }
-    const invalidatedSource =
-        run && active.activeRunId === run.id && active.invalidatedSource?.runId === run.id
-            ? active.invalidatedSource
-            : undefined;
-    const resultChange = useMemo(
-        () =>
-            run
-                ? retainedResultChange(run, {
-                      sql: active.sql,
-                      parameters: active.parameters,
-                      connectionId: connection.id,
-                  })
-                : undefined,
-        [run, active.sql, active.parameters, connection.id],
+    const failureLocation = failureErrorLocation(
+        failureSql,
+        failureRange,
+        submittedDraft,
+        submittedOffset,
     );
-    const staleResult = Boolean(invalidatedSource || resultChange);
+    return {
+        failureError,
+        failureSql,
+        failureRange,
+        failureLocation,
+        editorErrorContext,
+        editorErrorRange,
+    };
+}
+
+function staleResultDescription(
+    invalidatedSource: Draft['invalidatedSource'],
+    resultChange: ReturnType<typeof retainedResultChange>,
+    copy: Copy,
+) {
     let staleResultLabel: string | undefined;
 
     if (invalidatedSource) {
@@ -205,6 +176,88 @@ export function useWorkspaceViewState({
                 break;
         }
     }
+    return { staleResultLabel, staleResultReason };
+}
+
+export function useWorkspaceViewState({
+    active,
+    connection,
+    documents,
+    documentsLoaded,
+    documentsReadError,
+    savingDraftIds,
+    history,
+    run,
+    failedQueryError,
+    script,
+    scriptResultSelected = false,
+    copy,
+    experience,
+    view,
+    trusted,
+    unsupportedParameters,
+    nativeParseSnapshot,
+    snapshot,
+}: {
+    active: Draft;
+    connection: Connected;
+    documents: QueryDocument[];
+    documentsLoaded: boolean;
+    documentsReadError: boolean;
+    savingDraftIds: Record<string, boolean>;
+    history: Run[];
+    run?: Run;
+    failedQueryError?: FailedQueryError;
+    script?: Script;
+    scriptResultSelected?: boolean;
+    copy: Copy;
+    experience: ExperienceLevel;
+    view: ResultsView;
+    trusted: boolean;
+    unsupportedParameters: boolean;
+    nativeParseSnapshot?: NativeParseSnapshot;
+    snapshot?: Result;
+}) {
+    const sortedHistory = useMemo(
+        () => [...history].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+        [history],
+    );
+    const savedDocument = documents.find(document => document.id === active.serverId);
+    const saveStatus = draftSaveStatus(active, connection.id, savedDocument, {
+        saving: Boolean(savingDraftIds[active.id]),
+        pending: !documentsLoaded,
+        readError: documentsReadError,
+    });
+    const statementCount = safeStatementCount(active.sql);
+    const {
+        failureError,
+        failureSql,
+        failureRange,
+        failureLocation,
+        editorErrorContext,
+        editorErrorRange,
+    } = workspaceFailureState(active, run, script, scriptResultSelected, failedQueryError);
+    const invalidatedSource =
+        run && active.activeRunId === run.id && active.invalidatedSource?.runId === run.id
+            ? active.invalidatedSource
+            : undefined;
+    const resultChange = useMemo(
+        () =>
+            run
+                ? retainedResultChange(run, {
+                      sql: active.sql,
+                      parameters: active.parameters,
+                      connectionId: connection.id,
+                  })
+                : undefined,
+        [run, active.sql, active.parameters, connection.id],
+    );
+    const staleResult = Boolean(invalidatedSource || resultChange);
+    const { staleResultLabel, staleResultReason } = staleResultDescription(
+        invalidatedSource,
+        resultChange,
+        copy,
+    );
     const requestedResultsView =
         experience === 'beginner' && view === 'insights' ? 'results' : view;
     const sqlMapStatement = safeSelectedStatement(active.sql, active.from, active.from);

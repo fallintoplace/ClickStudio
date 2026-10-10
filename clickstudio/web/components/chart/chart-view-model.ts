@@ -22,33 +22,13 @@ import type { prepareChartSelection } from './chart-selection.js';
 import type { ChartSvgModel } from './chart-svg-model.js';
 import { prepareScatterAxes } from './chart-scatter-axes.js';
 
-export function prepareChartView({
-    result,
-    chart,
-    chartCopy,
-    locale,
-    categoryViewportWidth,
-    selection,
-}: {
-    result: Result;
-    chart: Draft['chart'];
-    chartCopy: Copy['chart'];
-    locale: Locale;
-    categoryViewportWidth: number;
-    selection: ReturnType<typeof prepareChartSelection>;
-}) {
-    const { suggestion, numericIndexes, inferredCandle, canChooseCandlestick, candleX } = selection;
-    let chartKind: 'number' | 'line' | 'bar' | 'scatter' | 'heatmap' | 'candlestick';
-
-    if (chart.kind === 'table') {
-        if (suggestion.config.kind === 'table') {
-            chartKind = 'bar';
-        } else {
-            chartKind = suggestion.config.kind;
-        }
-    } else {
-        chartKind = chart.kind;
-    }
+function prepareChartColumns(
+    result: Result,
+    chart: Draft['chart'],
+    selection: ReturnType<typeof prepareChartSelection>,
+    chartKind: Exclude<Draft['chart']['kind'], 'table'>,
+) {
+    const { suggestion, numericIndexes } = selection;
     const configuredMeasures = [
         ...new Set(chart.ys.filter(index => numericIndexes.includes(index))),
     ].slice(0, MAX_CHART_SERIES);
@@ -124,6 +104,42 @@ export function prepareChartView({
             ? selectedMeasures
             : selectedMeasures.slice(0, 1);
     const yIndex = measureIndexes[0] ?? 0;
+    return { xIndex, yIndex, groupByIndex, availableMeasures, measureIndexes };
+}
+
+export function prepareChartView({
+    result,
+    chart,
+    chartCopy,
+    locale,
+    categoryViewportWidth,
+    selection,
+}: {
+    result: Result;
+    chart: Draft['chart'];
+    chartCopy: Copy['chart'];
+    locale: Locale;
+    categoryViewportWidth: number;
+    selection: ReturnType<typeof prepareChartSelection>;
+}) {
+    const { suggestion, numericIndexes, inferredCandle, canChooseCandlestick, candleX } = selection;
+    let chartKind: 'number' | 'line' | 'bar' | 'scatter' | 'heatmap' | 'candlestick';
+
+    if (chart.kind === 'table') {
+        if (suggestion.config.kind === 'table') {
+            chartKind = 'bar';
+        } else {
+            chartKind = suggestion.config.kind;
+        }
+    } else {
+        chartKind = chart.kind;
+    }
+    const { xIndex, yIndex, groupByIndex, availableMeasures, measureIndexes } = prepareChartColumns(
+        result,
+        chart,
+        selection,
+        chartKind,
+    );
     const xType = result.columns[xIndex]?.type ?? '';
     const categoricalAxis =
         chartKind === 'bar' ||

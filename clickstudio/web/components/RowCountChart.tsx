@@ -109,67 +109,71 @@ export function RowCountChart({
     const noTimeValues = timeAxis && !series.length;
     const dimensionName = result.columns[xIndex]?.name ?? '';
     const groupName = groupByIndex === undefined ? '' : (result.columns[groupByIndex]?.name ?? '');
-    let generatedTitle: string;
+    const describeRowCountChart = () => {
+        let generatedTitle: string;
 
-    if (timeAxis) {
-        if (groupByIndex === undefined) {
-            generatedTitle = 'Rows over time';
-        } else {
-            generatedTitle = `Rows over time by ${groupName}`;
-        }
-    } else {
-        generatedTitle = `Rows by ${dimensionName}`;
-    }
-    const customTitle =
-        chart.title.trim() &&
-        !['Query result', generatedTitle, suggestion.config.title].includes(chart.title)
-            ? chart.title
-            : undefined;
-    const getSuggestionReason = () => {
         if (timeAxis) {
             if (groupByIndex === undefined) {
-                return copy.rowsOverTime;
+                generatedTitle = 'Rows over time';
+            } else {
+                generatedTitle = `Rows over time by ${groupName}`;
+            }
+        } else {
+            generatedTitle = `Rows by ${dimensionName}`;
+        }
+        const customTitle =
+            chart.title.trim() &&
+            !['Query result', generatedTitle, suggestion.config.title].includes(chart.title)
+                ? chart.title
+                : undefined;
+        const getSuggestionReason = () => {
+            if (timeAxis) {
+                if (groupByIndex === undefined) {
+                    return copy.rowsOverTime;
+                }
+
+                return chartText(copy.rowsOverTimeBy, { dimension: groupName });
             }
 
-            return chartText(copy.rowsOverTimeBy, { dimension: groupName });
+            return chartText(copy.rowsBy, { dimension: dimensionName });
+        };
+        const title = customTitle ?? getSuggestionReason();
+        let timeUnit: string;
+
+        switch (countData?.unit) {
+            case 'minute':
+                timeUnit = copy.minutes;
+                break;
+            case 'hour':
+                timeUnit = copy.hours;
+                break;
+            case 'day':
+                timeUnit = copy.days;
+                break;
+            case 'week':
+                timeUnit = copy.weeks;
+                break;
+            case 'month':
+                timeUnit = copy.months;
+                break;
+            default:
+                timeUnit = '';
+                break;
         }
+        let chartAriaLabel: string;
 
-        return chartText(copy.rowsBy, { dimension: dimensionName });
-    };
-    const title = customTitle ?? getSuggestionReason();
-    let timeUnit: string;
-
-    switch (countData?.unit) {
-        case 'minute':
-            timeUnit = copy.minutes;
-            break;
-        case 'hour':
-            timeUnit = copy.hours;
-            break;
-        case 'day':
-            timeUnit = copy.days;
-            break;
-        case 'week':
-            timeUnit = copy.weeks;
-            break;
-        case 'month':
-            timeUnit = copy.months;
-            break;
-        default:
-            timeUnit = '';
-            break;
-    }
-    let chartAriaLabel: string;
-
-    if (timeAxis) {
-        if (groupByIndex === undefined) {
-            chartAriaLabel = copy.rowsOverTime;
+        if (timeAxis) {
+            if (groupByIndex === undefined) {
+                chartAriaLabel = copy.rowsOverTime;
+            } else {
+                chartAriaLabel = chartText(copy.rowsOverTimeBy, { dimension: groupName });
+            }
         } else {
-            chartAriaLabel = chartText(copy.rowsOverTimeBy, { dimension: groupName });
+            chartAriaLabel = chartText(copy.rowsBy, { dimension: dimensionName });
         }
-    } else {
-        chartAriaLabel = chartText(copy.rowsBy, { dimension: dimensionName });
-    }
+        return { title, customTitle, timeUnit, chartAriaLabel };
+    };
+    const { title, customTitle, timeUnit, chartAriaLabel } = describeRowCountChart();
     const renderChartSvg = createRowCountSvgRenderer({
         plotRight,
         chartAriaLabel,

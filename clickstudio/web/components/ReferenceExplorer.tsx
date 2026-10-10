@@ -205,6 +205,22 @@ export function ReferenceExplorer({
                 setEntryError(copy.trustToInspect);
                 return;
             }
+            const loadBundledEntry = async () => {
+                try {
+                    const entry = await bundledProvider.get(
+                        summary.name,
+                        summary.type,
+                        controller.signal,
+                    );
+                    if (controller.signal.aborted) return;
+                    if (entry) {
+                        setForceBundled(true);
+                        setSelected(entry);
+                    } else setEntryError(copy.referenceEntryUnavailable);
+                } catch (fallbackError) {
+                    if (!controller.signal.aborted) setEntryError(message(fallbackError));
+                }
+            };
             setEntryLoading(true);
             try {
                 let entry = await provider.get(summary.name, summary.type, controller.signal);
@@ -221,20 +237,7 @@ export function ReferenceExplorer({
             } catch (caught) {
                 if (controller.signal.aborted) return;
                 if (provider.kind === 'native' && isReferenceUnavailable(caught)) {
-                    try {
-                        const entry = await bundledProvider.get(
-                            summary.name,
-                            summary.type,
-                            controller.signal,
-                        );
-                        if (controller.signal.aborted) return;
-                        if (entry) {
-                            setForceBundled(true);
-                            setSelected(entry);
-                        } else setEntryError(copy.referenceEntryUnavailable);
-                    } catch (fallbackError) {
-                        if (!controller.signal.aborted) setEntryError(message(fallbackError));
-                    }
+                    await loadBundledEntry();
                 } else setEntryError(message(caught));
             } finally {
                 if (!controller.signal.aborted) setEntryLoading(false);

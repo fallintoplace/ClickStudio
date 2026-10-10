@@ -432,52 +432,55 @@ function createDraftExecutor({
 
         return performExecution(
             async () => {
-                if (parseFailed) throw parseError;
-                if (!trusted)
-                    throw new Error(
-                        'Review and trust this read only connection before running SQL.',
-                    );
-                if (isScript && connection.manifest?.scripts.available !== true)
-                    throw new Error(
-                        connection.manifest?.scripts.reason ??
-                            'Scripts are unavailable on this connection.',
-                    );
-                if (kind === 'explain' && connection.manifest?.explain.available === false)
-                    throw new Error(
-                        connection.manifest.explain.reason ??
-                            'EXPLAIN is unavailable on this connection.',
-                    );
-                const explainPlan =
-                    connection.manifest?.explainPlan ?? connection.manifest?.explain;
-                if (kind === 'plan' && explainPlan?.available === false)
-                    throw new Error(
-                        explainPlan.reason ?? 'EXPLAIN PLAN is unavailable on this connection.',
-                    );
-                const explainPipeline =
-                    connection.manifest?.explainPipeline ?? connection.manifest?.pipeline;
-                if (kind === 'pipeline' && explainPipeline?.available === false)
-                    throw new Error(
-                        explainPipeline.reason ??
-                            'EXPLAIN PIPELINE is unavailable on this connection.',
-                    );
-                const explainAnalyze = connection.manifest?.explainAnalyze;
-                if (kind === 'analyze' && explainAnalyze?.available === false)
-                    throw new Error(
-                        explainAnalyze.reason ??
-                            'EXPLAIN ANALYZE is unavailable on this connection.',
-                    );
-                if (statements.length === 0)
-                    throw new Error('Write or select a SQL statement before running it.');
-                if (!isScript && statements.length > 1)
-                    throw new Error('This action accepts exactly one SQL statement.');
-                if (
-                    parameterNames(sql).length &&
-                    connection.manifest?.parameters.available === false
-                )
-                    throw new Error(
-                        connection.manifest.parameters.reason ??
-                            'Query parameters are unavailable on this connection.',
-                    );
+                const validateExecutionRequest = () => {
+                    if (parseFailed) throw parseError;
+                    if (!trusted)
+                        throw new Error(
+                            'Review and trust this read only connection before running SQL.',
+                        );
+                    if (isScript && connection.manifest?.scripts.available !== true)
+                        throw new Error(
+                            connection.manifest?.scripts.reason ??
+                                'Scripts are unavailable on this connection.',
+                        );
+                    if (kind === 'explain' && connection.manifest?.explain.available === false)
+                        throw new Error(
+                            connection.manifest.explain.reason ??
+                                'EXPLAIN is unavailable on this connection.',
+                        );
+                    const explainPlan =
+                        connection.manifest?.explainPlan ?? connection.manifest?.explain;
+                    if (kind === 'plan' && explainPlan?.available === false)
+                        throw new Error(
+                            explainPlan.reason ?? 'EXPLAIN PLAN is unavailable on this connection.',
+                        );
+                    const explainPipeline =
+                        connection.manifest?.explainPipeline ?? connection.manifest?.pipeline;
+                    if (kind === 'pipeline' && explainPipeline?.available === false)
+                        throw new Error(
+                            explainPipeline.reason ??
+                                'EXPLAIN PIPELINE is unavailable on this connection.',
+                        );
+                    const explainAnalyze = connection.manifest?.explainAnalyze;
+                    if (kind === 'analyze' && explainAnalyze?.available === false)
+                        throw new Error(
+                            explainAnalyze.reason ??
+                                'EXPLAIN ANALYZE is unavailable on this connection.',
+                        );
+                    if (statements.length === 0)
+                        throw new Error('Write or select a SQL statement before running it.');
+                    if (!isScript && statements.length > 1)
+                        throw new Error('This action accepts exactly one SQL statement.');
+                    if (
+                        parameterNames(sql).length &&
+                        connection.manifest?.parameters.available === false
+                    )
+                        throw new Error(
+                            connection.manifest.parameters.reason ??
+                                'Query parameters are unavailable on this connection.',
+                        );
+                };
+                validateExecutionRequest();
 
                 const importedSqlBaseline = await importedReveal.captureImportedSqlBaseline(
                     draft.id,
@@ -509,7 +512,7 @@ function createDraftExecutor({
                         ? { draftId: draft.id, run, page: resultPage, pageIndex: page }
                         : undefined;
 
-                if (isScript) {
+                const submitScript = async () => {
                     pendingExecution.start(
                         payload.clientRequestId,
                         draft.id,
@@ -551,7 +554,8 @@ function createDraftExecutor({
                     );
                     setViewForDraft(draft.id, 'results', true);
                     if (options.trackChartRun) setExampleChartRunId(undefined);
-                } else {
+                };
+                const submitRun = async () => {
                     pendingExecution.start(
                         payload.clientRequestId,
                         draft.id,
@@ -610,7 +614,9 @@ function createDraftExecutor({
                     if (draft.id === active.id) editor.current?.focus();
                     if (options.trackChartRun)
                         setExampleChartRunId(options.view === 'chart' ? created.id : undefined);
-                }
+                };
+                if (isScript) await submitScript();
+                else await submitRun();
                 if (options.expandResults) panels.revealPanelTemporarily('results', draft.id);
                 let successNotice: string | undefined;
 

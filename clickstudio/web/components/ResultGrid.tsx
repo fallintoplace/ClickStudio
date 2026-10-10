@@ -173,6 +173,20 @@ function ResultColumnHeader({
     );
 }
 
+function emptyRetainedRowsMessage(page: ResultPage): string {
+    let emptyRowsMessage: string;
+
+    if (page.totalRows > 0) {
+        emptyRowsMessage = 'No retained rows are available on this page.';
+    } else if (page.completeness === 'truncated') {
+        emptyRowsMessage =
+            'No rows fit in the retained result. The query may still have matched rows; the result limits left none to keep.';
+    } else {
+        emptyRowsMessage = 'This query returned zero rows.';
+    }
+    return emptyRowsMessage;
+}
+
 export function ResultGrid({
     run,
     page,
@@ -401,16 +415,7 @@ export function ResultGrid({
             )}
         </div>
     );
-    let emptyRowsMessage: string;
-
-    if (page.totalRows > 0) {
-        emptyRowsMessage = 'No retained rows are available on this page.';
-    } else if (page.completeness === 'truncated') {
-        emptyRowsMessage =
-            'No rows fit in the retained result. The query may still have matched rows; the result limits left none to keep.';
-    } else {
-        emptyRowsMessage = 'This query returned zero rows.';
-    }
+    const emptyRowsMessage = emptyRetainedRowsMessage(page);
     return (
         <div
             className={cx(

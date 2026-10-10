@@ -102,6 +102,39 @@ async function tokenContrast(page: Page, selected: boolean) {
     );
 }
 
+async function expectThemeTokenColors(page: Page, theme: string) {
+    for (const token of ['`FROM`', '`toDate`', '`UInt64`', '"SELECT"']) {
+        await expect(page.locator('.cm-content span').filter({ hasText: token }).last()).toHaveCSS(
+            'color',
+            theme === 'Light' ? 'rgb(31, 31, 31)' : 'rgb(239, 248, 250)',
+        );
+    }
+    await expect(
+        page
+            .locator('.cm-content span')
+            .filter({ hasText: /^NULL$/ })
+            .last(),
+    ).toHaveCSS('color', theme === 'Light' ? 'rgb(0, 0, 255)' : 'rgb(197, 152, 255)');
+    if (theme === 'Light') {
+        for (const [token, color] of [
+            ['SELECT', 'rgb(0, 0, 255)'],
+            ["'frontend'", 'rgb(163, 21, 21)'],
+            ['0.50', 'rgb(8, 118, 69)'],
+            ['/* aggregate */', 'rgb(0, 112, 0)'],
+            ['quantile', 'rgb(121, 94, 38)'],
+        ] as const) {
+            await expect(
+                page
+                    .locator('.cm-content span')
+                    .filter({
+                        hasText: new RegExp(`^${token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`),
+                    })
+                    .last(),
+            ).toHaveCSS('color', color);
+        }
+    }
+}
+
 for (const parser of ['ready', 'unavailable']) {
     test(`SQL tokens remain readable across themes and accents with the ${parser} parser`, async ({
         page,
@@ -127,37 +160,7 @@ for (const parser of ['ready', 'unavailable']) {
 
         for (const theme of ['Dark', 'Light']) {
             await page.getByRole('radio', { name: `${theme} theme`, exact: true }).click();
-            for (const token of ['`FROM`', '`toDate`', '`UInt64`', '"SELECT"']) {
-                await expect(
-                    page.locator('.cm-content span').filter({ hasText: token }).last(),
-                ).toHaveCSS('color', theme === 'Light' ? 'rgb(31, 31, 31)' : 'rgb(239, 248, 250)');
-            }
-            await expect(
-                page
-                    .locator('.cm-content span')
-                    .filter({ hasText: /^NULL$/ })
-                    .last(),
-            ).toHaveCSS('color', theme === 'Light' ? 'rgb(0, 0, 255)' : 'rgb(197, 152, 255)');
-            if (theme === 'Light') {
-                for (const [token, color] of [
-                    ['SELECT', 'rgb(0, 0, 255)'],
-                    ["'frontend'", 'rgb(163, 21, 21)'],
-                    ['0.50', 'rgb(8, 118, 69)'],
-                    ['/* aggregate */', 'rgb(0, 112, 0)'],
-                    ['quantile', 'rgb(121, 94, 38)'],
-                ] as const) {
-                    await expect(
-                        page
-                            .locator('.cm-content span')
-                            .filter({
-                                hasText: new RegExp(
-                                    `^${token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`,
-                                ),
-                            })
-                            .last(),
-                    ).toHaveCSS('color', color);
-                }
-            }
+            await expectThemeTokenColors(page, theme);
             for (const accent of ['Cyan accent', 'ClickHouse yellow accent']) {
                 await page.getByRole('button', { name: accent, exact: true }).click();
                 for (const state of ['normal', 'active', 'selected']) {

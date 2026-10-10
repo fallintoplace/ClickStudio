@@ -170,6 +170,42 @@ function findIdentifierRange(
     return undefined;
 }
 
+function clauseName(
+    word: string,
+    next: string | undefined,
+    hasClauses: boolean,
+): ClauseName | undefined {
+    switch (word) {
+        case 'GROUP':
+            return next === 'BY' ? 'GROUP BY' : undefined;
+        case 'ORDER':
+            return next === 'BY' ? 'ORDER BY' : undefined;
+        case 'WITH':
+            return hasClauses ? undefined : 'WITH';
+        default:
+            return [
+                'SELECT',
+                'FROM',
+                'PREWHERE',
+                'WHERE',
+                'HAVING',
+                'WINDOW',
+                'QUALIFY',
+                'LIMIT',
+                'OFFSET',
+                'UNION',
+            ].includes(word)
+                ? (word as ClauseName)
+                : undefined;
+    }
+}
+
+function clauseTokenWidth(name: ClauseName, next: string | undefined): number {
+    return name === 'GROUP BY' || name === 'ORDER BY' || (name === 'UNION' && next === 'ALL')
+        ? 2
+        : 1;
+}
+
 function topLevelClauses(sql: string): {
     tokens: Token[];
     clauses: ClauseSpan[];
@@ -199,29 +235,10 @@ function topLevelClauses(sql: string): {
         if (depth === 0 && token.kind === 'word') {
             const word = token.text.toUpperCase(),
                 next = tokens[index + 1]?.text.toUpperCase();
-            let name: ClauseName | undefined;
-            if (word === 'GROUP' && next === 'BY') name = 'GROUP BY';
-            else if (word === 'ORDER' && next === 'BY') name = 'ORDER BY';
-            else if (word === 'WITH' && found.length === 0) name = 'WITH';
-            else if (
-                [
-                    'SELECT',
-                    'FROM',
-                    'PREWHERE',
-                    'WHERE',
-                    'HAVING',
-                    'WINDOW',
-                    'QUALIFY',
-                    'LIMIT',
-                    'OFFSET',
-                    'UNION',
-                ].includes(word)
-            )
-                name = word as ClauseName;
+            const name = clauseName(word, next, found.length > 0);
             if (name) {
                 found.push({ name, from: token.from });
-                if (name === 'GROUP BY' || name === 'ORDER BY') index++;
-                if (name === 'UNION' && next === 'ALL') index++;
+                index += clauseTokenWidth(name, next) - 1;
             } else if (word === 'JOIN') joins.push({ from: token.from, to: token.to });
         }
         if (token.kind === 'symbol' && token.text === '(') depth++;
@@ -343,58 +360,67 @@ function makeAstBranch(
     };
 }
 
+function fallbackTableSource(tokens: Token[], index: number): Source {
+    const token = tokens[index]!;
+    let name = token.text.replace(/^[`"]|[`"]$/g, ''),
+        to = token.to;
+    if (tokens[index + 1]?.text === '.' && tokens[index + 2]) {
+        name += `.${tokens[index + 2]!.text.replace(/^[`"]|[`"]$/g, '')}`;
+        to = tokens[index + 2]!.to;
+    }
+    return {
+        name,
+        detail: 'Inferred table or table-function source',
+        range: { from: token.from, to },
+    };
+}
+
+function fallbackSources(tokens: Token[], from: ClauseSpan | undefined): Source[] {
+    const sources: Source[] = [];
+    if (!from) return sources;
+    let expect = true,
+        depth = 0;
+    for (let index = 0; index < tokens.length; index++) {
+        const token = tokens[index]!;
+        if (token.from < from.from || token.to > from.to) continue;
+        if (token.text === '(') {
+            if (expect && depth === 0)
+                sources.push({
+                    name: 'Subquery',
+                    detail: 'Nested SELECT source',
+                    range: { from: token.from, to: token.to },
+                });
+            depth++;
+            continue;
+        }
+        if (token.text === ')') {
+            depth = Math.max(0, depth - 1);
+            continue;
+        }
+        if (depth > 0) continue;
+        if (token.kind === 'word' && ['FROM', 'JOIN'].includes(token.text.toUpperCase())) {
+            expect = true;
+            continue;
+        }
+        if (token.text === ',') {
+            expect = true;
+            continue;
+        }
+        if (expect && (token.kind === 'word' || token.kind === 'quoted')) {
+            sources.push(fallbackTableSource(tokens, index));
+            expect = false;
+        }
+    }
+    return sources;
+}
+
 function buildFallbackBranch(
     tokens: Token[],
     clauses: ClauseSpan[],
     joins: SourceRange[],
 ): FlowBranch {
     const from = clauseFor(clauses, 'FROM');
-    const sources: Source[] = [];
-    if (from) {
-        let expect = true,
-            depth = 0;
-        for (let index = 0; index < tokens.length; index++) {
-            const token = tokens[index]!;
-            if (token.from < from.from || token.to > from.to) continue;
-            if (token.text === '(') {
-                if (expect && depth === 0)
-                    sources.push({
-                        name: 'Subquery',
-                        detail: 'Nested SELECT source',
-                        range: { from: token.from, to: token.to },
-                    });
-                depth++;
-                continue;
-            }
-            if (token.text === ')') {
-                depth = Math.max(0, depth - 1);
-                continue;
-            }
-            if (depth > 0) continue;
-            if (token.kind === 'word' && ['FROM', 'JOIN'].includes(token.text.toUpperCase())) {
-                expect = true;
-                continue;
-            }
-            if (token.text === ',') {
-                expect = true;
-                continue;
-            }
-            if (expect && (token.kind === 'word' || token.kind === 'quoted')) {
-                let name = token.text.replace(/^[`"]|[`"]$/g, ''),
-                    to = token.to;
-                if (tokens[index + 1]?.text === '.' && tokens[index + 2]) {
-                    name += `.${tokens[index + 2]!.text.replace(/^[`"]|[`"]$/g, '')}`;
-                    to = tokens[index + 2]!.to;
-                }
-                sources.push({
-                    name,
-                    detail: 'Inferred table or table-function source',
-                    range: { from: token.from, to },
-                });
-                expect = false;
-            }
-        }
-    }
+    const sources = fallbackSources(tokens, from);
     const names = new Set(
         tokens.filter(token => token.kind === 'word').map(token => token.text.toUpperCase()),
     );
@@ -483,21 +509,24 @@ function aggregatePipeline(
             );
             if (id) frontier.push(id);
         }
-        if (branch.joins.length || frontier.length > 1) {
-            const kind = branch.joins.length
-                ? branch.joins.slice(0, 3).join(' + ')
-                : 'CROSS / comma';
-            const span = branchClauses('FROM');
-            const id = addNode(
-                `join${suffix}`,
-                `Join · ${kind}`,
-                'join',
-                `${branch.joins.length || Math.max(0, frontier.length - 1)} join operation${(branch.joins.length || frontier.length - 1) === 1 ? '' : 's'} in FROM`,
-                span,
-            );
-            connect(frontier, id);
-            frontier = id ? [id] : frontier;
-        }
+        const addJoinStage = () => {
+            if (branch.joins.length || frontier.length > 1) {
+                const kind = branch.joins.length
+                    ? branch.joins.slice(0, 3).join(' + ')
+                    : 'CROSS / comma';
+                const span = branchClauses('FROM');
+                const id = addNode(
+                    `join${suffix}`,
+                    `Join · ${kind}`,
+                    'join',
+                    `${branch.joins.length || Math.max(0, frontier.length - 1)} join operation${(branch.joins.length || frontier.length - 1) === 1 ? '' : 's'} in FROM`,
+                    span,
+                );
+                connect(frontier, id);
+                frontier = id ? [id] : frontier;
+            }
+        };
+        addJoinStage();
         const add = (
             id: string,
             label: string,

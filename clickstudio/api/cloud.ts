@@ -1262,13 +1262,9 @@ async function commitCloudImport(
         generateId?: unknown;
     }>(form, 'createTable');
     const creating = createTable !== undefined;
-    let tableName: string;
-    let tableDatabase = credentials.database;
-    let destinationColumns: SchemaColumn[];
     let createColumns: { source: string; name: string; type: CreateTableColumnType }[] = [];
-    let expectedColumns: { name: string; type: string; defaultKind: string }[] | undefined;
 
-    if (creating) {
+    const prepareNewImportTable = async () => {
         if (
             !createTable ||
             (createTable.database !== undefined &&
@@ -1285,9 +1281,9 @@ async function commitCloudImport(
                 'IMPORT_CREATE_TABLE',
                 'Enter a table name and at least one column.',
             );
-        tableDatabase =
+        const tableDatabase =
             typeof createTable.database === 'string' ? createTable.database : credentials.database;
-        tableName = createTable.name;
+        const tableName = createTable.name;
         createColumns = createTable.columns.map(value => {
             if (
                 !isRecord(value) ||
@@ -1355,7 +1351,7 @@ async function commitCloudImport(
         } finally {
             await client.close();
         }
-        destinationColumns = createColumns.map(column => ({
+        const destinationColumns = createColumns.map(column => ({
             database: tableDatabase,
             table: tableName,
             name: column.name,
@@ -1363,7 +1359,10 @@ async function commitCloudImport(
             defaultKind: '',
             comment: '',
         }));
-    } else {
+        return { tableDatabase, tableName, destinationColumns };
+    };
+
+    const prepareExistingImportTable = async () => {
         const selectedTarget = parseImportTarget(target);
         if (!selectedTarget)
             throw new AppError(
@@ -1371,8 +1370,8 @@ async function commitCloudImport(
                 'IMPORT_TABLE',
                 'Choose a valid table in an accessible database.',
             );
-        tableDatabase = selectedTarget.database;
-        tableName = selectedTarget.table;
+        const tableDatabase = selectedTarget.database;
+        const tableName = selectedTarget.table;
         const schema = await readSchema(credentials, url);
         const selectedTable = schema.tables.find(
             table => table.database === tableDatabase && table.name === tableName,
@@ -1391,10 +1390,9 @@ async function commitCloudImport(
         );
         if (!allColumns.length)
             throw new AppError(404, 'IMPORT_TABLE', 'The selected table has no visible columns.');
-        expectedColumns = parseFormJson<{ name: string; type: string; defaultKind: string }[]>(
-            form,
-            'expectedColumns',
-        );
+        const expectedColumns = parseFormJson<
+            { name: string; type: string; defaultKind: string }[]
+        >(form, 'expectedColumns');
         if (
             !Array.isArray(expectedColumns) ||
             JSON.stringify(expectedColumns) !==
@@ -1407,34 +1405,41 @@ async function commitCloudImport(
                 'SCHEMA_CHANGED',
                 'The destination schema changed. Review the updated mapping before importing.',
             );
-        destinationColumns = allColumns;
-    }
+        return { tableDatabase, tableName, destinationColumns: allColumns };
+    };
 
-    const entries = Object.entries(fields);
-    const destinations = entries.map(([, destination]) => destination);
-    if (
-        !entries.length ||
-        entries.length > MAX_IMPORT_COLUMNS ||
-        destinations.some(destination => typeof destination !== 'string') ||
-        new Set(destinations).size !== destinations.length
-    )
-        throw new AppError(400, 'IMPORT_MAPPING', 'Map each destination column once.');
-    for (const [sourceName, destination] of entries) {
+    const { tableDatabase, tableName, destinationColumns } = creating
+        ? await prepareNewImportTable()
+        : await prepareExistingImportTable();
+
+    const validateImportFields = () => {
+        const entries = Object.entries(fields);
+        const destinations = entries.map(([, destination]) => destination);
         if (
-            !parsed.columns.includes(sourceName) ||
-            typeof destination !== 'string' ||
-            !destinationColumns.some(
-                column =>
-                    column.name === destination &&
-                    !['MATERIALIZED', 'ALIAS'].includes(column.defaultKind),
-            )
+            !entries.length ||
+            entries.length > MAX_IMPORT_COLUMNS ||
+            destinations.some(destination => typeof destination !== 'string') ||
+            new Set(destinations).size !== destinations.length
         )
-            throw new AppError(
-                400,
-                'IMPORT_MAPPING',
-                'Mapping references an unknown source or a non-writable destination column.',
-            );
-    }
+            throw new AppError(400, 'IMPORT_MAPPING', 'Map each destination column once.');
+        for (const [sourceName, destination] of entries) {
+            if (
+                !parsed.columns.includes(sourceName) ||
+                typeof destination !== 'string' ||
+                !destinationColumns.some(
+                    column =>
+                        column.name === destination &&
+                        !['MATERIALIZED', 'ALIAS'].includes(column.defaultKind),
+                )
+            )
+                throw new AppError(
+                    400,
+                    'IMPORT_MAPPING',
+                    'Mapping references an unknown source or a non-writable destination column.',
+                );
+        }
+    };
+    validateImportFields();
 
     let mappedRows: Record<string, Json>[];
     try {
@@ -1537,6 +1542,265 @@ async function postCloudImport(request: Request): Promise<Response> {
     }
 }
 
+async function handleCloudSchema(
+    body: Record<string, unknown>,
+    credentials: CloudCredentials,
+    url: string,
+): Promise<Response> {
+    const offset = (key: 'databaseOffset' | 'tableOffset' | 'columnOffset') => {
+        const value = body[key] === undefined ? 0 : Number(body[key]);
+        if (!Number.isSafeInteger(value) || value < 0 || value > 100_000_000)
+            throw new AppError(400, 'SCHEMA_OFFSET', 'The schema page is invalid.');
+        return value;
+    };
+    return json(
+        await readSchema(credentials, url, {
+            databases: offset('databaseOffset'),
+            tables: offset('tableOffset'),
+            columns: offset('columnOffset'),
+        }),
+    );
+}
+
+async function handleCloudQueryTree(
+    body: Record<string, unknown>,
+    credentials: CloudCredentials,
+    url: string,
+): Promise<Response> {
+    if (
+        typeof body.sql !== 'string' ||
+        !body.sql.trim() ||
+        body.sql.length > MAX_SQL_CHARS ||
+        splitSql(body.sql).length !== 1
+    )
+        return fail('QUERY_TREE_SQL', 'Enter one SQL statement to inspect.');
+    if (!isExplainableReadQuery(body.sql.trim()))
+        return fail(
+            'QUERY_TREE_SQL',
+            'Query-tree inspection accepts one read query, such as SELECT or WITH.',
+        );
+    return json(
+        await cloudQueryTree(credentials, url, body.sql.trim(), queryParameters(body.parameters)),
+    );
+}
+
+async function handleCloudProgress(
+    body: Record<string, unknown>,
+    credentials: CloudCredentials,
+    url: string,
+): Promise<Response> {
+    if (!validRunQueryId(body.queryId))
+        return fail('RUN_QUERY_ID', 'The running query id is invalid.');
+    return json({ progress: await readCloudProgress(credentials, url, body.queryId) });
+}
+
+async function handleCloudCancel(
+    body: Record<string, unknown>,
+    credentials: CloudCredentials,
+    url: string,
+): Promise<Response> {
+    if (!validRunQueryId(body.queryId))
+        return fail('RUN_QUERY_ID', 'The running query id is invalid.');
+    return json(await cancelCloudQuery(credentials, url, body.queryId));
+}
+
+async function handleCloudProfile(
+    body: Record<string, unknown>,
+    credentials: CloudCredentials,
+    url: string,
+): Promise<Response> {
+    if (!validRunQueryId(body.queryId)) return fail('RUN_QUERY_ID', 'The query id is invalid.');
+    if (!isQueryLogSource(body.source))
+        return fail('QUERY_LOG_UNAVAILABLE', 'Test the connection to check query-log access.', 409);
+    return json(await cloudQueryLogEvidence(credentials, url, body.queryId, body.source));
+}
+
+async function handleCloudPipeline(
+    body: Record<string, unknown>,
+    credentials: CloudCredentials,
+    url: string,
+): Promise<Response> {
+    if (
+        typeof body.sql !== 'string' ||
+        !body.sql.trim() ||
+        body.sql.length > MAX_SQL_CHARS ||
+        splitSql(body.sql).length !== 1
+    )
+        return fail('PIPELINE_SQL', 'Enter one SQL statement to inspect.');
+    if (!isExplainableReadQuery(body.sql.trim()))
+        return fail(
+            'PIPELINE_SQL',
+            'Pipeline inspection accepts one read query, such as SELECT or WITH.',
+        );
+    return json(
+        await cloudPipelineEvidence(
+            credentials,
+            url,
+            body.sql.trim(),
+            queryParameters(body.parameters),
+        ),
+    );
+}
+
+async function handleCloudFlamegraph(
+    body: Record<string, unknown>,
+    credentials: CloudCredentials,
+    url: string,
+): Promise<Response> {
+    if (!validRunQueryId(body.queryId)) return fail('RUN_QUERY_ID', 'The query id is invalid.');
+    if (!isFlamegraphSource(body.source))
+        return fail('TRACE_UNAVAILABLE', 'Test the connection to check trace-log access.', 409);
+    const date = (value: unknown) =>
+        typeof value === 'string' &&
+        /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+        !Number.isNaN(Date.parse(`${value}T00:00:00Z`))
+            ? value
+            : undefined;
+    const startDate = date(body.startDate),
+        endDate = date(body.endDate);
+    if (!startDate || !endDate) return fail('TRACE_DATE', 'The query time range is invalid.');
+    return json(
+        await cloudFlamegraph(credentials, url, body.queryId, startDate, endDate, body.source),
+    );
+}
+
+async function handleCloudDocumentationSearch(
+    body: Record<string, unknown>,
+    credentials: CloudCredentials,
+    url: string,
+): Promise<Response> {
+    const query = typeof body.query === 'string' ? body.query.slice(0, 128) : '';
+    const category = typeof body.category === 'string' ? body.category : 'all';
+    return json(await cloudReferenceSearch(credentials, url, query, category));
+}
+
+async function handleCloudDocumentationEntry(
+    body: Record<string, unknown>,
+    credentials: CloudCredentials,
+    url: string,
+): Promise<Response> {
+    if (
+        typeof body.name !== 'string' ||
+        body.name.length > 128 ||
+        typeof body.type !== 'string' ||
+        body.type.length > 80
+    )
+        return fail('DOCUMENTATION_ENTRY', 'Choose a valid ClickHouse reference entry.');
+    const version =
+        typeof body.serverVersion === 'string' ? body.serverVersion.slice(0, 80) : 'unknown';
+    return json(await cloudReferenceEntry(credentials, url, body.name, body.type, version));
+}
+
+async function handleCloudNativeExplorer(
+    body: Record<string, unknown>,
+    credentials: CloudCredentials,
+    url: string,
+): Promise<Response> {
+    if (
+        typeof body.database !== 'string' ||
+        !body.database.trim() ||
+        body.database.length > 128 ||
+        isSystemDatabaseName(body.database)
+    )
+        return fail('NATIVE_EXPLORER_DATABASE', 'Choose a valid non-system database to inspect.');
+    if (!isNativeExplorerKind(body.kind))
+        return fail('NATIVE_EXPLORER_KIND', 'Choose a supported metadata view.');
+    let request: NativeExplorerRequest;
+    if (body.kind === 'lineage') request = { kind: 'lineage', database: body.database };
+    else {
+        if (typeof body.table !== 'string' || !body.table.trim() || body.table.length > 128)
+            return fail('NATIVE_EXPLORER_TABLE', 'Choose a valid table to inspect.');
+        request = { kind: body.kind, database: body.database, table: body.table };
+    }
+    return json(await readNativeExplorer(credentials, url, request));
+}
+
+async function handleCloudTableParts(
+    body: Record<string, unknown>,
+    credentials: CloudCredentials,
+    url: string,
+): Promise<Response> {
+    if (
+        typeof body.database !== 'string' ||
+        !body.database.trim() ||
+        body.database.length > 128 ||
+        isSystemDatabaseName(body.database)
+    )
+        return fail('TABLE_PARTS_DATABASE', 'Choose a valid non-system database to inspect.');
+    if (typeof body.table !== 'string' || !body.table.trim() || body.table.length > 128)
+        return fail('TABLE_PARTS_TABLE', 'Choose a valid table to inspect.');
+    return json(await readTableParts(credentials, url, body.database, body.table));
+}
+
+async function handleCloudRun(
+    body: Record<string, unknown>,
+    credentials: CloudCredentials,
+    url: string,
+): Promise<Response> {
+    if (typeof body.sql !== 'string') return fail('SQL_REQUIRED', 'Enter SQL to run.');
+    const sessionId = body.sessionId;
+    if (
+        sessionId !== undefined &&
+        (typeof sessionId !== 'string' ||
+            !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(sessionId))
+    )
+        return fail('SESSION_ID', 'The SQL session id is invalid.');
+    if (body.queryId !== undefined && !validRunQueryId(body.queryId))
+        return fail('RUN_QUERY_ID', 'The query id is invalid.');
+    return json(
+        await runSql(
+            credentials,
+            url,
+            body.sql,
+            sessionId,
+            body.queryId as string | undefined,
+            queryParameters(body.parameters),
+        ),
+    );
+}
+
+async function handleCloudWorkload(
+    body: Record<string, unknown>,
+    credentials: CloudCredentials,
+    url: string,
+): Promise<Response> {
+    if (!isWorkloadWindow(body.minutes))
+        return fail('WORKLOAD_WINDOW', 'Choose a supported workload time window.');
+    const source = isQueryLogSource(body.source) ? body.source : undefined;
+    if (!source)
+        return fail('QUERY_LOG_UNAVAILABLE', 'Test the connection to check query-log access.', 409);
+    return json(await readWorkload(credentials, url, body.minutes, source));
+}
+
+async function handleCloudImportStatus(
+    body: Record<string, unknown>,
+    credentials: CloudCredentials,
+    url: string,
+): Promise<Response> {
+    const targetTable = typeof body.table === 'string' ? body.table : '';
+    if (
+        !validImportQueryId(body.queryId) ||
+        !parseImportTarget(targetTable) ||
+        typeof body.rows !== 'number' ||
+        !Number.isSafeInteger(body.rows) ||
+        body.rows < 1 ||
+        body.rows > MAX_IMPORT_ROWS ||
+        (body.deduplicationToken !== undefined &&
+            !validImportDeduplicationToken(body.deduplicationToken))
+    )
+        return fail('IMPORT_STATUS', 'The saved import details are invalid.');
+    return json(
+        await inspectCloudImport(
+            credentials,
+            url,
+            body.queryId,
+            targetTable,
+            body.rows,
+            body.deduplicationToken as string | undefined,
+        ),
+    );
+}
+
 async function post(request: Request): Promise<Response> {
     const contentType = request.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase();
     if (contentType === 'multipart/form-data') return await postCloudImport(request);
@@ -1569,236 +1833,43 @@ async function post(request: Request): Promise<Response> {
 
     const { credentials, url } = validated;
     try {
-        if (body.action === CLOUD_ACTIONS.test) return json(await testConnection(credentials, url));
-        if (body.action === CLOUD_ACTIONS.schema) {
-            const offset = (key: 'databaseOffset' | 'tableOffset' | 'columnOffset') => {
-                const value = body[key] === undefined ? 0 : Number(body[key]);
-                if (!Number.isSafeInteger(value) || value < 0 || value > 100_000_000)
-                    throw new AppError(400, 'SCHEMA_OFFSET', 'The schema page is invalid.');
-                return value;
-            };
-            return json(
-                await readSchema(credentials, url, {
-                    databases: offset('databaseOffset'),
-                    tables: offset('tableOffset'),
-                    columns: offset('columnOffset'),
-                }),
-            );
-        }
-        if (body.action === CLOUD_ACTIONS.queryTree) {
-            if (
-                typeof body.sql !== 'string' ||
-                !body.sql.trim() ||
-                body.sql.length > MAX_SQL_CHARS ||
-                splitSql(body.sql).length !== 1
-            )
-                return fail('QUERY_TREE_SQL', 'Enter one SQL statement to inspect.');
-            if (!isExplainableReadQuery(body.sql.trim()))
-                return fail(
-                    'QUERY_TREE_SQL',
-                    'Query-tree inspection accepts one read query, such as SELECT or WITH.',
-                );
-            return json(
-                await cloudQueryTree(
-                    credentials,
-                    url,
-                    body.sql.trim(),
-                    queryParameters(body.parameters),
-                ),
-            );
-        }
-        if (body.action === CLOUD_ACTIONS.progress) {
-            if (!validRunQueryId(body.queryId))
-                return fail('RUN_QUERY_ID', 'The running query id is invalid.');
-            return json({ progress: await readCloudProgress(credentials, url, body.queryId) });
-        }
-        if (body.action === CLOUD_ACTIONS.cancel) {
-            if (!validRunQueryId(body.queryId))
-                return fail('RUN_QUERY_ID', 'The running query id is invalid.');
-            return json(await cancelCloudQuery(credentials, url, body.queryId));
-        }
-        if (body.action === CLOUD_ACTIONS.profile) {
-            if (!validRunQueryId(body.queryId))
-                return fail('RUN_QUERY_ID', 'The query id is invalid.');
-            if (!isQueryLogSource(body.source))
-                return fail(
-                    'QUERY_LOG_UNAVAILABLE',
-                    'Test the connection to check query-log access.',
-                    409,
-                );
-            return json(await cloudQueryLogEvidence(credentials, url, body.queryId, body.source));
-        }
-        if (body.action === CLOUD_ACTIONS.pipeline) {
-            if (
-                typeof body.sql !== 'string' ||
-                !body.sql.trim() ||
-                body.sql.length > MAX_SQL_CHARS ||
-                splitSql(body.sql).length !== 1
-            )
-                return fail('PIPELINE_SQL', 'Enter one SQL statement to inspect.');
-            if (!isExplainableReadQuery(body.sql.trim()))
-                return fail(
-                    'PIPELINE_SQL',
-                    'Pipeline inspection accepts one read query, such as SELECT or WITH.',
-                );
-            return json(
-                await cloudPipelineEvidence(
-                    credentials,
-                    url,
-                    body.sql.trim(),
-                    queryParameters(body.parameters),
-                ),
-            );
-        }
-        if (body.action === CLOUD_ACTIONS.flamegraph) {
-            if (!validRunQueryId(body.queryId))
-                return fail('RUN_QUERY_ID', 'The query id is invalid.');
-            if (!isFlamegraphSource(body.source))
-                return fail(
-                    'TRACE_UNAVAILABLE',
-                    'Test the connection to check trace-log access.',
-                    409,
-                );
-            const date = (value: unknown) =>
-                typeof value === 'string' &&
-                /^\d{4}-\d{2}-\d{2}$/.test(value) &&
-                !Number.isNaN(Date.parse(`${value}T00:00:00Z`))
-                    ? value
-                    : undefined;
-            const startDate = date(body.startDate),
-                endDate = date(body.endDate);
-            if (!startDate || !endDate)
-                return fail('TRACE_DATE', 'The query time range is invalid.');
-            return json(
-                await cloudFlamegraph(
-                    credentials,
-                    url,
-                    body.queryId,
-                    startDate,
-                    endDate,
-                    body.source,
-                ),
-            );
-        }
-        if (body.action === CLOUD_ACTIONS.documentationSearch) {
-            const query = typeof body.query === 'string' ? body.query.slice(0, 128) : '';
-            const category = typeof body.category === 'string' ? body.category : 'all';
-            return json(await cloudReferenceSearch(credentials, url, query, category));
-        }
-        if (body.action === CLOUD_ACTIONS.documentationEntry) {
-            if (
-                typeof body.name !== 'string' ||
-                body.name.length > 128 ||
-                typeof body.type !== 'string' ||
-                body.type.length > 80
-            )
-                return fail('DOCUMENTATION_ENTRY', 'Choose a valid ClickHouse reference entry.');
-            const version =
-                typeof body.serverVersion === 'string'
-                    ? body.serverVersion.slice(0, 80)
-                    : 'unknown';
-            return json(await cloudReferenceEntry(credentials, url, body.name, body.type, version));
-        }
-        if (body.action === CLOUD_ACTIONS.nativeExplorer) {
-            if (
-                typeof body.database !== 'string' ||
-                !body.database.trim() ||
-                body.database.length > 128 ||
-                isSystemDatabaseName(body.database)
-            )
-                return fail(
-                    'NATIVE_EXPLORER_DATABASE',
-                    'Choose a valid non-system database to inspect.',
-                );
-            if (!isNativeExplorerKind(body.kind))
-                return fail('NATIVE_EXPLORER_KIND', 'Choose a supported metadata view.');
-            let request: NativeExplorerRequest;
-            if (body.kind === 'lineage') request = { kind: 'lineage', database: body.database };
-            else {
-                if (typeof body.table !== 'string' || !body.table.trim() || body.table.length > 128)
-                    return fail('NATIVE_EXPLORER_TABLE', 'Choose a valid table to inspect.');
-                request = { kind: body.kind, database: body.database, table: body.table };
-            }
-            return json(await readNativeExplorer(credentials, url, request));
-        }
-        if (body.action === CLOUD_ACTIONS.tableParts) {
-            if (
-                typeof body.database !== 'string' ||
-                !body.database.trim() ||
-                body.database.length > 128 ||
-                isSystemDatabaseName(body.database)
-            )
-                return fail(
-                    'TABLE_PARTS_DATABASE',
-                    'Choose a valid non-system database to inspect.',
-                );
-            if (typeof body.table !== 'string' || !body.table.trim() || body.table.length > 128)
-                return fail('TABLE_PARTS_TABLE', 'Choose a valid table to inspect.');
-            return json(await readTableParts(credentials, url, body.database, body.table));
-        }
-        if (body.action === CLOUD_ACTIONS.run) {
-            if (typeof body.sql !== 'string') return fail('SQL_REQUIRED', 'Enter SQL to run.');
-            const sessionId = body.sessionId;
-            if (
-                sessionId !== undefined &&
-                (typeof sessionId !== 'string' ||
-                    !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(sessionId))
-            )
-                return fail('SESSION_ID', 'The SQL session id is invalid.');
-            if (body.queryId !== undefined && !validRunQueryId(body.queryId))
-                return fail('RUN_QUERY_ID', 'The query id is invalid.');
-            return json(
-                await runSql(
-                    credentials,
-                    url,
-                    body.sql,
-                    sessionId,
-                    body.queryId as string | undefined,
-                    queryParameters(body.parameters),
-                ),
-            );
-        }
-        if (body.action === CLOUD_ACTIONS.workload) {
-            if (!isWorkloadWindow(body.minutes))
-                return fail('WORKLOAD_WINDOW', 'Choose a supported workload time window.');
-            const source = isQueryLogSource(body.source) ? body.source : undefined;
-            if (!source)
-                return fail(
-                    'QUERY_LOG_UNAVAILABLE',
-                    'Test the connection to check query-log access.',
-                    409,
-                );
-            return json(await readWorkload(credentials, url, body.minutes, source));
-        }
-        if (body.action === CLOUD_ACTIONS.replication)
-            return json(await readReplication(credentials, url));
-        if (body.action === CLOUD_ACTIONS.createTable)
-            return json(await createCloudTable(credentials, url, body));
-        if (body.action === CLOUD_ACTIONS.dropTable)
-            return json(await dropCloudTable(credentials, url, body));
-        if (body.action === CLOUD_ACTIONS.importStatus) {
-            const targetTable = typeof body.table === 'string' ? body.table : '';
-            if (
-                !validImportQueryId(body.queryId) ||
-                !parseImportTarget(targetTable) ||
-                typeof body.rows !== 'number' ||
-                !Number.isSafeInteger(body.rows) ||
-                body.rows < 1 ||
-                body.rows > MAX_IMPORT_ROWS ||
-                (body.deduplicationToken !== undefined &&
-                    !validImportDeduplicationToken(body.deduplicationToken))
-            )
-                return fail('IMPORT_STATUS', 'The saved import details are invalid.');
-            return json(
-                await inspectCloudImport(
-                    credentials,
-                    url,
-                    body.queryId,
-                    targetTable,
-                    body.rows,
-                    body.deduplicationToken as string | undefined,
-                ),
-            );
+        switch (body.action) {
+            case CLOUD_ACTIONS.test:
+                return json(await testConnection(credentials, url));
+            case CLOUD_ACTIONS.schema:
+                return await handleCloudSchema(body, credentials, url);
+            case CLOUD_ACTIONS.queryTree:
+                return await handleCloudQueryTree(body, credentials, url);
+            case CLOUD_ACTIONS.progress:
+                return await handleCloudProgress(body, credentials, url);
+            case CLOUD_ACTIONS.cancel:
+                return await handleCloudCancel(body, credentials, url);
+            case CLOUD_ACTIONS.profile:
+                return await handleCloudProfile(body, credentials, url);
+            case CLOUD_ACTIONS.pipeline:
+                return await handleCloudPipeline(body, credentials, url);
+            case CLOUD_ACTIONS.flamegraph:
+                return await handleCloudFlamegraph(body, credentials, url);
+            case CLOUD_ACTIONS.documentationSearch:
+                return await handleCloudDocumentationSearch(body, credentials, url);
+            case CLOUD_ACTIONS.documentationEntry:
+                return await handleCloudDocumentationEntry(body, credentials, url);
+            case CLOUD_ACTIONS.nativeExplorer:
+                return await handleCloudNativeExplorer(body, credentials, url);
+            case CLOUD_ACTIONS.tableParts:
+                return await handleCloudTableParts(body, credentials, url);
+            case CLOUD_ACTIONS.run:
+                return await handleCloudRun(body, credentials, url);
+            case CLOUD_ACTIONS.workload:
+                return await handleCloudWorkload(body, credentials, url);
+            case CLOUD_ACTIONS.replication:
+                return json(await readReplication(credentials, url));
+            case CLOUD_ACTIONS.createTable:
+                return json(await createCloudTable(credentials, url, body));
+            case CLOUD_ACTIONS.dropTable:
+                return json(await dropCloudTable(credentials, url, body));
+            case CLOUD_ACTIONS.importStatus:
+                return await handleCloudImportStatus(body, credentials, url);
         }
         return fail('CLOUD_ACTION', 'Choose a supported ClickHouse Cloud workspace action.');
     } catch (error) {

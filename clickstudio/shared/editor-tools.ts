@@ -11,6 +11,42 @@ export interface StatementOutline {
 
 export type SqlOperation = 'read' | 'insert' | 'update' | 'delete' | 'schema' | 'unknown';
 
+function classifyAlterTokens(tokens: readonly Token[]): SqlOperation {
+    let index =
+        tokens.findIndex(token => token.kind === 'word' && token.text.toUpperCase() === 'TABLE') +
+        1;
+    if (index === 0) return 'schema';
+    const isIdentifier = (token: Token | undefined) =>
+        token?.kind === 'word' || token?.kind === 'quoted';
+    if (
+        tokens[index]?.kind === 'word' &&
+        tokens[index]?.text.toUpperCase() === 'IF' &&
+        tokens[index + 1]?.text.toUpperCase() === 'EXISTS'
+    )
+        index += 2;
+    if (isIdentifier(tokens[index])) index++;
+    while (tokens[index]?.text === '.' && isIdentifier(tokens[index + 1])) index += 2;
+    if (
+        tokens[index]?.kind === 'word' &&
+        tokens[index]?.text.toUpperCase() === 'ON' &&
+        tokens[index + 1]?.kind === 'word' &&
+        tokens[index + 1]?.text.toUpperCase() === 'CLUSTER'
+    ) {
+        index += 2;
+        if (isIdentifier(tokens[index])) index++;
+    }
+    const action = tokens[index]?.kind === 'word' ? tokens[index]?.text.toUpperCase() : undefined;
+    if (action === 'UPDATE') return 'update';
+    if (
+        action === 'DELETE' ||
+        (action === 'DROP' &&
+            tokens[index + 1]?.kind === 'word' &&
+            tokens[index + 1]?.text.toUpperCase() === 'PARTITION')
+    )
+        return 'delete';
+    return 'schema';
+}
+
 function classifyTokens(tokens: readonly Token[]): SqlOperation {
     const words = tokens
         .filter(token => token.kind === 'word')
@@ -33,43 +69,7 @@ function classifyTokens(tokens: readonly Token[]): SqlOperation {
     if (first === 'INSERT') return 'insert';
     if (first === 'UPDATE') return 'update';
     if (first === 'DELETE' || first === 'TRUNCATE' || first === 'DROP') return 'delete';
-    if (first === 'ALTER') {
-        let index =
-            tokens.findIndex(
-                token => token.kind === 'word' && token.text.toUpperCase() === 'TABLE',
-            ) + 1;
-        if (index === 0) return 'schema';
-        const isIdentifier = (token: Token | undefined) =>
-            token?.kind === 'word' || token?.kind === 'quoted';
-        if (
-            tokens[index]?.kind === 'word' &&
-            tokens[index]?.text.toUpperCase() === 'IF' &&
-            tokens[index + 1]?.text.toUpperCase() === 'EXISTS'
-        )
-            index += 2;
-        if (isIdentifier(tokens[index])) index++;
-        while (tokens[index]?.text === '.' && isIdentifier(tokens[index + 1])) index += 2;
-        if (
-            tokens[index]?.kind === 'word' &&
-            tokens[index]?.text.toUpperCase() === 'ON' &&
-            tokens[index + 1]?.kind === 'word' &&
-            tokens[index + 1]?.text.toUpperCase() === 'CLUSTER'
-        ) {
-            index += 2;
-            if (isIdentifier(tokens[index])) index++;
-        }
-        const action =
-            tokens[index]?.kind === 'word' ? tokens[index]?.text.toUpperCase() : undefined;
-        if (action === 'UPDATE') return 'update';
-        if (
-            action === 'DELETE' ||
-            (action === 'DROP' &&
-                tokens[index + 1]?.kind === 'word' &&
-                tokens[index + 1]?.text.toUpperCase() === 'PARTITION')
-        )
-            return 'delete';
-        return 'schema';
-    }
+    if (first === 'ALTER') return classifyAlterTokens(tokens);
     if (['CREATE', 'RENAME', 'ATTACH', 'DETACH', 'EXCHANGE'].includes(first)) return 'schema';
     return 'unknown';
 }

@@ -102,6 +102,82 @@ function sourceLabel(lines: ExplainLine[], before: number) {
     return 'Table read';
 }
 
+function readIndexSection(
+    lines: ExplainLine[],
+    cursor: number,
+    section: IndexSection,
+    parsedIndexCount: number,
+    sectionIndex: number,
+) {
+    const heading = lines[cursor]!;
+    let truncated = false;
+    let entryIndent: number | undefined;
+    let current: ExplainIndexStep | undefined;
+    let collectingKeys = false;
+    let keys: string[] = [];
+    const finishKeys = () => {
+        if (!current || !keys.length) return;
+        property(current, 'Keys', keys.join(', '));
+        keys = [];
+    };
+    const readIndexProperty = (line: ExplainLine, separator: number) => {
+        if (!current) return;
+        const name = line.text.slice(0, separator).trim();
+        const value = line.text.slice(separator + 1).trim();
+        if (name.toLowerCase() === 'keys') {
+            finishKeys();
+            collectingKeys = true;
+            if (value) keys.push(value);
+            return;
+        }
+        finishKeys();
+        collectingKeys = false;
+        property(current, name, value);
+    };
+    for (let lineIndex = cursor + 1; lineIndex < lines.length; lineIndex++) {
+        const line = lines[lineIndex]!;
+        if (line.indent <= heading.indent) break;
+        if (
+            /^Indexes\s*:/i.test(line.text) ||
+            /\bReadFrom(?:MergeTree|Merge|Remote|File|S3|URL|MySQL|PostgreSQL|SQLite|Bifurcate|Dictionary|Null|Numbers|System|Values|View)\b/i.test(
+                line.text,
+            )
+        )
+            break;
+        const separator = line.text.indexOf(':');
+        if (separator >= 0) {
+            readIndexProperty(line, separator);
+            continue;
+        }
+        if (entryIndent === undefined || line.indent <= entryIndent) {
+            finishKeys();
+            collectingKeys = false;
+            entryIndent = line.indent;
+            if (parsedIndexCount >= MAX_GRAPH_NODES) {
+                truncated = true;
+                break;
+            }
+            current = {
+                id: `index-${sectionIndex}-${section.steps.length}`,
+                type: line.text.slice(0, 160),
+                properties: [],
+            };
+            section.steps.push(current);
+            parsedIndexCount++;
+            continue;
+        }
+        if (collectingKeys) keys.push(line.text);
+        else if (current) {
+            const previous = current.properties.at(-1);
+            if (previous)
+                previous.value = `${previous.value}\n${line.text}`.slice(0, MAX_PROPERTY_CHARS);
+            else property(current, 'Details', line.text);
+        }
+    }
+    finishKeys();
+    return { parsedIndexCount, truncated };
+}
+
 function indexSteps(lines: ExplainLine[], truncatedInput: boolean) {
     const sections: IndexSection[] = [];
     let truncated = truncatedInput;
@@ -118,67 +194,9 @@ function indexSteps(lines: ExplainLine[], truncatedInput: boolean) {
             break;
         }
         const section: IndexSection = { source: sourceLabel(lines, cursor - 1), steps: [] };
-        let entryIndent: number | undefined;
-        let current: ExplainIndexStep | undefined;
-        let collectingKeys = false;
-        let keys: string[] = [];
-        const finishKeys = () => {
-            if (!current || !keys.length) return;
-            property(current, 'Keys', keys.join(', '));
-            keys = [];
-        };
-        for (let lineIndex = cursor + 1; lineIndex < lines.length; lineIndex++) {
-            const line = lines[lineIndex]!;
-            if (line.indent <= heading.indent) break;
-            if (
-                /^Indexes\s*:/i.test(line.text) ||
-                /\bReadFrom(?:MergeTree|Merge|Remote|File|S3|URL|MySQL|PostgreSQL|SQLite|Bifurcate|Dictionary|Null|Numbers|System|Values|View)\b/i.test(
-                    line.text,
-                )
-            )
-                break;
-            const separator = line.text.indexOf(':');
-            if (separator >= 0) {
-                if (!current) continue;
-                const name = line.text.slice(0, separator).trim();
-                const value = line.text.slice(separator + 1).trim();
-                if (name.toLowerCase() === 'keys') {
-                    finishKeys();
-                    collectingKeys = true;
-                    if (value) keys.push(value);
-                    continue;
-                }
-                finishKeys();
-                collectingKeys = false;
-                property(current, name, value);
-                continue;
-            }
-            if (entryIndent === undefined || line.indent <= entryIndent) {
-                finishKeys();
-                collectingKeys = false;
-                entryIndent = line.indent;
-                if (parsedIndexCount >= MAX_GRAPH_NODES) {
-                    truncated = true;
-                    break;
-                }
-                current = {
-                    id: `index-${sections.length}-${section.steps.length}`,
-                    type: line.text.slice(0, 160),
-                    properties: [],
-                };
-                section.steps.push(current);
-                parsedIndexCount++;
-                continue;
-            }
-            if (collectingKeys) keys.push(line.text);
-            else if (current) {
-                const previous = current.properties.at(-1);
-                if (previous)
-                    previous.value = `${previous.value}\n${line.text}`.slice(0, MAX_PROPERTY_CHARS);
-                else property(current, 'Details', line.text);
-            }
-        }
-        finishKeys();
+        const parsed = readIndexSection(lines, cursor, section, parsedIndexCount, sections.length);
+        parsedIndexCount = parsed.parsedIndexCount;
+        truncated ||= parsed.truncated;
         if (section.steps.length) sections.push(section);
     }
     return { sections, truncated };

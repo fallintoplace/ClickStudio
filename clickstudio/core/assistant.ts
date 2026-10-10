@@ -208,6 +208,33 @@ function relevantTableKeys(input: ContextInput): Set<string> {
     }
     return relevant;
 }
+function boundAssistantContext(context: AssistantContextData) {
+    // Bound the actual wire representation. Whole rows/columns are removed, never half a JSON
+    // value.
+    const encoded = () => JSON.stringify(context);
+    const result = context.result;
+    while (Buffer.byteLength(encoded()) > 60000 && result?.rows.length) result.rows.pop();
+    const sentReferenceDocs = context.referenceDocs;
+    while (Buffer.byteLength(encoded()) > 60000 && sentReferenceDocs?.length)
+        sentReferenceDocs.pop();
+    const schema = context.schema;
+    while (Buffer.byteLength(encoded()) > 60000 && schema.length) {
+        schema.pop();
+        context.schemaIncomplete = true;
+    }
+    while (Buffer.byteLength(encoded()) > 60000 && context.tables.length) {
+        context.tables.pop();
+        context.tablesIncomplete = true;
+    }
+    requireThat(
+        Buffer.byteLength(encoded()) <= 60000,
+        413,
+        'CONTEXT_TOO_LARGE',
+        'Select a smaller SQL statement or plan for this request',
+    );
+    return { encoded, result, sentReferenceDocs, schema };
+}
+
 export function buildContext(input: ContextInput): {
     payload: PreparedContext['payload'];
     summary: string[];
@@ -323,29 +350,7 @@ export function buildContext(input: ContextInput): {
             `Result: ${result.rows.length} retained rows before context-size bounding; sensitive columns excluded.`,
         );
     }
-    // Bound the actual wire representation. Whole rows/columns are removed, never half a JSON
-    // value.
-    const encoded = () => JSON.stringify(context);
-    const result = context.result;
-    while (Buffer.byteLength(encoded()) > 60000 && result?.rows.length) result.rows.pop();
-    const sentReferenceDocs = context.referenceDocs;
-    while (Buffer.byteLength(encoded()) > 60000 && sentReferenceDocs?.length)
-        sentReferenceDocs.pop();
-    const schema = context.schema;
-    while (Buffer.byteLength(encoded()) > 60000 && schema.length) {
-        schema.pop();
-        context.schemaIncomplete = true;
-    }
-    while (Buffer.byteLength(encoded()) > 60000 && context.tables.length) {
-        context.tables.pop();
-        context.tablesIncomplete = true;
-    }
-    requireThat(
-        Buffer.byteLength(encoded()) <= 60000,
-        413,
-        'CONTEXT_TOO_LARGE',
-        'Select a smaller SQL statement or plan for this request',
-    );
+    const { encoded, result, sentReferenceDocs, schema } = boundAssistantContext(context);
     if (result && input.result && result.rows.length < input.result.rows.length)
         summary.push(
             `Context truncated to ${result.rows.length} result rows; not the full result.`,

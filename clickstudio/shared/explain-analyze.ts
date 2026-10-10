@@ -183,7 +183,44 @@ function visibleText(lines: readonly string[]) {
     return lines.map(line => line.replace(/^\s*[│┃]\s?/u, '').trim()).filter(Boolean);
 }
 
-export function parseExplainAnalyze(input: unknown): ExplainAnalyzeEvidence | undefined {
+function runtimeGraphNodes(nodes: RuntimeNode[]) {
+    return nodes.map(node => ({
+        id: node.id,
+        label: node.label.slice(0, 160),
+        kind: node.kind,
+        status: 'measured' as const,
+        ...(node.detail.length
+            ? { detail: node.detail.slice(0, 12).join(' · ').slice(0, 600) }
+            : {}),
+        ...(node.durationMs === undefined ? {} : { durationMs: node.durationMs }),
+        ...(node.timePercent === undefined ? {} : { timePercent: node.timePercent }),
+        ...(node.parallelism === undefined ? {} : { parallelism: node.parallelism }),
+        ...(node.inputRows === undefined ? {} : { inputRows: node.inputRows }),
+        ...(node.outputRows === undefined ? {} : { outputRows: node.outputRows }),
+        ...(node.inputBytes === undefined ? {} : { inputBytes: node.inputBytes }),
+        ...(node.outputBytes === undefined ? {} : { outputBytes: node.outputBytes }),
+        ...((node.inputRows ?? node.outputRows) === undefined
+            ? {}
+            : { rows: node.inputRows ?? node.outputRows }),
+        ...((node.inputBytes ?? node.outputBytes) === undefined
+            ? {}
+            : { bytes: node.inputBytes ?? node.outputBytes }),
+    }));
+}
+
+function applyRuntimeMetadata(current: RuntimeNode, metadata: string) {
+    if (/^I\/O:/i.test(metadata)) applyIo(current, metadata);
+    else if (/\btime\s+\d/i.test(metadata)) {
+        const stage = metadata.match(/^Stage\s*\(([^)]+)\)\s*:/i)?.[1];
+        const timing = metadata.match(
+            /time\s+(\d+(?:\.\d+)?\s*(?:ns|us|µs|μs|ms|s)(?:\s*\(\d+(?:\.\d+)?%\))?)/i,
+        )?.[1];
+        if (timing) current.detail.push(`${stage ? `${stage}: ` : ''}${timing}`.slice(0, 180));
+        applyTiming(current, metadata);
+    } else if (!isNodeMetadata(metadata) && metadata.length < 400) current.detail.push(metadata);
+}
+
+function explainAnalyzeText(input: unknown): string {
     let text: string;
 
     if (typeof input === 'string') {
@@ -205,6 +242,44 @@ export function parseExplainAnalyze(input: unknown): ExplainAnalyzeEvidence | un
     } else {
         text = '';
     }
+    return text;
+}
+
+function appendRuntimeBranch(branch: RegExpMatchArray, nodes: RuntimeNode[], stack: RuntimeNode[]) {
+    const level = Math.max(1, Math.ceil(branch[1]!.length / 3));
+    const parent = stack[level - 1];
+    const node: RuntimeNode = {
+        id: `runtime-${nodes.length}`,
+        label: branch[2]!.trim(),
+        kind: nodeKind(branch[2]!.trim()),
+        detail: [],
+        ...(parent ? { parent: parent.id } : {}),
+    };
+    if (nodes.length >= MAX_RUNTIME_NODES) {
+        return false;
+    }
+    while (stack.length > level) stack.pop();
+    nodes.push(node);
+    stack[level] = node;
+    return true;
+}
+
+function runtimeRootNode(content: string): RuntimeNode | undefined {
+    if (
+        !content ||
+        isNodeMetadata(content) ||
+        /^(?:Output|Query summary|Indexes):?$/i.test(content)
+    )
+        return undefined;
+    if (/^[┌┐└├─]+$/.test(content)) return undefined;
+    const label = content.replace(/^[│┃]\s*/u, '').trim();
+    if (!label || label.length > 400) return undefined;
+    const node: RuntimeNode = { id: 'runtime-0', label, kind: nodeKind(label), detail: [] };
+    return node;
+}
+
+export function parseExplainAnalyze(input: unknown): ExplainAnalyzeEvidence | undefined {
+    const text = explainAnalyzeText(input);
     if (!text.trim()) return undefined;
     const boundedText = text.slice(0, MAX_OUTPUT_CHARS);
     const allLines = boundedText.split(/\r?\n/);
@@ -227,36 +302,16 @@ export function parseExplainAnalyze(input: unknown): ExplainAnalyzeEvidence | un
         const branch = line.match(/^([ │]*)[├└]──\s*(.*?)\s*$/u);
         const content = stripFrame(line);
         if (branch) {
-            const level = Math.max(1, Math.ceil(branch[1]!.length / 3));
-            const parent = stack[level - 1];
-            const node: RuntimeNode = {
-                id: `runtime-${nodes.length}`,
-                label: branch[2]!.trim(),
-                kind: nodeKind(branch[2]!.trim()),
-                detail: [],
-                ...(parent ? { parent: parent.id } : {}),
-            };
-            if (nodes.length >= MAX_RUNTIME_NODES) {
+            if (!appendRuntimeBranch(branch, nodes, stack)) {
                 truncated = true;
                 break;
             }
-            while (stack.length > level) stack.pop();
-            nodes.push(node);
-            stack[level] = node;
             started = true;
             continue;
         }
         if (!started) {
-            if (
-                !content ||
-                isNodeMetadata(content) ||
-                /^(?:Output|Query summary|Indexes):?$/i.test(content)
-            )
-                continue;
-            if (/^[┌┐└├─]+$/.test(content)) continue;
-            const label = content.replace(/^[│┃]\s*/u, '').trim();
-            if (!label || label.length > 400) continue;
-            const node: RuntimeNode = { id: 'runtime-0', label, kind: nodeKind(label), detail: [] };
+            const node = runtimeRootNode(content);
+            if (!node) continue;
             nodes.push(node);
             stack.push(node);
             started = true;
@@ -265,44 +320,14 @@ export function parseExplainAnalyze(input: unknown): ExplainAnalyzeEvidence | un
         const current = stack.at(-1);
         if (!current || !content) continue;
         const metadata = stripFrame(content);
-        if (/^I\/O:/i.test(metadata)) applyIo(current, metadata);
-        else if (/\btime\s+\d/i.test(metadata)) {
-            const stage = metadata.match(/^Stage\s*\(([^)]+)\)\s*:/i)?.[1];
-            const timing = metadata.match(
-                /time\s+(\d+(?:\.\d+)?\s*(?:ns|us|µs|μs|ms|s)(?:\s*\(\d+(?:\.\d+)?%\))?)/i,
-            )?.[1];
-            if (timing) current.detail.push(`${stage ? `${stage}: ` : ''}${timing}`.slice(0, 180));
-            applyTiming(current, metadata);
-        } else if (!isNodeMetadata(metadata) && metadata.length < 400)
-            current.detail.push(metadata);
+        applyRuntimeMetadata(current, metadata);
     }
 
     if (!nodes.length && !summary.totalTime && !summary.executionTime) return undefined;
     const flowFor = (node: RuntimeNode) =>
         metricNumber(node.outputRows) ?? metricNumber(node.inputRows) ?? 0;
     const largestFlow = nodes.reduce((largest, node) => Math.max(largest, flowFor(node)), 0);
-    const graphNodes = nodes.map(node => ({
-        id: node.id,
-        label: node.label.slice(0, 160),
-        kind: node.kind,
-        status: 'measured' as const,
-        ...(node.detail.length
-            ? { detail: node.detail.slice(0, 12).join(' · ').slice(0, 600) }
-            : {}),
-        ...(node.durationMs === undefined ? {} : { durationMs: node.durationMs }),
-        ...(node.timePercent === undefined ? {} : { timePercent: node.timePercent }),
-        ...(node.parallelism === undefined ? {} : { parallelism: node.parallelism }),
-        ...(node.inputRows === undefined ? {} : { inputRows: node.inputRows }),
-        ...(node.outputRows === undefined ? {} : { outputRows: node.outputRows }),
-        ...(node.inputBytes === undefined ? {} : { inputBytes: node.inputBytes }),
-        ...(node.outputBytes === undefined ? {} : { outputBytes: node.outputBytes }),
-        ...((node.inputRows ?? node.outputRows) === undefined
-            ? {}
-            : { rows: node.inputRows ?? node.outputRows }),
-        ...((node.inputBytes ?? node.outputBytes) === undefined
-            ? {}
-            : { bytes: node.inputBytes ?? node.outputBytes }),
-    }));
+    const graphNodes = runtimeGraphNodes(nodes);
     const edges = nodes.flatMap(node => {
         if (!node.parent) return [];
         const flow = flowFor(node);

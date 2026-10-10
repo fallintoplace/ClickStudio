@@ -58,6 +58,47 @@ function allowRequest(ip: string): boolean {
     return true;
 }
 
+function prepareAssistantContext(body: Record<string, unknown>) {
+    const connectionId = field(body.connectionId, 'Connection ID', 128);
+    const question = field(body.question, 'Question', 4_000);
+    const conversation = validateAssistantConversation(body.conversation);
+    const sql = field(body.sql, 'SQL', MAX_SQL_CHARS, true);
+    const database =
+        body.database === undefined ? undefined : field(body.database, 'Database', 128);
+    const schema = schemaFrom(body.schema, connectionId);
+    const { action, repair } = assistantRequestFrom(body.action, body.repair);
+    const includeRun = body.includeRun === true && !repair;
+    if (includeRun) field(body.runId, 'Run ID', 200);
+    const result = includeRun && body.result !== undefined ? resultFrom(body.result) : undefined;
+    const evidenceSql =
+        includeRun && body.evidenceSql !== undefined
+            ? field(body.evidenceSql, 'Selected run SQL', MAX_SQL_CHARS, true)
+            : undefined;
+    const error =
+        includeRun && body.error !== undefined
+            ? field(body.error, 'Selected run error', 3_000, true)
+            : undefined;
+    const serverVersion =
+        typeof body.serverVersion === 'string' ? body.serverVersion.slice(0, 128) : undefined;
+    const built = buildContext({
+        connectionId,
+        database,
+        action,
+        question,
+        conversation,
+        sql,
+        schema,
+        result,
+        evidenceSql: repair?.sql ?? evidenceSql,
+        error: repair?.error ?? error,
+        serverVersion,
+        sensitiveColumns: (process.env.AI_SENSITIVE_COLUMNS ?? 'password,token,secret,api_key')
+            .split(',')
+            .map(name => name.trim()),
+    });
+    return { connectionId, action, sql, schema, built };
+}
+
 async function post(request: Request): Promise<Response> {
     if (request.method !== 'POST')
         return fail('METHOD_NOT_ALLOWED', 'Use POST to ask the ClickHouse assistant.', 405);
@@ -106,44 +147,7 @@ async function post(request: Request): Promise<Response> {
 
     let timeoutSignal: AbortSignal | undefined;
     try {
-        const connectionId = field(body.connectionId, 'Connection ID', 128);
-        const question = field(body.question, 'Question', 4_000);
-        const conversation = validateAssistantConversation(body.conversation);
-        const sql = field(body.sql, 'SQL', MAX_SQL_CHARS, true);
-        const database =
-            body.database === undefined ? undefined : field(body.database, 'Database', 128);
-        const schema = schemaFrom(body.schema, connectionId);
-        const { action, repair } = assistantRequestFrom(body.action, body.repair);
-        const includeRun = body.includeRun === true && !repair;
-        if (includeRun) field(body.runId, 'Run ID', 200);
-        const result =
-            includeRun && body.result !== undefined ? resultFrom(body.result) : undefined;
-        const evidenceSql =
-            includeRun && body.evidenceSql !== undefined
-                ? field(body.evidenceSql, 'Selected run SQL', MAX_SQL_CHARS, true)
-                : undefined;
-        const error =
-            includeRun && body.error !== undefined
-                ? field(body.error, 'Selected run error', 3_000, true)
-                : undefined;
-        const serverVersion =
-            typeof body.serverVersion === 'string' ? body.serverVersion.slice(0, 128) : undefined;
-        const built = buildContext({
-            connectionId,
-            database,
-            action,
-            question,
-            conversation,
-            sql,
-            schema,
-            result,
-            evidenceSql: repair?.sql ?? evidenceSql,
-            error: repair?.error ?? error,
-            serverVersion,
-            sensitiveColumns: (process.env.AI_SENSITIVE_COLUMNS ?? 'password,token,secret,api_key')
-                .split(',')
-                .map(name => name.trim()),
-        });
+        const { connectionId, action, sql, schema, built } = prepareAssistantContext(body);
         const ip =
             request.headers.get('x-real-ip')?.trim() ||
             request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||

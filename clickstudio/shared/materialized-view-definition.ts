@@ -43,6 +43,21 @@ function reference(
     return second ? { value: { database: first, table: second }, next: start + 3 } : undefined;
 }
 
+function viewHeader(tokens: Token[], next: number): Token[] {
+    // Column definitions and engine arguments can contain identifiers named REFRESH or TO.
+    const header: Token[] = [];
+    let depth = 0;
+    const headerStart =
+        word(tokens[next], 'ON') && word(tokens[next + 1], 'CLUSTER') ? next + 3 : next;
+    for (const token of tokens.slice(headerStart)) {
+        if (token.kind === 'symbol' && token.text === '(') depth++;
+        if (!depth && word(token, 'AS')) break;
+        if (!depth) header.push(token);
+        if (token.kind === 'symbol' && token.text === ')') depth = Math.max(0, depth - 1);
+    }
+    return header;
+}
+
 /** Read only the CREATE header; never guess SELECT lineage from SQL text. */
 export function materializedViewDefinition(
     sql: string,
@@ -68,19 +83,7 @@ export function materializedViewDefinition(
         start += 3;
     const name = reference(tokens, start, database);
     if (!name) return unknown;
-    // Column definitions and engine arguments can contain identifiers named REFRESH or TO.
-    const header: Token[] = [];
-    let depth = 0;
-    const headerStart =
-        word(tokens[name.next], 'ON') && word(tokens[name.next + 1], 'CLUSTER')
-            ? name.next + 3
-            : name.next;
-    for (const token of tokens.slice(headerStart)) {
-        if (token.kind === 'symbol' && token.text === '(') depth++;
-        if (!depth && word(token, 'AS')) break;
-        if (!depth) header.push(token);
-        if (token.kind === 'symbol' && token.text === ')') depth = Math.max(0, depth - 1);
-    }
+    const header = viewHeader(tokens, name.next);
     const refresh = header.findIndex(
         (token, index) =>
             word(token, 'REFRESH') &&

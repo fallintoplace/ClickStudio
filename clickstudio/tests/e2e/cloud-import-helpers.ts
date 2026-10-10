@@ -50,6 +50,17 @@ const previewCloudConnectionTest: CloudConnectionTest = {
     parameters: { available: false, reason: 'Unavailable in this preview test.' },
 };
 
+function importFileRowCount(format: string | undefined, contents: string): number {
+    switch (format) {
+        case 'json':
+            return (JSON.parse(contents) as unknown[]).length;
+        case 'ndjson':
+            return contents.split(/\r?\n/).filter(Boolean).length;
+        default:
+            return Math.max(0, contents.trim().split(/\r?\n/).length - 1);
+    }
+}
+
 export async function mockCloudEndpoint(
     page: Page,
     commitOutcome: 'success' | 'unknown' | 'running' = 'success',
@@ -59,6 +70,42 @@ export async function mockCloudEndpoint(
     const imports: string[] = [];
     let activeSchema = cloudSchema;
     let importSucceeded = false;
+    const applyCreatedTable = (createTable: {
+        name: string;
+        columns: { name: string; type: string }[];
+        generateId: boolean;
+    }) => {
+        activeSchema = {
+            ...activeSchema,
+            tables: [
+                ...activeSchema.tables.filter(item => item.name !== createTable.name),
+                { database: 'default', name: createTable.name, engine: 'MergeTree' },
+            ],
+            columns: [
+                ...activeSchema.columns.filter(item => item.table !== createTable.name),
+                ...createTable.columns.map(column => ({
+                    database: 'default',
+                    table: createTable.name,
+                    name: column.name,
+                    type: column.type,
+                    defaultKind: '',
+                    comment: '',
+                })),
+                ...(createTable.generateId
+                    ? [
+                          {
+                              database: 'default',
+                              table: createTable.name,
+                              name: 'id',
+                              type: 'UInt64',
+                              defaultKind: 'DEFAULT',
+                              comment: '',
+                          },
+                      ]
+                    : []),
+            ],
+        };
+    };
     await page.route('**/api/cloud', async route => {
         const request = route.request();
         const contentType = request.headers()['content-type'] ?? '';
@@ -74,15 +121,7 @@ export async function mockCloudEndpoint(
                 body.match(
                     /name="file"; filename="[^\"]+"\r\nContent-Type: [^\r\n]+\r\n\r\n([\s\S]*?)\r\n--/,
                 )?.[1] ?? '';
-            let rows: number;
-
-            if (format === 'json') {
-                rows = (JSON.parse(fileContents) as unknown[]).length;
-            } else if (format === 'ndjson') {
-                rows = fileContents.split(/\r?\n/).filter(Boolean).length;
-            } else {
-                rows = Math.max(0, fileContents.trim().split(/\r?\n/).length - 1);
-            }
+            const rows = importFileRowCount(format, fileContents);
             const id = queryId.replace('clickstudio-import-', '');
             const createValue = body.match(/name="createTable"\r\n\r\n([^\r\n]+)/)?.[1];
             const createTable = createValue
@@ -117,38 +156,7 @@ export async function mockCloudEndpoint(
                 });
                 return;
             }
-            if (createTable) {
-                activeSchema = {
-                    ...activeSchema,
-                    tables: [
-                        ...activeSchema.tables.filter(item => item.name !== createTable.name),
-                        { database: 'default', name: createTable.name, engine: 'MergeTree' },
-                    ],
-                    columns: [
-                        ...activeSchema.columns.filter(item => item.table !== createTable.name),
-                        ...createTable.columns.map(column => ({
-                            database: 'default',
-                            table: createTable.name,
-                            name: column.name,
-                            type: column.type,
-                            defaultKind: '',
-                            comment: '',
-                        })),
-                        ...(createTable.generateId
-                            ? [
-                                  {
-                                      database: 'default',
-                                      table: createTable.name,
-                                      name: 'id',
-                                      type: 'UInt64',
-                                      defaultKind: 'DEFAULT',
-                                      comment: '',
-                                  },
-                              ]
-                            : []),
-                    ],
-                };
-            }
+            if (createTable) applyCreatedTable(createTable);
             importSucceeded = true;
             await route.fulfill({
                 json: {
