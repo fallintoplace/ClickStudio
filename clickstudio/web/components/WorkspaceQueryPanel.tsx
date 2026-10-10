@@ -148,7 +148,7 @@ export function WorkspaceQueryPanel({
             className={cx(
                 'editor-surface',
                 viewState.failureError && !state.executionPending && 'has-error-output',
-                panels.queryCollapsed && 'is-collapsed',
+                !detached && panels.queryCollapsed && 'is-collapsed',
             )}
         >
             {renderQueryHeading({
@@ -166,7 +166,7 @@ export function WorkspaceQueryPanel({
             <div
                 id="sql-editor-content"
                 className="panel-content editor-content"
-                hidden={panels.queryCollapsed}
+                hidden={!detached && panels.queryCollapsed}
             >
                 <div className="editor-workspace-layout">
                     <div className="editor-main-column">
@@ -503,21 +503,27 @@ function renderQueryHeading({
                         </Button>
                     )
                 )}
-                <Button
-                    variant="ghost"
-                    className="panel-collapse-button"
-                    aria-label={
-                        panels.queryCollapsed ? copy.common.expandQuery : copy.common.collapseQuery
-                    }
-                    aria-expanded={!panels.queryCollapsed}
-                    aria-controls="sql-editor-content"
-                    title={
-                        panels.queryCollapsed ? copy.common.expandQuery : copy.common.collapseQuery
-                    }
-                    onClick={() => panels.setQueryCollapsed(value => !value)}
-                >
-                    <Icon className="panel-toggle-icon" name="chevron" />
-                </Button>
+                {!detached && (
+                    <Button
+                        variant="ghost"
+                        className="panel-collapse-button"
+                        aria-label={
+                            panels.queryCollapsed
+                                ? copy.common.expandQuery
+                                : copy.common.collapseQuery
+                        }
+                        aria-expanded={!panels.queryCollapsed}
+                        aria-controls="sql-editor-content"
+                        title={
+                            panels.queryCollapsed
+                                ? copy.common.expandQuery
+                                : copy.common.collapseQuery
+                        }
+                        onClick={() => panels.setQueryCollapsed(value => !value)}
+                    >
+                        <Icon className="panel-toggle-icon" name="chevron" />
+                    </Button>
+                )}
             </div>
         </div>
     );

@@ -4,13 +4,11 @@ import { Button, Icon } from './ui';
 export function DetachedQueryPlaceholder({
     name,
     copy,
-    collapsed,
     onFocus,
     onDock,
 }: {
     name: string;
     copy: Copy['common'];
-    collapsed: boolean;
     onFocus: () => void;
     onDock: () => void;
 }) {
@@ -29,10 +27,6 @@ export function DetachedQueryPlaceholder({
                         </span>
                     </div>
                 </div>
-                <div className="editor-heading-tools detached-query-status">
-                    <span className="editor-language-dot" />
-                    <span>{copy.detachedQueryStatus}</span>
-                </div>
                 <div className="editor-heading-actions detached-query-actions">
                     <Button variant="secondary" className="toolbar-small" onClick={onFocus}>
                         {copy.focusQueryEditor}
@@ -48,15 +42,6 @@ export function DetachedQueryPlaceholder({
                     </Button>
                 </div>
             </div>
-            {!collapsed && (
-                <div className="panel-content detached-query-placeholder-content">
-                    <Icon name="newWindow" />
-                    <div>
-                        <strong>{copy.detachedQueryStatus}</strong>
-                        <p>{copy.detachedQueryDescription}</p>
-                    </div>
-                </div>
-            )}
         </section>
     );
 }

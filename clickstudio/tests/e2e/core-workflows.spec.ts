@@ -1367,10 +1367,20 @@ for (const mode of ['Standard', 'Experimental'])
             .click();
         const editorPopup = await editorPopupPromise;
         await expect(editorPopup.locator('.cm-content')).toBeVisible();
+        await expect(editorPopup.locator('.panel-collapse-button')).toHaveCount(0);
         await expect(editorPopup.locator('.editor-surface')).toHaveCSS('border-radius', '4px');
         await expect(
             editorPopup.getByRole('button', { name: /Float|Maximize|Restore/ }),
         ).toHaveCount(0);
+        await expect(page.locator('.detached-query-placeholder-content')).toHaveCount(0);
+        await expect(page.getByText('Editor open in another window')).toHaveCount(0);
+        await expect(page.locator('.workspace-panel-splitter')).toHaveCount(0);
+        const workspaceBounds = await page.locator('.workspace-content').boundingBox();
+        const placeholderBounds = await page.locator('.detached-query-placeholder').boundingBox();
+        const outputBounds = await page.locator('.results-surface').boundingBox();
+        expect(workspaceBounds).not.toBeNull();
+        expect(placeholderBounds?.height).toBeLessThan(80);
+        expect(outputBounds?.height).toBeGreaterThan(workspaceBounds!.height * 0.7);
         const editedSql = 'SELECT number AS value FROM numbers(3)';
         await replaceSql(editorPopup, editedSql);
         await page
@@ -1395,6 +1405,25 @@ for (const mode of ['Standard', 'Experimental'])
             page.locator('.results-surface').getByRole('table', { name: 'Retained query rows' }),
         ).toHaveText(retainedRows, { useInnerText: true });
     });
+
+test('Detached beginner editor leaves only a compact workspace header without results', async ({
+    page,
+}) => {
+    await page.addInitScript(() => localStorage.setItem('clickstudio:experience', 'beginner'));
+    await page.setViewportSize({ width: 1400, height: 1000 });
+    await trust(page);
+
+    const editorPopupPromise = page.waitForEvent('popup');
+    await page
+        .getByRole('button', { name: 'Open editor in a separate window', exact: true })
+        .click();
+    const editorPopup = await editorPopupPromise;
+    await expect(editorPopup.locator('#sql-editor-content')).toBeVisible();
+    await expect(editorPopup.locator('.panel-collapse-button')).toHaveCount(0);
+    await expect(page.locator('.detached-query-placeholder-content')).toHaveCount(0);
+    const placeholderBounds = await page.locator('.detached-query-placeholder').boundingBox();
+    expect(placeholderBounds?.height).toBeLessThan(80);
+});
 
 test('Desktop docked query and output panels resize with the splitter', async ({ page }) => {
     await page.setViewportSize({ width: 1400, height: 1000 });

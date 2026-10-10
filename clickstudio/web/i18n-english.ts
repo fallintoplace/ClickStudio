@@ -154,8 +154,6 @@ export const english = {
         query: 'QUERY',
         openQueryInNewWindow: 'Open editor in a separate window',
         detachedQueryStatus: 'Editor open in another window',
-        detachedQueryDescription:
-            'This editor stays in sync with the workspace. Move its window to another screen.',
         focusQueryEditor: 'Focus editor',
         dockQueryEditor: 'Dock editor here',
         queryWindowBlocked:

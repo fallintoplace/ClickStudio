@@ -180,18 +180,11 @@
     min-height: 0;
     flex: 1;
   }
-  .detached-query-window-root > .editor-surface.is-collapsed {
-    height: auto;
-    flex: 0 0 auto;
-  }
   .detached-query-window-root .editor-main-column {
     overflow: hidden;
   }
   .detached-query-window-root .editor-frame {
     min-height: 0;
-  }
-  .detached-query-placeholder {
-    flex: 1;
   }
   .detached-query-placeholder .editor-heading-actions {
     padding-right: 0;
@@ -204,40 +197,6 @@
     color: var(--text);
     font-size: 13px;
     font-weight: 630;
-  }
-  .detached-query-status {
-    align-items: center;
-    gap: 8px;
-    margin-inline: auto;
-    color: var(--text-soft);
-    font-size: 9px;
-  }
-  .detached-query-placeholder-content {
-    display: flex;
-    min-height: 0;
-    flex: 1;
-    align-items: center;
-    justify-content: center;
-    gap: 14px;
-    padding: 28px;
-    color: var(--muted);
-  }
-  .detached-query-placeholder-content > svg {
-    width: 30px;
-    height: 30px;
-    flex: none;
-    color: var(--signal-accent);
-  }
-  .detached-query-placeholder-content strong {
-    color: var(--text-soft);
-    font-size: 12px;
-  }
-  .detached-query-placeholder-content p {
-    max-width: 390px;
-    margin: 5px 0 0;
-    color: var(--muted);
-    font-size: 10px;
-    line-height: 1.55;
   }
   .editor-heading {
     position: relative;

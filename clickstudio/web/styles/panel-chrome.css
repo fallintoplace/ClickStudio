@@ -47,6 +47,19 @@
 .workspace-content.beginner-workspace-content:not(.has-run).is-query-collapsed > .editor-surface {
   flex: 0 0 auto;
 }
+.workspace-content.has-detached-query,
+.workspace-content.has-detached-query.has-run,
+.workspace-content.has-detached-query.has-sql-map:not(.has-run) {
+  grid-template-rows: max-content minmax(0, 1fr);
+}
+.workspace-content.has-detached-query.is-results-collapsed,
+.workspace-content.has-detached-query.has-run.is-results-collapsed,
+.workspace-content.has-detached-query.has-sql-map:not(.has-run).is-results-collapsed {
+  grid-template-rows: max-content max-content;
+}
+.workspace-content.has-detached-query > .detached-query-placeholder {
+  flex: none;
+}
 .panel-window-button {
   width: 36px;
   min-width: 36px;

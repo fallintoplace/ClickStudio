@@ -724,9 +724,12 @@ function renderWorkspaceLayout({
                             role="tabpanel"
                             aria-labelledby={`document-tab-${active.id}`}
                             tabIndex={0}
-                            style={panels.workspaceLayoutStyle}
+                            style={
+                                detachedEditor.detached ? undefined : panels.workspaceLayoutStyle
+                            }
                             className={cx(
                                 'workspace-content',
+                                Boolean(detachedEditor.detached) && 'has-detached-query',
                                 experience === 'beginner' && 'beginner-workspace-content',
                                 outputVisible &&
                                     Boolean(
@@ -737,16 +740,19 @@ function renderWorkspaceLayout({
                                     ) &&
                                     'has-run',
                                 outputVisible && visibleResultsView === 'sqlmap' && 'has-sql-map',
-                                panels.queryCollapsed && 'is-query-collapsed',
+                                panels.queryCollapsed &&
+                                    !detachedEditor.detached &&
+                                    'is-query-collapsed',
                                 outputVisible && panels.resultsCollapsed && 'is-results-collapsed',
-                                panels.canSplitPanels && 'has-panel-split',
+                                panels.canSplitPanels &&
+                                    !detachedEditor.detached &&
+                                    'has-panel-split',
                             )}
                         >
                             {detachedEditor.detached ? (
                                 <DetachedQueryPlaceholder
                                     name={active.name}
                                     copy={copy.common}
-                                    collapsed={panels.queryCollapsed}
                                     onFocus={detachedEditor.focusEditor}
                                     onDock={detachedEditor.dockEditor}
                                 />
@@ -754,7 +760,9 @@ function renderWorkspaceLayout({
                                 queryPanel
                             )}
 
-                            {outputVisible && <WorkspacePanelSplitter panels={panels} />}
+                            {outputVisible && !detachedEditor.detached && (
+                                <WorkspacePanelSplitter panels={panels} />
+                            )}
 
                             {outputVisible && resultsPanel}
                         </div>
