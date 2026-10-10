@@ -219,7 +219,16 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         setViewForDraft(active.id, current => typeof next === 'function' ? next(current ?? 'results') : next, true);
     }, [active.id, setViewForDraft, setOutputClosedForDraft]);
     const [exampleChartRunId, setExampleChartRunId] = useState<string>();
-    const [inspector, setInspector] = useState<Inspector>('schema');
+    const [inspectorsByExperience, setInspectorsByExperience] = useState<Record<ExperienceLevel, Inspector>>({
+        beginner: 'schema',
+        expert: 'schema',
+    });
+    const experienceRef = useRef(experience);
+    experienceRef.current = experience;
+    const inspector = inspectorsByExperience[experience];
+    const setInspector = useCallback((next: Inspector) => {
+        setInspectorsByExperience(current => ({ ...current, [experienceRef.current]: next }));
+    }, []);
     const inspectorRef = useRef(inspector);
     inspectorRef.current = inspector;
     const [compactViewport, setCompactViewport] = useState(() => window.matchMedia('(max-width: 850px)').matches);
@@ -317,8 +326,6 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         return () => media.removeEventListener('change', update);
     }, [experience]);
     const cancellingRef = useRef(false);
-
-    useEffect(() => { setDrawerOpen(experience === 'expert' && !window.matchMedia('(max-width: 850px)').matches); }, [experience]);
 
     const update = useCallback((id: string, change: (draft: Draft) => Draft) => setWorkspace(current => workspaceWithUpdatedDraft(current, id, change)), []);
     const clearUnavailableRun = useCallback((runId: string) => update(active.id, draft => draft.activeRunId === runId ? { ...draft, activeRunId: undefined } : draft), [active.id, update]);
