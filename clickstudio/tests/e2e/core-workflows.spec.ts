@@ -908,16 +908,23 @@ for (const theme of ['Dark', 'Light'])
             await expect(
                 results.getByRole('button', { name: 'Close output', exact: true }),
             ).toHaveCount(0);
-            const fix = failure.getByRole('button', { name: 'Fix with AI', exact: true });
+            const header = results.locator('.results-header');
+            const fix = header.getByRole('button', { name: 'Fix with AI', exact: true });
             await expect(fix).toBeVisible();
-            const titleBounds = (await failure
-                .locator('.result-failure-heading h3')
-                .boundingBox())!;
+            await expect(
+                failure.getByRole('button', { name: 'Fix with AI', exact: true }),
+            ).toHaveCount(0);
+            const headerBounds = (await header.boundingBox())!;
+            const collapseBounds = (await header.locator('.panel-collapse-button').boundingBox())!;
             const fixBounds = (await fix.boundingBox())!;
-            expect(fixBounds.x - titleBounds.x - titleBounds.width).toBeGreaterThanOrEqual(8);
-            expect(fixBounds.x - titleBounds.x - titleBounds.width).toBeLessThanOrEqual(16);
+            expect(fixBounds.x).toBeGreaterThanOrEqual(headerBounds.x);
+            expect(fixBounds.x + fixBounds.width).toBeLessThan(collapseBounds.x);
+            expect(fixBounds.y).toBeGreaterThanOrEqual(headerBounds.y);
+            expect(fixBounds.y + fixBounds.height).toBeLessThanOrEqual(
+                headerBounds.y + headerBounds.height,
+            );
             expect(fixBounds.y + fixBounds.height / 2).toBeCloseTo(
-                titleBounds.y + titleBounds.height / 2,
+                collapseBounds.y + collapseBounds.height / 2,
                 0,
             );
             const contrast = await fix.evaluate(element => {

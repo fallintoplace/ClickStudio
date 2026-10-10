@@ -83,7 +83,13 @@ for (const mode of ['beginner', 'expert'])
         await composer.fill('Keep my unfinished question');
         await replaceSql(page, failedSql);
         await rejectQuery(page);
-        await page.getByRole('button', { name: 'Fix with AI', exact: true }).click();
+        await page.getByRole('button', { name: 'Collapse Query results', exact: true }).click();
+        await expect(page.getByTestId('query-failure')).toBeHidden();
+        const fix = page
+            .locator('.results-header')
+            .getByRole('button', { name: 'Fix with AI', exact: true });
+        await expect(fix).toBeVisible();
+        await fix.click();
         await expect(page.getByTestId('assistant-proposal-summary')).toHaveText(
             'Use the events column.',
         );
@@ -112,6 +118,7 @@ for (const mode of ['beginner', 'expert'])
             'data-run-status',
             'succeeded',
         );
+        await expect(fix).toHaveCount(0);
         await page.reload();
         await page.getByTestId('open-ai').click();
         await expect(page.getByTestId('assistant-proposal-summary')).toHaveText(
@@ -140,7 +147,7 @@ test('Fix with AI keeps the full draft when a selected statement fails', async (
 });
 
 for (const theme of ['Dark', 'Light'])
-    test(`Fix with AI stays visible beside long errors in narrow ${theme.toLowerCase()} panels`, async ({
+    test(`Fix with AI stays in the Output header above long errors in narrow ${theme.toLowerCase()} panels`, async ({
         page,
     }, testInfo) => {
         await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -153,12 +160,17 @@ for (const theme of ['Dark', 'Light'])
                 'Syntax error: failed at position 1 (an_exceptionally_long_failed_sql_keyword). Expected one of: SELECT.',
         });
         const failure = page.getByTestId('query-failure');
-        const fix = failure.getByRole('button', { name: 'Fix with AI', exact: true });
+        const header = page.locator('.results-header');
+        const fix = header.getByRole('button', { name: 'Fix with AI', exact: true });
+        await expect(failure.getByRole('button', { name: 'Fix with AI', exact: true })).toHaveCount(
+            0,
+        );
         for (const width of [900, 720]) {
             await page.setViewportSize({ width, height: 900 });
             await fix.scrollIntoViewIfNeeded();
             await expect(fix).toBeVisible();
-            const bounds = (await failure.boundingBox())!;
+            const bounds = (await header.boundingBox())!;
+            const failureBounds = (await failure.boundingBox())!;
             const fixBounds = (await fix.boundingBox())!;
             const titleBounds = (await failure.locator('.result-failure-title h3').boundingBox())!;
             const statusBounds = (await failure
@@ -168,15 +180,11 @@ for (const theme of ['Dark', 'Light'])
                 titleBounds.y + titleBounds.height / 2,
                 0,
             );
-            const detailsBounds = (await failure.locator('details > summary').boundingBox())!;
             expect(fixBounds.x).toBeGreaterThanOrEqual(bounds.x);
             expect(fixBounds.x + fixBounds.width).toBeLessThanOrEqual(bounds.x + bounds.width);
-            expect(
-                fixBounds.x < detailsBounds.x + detailsBounds.width &&
-                    fixBounds.x + fixBounds.width > detailsBounds.x &&
-                    fixBounds.y < detailsBounds.y + detailsBounds.height &&
-                    fixBounds.y + fixBounds.height > detailsBounds.y,
-            ).toBe(false);
+            expect(fixBounds.y).toBeGreaterThanOrEqual(bounds.y);
+            expect(fixBounds.y + fixBounds.height).toBeLessThanOrEqual(bounds.y + bounds.height);
+            expect(fixBounds.y + fixBounds.height).toBeLessThanOrEqual(failureBounds.y);
             await page.screenshot({ path: testInfo.outputPath(`error-${width}.png`) });
         }
     });

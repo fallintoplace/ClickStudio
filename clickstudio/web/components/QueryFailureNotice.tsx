@@ -1,6 +1,5 @@
 import type { ApiError } from '../../shared/types';
 import type { Copy } from '../i18n';
-import { Button, Icon } from './ui';
 import {
     queryFailureSummary,
     sqlErrorContext,
@@ -14,16 +13,12 @@ export function QueryFailureNotice({
     copy,
     errorRange,
     location,
-    onFixWithAi,
-    fixBusy = false,
 }: {
     error: ApiError;
     sql?: string;
     copy: Copy['common'];
     errorRange?: SqlErrorRange;
     location?: { line: number; column: number };
-    onFixWithAi?: () => void;
-    fixBusy?: boolean;
 }) {
     const diagnostic = queryFailureSummary(error);
     const title = diagnostic.syntax
@@ -44,17 +39,6 @@ export function QueryFailureNotice({
                         <span className="status-light is-error" aria-hidden="true" />
                         <h3>{title}</h3>
                     </div>
-                    {onFixWithAi && (
-                        <Button
-                            variant="danger"
-                            className="result-failure-fix"
-                            onClick={onFixWithAi}
-                            disabled={fixBusy}
-                        >
-                            <Icon name="assistant" />
-                            {copy.fixWithAi}
-                        </Button>
-                    )}
                     {location && (
                         <span className="result-failure-location">
                             {copy.errorLocation

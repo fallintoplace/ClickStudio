@@ -96,7 +96,6 @@ export function WorkspaceResultsPanel({
         nativeParseSnapshot,
         trusted,
         busy,
-        assistantBusy,
         execution,
         retainedExecutionResult,
         cancelling,
@@ -264,8 +263,6 @@ export function WorkspaceResultsPanel({
                                 copy={copy.common}
                                 errorRange={viewState.failureRange}
                                 location={viewState.failureLocation}
-                                onFixWithAi={failureSql ? actions.onFixWithAi : undefined}
-                                fixBusy={assistantBusy || Boolean(busy)}
                             />
                         ) : (
                             <>
@@ -450,8 +447,9 @@ function renderResultsHeader({
         snapshotChart,
         resultTabs,
         resultsPanelLabel,
+        failureSql,
     } = viewState;
-    const { copy, run } = state;
+    const { copy, run, assistantBusy, busy } = state;
 
     return (
         <div className="results-header">
@@ -510,6 +508,17 @@ function renderResultsHeader({
                             </button>
                         ))}
                     </div>
+                )}
+                {showFailure && failureSql && (
+                    <Button
+                        variant="danger"
+                        className="results-fix-with-ai"
+                        onClick={actions.onFixWithAi}
+                        disabled={assistantBusy || Boolean(busy)}
+                    >
+                        <Icon name="assistant" />
+                        {copy.common.fixWithAi}
+                    </Button>
                 )}
                 <Button
                     variant="ghost"
