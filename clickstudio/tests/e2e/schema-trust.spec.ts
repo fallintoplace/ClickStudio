@@ -223,6 +223,30 @@ test('Object explorer shows ClickHouse metadata, searchable children, and genera
     await expect(page.getByLabel('Selected object')).toContainText('18.2K');
 });
 
+test('Object explorer keeps selection while browsing and restores expansion after reload', async ({
+    page,
+}) => {
+    await mockLiveWorkspace(page, route => route.fulfill({ json: schema }));
+    const table = page.locator(
+        '[role="treeitem"][data-database="analytics"][data-table-name="events"]',
+    );
+    await expect(table).toBeVisible();
+    await table.locator('.object-tree-toggle').click();
+    await expect(table).toHaveAttribute('aria-expanded', 'true');
+    await table.locator('.object-tree-main').click();
+    await expect(page.getByLabel('Selected object')).toContainText('MergeTree');
+    await page.getByRole('button', { name: '‹ Objects', exact: true }).click();
+    await expect(table).toHaveAttribute('aria-selected', 'true');
+    const search = page.getByTestId('schema-search');
+    await search.fill('events');
+    await expect(table).toHaveAttribute('aria-selected', 'true');
+    await search.fill('');
+    await page.reload();
+    await expect(table).toBeVisible();
+    await expect(table).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.getByText('day', { exact: true }).first()).toBeVisible();
+});
+
 test('Object explorer explains when the loaded schema has no visible objects', async ({ page }) => {
     await mockLiveWorkspace(page, route =>
         route.fulfill({ json: { ...schema, tables: [], columns: [], dictionaries: [] } }),
