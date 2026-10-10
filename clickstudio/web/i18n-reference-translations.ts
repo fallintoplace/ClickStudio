@@ -2,13 +2,13 @@ import type { Copy, Locale } from './i18n-types.js';
 
 type ReferenceTranslation = Pick<Copy['common'],
     'reference' | 'referenceSearch' | 'referenceAll' | 'referenceFunctions' | 'referenceTypes' | 'referenceEngines' |
-    'referenceSettings' | 'referenceSystem' | 'referencePopular' | 'referenceNoMatches' | 'referenceNative' |
+    'referenceSettings' | 'referenceSystem' | 'referenceNoMatches' | 'referenceNative' |
     'referenceBundled' | 'referenceSource' | 'referenceBack' | 'referenceEntryUnavailable' | 'referenceRetry' |
     'referenceBundledNote' | 'referenceCategories' | 'referenceMatches' | 'referenceEmptyHint' | 'referenceResults' |
     'referenceInsert' | 'referenceCopy' | 'referenceSystemTable' | 'clearSearch'>;
 
 export const referenceTranslations: Record<Exclude<Locale, 'en'>, ReferenceTranslation> = {
-    zh: { reference: '参考', referenceSearch: '搜索 ClickHouse…', referenceAll: '全部', referenceFunctions: '函数', referenceTypes: '类型', referenceEngines: '引擎', referenceSettings: '设置', referenceSystem: '系统', referencePopular: '热门', referenceNoMatches: '没有匹配的参考条目。', referenceNative: 'ClickHouse 原生参考', referenceBundled: '内置演示参考', referenceSource: '来源', referenceBack: '返回结果', referenceEntryUnavailable: '所选服务器没有此条目的文档。', referenceRetry: '重试', referenceBundledNote: 'ClickStudio 内含示例条目。', referenceCategories: '参考类别', referenceMatches: '{count} 条匹配', referenceEmptyHint: '尝试其他名称或类别。', referenceResults: '参考结果', referenceInsert: '插入名称', referenceCopy: '复制名称', referenceSystemTable: '系统表参考', clearSearch: '清除搜索' },
+    zh: { reference: '参考', referenceSearch: '搜索 ClickHouse…', referenceAll: '全部', referenceFunctions: '函数', referenceTypes: '类型', referenceEngines: '引擎', referenceSettings: '设置', referenceSystem: '系统', referenceNoMatches: '没有匹配的参考条目。', referenceNative: 'ClickHouse 原生参考', referenceBundled: '内置演示参考', referenceSource: '来源', referenceBack: '返回结果', referenceEntryUnavailable: '所选服务器没有此条目的文档。', referenceRetry: '重试', referenceBundledNote: 'ClickStudio 内含示例条目。', referenceCategories: '参考类别', referenceMatches: '{count} 条匹配', referenceEmptyHint: '尝试其他名称或类别。', referenceResults: '参考结果', referenceInsert: '插入名称', referenceCopy: '复制名称', referenceSystemTable: '系统表参考', clearSearch: '清除搜索' },
 };
 
 type ReferenceCatalogTranslation = Pick<Copy['common'], 'referenceFormats' | 'referenceSql' | 'referenceBrowse' | 'referenceBundled' | 'referenceBundledNote'>;

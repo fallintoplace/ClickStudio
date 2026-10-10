@@ -194,3 +194,123 @@ test('Schema examples expose only the first six non-system tables', () => {
     assert.equal(tableExamples.length, 6);
     assert.deepEqual(tableExamples.map(example => example.name), Array.from({ length: 6 }, (_, index) => `Preview analytics.table_${index}`));
 });
+
+function exampleSchema(tables) {
+    return {
+        connectionId: 'production', fetchedAt: '', warnings: [], truncated: false,
+        tables: tables.map(({ columns: _columns, ...table }) => ({ database: 'analytics', engine: 'MergeTree', ...table })),
+        columns: tables.flatMap(table => (table.columns ?? []).map(column => ({
+            database: 'analytics', table: table.name, comment: '', ...column,
+        }))),
+    };
+}
+
+test('Empty Cloud schemas offer generated read queries and separately labeled write examples', () => {
+    const schema = exampleSchema([{ database: 'system', name: 'tables' }]);
+    const connection = { id: 'production', dataSource: 'clickhouse', database: ' analytics`archive ' };
+    const examples = sqlExamplesFor(connection, schema);
+    const writes = examples.filter(example => example.category === 'writeOperations');
+    const generated = examples.filter(example => example.dataset === 'Generated data');
+    assert.equal(generated.length, 3);
+    assert.ok(generated.every(example => /^(?:SELECT|WITH)\b/.test(example.sql)));
+    assert.deepEqual(writes.map(example => example.featuredOrder), [4, 5]);
+    assert.match(writes[0].sql, /^CREATE TABLE IF NOT EXISTS `analytics``archive`\./);
+    assert.match(writes[1].sql, /^INSERT INTO `analytics``archive`\./);
+    assert.ok(writes.every(example => example.chart.kind === 'table' && /permission/.test(example.description)));
+    assert.equal(sqlExamplesFor({ ...connection, database: ' ' }, schema).some(example => example.category === 'writeOperations'), false);
+    for (const write of writes) {
+        assert.ok(hasSqlExampleTranslation(write.id, 'zh'));
+        assert.notEqual(localizeSqlExample(write, 'zh').name, write.name);
+    }
+});
+
+test('Schema examples use wrapped column types, exclude identifier dimensions, and retain native geometry', () => {
+    const schema = exampleSchema([{ name: 'events', rowEstimate: '500', columns: [
+        { name: 'created_at', type: "Nullable(DateTime64(3, 'UTC'))" },
+        { name: 'revenue', type: 'Nullable(Decimal(18, 2))' },
+        { name: 'country', type: 'LowCardinality(Nullable(String))' },
+        { name: 'user_id', type: 'String' },
+        { name: 'location', type: 'Point' },
+    ] }]);
+    const examples = sqlExamplesFor({ id: 'production', dataSource: 'clickhouse' }, schema);
+    const time = examples.find(example => example.category === 'timeSeries');
+    const category = examples.find(example => example.category === 'aggregation');
+    const geo = examples.find(example => example.id.startsWith('cloud-geo-native'));
+    assert.match(time.sql, /sum\(`revenue`\) AS metric_value/);
+    assert.match(time.sql, /`created_at` IS NOT NULL/);
+    assert.match(time.sql, /LIMIT 30/);
+    assert.match(category.sql, /`country` AS category/);
+    assert.doesNotMatch(category.sql, /user_id/);
+    assert.match(geo.sql, /SELECT `location` AS location/);
+    assert.match(geo.sql, /LIMIT 100$/);
+    assert.deepEqual([time, category, geo].map(example => example.featuredOrder), [1, 2, 3]);
+
+    const identifiersOnly = exampleSchema([{ name: 'users', columns: [
+        { name: 'user_id', type: 'String' },
+        { name: 'session_uuid', type: 'UUID' },
+    ] }]);
+    assert.equal(sqlExamplesFor({ id: 'production', dataSource: 'clickhouse' }, identifiersOnly)
+        .some(example => example.category === 'aggregation'), false);
+});
+
+test('Large unsampled tables offer only bounded previews until a usable time key is known', () => {
+    const table = { name: 'events', rowEstimate: '1000000', columns: [
+        { name: 'created_at', type: 'DateTime' },
+        { name: 'latency', type: 'Float64' },
+        { name: 'country', type: 'String' },
+        { name: 'location', type: 'Point' },
+    ] };
+    const connection = { id: 'production', dataSource: 'clickhouse' };
+    const unbounded = sqlExamplesFor(connection, exampleSchema([table]));
+    assert.equal(unbounded.some(example => example.id.startsWith('cloud-')), false);
+    const bounded = sqlExamplesFor(connection, exampleSchema([{ ...table, partitionKey: 'toYYYYMM(created_at)' }]));
+    const time = bounded.find(example => example.category === 'timeSeries');
+    assert.match(time.sql, /avg\(`latency`\) AS metric_value/);
+    assert.match(time.sql, /`created_at` >= now\(\) - INTERVAL 30 DAY/);
+    assert.doesNotMatch(time.sql, /SAMPLE/);
+    assert.equal(bounded.some(example => example.category === 'aggregation'), false);
+});
+
+for (const [measure, expected] of [
+    [{ name: 'revenue', type: 'UInt64' }, 'sum(`revenue` * _sample_factor) AS metric_value'],
+    [{ name: 'price', type: 'Decimal64(2)' }, 'avg(`price`) AS metric_value'],
+    [undefined, 'sum(_sample_factor) AS row_count'],
+]) test(`Sampled examples preserve ${measure?.name ?? 'row count'} aggregation semantics`, () => {
+    const schema = exampleSchema([{ name: 'events', rowEstimate: '18446744073709551615',
+        samplingKey: 'intHash64(id)', orderBy: 'tuple(day, id)', columns: [
+            { name: 'day', type: 'Nullable(Date32)' },
+            { name: 'country', type: 'String' },
+            ...(measure ? [measure] : []),
+        ] }]);
+    const examples = sqlExamplesFor({ id: 'production', dataSource: 'clickhouse' }, schema);
+    const time = examples.find(example => example.category === 'timeSeries');
+    const category = examples.find(example => example.category === 'aggregation');
+    assert.ok(time.sql.includes(expected));
+    assert.match(time.sql, /SAMPLE 100000/);
+    assert.match(time.sql, /`day` >= today\(\) - INTERVAL 29 DAY/);
+    assert.match(time.description, /sample/);
+    assert.match(category.sql, /sum\(_sample_factor\) AS row_count/);
+    assert.match(category.sql, /SAMPLE 100000/);
+});
+
+test('Coordinate examples bound geographic values and take dimensions from the same table', () => {
+    const schema = exampleSchema([
+        { name: 'smaller', rowEstimate: '9007199254740992', samplingKey: 'id', columns: [
+            { name: 'country', type: 'String' },
+        ] },
+        { name: 'larger', rowEstimate: '9007199254740993', samplingKey: 'id', columns: [
+            { name: 'lat', type: 'Nullable(Float64)' },
+            { name: 'lng', type: 'Float64' },
+            { name: 'channel', type: 'String' },
+            { name: 'country', type: 'String' },
+        ] },
+    ]);
+    const examples = sqlExamplesFor({ id: 'production', dataSource: 'clickhouse' }, schema);
+    const geo = examples.find(example => example.id.startsWith('cloud-geo-coordinates'));
+    assert.match(geo.sql, /FROM `analytics`\.`larger` SAMPLE 100000/);
+    assert.match(geo.sql, /`lat` BETWEEN -90 AND 90/);
+    assert.match(geo.sql, /`lng` BETWEEN -180 AND 180/);
+    assert.match(geo.sql, /LIMIT 500$/);
+    assert.deepEqual(examples.filter(example => example.category === 'aggregation').map(example => example.dataset).sort(),
+        ['analytics.larger', 'analytics.smaller']);
+});

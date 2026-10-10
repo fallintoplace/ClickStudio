@@ -1,7 +1,7 @@
 import type { Copy, Locale } from './i18n-types.js';
 
 export const explainCommonTranslations: Record<Exclude<Locale, 'en'>, Pick<Copy['common'],
-    'explain' | 'explainPlan' | 'indexAnalysisGraph' | 'indexAnalysisDescription' | 'indexAnalysisItem' | 'indexAnalysisSelected' | 'indexAnalysisInspect' | 'indexAnalysisDetails' | 'indexAnalysisHint' | 'indexAnalysisNoOutput' | 'logicalPlan' | 'logicalPlanDescription' | 'planGraphView' | 'planTreeView' | 'planGraphHint' | 'planStep' | 'planSelectedStep' | 'planInspectStep' | 'planStepDetails' | 'planUnknownStep' | 'planDepthLimit' | 'pipelineGraph' | 'pipelineGraphDescription' |
+    'explain' | 'explainPlan' | 'indexAnalysisGraph' | 'indexAnalysisDescription' | 'indexAnalysisItem' | 'indexAnalysisSelected' | 'indexAnalysisInspect' | 'indexAnalysisDetails' | 'indexAnalysisHint' | 'indexAnalysisNoOutput' | 'logicalPlan' | 'planGraphView' | 'planTreeView' | 'planGraphHint' | 'planStep' | 'planSelectedStep' | 'planInspectStep' | 'planStepDetails' | 'planUnknownStep' | 'planDepthLimit' | 'pipelineGraph' | 'pipelineGraphDescription' |
     'pipelineGraphHint' | 'pipelineGraphTruncated' | 'pipelineZoomControls' | 'pipelineZoomOut' | 'pipelineZoomIn' | 'pipelineZoomReset' | 'pipelineZoomLevel' | 'pipelineFocusNode' | 'pipelineFit' |
     'pipelineInputs' | 'pipelineOutputs' | 'pipelineRunDuration' | 'pipelineRunRows' | 'pipelineRunBytes' |
     'planNodeCount' | 'planProperties' | 'planNoOutput' | 'planLoading' | 'planTruncated' | 'pipelineNoOutput' |
@@ -9,7 +9,6 @@ export const explainCommonTranslations: Record<Exclude<Locale, 'en'>, Pick<Copy[
     zh: {
         explain: 'EXPLAIN INDEXES', explainPlan: 'EXPLAIN PLAN', logicalPlan: '逻辑查询计划',
         indexAnalysisGraph: '索引裁剪图', indexAnalysisDescription: 'ClickHouse 返回的索引检查及保留的数据分区和粒度。', indexAnalysisItem: '索引检查', indexAnalysisSelected: '已选索引', indexAnalysisInspect: '查看索引', indexAnalysisDetails: '所选索引详情', indexAnalysisHint: '选择索引以查看条件和裁剪数量。', indexAnalysisNoOutput: 'ClickHouse 未返回索引详情。',
-        logicalPlanDescription: 'ClickHouse 执行前的优化步骤。此视图不显示运行时测量数据。',
         planGraphView: '图', planTreeView: '树', planGraphHint: '选择步骤以查看其属性。', planStep: '步骤', planSelectedStep: '已选步骤', planInspectStep: '查看步骤', planStepDetails: '所选计划步骤详情',
         pipelineGraph: 'ClickHouse 执行管线', pipelineGraphDescription: '来自 EXPLAIN PIPELINE 的计划处理器拓扑。运行时数据单独显示。',
         planUnknownStep: '未知步骤', planDepthLimit: '已达到计划深度上限',
