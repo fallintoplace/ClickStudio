@@ -20,14 +20,12 @@ export function useWorkspaceData({
     activeServerId,
     setWorkspace,
     workspaceRef,
-    setError,
 }: {
     connectionId: string;
     trusted: boolean;
     activeServerId?: string;
     setWorkspace: Dispatch<SetStateAction<WorkspaceState>>;
     workspaceRef: { current: WorkspaceState };
-    setError: (message: string) => void;
 }) {
     const [schema, setSchema] = useState<Schema>();
     const [schemaLoading, setSchemaLoading] = useState(false);
@@ -38,6 +36,8 @@ export function useWorkspaceData({
     const [documents, setDocuments] = useState<QueryDocument[]>([]);
     const [documentsLoaded, setDocumentsLoaded] = useState(false);
     const [documentsReadError, setDocumentsReadError] = useState(false);
+    const [documentsError, setDocumentsError] = useState('');
+    const [historyError, setHistoryError] = useState('');
     const [documentRevisions, setDocumentRevisions] = useState<QueryDocument[]>([]);
     const [revisionsDocumentId, setRevisionsDocumentId] = useState<string>();
     const [revisionLoading, setRevisionLoading] = useState(false);
@@ -85,9 +85,15 @@ export function useWorkspaceData({
                     `/runs?connectionId=${encodeURIComponent(connectionId)}`,
                     { signal },
                 );
-                if (!signal?.aborted && historyRequestRef.current === requestId) setHistory(next);
+                if (!signal?.aborted && historyRequestRef.current === requestId) {
+                    setHistory(next);
+                    setHistoryError('');
+                }
             } catch (caught) {
-                if (!signal?.aborted && historyRequestRef.current === requestId) throw caught;
+                if (!signal?.aborted && historyRequestRef.current === requestId) {
+                    setHistoryError(message(caught));
+                    throw caught;
+                }
             }
         },
         [connectionId],
@@ -113,10 +119,12 @@ export function useWorkspaceData({
                     }),
                 }));
                 setDocumentsReadError(false);
+                setDocumentsError('');
             }
         } catch (caught) {
             if (documentsRequestRef.current === requestId) {
                 setDocumentsReadError(true);
+                setDocumentsError(message(caught));
                 throw caught;
             }
         } finally {
@@ -253,20 +261,10 @@ export function useWorkspaceData({
     }, [connectionId, schema, schemaLoadingMore]);
 
     useEffect(() => {
-        let initialHistoryLoad = true;
-        const stopHistoryPolling = startVisiblePolling(
-            async signal => {
-                try {
-                    await loadHistory(signal);
-                } catch (caught) {
-                    if (initialHistoryLoad && !signal.aborted) setError(message(caught));
-                } finally {
-                    if (!signal.aborted) initialHistoryLoad = false;
-                }
-            },
-            { intervalMs: 15000 },
-        );
-        void loadDocuments().catch(caught => setError(message(caught)));
+        const stopHistoryPolling = startVisiblePolling(signal => loadHistory(signal), {
+            intervalMs: 15000,
+        });
+        void loadDocuments().catch(() => undefined);
         if (trusted) void loadSchema();
         else {
             schemaRequestRef.current++;
@@ -279,7 +277,7 @@ export function useWorkspaceData({
             stopHistoryPolling();
             invalidateRequests();
         };
-    }, [invalidateRequests, loadDocuments, loadHistory, loadSchema, setError, trusted]);
+    }, [invalidateRequests, loadDocuments, loadHistory, loadSchema, trusted]);
 
     return {
         schema,
@@ -293,6 +291,8 @@ export function useWorkspaceData({
         setDocuments,
         documentsLoaded,
         documentsReadError,
+        documentsError,
+        historyError,
         documentRevisions,
         revisionsDocumentId,
         revisionLoading,

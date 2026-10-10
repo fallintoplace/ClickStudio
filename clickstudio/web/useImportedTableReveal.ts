@@ -3,6 +3,7 @@ import { lexSql } from '../shared/sql';
 import type { Schema, Script } from '../shared/types';
 import type { ImportJob } from './components/import-wizard-model';
 import { isFrontendDemoPreview } from './api';
+import type { WorkspaceFeedback } from './useWorkspaceNotifications';
 import type { ImportedTableTarget, Inspector } from './workspace-types';
 
 type Options = {
@@ -14,7 +15,6 @@ type Options = {
     setInspector: (inspector: Inspector) => void;
     setDrawerOpen: (open: boolean) => void;
     openInspectorDrawer: boolean;
-    setNotice: (notice: string) => void;
 };
 
 export function isSchemaChangingSql(sql: string) {
@@ -50,8 +50,8 @@ export function useImportedTableReveal({
     setInspector,
     setDrawerOpen,
     openInspectorDrawer,
-    setNotice,
 }: Options) {
+    const [importFeedback, setImportFeedback] = useState<WorkspaceFeedback>();
     const [importedTableTarget, setImportedTableTarget] = useState<ImportedTableTarget>();
     const latestImportIdRef = useRef<string | undefined>(undefined);
     const importedSqlDraftIdsRef = useRef(new Set<string>());
@@ -68,9 +68,8 @@ export function useImportedTableReveal({
             setSearch('');
             setImportedTableTarget({ id, table, source: 'sql' });
             revealInspector();
-            setNotice(`SQL created ${table}. Showing it in Objects…`);
         },
-        [revealInspector, setNotice, setSearch],
+        [revealInspector, setSearch],
     );
 
     const markImportedSqlDraft = useCallback((id: string) => {
@@ -144,9 +143,6 @@ export function useImportedTableReveal({
     const onImported = useCallback(
         (job: ImportJob) => {
             if (demoMode && isFrontendDemoPreview && connectionId === 'demo') {
-                setNotice(
-                    'Interview rows saved in this browser. Switch to Sample data and query demo.interview_imports.',
-                );
                 return;
             }
 
@@ -159,7 +155,7 @@ export function useImportedTableReveal({
                 source: 'rows',
             });
             revealInspector();
-            setNotice(`Import complete. Refreshing the table list for ${job.table}…`);
+            setImportFeedback(undefined);
             void loadSchema(true).then(refreshedSchema => {
                 if (latestImportIdRef.current !== job.id) return;
                 if (
@@ -167,12 +163,13 @@ export function useImportedTableReveal({
                         table => `${table.database}.${table.name}` === job.table,
                     )
                 )
-                    setNotice(
-                        `Import succeeded, but ${job.table} is not in the table list yet. Use Refresh to try again.`,
-                    );
+                    setImportFeedback({
+                        tone: 'warning',
+                        message: `Import completed. Refresh Objects to find “${job.table}”.`,
+                    });
             });
         },
-        [connectionId, demoMode, loadSchema, revealInspector, setNotice, setSearch],
+        [connectionId, demoMode, loadSchema, revealInspector, setSearch],
     );
 
     const onUnconfirmedDestination = useCallback(
@@ -182,38 +179,25 @@ export function useImportedTableReveal({
             setSearch('');
             setImportedTableTarget({ id: job.id, table: job.table, source: 'partial' });
             revealInspector();
-            setNotice(
-                `Opening ${job.table} in Objects. Check whether the imported rows are there.`,
-            );
+            setImportFeedback({
+                tone: 'warning',
+                message: `Import not confirmed. Check the rows in “${job.table}” before importing again.`,
+            });
             void loadSchema(true);
         },
-        [loadSchema, revealInspector, setNotice, setSearch],
+        [loadSchema, revealInspector, setSearch],
     );
 
-    const onImportedTableRevealed = useCallback(
-        (target: ImportedTableTarget) => {
-            if (latestImportIdRef.current !== target.id) return;
-            latestImportIdRef.current = undefined;
-            setImportedTableTarget(current => (current?.id === target.id ? undefined : current));
-            const getRevealMessage = () => {
-                switch (target.source) {
-                    case 'partial':
-                        return `Selected ${target.table} in Objects. Check whether the imported rows are there.`;
-
-                    case 'sql':
-                        return `Created ${target.table} from imported SQL. The table is selected in Objects.`;
-
-                    default:
-                        return `Imported ${(target.rows ?? 0).toLocaleString()} ${target.rows === 1 ? 'row' : 'rows'} into ${target.table}. The table is selected in Objects.`;
-                }
-            };
-            setNotice(getRevealMessage());
-        },
-        [setNotice],
-    );
+    const onImportedTableRevealed = useCallback((target: ImportedTableTarget) => {
+        if (latestImportIdRef.current !== target.id) return;
+        latestImportIdRef.current = undefined;
+        setImportedTableTarget(current => (current?.id === target.id ? undefined : current));
+        if (target.source !== 'partial') setImportFeedback(undefined);
+    }, []);
 
     return {
         importedTableTarget,
+        importFeedback,
         onImported,
         onUnconfirmedDestination,
         onImportedTableRevealed,

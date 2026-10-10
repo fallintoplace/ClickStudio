@@ -20,6 +20,8 @@ import { ScriptResults } from './WorkspaceChrome';
 import { ScrollEdgeFrame } from './ScrollEdgeShadows';
 import { QueryFailureNotice } from './QueryFailureNotice';
 import { resultsTabLabel } from '../workspace-helpers';
+import { WorkspaceInlineNotice } from './WorkspaceInlineNotice';
+import type { WorkspaceFeedback } from '../useWorkspaceNotifications';
 
 export type WorkspaceResultsPanelState = Readonly<{
     active: Draft;
@@ -47,6 +49,7 @@ export type WorkspaceResultsPanelState = Readonly<{
     retainedExecutionResult?: Readonly<{ run: Run; page: ResultPage; pageIndex: number }>;
     cancelling: boolean;
     experience: ExperienceLevel;
+    readFeedback?: WorkspaceFeedback;
 }>;
 
 export type WorkspaceResultsPanelActions = Readonly<{
@@ -61,6 +64,7 @@ export type WorkspaceResultsPanelActions = Readonly<{
     onLoadFlamegraph: () => void;
     onRevealRange: (from: number, to: number) => void;
     onFixWithAi: () => void;
+    onRetryRead?: () => void;
 }>;
 
 export function WorkspaceResultsPanel({
@@ -144,6 +148,7 @@ export function WorkspaceResultsPanel({
         !execution &&
         !failedAttempt &&
         !failedScriptStatement &&
+        !state.readFeedback &&
         visibleResultsView !== 'sqlmap'
     )
         return null;
@@ -167,6 +172,7 @@ export function WorkspaceResultsPanel({
                 viewState,
                 state,
             })}
+            <WorkspaceInlineNotice feedback={state.readFeedback} onRetry={actions.onRetryRead} />
             <ScrollEdgeFrame<HTMLDivElement>
                 className="results-content-frame"
                 hidden={panels.resultsCollapsed}

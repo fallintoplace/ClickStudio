@@ -92,4 +92,5 @@ test('Opening a SQL file creates a draft without executing it', async ({ page })
     await expect(page.getByRole('tab', { name: 'saved-query.sql', exact: true })).toBeVisible();
     await expect(page.locator('.cm-content')).toContainText('SELECT 42');
     expect(runRequests).toBe(0);
+    await expect(page.locator('.toast')).toHaveCount(0);
 });

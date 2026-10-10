@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, type RefObject } from 'react';
-import type { Copy, ExperienceLevel } from './i18n';
+import type { ExperienceLevel } from './i18n';
 import type { EditorHandle } from './components/SqlEditor';
 import type { WorkspacePanelController } from './useWorkspacePanels';
 import { useDetachedEditorWindow } from './useDetachedWorkspaceWindow';
@@ -10,18 +10,14 @@ export function useDetachedQueryEditor({
     experience,
     panels,
     editorRef,
-    copy,
     setError,
-    setNotice,
 }: {
     activeDraftId: string;
     activeName: string;
     experience: ExperienceLevel;
     panels: WorkspacePanelController;
     editorRef: RefObject<EditorHandle | null>;
-    copy: Copy['common'];
     setError: (message: string) => void;
-    setNotice: (message: string) => void;
 }) {
     const { detached, open, focus, dock, setTitle } = useDetachedEditorWindow();
     const detachedWasOpen = useRef(false);
@@ -64,29 +60,22 @@ export function useDetachedQueryEditor({
 
     const openEditor = useCallback(() => {
         if (!open(activeName, experience)) {
-            setError(copy.queryWindowBlocked);
+            setError('Editor window blocked. Allow pop-ups and try again.');
             return;
         }
         revealPanelTemporarily('query', activeDraftId);
         setPanelLayout(current => ({ ...current, query: { ...current.query, mode: 'docked' } }));
-        setNotice(copy.queryWindowOpened);
     }, [
         activeDraftId,
         activeName,
-        copy.queryWindowBlocked,
-        copy.queryWindowOpened,
         experience,
         open,
         revealPanelTemporarily,
         setError,
-        setNotice,
         setPanelLayout,
     ]);
 
-    const dockEditor = useCallback(() => {
-        dock();
-        setNotice(copy.queryWindowDocked);
-    }, [copy.queryWindowDocked, dock, setNotice]);
+    const dockEditor = useCallback(() => dock(), [dock]);
     const closeEditor = useCallback(() => dock(), [dock]);
 
     const focusEditor = useCallback(() => {

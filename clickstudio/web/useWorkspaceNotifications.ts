@@ -1,38 +1,59 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
-export const WORKSPACE_TOAST_TIMEOUT_MS = 10_000;
+export type WorkspaceFeedback = Readonly<{
+    message: string;
+    tone: 'error' | 'warning' | 'info';
+    detail?: string;
+    retry?: () => void;
+}>;
 
-function useTimedMessage(timeoutMs: number) {
-    const [value, setValue] = useState('');
-    const timerRef = useRef<number | undefined>(undefined);
+export type ToastOptions = Readonly<{
+    tone?: 'error' | 'warning';
+    timeoutMs?: number | null;
+    context?: string;
+    detail?: string;
+    action?: { label: string; onSelect: () => void };
+}>;
 
-    const setMessage = useCallback(
-        (message: string) => {
-            if (timerRef.current !== undefined) window.clearTimeout(timerRef.current);
-            timerRef.current = undefined;
-            setValue(message);
-            if (message) {
-                timerRef.current = window.setTimeout(() => {
-                    timerRef.current = undefined;
-                    setValue('');
-                }, timeoutMs);
-            }
-        },
-        [timeoutMs],
-    );
-
-    useEffect(
-        () => () => {
-            if (timerRef.current !== undefined) window.clearTimeout(timerRef.current);
-        },
-        [],
-    );
-
-    return [value, setMessage] as const;
-}
+export type WorkspaceToastMessage = Readonly<{
+    id: number;
+    message: string;
+    tone: 'error' | 'warning';
+    timeoutMs: number | null;
+    context?: string;
+    detail?: string;
+    action?: ToastOptions['action'];
+}>;
 
 export function useWorkspaceNotifications() {
-    const [error, setError] = useTimedMessage(WORKSPACE_TOAST_TIMEOUT_MS);
-    const [notice, setNotice] = useTimedMessage(WORKSPACE_TOAST_TIMEOUT_MS);
-    return { error, setError, notice, setNotice };
+    const [toast, setToast] = useState<WorkspaceToastMessage>();
+    const nextId = useRef(0);
+    const setError = useCallback((message: string, options: ToastOptions = {}) => {
+        if (!message) {
+            setToast(undefined);
+            return;
+        }
+        const notification = {
+            message,
+            tone: options.tone ?? 'error',
+            timeoutMs: options.timeoutMs === undefined ? 8000 : options.timeoutMs,
+            context: options.context,
+            detail: options.detail,
+            action: options.action,
+        };
+        const id = ++nextId.current;
+        setToast(current =>
+            current?.message === message &&
+            current.context === notification.context &&
+            current.tone === notification.tone &&
+            current.timeoutMs === notification.timeoutMs
+                ? current
+                : { ...notification, id },
+        );
+    }, []);
+    const dismissToast = useCallback(() => setToast(undefined), []);
+    const clearToast = useCallback((context: string) => {
+        setToast(current => (current?.context === context ? undefined : current));
+    }, []);
+    return { toast, setError, dismissToast, clearToast };
 }

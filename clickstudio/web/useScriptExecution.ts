@@ -10,7 +10,7 @@ export function useScriptExecution({
     updateDraft,
     setScripts,
     loadHistory,
-    setError,
+    setReadError,
     onComplete,
 }: {
     scriptId?: string;
@@ -18,7 +18,7 @@ export function useScriptExecution({
     updateDraft: (id: string, change: (draft: Draft) => Draft) => void;
     setScripts: Dispatch<SetStateAction<Record<string, Script>>>;
     loadHistory: () => Promise<void>;
-    setError: (error: string) => void;
+    setReadError: (error: string) => void;
     onComplete: (script: Script) => void;
 }) {
     const followRef = useRef<{ scriptId: string; enabled: boolean } | undefined>(undefined);
@@ -38,6 +38,7 @@ export function useScriptExecution({
                 const next = await api<Script>(`/scripts/${encodeURIComponent(scriptId)}`);
                 if (closed) return;
                 setScripts(current => ({ ...current, [scriptId]: next }));
+                setReadError('');
                 const incomingRunIds = next.statements.flatMap(statement =>
                     statement.runId ? [statement.runId] : [],
                 );
@@ -60,7 +61,7 @@ export function useScriptExecution({
                     onComplete(next);
                 }
             } catch (caught) {
-                if (!closed) setError(message(caught));
+                if (!closed) setReadError(message(caught));
             } finally {
                 inFlight = false;
             }
@@ -73,7 +74,7 @@ export function useScriptExecution({
             closed = true;
             window.clearInterval(timer);
         };
-    }, [draftId, loadHistory, onComplete, scriptId, setError, setScripts, updateDraft]);
+    }, [draftId, loadHistory, onComplete, scriptId, setReadError, setScripts, updateDraft]);
 
     return followRef;
 }

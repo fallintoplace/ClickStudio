@@ -775,7 +775,9 @@ test('Failed execution replaces visible results and can collapse, reopen and ret
         await expect(results.locator('.result-provenance-header')).toHaveCount(0);
         await expect(page.locator('.execution-bar')).toHaveAttribute('data-run-status', 'failed');
         await expect(page.locator('.execution-bar')).not.toHaveAttribute('data-query-id');
-        await expect(page.locator('.execution-bar')).not.toContainText('Query failed');
+        await expect(page.locator('.execution-bar')).not.toContainText(
+            '“Getting started.sql” failed.',
+        );
         await expect(page.locator('.query-failed-status')).toHaveText('Last execution failed');
         await expect(failure.locator('details')).not.toHaveAttribute('open');
         await expect(
@@ -860,7 +862,7 @@ test('A query failure in another draft remains discoverable without showing its 
     await request;
     await openBlankSql(page);
     release();
-    await expect(page.locator('.toast-error')).toContainText('Query failed');
+    await expect(page.locator('.toast-error')).toContainText('“Getting started.sql” failed.');
     await expect(page.getByTestId('query-failure')).toHaveCount(0);
     await page.getByRole('button', { name: 'Dismiss error', exact: true }).click();
     await page.getByRole('tab').filter({ hasText: 'Getting started.sql' }).click();

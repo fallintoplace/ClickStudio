@@ -10,18 +10,17 @@ import { terminal } from './components/ui';
 import { useScopedValue } from './useScopedValue';
 import type { RunEventState } from './workspace-types';
 import { startVisiblePolling } from './visible-polling';
+import type { WorkspaceFeedback } from './useWorkspaceNotifications';
 
 export function useRunEvidence({
     activeRunId,
     connectionId,
     loadHistory,
-    setError,
     onRunUnavailable,
 }: {
     activeRunId?: string;
     connectionId: string;
     loadHistory: () => Promise<void>;
-    setError: (error: string) => void;
     onRunUnavailable: (runId: string) => void;
 }) {
     const [run, setRunForRun] = useScopedValue<Run>(activeRunId);
@@ -48,6 +47,17 @@ export function useRunEvidence({
         },
         [activeRunId, setPageForRun],
     );
+    const [runReadFeedback, setRunReadFeedback] = useScopedValue<WorkspaceFeedback | undefined>(
+        activeRunId,
+    );
+    const [resultReadFeedback, setResultReadFeedback] = useScopedValue<
+        WorkspaceFeedback | undefined
+    >(activeRunId);
+    const [assetReadFeedback, setAssetReadFeedback] = useScopedValue<WorkspaceFeedback | undefined>(
+        activeRunId,
+    );
+    const [readAttempt, setReadAttempt] = useState(0);
+    const retryRead = useCallback(() => setReadAttempt(current => current + 1), []);
     const [eventState, setEventState] = useState<RunEventState>('idle');
     const resultPage = resultPageState?.page === page ? resultPageState.value : undefined;
     const running = Boolean(run && !terminal(run));
@@ -59,6 +69,7 @@ export function useRunEvidence({
             .then(next => {
                 if (cancelled || next.connectionId !== connectionId) return;
                 setRunForRun(activeRunId, next);
+                setRunReadFeedback(activeRunId, undefined);
                 if (terminal(next)) void loadHistory().catch(() => undefined);
             })
             .catch(caught => {
@@ -67,12 +78,24 @@ export function useRunEvidence({
                     onRunUnavailable(activeRunId);
                     return;
                 }
-                setError(message(caught));
+                setRunReadFeedback(activeRunId, {
+                    tone: 'warning',
+                    message: 'Couldn’t load the query status. Retry to check its outcome.',
+                    detail: message(caught),
+                });
             });
         return () => {
             cancelled = true;
         };
-    }, [activeRunId, connectionId, loadHistory, onRunUnavailable, setError, setRunForRun]);
+    }, [
+        activeRunId,
+        connectionId,
+        loadHistory,
+        onRunUnavailable,
+        setRunReadFeedback,
+        setRunForRun,
+        readAttempt,
+    ]);
 
     useEffect(() => {
         if (!activeRunId || !run || !terminal(run) || run.resultState !== 'reopenable') return;
@@ -81,15 +104,23 @@ export function useRunEvidence({
             `/runs/${encodeURIComponent(activeRunId)}/result?offset=${page * DEFAULT_RESULT_PAGE_ROWS}&count=${DEFAULT_RESULT_PAGE_ROWS}`,
         )
             .then(next => {
-                if (!cancelled) setResultPageForRun(activeRunId, { page, value: next });
+                if (!cancelled) {
+                    setResultPageForRun(activeRunId, { page, value: next });
+                    setResultReadFeedback(activeRunId, undefined);
+                }
             })
             .catch(caught => {
-                if (!cancelled) setError(message(caught));
+                if (!cancelled)
+                    setResultReadFeedback(activeRunId, {
+                        tone: 'error',
+                        message: 'Couldn’t load the result rows. Try again.',
+                        detail: message(caught),
+                    });
             });
         return () => {
             cancelled = true;
         };
-    }, [activeRunId, page, run, setError, setResultPageForRun]);
+    }, [activeRunId, page, run, setResultReadFeedback, setResultPageForRun, readAttempt]);
 
     useEffect(() => {
         if (!activeRunId || !running) {
@@ -109,6 +140,7 @@ export function useRunEvidence({
                 const payload = parseRunEvent(parsed);
                 if (payload.run.id !== activeRunId || payload.run.connectionId !== connectionId)
                     return;
+                setRunReadFeedback(activeRunId, undefined);
                 setRunForRun(activeRunId, current =>
                     !current || current.sequence <= payload.sequence ? payload.run : current,
                 );
@@ -123,22 +155,42 @@ export function useRunEvidence({
         };
         stream.onerror = () => setEventState('reconnecting');
         return () => stream.close();
-    }, [activeRunId, connectionId, loadHistory, running, setRunForRun]);
+    }, [activeRunId, connectionId, loadHistory, running, setRunForRun, setRunReadFeedback]);
 
     useEffect(() => {
         if (!running || eventState === 'live' || !activeRunId) return;
         return startVisiblePolling(
             async signal => {
-                const next = await api<Run>(`/runs/${encodeURIComponent(activeRunId)}`, { signal });
-                if (signal.aborted || next.connectionId !== connectionId) return;
-                setRunForRun(activeRunId, current =>
-                    !current || current.sequence <= next.sequence ? next : current,
-                );
-                if (terminal(next)) void loadHistory().catch(() => undefined);
+                try {
+                    const next = await api<Run>(`/runs/${encodeURIComponent(activeRunId)}`, {
+                        signal,
+                    });
+                    if (signal.aborted || next.connectionId !== connectionId) return;
+                    setRunForRun(activeRunId, current =>
+                        !current || current.sequence <= next.sequence ? next : current,
+                    );
+                    setRunReadFeedback(activeRunId, undefined);
+                    if (terminal(next)) void loadHistory().catch(() => undefined);
+                } catch (caught) {
+                    if (!signal.aborted)
+                        setRunReadFeedback(activeRunId, {
+                            tone: 'warning',
+                            message: 'Couldn’t refresh the query status. Retrying…',
+                            detail: message(caught),
+                        });
+                }
             },
             { intervalMs: 1500, immediate: false },
         );
-    }, [activeRunId, connectionId, eventState, loadHistory, running, setRunForRun]);
+    }, [
+        activeRunId,
+        connectionId,
+        eventState,
+        loadHistory,
+        running,
+        setRunForRun,
+        setRunReadFeedback,
+    ]);
 
     return {
         run,
@@ -158,5 +210,10 @@ export function useRunEvidence({
         pipelinesByRun,
         flamegraphsByRun,
         eventState,
+        runReadFeedback,
+        resultReadFeedback,
+        assetReadFeedback,
+        setAssetReadFeedback,
+        retryRead,
     };
 }

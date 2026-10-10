@@ -21,7 +21,8 @@ import type {
     Script,
 } from '../shared/types';
 import { sameSavedContent } from '../shared/workspace-view';
-import { api, download, isFrontendDemoPreview, message, post } from './api';
+import { api, download, isFrontendDemoPreview, message, post, RequestError } from './api';
+import { documentFailureNotice } from './workspace-notification-policy';
 import { CLICKHOUSE_CLOUD_CONNECTION_ID } from './cloud-connection';
 import type { EditorHandle } from './components/SqlEditor';
 import { terminal } from './components/ui';
@@ -57,7 +58,7 @@ import type {
 import { useDetachedQueryEditor } from './useDetachedQueryEditor';
 import { useWorkspaceDocumentSave } from './useWorkspaceDocumentSave';
 import { useWorkspaceExecution } from './useWorkspaceExecution';
-import { useWorkspaceNotifications } from './useWorkspaceNotifications';
+import { useWorkspaceNotifications, type WorkspaceFeedback } from './useWorkspaceNotifications';
 import { useWorkspaceSqlFormatter } from './useWorkspaceSqlFormatter';
 import { useWorkspaceViewState } from './useWorkspaceViewState';
 
@@ -186,16 +187,19 @@ export function useWorkspaceController({
     const {
         busy,
         setError,
+        clearToast,
+        setDraftFeedback,
         setSearch,
         setInspector,
         setDrawerOpen,
-        setNotice,
         inspector,
         setCompactViewport,
         inspectorRef,
         setRestoreRevisionConfirmation,
         drawerOpen,
     } = ui;
+
+    useDismissVisibleDraftToast(active.id, clearToast);
 
     const storageError = useWorkspacePersistence(key, workspace);
     const parameters = useMemo(() => {
@@ -207,19 +211,15 @@ export function useWorkspaceController({
     }, [active.sql]);
     const unsupportedParameters =
         parameters.length > 0 && connection.manifest?.parameters.available === false;
-    const runActionTitle = (
-        capability: WorkspaceRunCapability | undefined,
-        action: WorkspaceRunCapabilityAction,
-    ): string | undefined =>
-        workspaceRunActionTitle(capability, action, {
-            trusted,
-            busy,
-            unsupportedParameters,
-            connection,
-            copy: copy.common,
-        });
     const currentConnection = connections.find(item => item.id === connection.id) ?? connection;
     const trusted = currentConnection.trusted;
+    const runActionTitle = createRunActionTitle({
+        trusted,
+        busy,
+        unsupportedParameters,
+        connection,
+        copy: copy.common,
+    });
 
     const assistant = useWorkspaceAssistant({
         active,
@@ -236,7 +236,6 @@ export function useWorkspaceController({
         activeServerId: active.serverId,
         setWorkspace,
         workspaceRef,
-        setError,
     });
     const { schema, setDocuments, loadHistory, loadDocumentRevisions, loadSchema } = data;
     const importedReveal = useImportedTableReveal({
@@ -248,7 +247,6 @@ export function useWorkspaceController({
         setInspector,
         setDrawerOpen,
         openInspectorDrawer: true,
-        setNotice,
     });
     const sqlExamples = useMemo(() => sqlExamplesFor(connection, schema), [connection, schema]);
     useEffect(() => {
@@ -279,8 +277,13 @@ export function useWorkspaceController({
         [active.id, update],
     );
     const patch = useCallback(
-        (values: Partial<Draft>) => update(active.id, draft => ({ ...draft, ...values })),
-        [active.id, update],
+        (values: Partial<Draft>) => {
+            update(active.id, draft => ({ ...draft, ...values }));
+            setDraftFeedback(active.id, current =>
+                current?.tone === 'info' ? undefined : current,
+            );
+        },
+        [active.id, update, setDraftFeedback],
     );
     const formatActiveSql = useWorkspaceSqlFormatter(
         active,
@@ -294,10 +297,9 @@ export function useWorkspaceController({
         activeRunId,
         connectionId: connection.id,
         loadHistory,
-        setError,
         onRunUnavailable: clearUnavailableRun,
     });
-    const { run, snapshot, setSnapshotForRun } = evidence;
+    const { run, snapshot, setSnapshotForRun, setAssetReadFeedback } = evidence;
     const trackSchemaRefresh = useSchemaRefreshAfterDdl(
         run,
         connection.id,
@@ -306,13 +308,14 @@ export function useWorkspaceController({
     const selectableRunId = run && terminal(run) ? run.id : undefined;
     useDefaultAssistantRunContext(selectableRunId, includeRun, assistantBusy, setIncludeRun);
     const pendingExecution = usePendingExecution({ activeDraftId: active.id, busy, run, script });
+    const [scriptReadFeedback, reportScriptReadError] = useScriptReadFeedback(active.scriptId);
     const scriptFollowRef = useScriptExecution({
         scriptId: active.scriptId,
         draftId: active.id,
         updateDraft: update,
         setScripts,
         loadHistory,
-        setError,
+        setReadError: reportScriptReadError,
         onComplete: importedReveal.refreshAfterImportedSqlScript,
     });
 
@@ -348,6 +351,14 @@ export function useWorkspaceController({
     });
     const { perform, addDraft } = executionView;
 
+    const reportDocumentFailure = createDocumentFailureReporter({
+        workspaceRef,
+        setWorkspace,
+        setDraftFeedback,
+        setError,
+        panels: executionView.panels,
+    });
+
     const saveDraft = useWorkspaceDocumentSave({
         active,
         busy,
@@ -358,8 +369,10 @@ export function useWorkspaceController({
         updateDraft: update,
         setSavingDraftIds,
         setDocuments,
-        setNotice,
         loadDocumentRevisions,
+        setDraftFeedback,
+        clearToast,
+        onFailure: (draft, caught) => reportDocumentFailure(draft, 'save', caught),
     });
 
     const finishTabRename = (
@@ -377,8 +390,10 @@ export function useWorkspaceController({
         workspaceRef,
         setRestoreRevisionConfirmation,
         update,
-        setNotice,
         data,
+        setDraftFeedback,
+        clearToast,
+        reportDocumentFailure,
     });
 
     const loadSnapshot = useResultSnapshot({
@@ -387,6 +402,7 @@ export function useWorkspaceController({
         snapshot,
         setSnapshotForRun,
         onSnapshot: (runId, full) => {
+            setAssetReadFeedback(runId, undefined);
             if (activeRunIdRef.current !== runId || workspaceRef.current.activeId !== active.id)
                 return;
             const suggestion = recommendChart(full.columns, full.rows);
@@ -394,6 +410,8 @@ export function useWorkspaceController({
                 patch({ chart: suggestion.config });
         },
     });
+
+    const reportSnapshotFailure = useSnapshotReadFailure(loadSnapshot, setAssetReadFeedback);
 
     useEffect(() => {
         if (
@@ -408,13 +426,13 @@ export function useWorkspaceController({
             return;
         }
         void loadSnapshot()
-            .catch(caught => setError(message(caught)))
+            .catch(caught => reportSnapshotFailure(exampleChartRunId, caught))
             .finally(() => {
                 setExampleChartRunId(current =>
                     current === exampleChartRunId ? undefined : current,
                 );
             });
-    }, [activeRunId, exampleChartRunId, loadSnapshot, run, setError, snapshot?.runId]);
+    }, [activeRunId, exampleChartRunId, loadSnapshot, run, reportSnapshotFailure, snapshot?.runId]);
 
     useEffect(() => {
         if (
@@ -425,8 +443,8 @@ export function useWorkspaceController({
             snapshot?.runId === run.id
         )
             return;
-        void loadSnapshot().catch(caught => setError(message(caught)));
-    }, [loadSnapshot, run, setError, snapshot?.runId, view]);
+        void loadSnapshot().catch(caught => reportSnapshotFailure(run.id, caught));
+    }, [loadSnapshot, run, reportSnapshotFailure, snapshot?.runId, view]);
 
     const exports = createWorkspaceExports({
         setError,
@@ -447,45 +465,42 @@ export function useWorkspaceController({
     const inspectorDocked = drawerOpen;
 
     const trustConnection = () =>
-        perform(async () => {
-            if (
-                !trusted &&
-                !demoMode &&
-                !window.confirm(
-                    `Check these connection details before continuing:\n\nConnection: ${connectionLabel}\nServer: ${connection.host}\nDatabase: ${connection.database}\nUser: ${connection.username}\nAccess: read-only\n\nAllow read-only access so you can run queries?`,
+        perform(
+            async () => {
+                if (
+                    !trusted &&
+                    !demoMode &&
+                    !window.confirm(
+                        `Check these connection details before continuing:\n\nConnection: ${connectionLabel}\nServer: ${connection.host}\nDatabase: ${connection.database}\nUser: ${connection.username}\nAccess: read-only\n\nAllow read-only access so you can run queries?`,
+                    )
                 )
-            )
-                return;
-            await post(`/connections/${encodeURIComponent(connection.id)}/trust`, {
-                trusted: !trusted,
-                confirmation: connection.id,
-            });
-            await onRefreshConnections();
-            const getTrustNotice = () => {
-                if (demoMode) {
-                    return 'Sample data is ready. You can explore the workspace.';
-                }
-
-                if (trusted) {
-                    return 'Read-only access was turned off.';
-                }
-
-                return 'Connection is ready for read-only queries.';
-            };
-            setNotice(getTrustNotice());
-        }, 'save');
+                    return;
+                await post(`/connections/${encodeURIComponent(connection.id)}/trust`, {
+                    trusted: !trusted,
+                    confirmation: connection.id,
+                });
+                await onRefreshConnections();
+            },
+            'save',
+            caught =>
+                setError('Couldn’t update connection access. Check its details and try again.', {
+                    detail: message(caught),
+                }),
+        );
     trustActionRef.current = trustConnection;
 
     const testConnection = () =>
-        perform(async () => {
-            const tested = await post<Connected>(
-                `/connections/${encodeURIComponent(connection.id)}/test`,
-            );
-            await onRefreshConnections();
-            setNotice(
-                `Connection tested · ClickHouse ${tested.manifest?.serverVersion ?? 'server'}. Review the connection, then trust it to run queries.`,
-            );
-        }, 'save');
+        perform(
+            async () => {
+                await post<Connected>(`/connections/${encodeURIComponent(connection.id)}/test`);
+                await onRefreshConnections();
+            },
+            'save',
+            caught =>
+                setError('Couldn’t test the connection. Check its details and try again.', {
+                    detail: message(caught),
+                }),
+        );
     testConnectionActionRef.current = testConnection;
 
     const openDocument = (document: QueryDocument) => {
@@ -519,6 +534,7 @@ export function useWorkspaceController({
         script,
         setSelectedScriptResult,
         scriptFollowRef,
+        scriptReadFeedback,
         update,
         inspectorDocked,
         storageError,
@@ -532,6 +548,108 @@ export function useWorkspaceController({
         executionView,
         exports,
     });
+}
+
+function useDismissVisibleDraftToast(
+    draftId: string,
+    clearToast: ReturnType<typeof useWorkspaceNotifications>['clearToast'],
+) {
+    useEffect(() => {
+        clearToast(`draft:${draftId}`);
+        clearToast(`query:${draftId}`);
+    }, [draftId, clearToast]);
+}
+
+function createRunActionTitle(options: Parameters<typeof workspaceRunActionTitle>[2]) {
+    return (capability: WorkspaceRunCapability | undefined, action: WorkspaceRunCapabilityAction) =>
+        workspaceRunActionTitle(capability, action, options);
+}
+
+function useSnapshotReadFailure(
+    loadSnapshot: ReturnType<typeof useResultSnapshot>,
+    setAssetReadFeedback: ReturnType<typeof useRunEvidence>['setAssetReadFeedback'],
+) {
+    const reportSnapshotFailure = useCallback(
+        function report(runId: string, caught: unknown) {
+            setAssetReadFeedback(runId, {
+                tone: 'error',
+                message: 'Couldn’t load the result data. Try again.',
+                detail: message(caught),
+                retry: () => void loadSnapshot().catch(next => report(runId, next)),
+            });
+        },
+        [loadSnapshot, setAssetReadFeedback],
+    );
+
+    return reportSnapshotFailure;
+}
+
+function useScriptReadFeedback(scriptId?: string) {
+    const [scriptReadFeedback, setScriptReadFeedback] = useScopedValue<
+        WorkspaceFeedback | undefined
+    >(scriptId);
+    const reportScriptReadError = useCallback(
+        (detail: string) => {
+            if (!scriptId) return;
+            setScriptReadFeedback(
+                scriptId,
+                detail
+                    ? {
+                          tone: 'warning',
+                          message: 'Couldn’t refresh the script status. Retrying…',
+                          detail,
+                      }
+                    : undefined,
+            );
+        },
+        [scriptId, setScriptReadFeedback],
+    );
+    return [scriptReadFeedback, reportScriptReadError] as const;
+}
+
+function createDocumentFailureReporter({
+    workspaceRef,
+    setWorkspace,
+    setDraftFeedback,
+    setError,
+    panels,
+}: {
+    workspaceRef: import('react').RefObject<WorkspaceState>;
+    setWorkspace: Dispatch<SetStateAction<WorkspaceState>>;
+    setDraftFeedback: ReturnType<typeof useWorkspaceUiState>['setDraftFeedback'];
+    setError: ReturnType<typeof useWorkspaceNotifications>['setError'];
+    panels: ReturnType<typeof useWorkspaceExecutionView>['panels'];
+}) {
+    return (draft: Pick<Draft, 'id' | 'name'>, operation: 'save' | 'restore', caught: unknown) => {
+        const failure = documentFailureNotice(
+            draft.name,
+            operation,
+            caught instanceof RequestError
+                ? {
+                      status: caught.status,
+                      code: caught.detail.code,
+                  }
+                : {},
+        );
+        setDraftFeedback(draft.id, { ...failure, detail: message(caught) }, true);
+        if (workspaceRef.current.activeId !== draft.id)
+            setError(failure.message, {
+                ...failure,
+                detail: message(caught),
+                context: `draft:${draft.id}`,
+                action: workspaceRef.current.tabs.some(item => item.id === draft.id)
+                    ? {
+                          label: 'Open tab',
+                          onSelect: () => {
+                              if (!workspaceRef.current.tabs.some(item => item.id === draft.id))
+                                  return;
+                              setWorkspace(current => ({ ...current, activeId: draft.id }));
+                              panels.revealPanelTemporarily('query', draft.id);
+                          },
+                      }
+                    : undefined,
+            });
+    };
 }
 
 function createWorkspaceExports({
@@ -549,7 +667,31 @@ function createWorkspaceExports({
     activeRunIdRef: import('react').RefObject<string | undefined>;
     evidence: ReturnType<typeof useRunEvidence>;
 }) {
-    const { run, snapshot, setProfileForRun, setPipelineForRun, setFlamegraphForRun } = evidence;
+    const {
+        run,
+        snapshot,
+        setProfileForRun,
+        setPipelineForRun,
+        setFlamegraphForRun,
+        setAssetReadFeedback,
+    } = evidence;
+    const loadAsset = async (
+        runId: string,
+        label: string,
+        task: () => Promise<void>,
+    ): Promise<void> => {
+        try {
+            await task();
+            setAssetReadFeedback(runId, undefined);
+        } catch (caught) {
+            setAssetReadFeedback(runId, {
+                tone: 'error',
+                message: `Couldn’t load ${label}. Try again.`,
+                detail: message(caught),
+                retry: () => void loadAsset(runId, label, task),
+            });
+        }
+    };
 
     const exportCurrentCsv = async () => {
         if (!run) return;
@@ -567,7 +709,7 @@ function createWorkspaceExports({
             link.download = `${run.queryId}.csv`;
             link.click();
         } catch (caught) {
-            setError(message(caught));
+            setError('Couldn’t prepare the CSV export. Try again.', { detail: message(caught) });
         }
     };
 
@@ -584,28 +726,34 @@ function createWorkspaceExports({
         if (!activeRunId) return;
         if (connection.manifest?.queryLog.available === false) return;
         const runId = activeRunId;
-        const response = await api<QueryProfile>(`/runs/${encodeURIComponent(runId)}/profile`);
-        setProfileForRun(runId, response);
+        await loadAsset(runId, 'the query profile', async () => {
+            const response = await api<QueryProfile>(`/runs/${encodeURIComponent(runId)}/profile`);
+            setProfileForRun(runId, response);
+        });
     };
 
     const loadPipeline = async () => {
         if (!activeRunId) return;
         if (connection.manifest?.pipeline.available === false) return;
         const runId = activeRunId;
-        const response = await api<ProfilePipeline>(
-            `/runs/${encodeURIComponent(runId)}/profile/pipeline`,
-        );
-        if (activeRunIdRef.current !== runId) return;
-        setPipelineForRun(runId, response);
+        await loadAsset(runId, 'the query pipeline', async () => {
+            const response = await api<ProfilePipeline>(
+                `/runs/${encodeURIComponent(runId)}/profile/pipeline`,
+            );
+            if (activeRunIdRef.current !== runId) return;
+            setPipelineForRun(runId, response);
+        });
     };
 
     const loadFlamegraph = async () => {
         if (!activeRunId || connection.manifest?.traceLog?.available !== true) return;
         const runId = activeRunId;
-        const response = await api<FlamegraphSnapshot>(
-            `/runs/${encodeURIComponent(runId)}/profile/flamegraph`,
-        );
-        if (activeRunIdRef.current === runId) setFlamegraphForRun(runId, response);
+        await loadAsset(runId, 'the flamegraph', async () => {
+            const response = await api<FlamegraphSnapshot>(
+                `/runs/${encodeURIComponent(runId)}/profile/flamegraph`,
+            );
+            if (activeRunIdRef.current === runId) setFlamegraphForRun(runId, response);
+        });
     };
     return { loadProfile, loadPipeline, loadFlamegraph, exportCurrentQuery, exportCurrentCsv };
 }
@@ -615,8 +763,10 @@ function createRevisionRestorer({
     workspaceRef,
     setRestoreRevisionConfirmation,
     update,
-    setNotice,
     data,
+    setDraftFeedback,
+    clearToast,
+    reportDocumentFailure,
 }: {
     perform: ReturnType<typeof useWorkspaceExecution>['perform'];
     workspaceRef: import('react').RefObject<WorkspaceState>;
@@ -624,7 +774,13 @@ function createRevisionRestorer({
         import('react').SetStateAction<QueryDocument | undefined>
     >;
     update: (id: string, change: (draft: Draft) => Draft) => void;
-    setNotice: ReturnType<typeof useWorkspaceNotifications>['setNotice'];
+    setDraftFeedback: ReturnType<typeof useScopedValue<WorkspaceFeedback | undefined>>[1];
+    clearToast: ReturnType<typeof useWorkspaceNotifications>['clearToast'];
+    reportDocumentFailure: (
+        draft: Pick<Draft, 'id' | 'name'>,
+        operation: 'save' | 'restore',
+        caught: unknown,
+    ) => void;
     data: ReturnType<typeof useWorkspaceData>;
 }) {
     const {
@@ -635,93 +791,116 @@ function createRevisionRestorer({
         loadDocumentRevisions,
     } = data;
 
-    return (revision: QueryDocument, confirmed = false) =>
-        void perform(async () => {
-            const draft = workspaceRef.current.tabs.find(
-                item => item.id === workspaceRef.current.activeId,
-            );
-            if (!draft?.serverId || draft.serverId !== revision.id)
-                throw new Error('Open the saved query before restoring one of its versions.');
-            const latestSaved =
-                revisionsDocumentId === draft.serverId
-                    ? documentRevisions[0]
-                    : documents.find(document => document.id === draft.serverId);
-            if (!latestSaved || latestSaved.deletedAt)
-                throw new Error(
-                    'The latest saved version could not be checked. Refresh saved queries and try again.',
+    return (revision: QueryDocument, confirmed = false) => {
+        const target = workspaceRef.current.tabs.find(
+            item => item.id === workspaceRef.current.activeId,
+        );
+        void perform(
+            async () => {
+                const draft = workspaceRef.current.tabs.find(
+                    item => item.id === workspaceRef.current.activeId,
                 );
-            const hasUnsavedChanges =
-                draft.baseRevision !== latestSaved.revision ||
-                !sameSavedContent(draft, latestSaved);
-            if (hasUnsavedChanges && !confirmed) {
-                setRestoreRevisionConfirmation(revision);
-                return;
-            }
-            const restoreBase: QueryDocument = {
-                ...latestSaved,
-                name: draft.name,
-                sql: draft.sql,
-                parameters: { ...draft.parameters },
-                chart: { ...draft.chart, ys: [...draft.chart.ys] },
-                runId: draft.activeRunId,
-                parentDocumentId: draft.parentDocumentId,
-                kind: draft.kind,
-                metric: draft.metric
-                    ? {
-                          ...draft.metric,
-                          dimensions: [...draft.metric.dimensions],
-                          sourceColumns: [...draft.metric.sourceColumns],
-                      }
-                    : undefined,
-                dependencies: [...draft.dependencies],
-            };
-            const restored = await post<QueryDocument>(
-                `/documents/${encodeURIComponent(draft.serverId)}/restore-revision`,
-                {
-                    revision: revision.revision,
-                    baseRevision: latestSaved.revision,
-                },
-            );
-            const currentDraft = workspaceRef.current.tabs.find(item => item.id === draft.id);
-            const editedDuringRestore = Boolean(
-                currentDraft && !sameSavedContent(currentDraft, restoreBase),
-            );
-            update(draft.id, current =>
-                editedDuringRestore
-                    ? { ...current, baseRevision: restored.revision }
-                    : {
-                          ...checkpoint(current, `Before restoring Version ${revision.revision}`),
-                          name: restored.name,
-                          sql: restored.sql,
-                          baseRevision: restored.revision,
-                          parameters: { ...restored.parameters },
-                          chart: { ...restored.chart, ys: [...restored.chart.ys] },
-                          parentRunId: undefined,
-                          parentDocumentId: restored.parentDocumentId,
-                          kind: restored.kind,
-                          metric: restored.metric
-                              ? {
-                                    ...restored.metric,
-                                    dimensions: [...restored.metric.dimensions],
-                                    sourceColumns: [...restored.metric.sourceColumns],
-                                }
-                              : undefined,
-                          dependencies: [...restored.dependencies],
-                          from: 0,
-                          to: 0,
-                      },
-            );
-            setDocuments(current => [
-                restored,
-                ...current.filter(document => document.id !== restored.id),
-            ]);
-            setNotice(
-                editedDuringRestore
-                    ? `Restored Version ${revision.revision} as Version ${restored.revision}. Edits made during restore are still in your draft.`
-                    : `Restored Version ${revision.revision} as Version ${restored.revision}.`,
-            );
-            await loadDocumentRevisions(restored.id);
-        }, 'save');
+                if (!draft?.serverId || draft.serverId !== revision.id)
+                    throw new Error('Open the saved query before restoring one of its versions.');
+                const latestSaved =
+                    revisionsDocumentId === draft.serverId
+                        ? documentRevisions[0]
+                        : documents.find(document => document.id === draft.serverId);
+                if (!latestSaved || latestSaved.deletedAt)
+                    throw new Error(
+                        'The latest saved version could not be checked. Refresh saved queries and try again.',
+                    );
+                const hasUnsavedChanges =
+                    draft.baseRevision !== latestSaved.revision ||
+                    !sameSavedContent(draft, latestSaved);
+                if (hasUnsavedChanges && !confirmed) {
+                    setRestoreRevisionConfirmation(revision);
+                    return;
+                }
+                const restoreBase: QueryDocument = {
+                    ...latestSaved,
+                    name: draft.name,
+                    sql: draft.sql,
+                    parameters: { ...draft.parameters },
+                    chart: { ...draft.chart, ys: [...draft.chart.ys] },
+                    runId: draft.activeRunId,
+                    parentDocumentId: draft.parentDocumentId,
+                    kind: draft.kind,
+                    metric: draft.metric
+                        ? {
+                              ...draft.metric,
+                              dimensions: [...draft.metric.dimensions],
+                              sourceColumns: [...draft.metric.sourceColumns],
+                          }
+                        : undefined,
+                    dependencies: [...draft.dependencies],
+                };
+                const restored = await post<QueryDocument>(
+                    `/documents/${encodeURIComponent(draft.serverId)}/restore-revision`,
+                    {
+                        revision: revision.revision,
+                        baseRevision: latestSaved.revision,
+                    },
+                );
+                const currentDraft = workspaceRef.current.tabs.find(item => item.id === draft.id);
+                const editedDuringRestore = Boolean(
+                    currentDraft && !sameSavedContent(currentDraft, restoreBase),
+                );
+                update(draft.id, current =>
+                    editedDuringRestore
+                        ? { ...current, baseRevision: restored.revision }
+                        : {
+                              ...checkpoint(
+                                  current,
+                                  `Before restoring Version ${revision.revision}`,
+                              ),
+                              name: restored.name,
+                              sql: restored.sql,
+                              baseRevision: restored.revision,
+                              parameters: { ...restored.parameters },
+                              chart: { ...restored.chart, ys: [...restored.chart.ys] },
+                              parentRunId: undefined,
+                              parentDocumentId: restored.parentDocumentId,
+                              kind: restored.kind,
+                              metric: restored.metric
+                                  ? {
+                                        ...restored.metric,
+                                        dimensions: [...restored.metric.dimensions],
+                                        sourceColumns: [...restored.metric.sourceColumns],
+                                    }
+                                  : undefined,
+                              dependencies: [...restored.dependencies],
+                              from: 0,
+                              to: 0,
+                          },
+                );
+                setDocuments(current => [
+                    restored,
+                    ...current.filter(document => document.id !== restored.id),
+                ]);
+                clearToast(`draft:${draft.id}`);
+                setDraftFeedback(
+                    draft.id,
+                    {
+                        tone: 'info',
+                        message: editedDuringRestore
+                            ? `Restored Version ${revision.revision} as Version ${restored.revision}. Edits made during restore are still in your draft.`
+                            : `Restored Version ${revision.revision} as Version ${restored.revision}.`,
+                    },
+                    true,
+                );
+                await loadDocumentRevisions(restored.id);
+            },
+            'save',
+            caught => {
+                reportDocumentFailure(
+                    target ?? { id: `document:${revision.id}`, name: revision.name },
+                    'restore',
+                    caught,
+                );
+            },
+        );
+    };
 }
 
 function useWorkspaceExecutionView({
@@ -791,7 +970,7 @@ function useWorkspaceExecutionView({
         failedQueryError,
         compactViewport,
         setError,
-        setNotice,
+        setDraftFeedback,
         busy,
         setBusy,
         setCancelling,
@@ -833,6 +1012,7 @@ function useWorkspaceExecutionView({
     } = viewState;
 
     const outputVisible = Boolean(
+        active.activeRunId ||
         run ||
         failedQueryError ||
         script ||
@@ -850,9 +1030,7 @@ function useWorkspaceExecutionView({
         experience,
         panels,
         editorRef: editor,
-        copy: copy.common,
         setError,
-        setNotice,
     });
 
     const {
@@ -892,7 +1070,7 @@ function useWorkspaceExecutionView({
         setCancelling,
         setExampleChartRunId,
         setError,
-        setNotice,
+        setDraftFeedback,
         clearFailedQueryError,
         storeFailedQueryError,
         setViewForDraft,
@@ -994,7 +1172,10 @@ function useWorkspaceUiState({
     } = useWorkspaceHelpState();
     const [busy, setBusy] = useState<BusyAction>('');
     const [cancelling, setCancelling] = useState(false);
-    const { error, setError, notice, setNotice } = useWorkspaceNotifications();
+    const { toast, setError, dismissToast, clearToast } = useWorkspaceNotifications();
+    const [draftFeedback, setDraftFeedback] = useScopedValue<WorkspaceFeedback | undefined>(
+        active.id,
+    );
     const {
         error: failedQueryError,
         clear: clearFailedQueryError,
@@ -1004,10 +1185,14 @@ function useWorkspaceUiState({
     return {
         busy,
         setError,
+        clearToast,
+        setDraftFeedback,
+        draftFeedback,
+        toast,
+        dismissToast,
         setSearch,
         setInspector,
         setDrawerOpen,
-        setNotice,
         inspector,
         setCompactViewport,
         failedQueryError,
@@ -1021,8 +1206,6 @@ function useWorkspaceUiState({
         drawerOpen,
         search,
         cancelling,
-        error,
-        notice,
         setImportOpen,
         setExportOpen,
         helpPanelOpen,
@@ -1066,6 +1249,7 @@ function createWorkspaceControllerModel({
     script,
     setSelectedScriptResult,
     scriptFollowRef,
+    scriptReadFeedback,
     update,
     inspectorDocked,
     storageError,
@@ -1113,6 +1297,7 @@ function createWorkspaceControllerModel({
     script: Script | undefined;
     setSelectedScriptResult: ReturnType<typeof useScopedValue<string>>[1];
     scriptFollowRef: ReturnType<typeof useScriptExecution>;
+    scriptReadFeedback: WorkspaceFeedback | undefined;
     update: (id: string, change: (draft: Draft) => Draft) => void;
     inspectorDocked: boolean;
     storageError: ReturnType<typeof useWorkspacePersistence>;
@@ -1138,10 +1323,10 @@ function createWorkspaceControllerModel({
         busy,
         cancelling,
         failedQueryError,
-        error,
         setError,
-        notice,
-        setNotice,
+        toast,
+        dismissToast,
+        draftFeedback,
         drawerOpen,
         setImportOpen,
         setExportOpen,
@@ -1231,13 +1416,14 @@ function createWorkspaceControllerModel({
         script,
         setSelectedScriptResult,
         scriptFollowRef,
+        scriptReadFeedback,
         update,
         loadFlamegraph,
         inspectorDocked,
-        error,
         setError,
-        notice,
-        setNotice,
+        toast,
+        dismissToast,
+        draftFeedback,
         storageError,
         drawerOpen,
         setImportOpen,

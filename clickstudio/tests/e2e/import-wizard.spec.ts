@@ -508,6 +508,7 @@ test('File import reports an unknown insert without retrying automatically', asy
     await dialog.getByRole('button', { name: 'Import rows', exact: true }).click();
 
     await expect(dialog).toContainText('We couldn’t confirm the import.');
+    await expect(page.locator('.toast')).toHaveCount(0);
     await expect(dialog).toContainText('The insert outcome is unknown.');
     await expect(
         dialog.getByRole('button', { name: 'I checked; the rows are there' }),

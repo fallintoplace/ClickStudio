@@ -1,6 +1,8 @@
 import { useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
 import type { QueryDocument } from '../shared/types';
 import { api } from './api';
+import type { WorkspaceFeedback } from './useWorkspaceNotifications';
+import type { useScopedValue } from './useScopedValue';
 import type { Draft, WorkspaceState } from './workspace-state';
 import type { BusyAction, Inspector } from './workspace-types';
 
@@ -10,11 +12,17 @@ type SaveDraftOptions = Readonly<{
     connectionId: string;
     workspaceRef: { current: WorkspaceState };
     inspectorRef: { current: Inspector };
-    perform: (task: () => Promise<void>, kind?: BusyAction) => Promise<void>;
+    perform: (
+        task: () => Promise<void>,
+        kind?: BusyAction,
+        onFailure?: (caught: unknown) => void,
+    ) => Promise<void>;
     updateDraft: (id: string, change: (draft: Draft) => Draft) => void;
     setSavingDraftIds: Dispatch<SetStateAction<Record<string, boolean>>>;
     setDocuments: Dispatch<SetStateAction<QueryDocument[]>>;
-    setNotice: (notice: string) => void;
+    setDraftFeedback: ReturnType<typeof useScopedValue<WorkspaceFeedback | undefined>>[1];
+    clearToast: (context: string) => void;
+    onFailure: (draft: Draft, caught: unknown) => void;
     loadDocumentRevisions: (documentId: string) => Promise<void>;
 }>;
 
@@ -28,7 +36,9 @@ export function useWorkspaceDocumentSave({
     updateDraft,
     setSavingDraftIds,
     setDocuments,
-    setNotice,
+    setDraftFeedback,
+    clearToast,
+    onFailure,
     loadDocumentRevisions,
 }: SaveDraftOptions) {
     const saveRunningRef = useRef(false);
@@ -80,38 +90,43 @@ export function useWorkspaceDocumentSave({
 
         saveRunningRef.current = true;
         inFlightSaveDraftsRef.current.set(target.id, target);
-        return perform(async () => {
-            const draft = resolveDraft();
-            const payload = savePayload(draft);
-            if (!payload.name) throw new Error('Enter a query name before saving.');
-            setSavingDraftIds(current => ({ ...current, [draft.id]: true }));
-            try {
-                const saved = await api<QueryDocument>(
-                    draft.serverId
-                        ? `/documents/${encodeURIComponent(draft.serverId)}`
-                        : '/documents',
-                    {
-                        method: draft.serverId ? 'PUT' : 'POST',
-                        body: payload,
-                    },
-                );
-                updateDraft(draft.id, current => ({
-                    ...current,
-                    ...(current.name.trim() === draft.name ? { name: saved.name } : {}),
-                    serverId: saved.id,
-                    baseRevision: saved.revision,
-                }));
-                setDocuments(current => [
-                    saved,
-                    ...current.filter(document => document.id !== saved.id),
-                ]);
-                setNotice(`Saved ${saved.name} · revision ${saved.revision}`);
-                if (draft.serverId && inspectorRef.current === 'revisions')
-                    void loadDocumentRevisions(saved.id);
-            } finally {
-                setSavingDraftIds(current => ({ ...current, [draft.id]: false }));
-            }
-        }, 'save').finally(() => {
+        return perform(
+            async () => {
+                const draft = resolveDraft();
+                const payload = savePayload(draft);
+                if (!payload.name) throw new Error('Enter a query name before saving.');
+                setSavingDraftIds(current => ({ ...current, [draft.id]: true }));
+                try {
+                    const saved = await api<QueryDocument>(
+                        draft.serverId
+                            ? `/documents/${encodeURIComponent(draft.serverId)}`
+                            : '/documents',
+                        {
+                            method: draft.serverId ? 'PUT' : 'POST',
+                            body: payload,
+                        },
+                    );
+                    updateDraft(draft.id, current => ({
+                        ...current,
+                        ...(current.name.trim() === draft.name ? { name: saved.name } : {}),
+                        serverId: saved.id,
+                        baseRevision: saved.revision,
+                    }));
+                    setDocuments(current => [
+                        saved,
+                        ...current.filter(document => document.id !== saved.id),
+                    ]);
+                    clearToast(`draft:${draft.id}`);
+                    setDraftFeedback(draft.id, undefined, true);
+                    if (draft.serverId && inspectorRef.current === 'revisions')
+                        void loadDocumentRevisions(saved.id);
+                } finally {
+                    setSavingDraftIds(current => ({ ...current, [draft.id]: false }));
+                }
+            },
+            'save',
+            caught => onFailure(target, caught),
+        ).finally(() => {
             saveRunningRef.current = false;
             inFlightSaveDraftsRef.current.delete(target.id);
         });

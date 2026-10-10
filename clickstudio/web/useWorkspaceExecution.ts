@@ -3,7 +3,7 @@ import { parameterNames, selectedStatement, splitSql } from '../shared/sql';
 import type { Run, RunKind, Script } from '../shared/types';
 import { DEFAULT_LIMITS } from '../shared/types';
 import { rememberRunIds } from '../shared/workspace-view';
-import { isFrontendDemoPreview, message, post } from './api';
+import { message, post } from './api';
 import type { EditorHandle } from './components/SqlEditor';
 import { terminal } from './components/ui';
 import type { Copy, ExperienceLevel, Locale } from './i18n';
@@ -14,6 +14,7 @@ import type { usePendingExecution } from './usePendingExecution';
 import type { useRunEvidence } from './useRunEvidence';
 import type { useScopedValue } from './useScopedValue';
 import type { useScriptExecution } from './useScriptExecution';
+import type { WorkspaceFeedback, useWorkspaceNotifications } from './useWorkspaceNotifications';
 import type { WorkspacePanelController } from './useWorkspacePanels';
 import { apiErrorDetail, type FailedQueryError } from './workspace-helpers';
 import { MAX_TABS, newDraft, type Draft, type WorkspaceState } from './workspace-state';
@@ -45,8 +46,8 @@ type WorkspaceExecutionOptions = {
     setBusy: Dispatch<SetStateAction<BusyAction>>;
     setCancelling: Dispatch<SetStateAction<boolean>>;
     setExampleChartRunId: Dispatch<SetStateAction<string | undefined>>;
-    setError: (error: string) => void;
-    setNotice: (notice: string) => void;
+    setError: ReturnType<typeof useWorkspaceNotifications>['setError'];
+    setDraftFeedback: ReturnType<typeof useScopedValue<WorkspaceFeedback | undefined>>[1];
     clearFailedQueryError: (draftId: string) => void;
     storeFailedQueryError: (failure: FailedQueryError) => void;
     setViewForDraft: ReturnType<typeof useScopedValue<ResultsView>>[1];
@@ -86,7 +87,6 @@ export function useWorkspaceExecution({
     connection,
     trusted,
     experience,
-    demoMode,
     locale,
     copy,
     onSelectConnection,
@@ -108,30 +108,64 @@ export function useWorkspaceExecution({
     setCancelling,
     setExampleChartRunId,
     setError,
-    setNotice,
+    setDraftFeedback,
     clearFailedQueryError,
     storeFailedQueryError,
     setViewForDraft,
 }: WorkspaceExecutionOptions) {
-    const executionFailureRef = useRef<string | undefined>(undefined);
+    const executionFailureRef = useRef<{ id: string; name: string } | undefined>(undefined);
     const executionInFlightRef = useRef(false);
     const cancellingRef = useRef(false);
     const { run, setRunForRun } = evidence;
 
-    const perform = async (task: () => Promise<void>, kind: BusyAction = 'save') => {
+    const perform = async (
+        task: () => Promise<void>,
+        kind: BusyAction = 'save',
+        onFailure?: (caught: unknown) => void,
+    ) => {
         if (busy) return;
         setBusy(kind);
-        setError('');
-        setNotice('');
         try {
             await task();
         } catch (caught) {
             if (executionFailureRef.current) {
-                const failedDraftId = executionFailureRef.current;
+                const failedDraft = executionFailureRef.current;
                 executionFailureRef.current = undefined;
-                if (workspaceRef.current.activeId !== failedDraftId)
-                    setError(copy.common.queryFailed);
-            } else setError(message(caught));
+                if (workspaceRef.current.activeId !== failedDraft.id) {
+                    const canOpen = workspaceRef.current.tabs.some(
+                        item => item.id === failedDraft.id,
+                    );
+                    setError(
+                        `“${failedDraft.name}” failed.${canOpen ? ' Open the tab to see the error.' : ''}`,
+                        {
+                            context: `query:${failedDraft.id}`,
+                            detail: message(caught),
+                            action: canOpen
+                                ? {
+                                      label: 'Open tab',
+                                      onSelect: () => {
+                                          if (
+                                              !workspaceRef.current.tabs.some(
+                                                  item => item.id === failedDraft.id,
+                                              )
+                                          )
+                                              return;
+                                          setWorkspace(current => ({
+                                              ...current,
+                                              activeId: failedDraft.id,
+                                          }));
+                                          panels.revealPanelTemporarily('results', failedDraft.id);
+                                      },
+                                  }
+                                : undefined,
+                        },
+                    );
+                }
+            } else if (onFailure) {
+                onFailure(caught);
+            } else {
+                setDraftFeedback(active.id, { tone: 'warning', message: message(caught) }, true);
+            }
         } finally {
             setBusy('');
         }
@@ -148,9 +182,10 @@ export function useWorkspaceExecution({
 
     const addDraft = (draft: Draft) => {
         if (workspaceRef.current.tabs.length >= MAX_TABS) {
-            setError(
-                `Close a tab before creating another. This workspace supports ${MAX_TABS} open drafts.`,
-            );
+            setError(`${MAX_TABS} tabs open. Close one to create another.`, {
+                tone: 'warning',
+                timeoutMs: 5000,
+            });
             return false;
         }
         setWorkspace(current => ({
@@ -166,7 +201,14 @@ export function useWorkspaceExecution({
         return true;
     };
     const recordFailedQueryError = (failure: FailedQueryError) => {
-        executionFailureRef.current = failure.draftId;
+        executionFailureRef.current = {
+            id: failure.draftId,
+            name:
+                (
+                    workspaceRef.current.tabs.find(draft => draft.id === failure.draftId) ??
+                    workspaceRef.current.closedTabs?.find(draft => draft.id === failure.draftId)
+                )?.name ?? 'Query',
+        };
         storeFailedQueryError(failure);
         if (workspaceRef.current.activeId !== failure.draftId) return;
         setViewForDraft(failure.draftId, 'results', true);
@@ -191,19 +233,17 @@ export function useWorkspaceExecution({
         trackSchemaRefresh,
         editor,
         panels,
-        demoMode,
-        setNotice,
         loadHistory,
         evidence,
     });
 
     const runExample = (example: SqlExample, output: 'results' | 'chart' | 'map') => {
         if (busy || executionInFlightRef.current) {
-            setError(copy.common.runActionWait);
+            setError(copy.common.runActionWait, { tone: 'warning', timeoutMs: 5000 });
             return true;
         }
         if (!trusted) {
-            setError(copy.common.runActionTrustRequired);
+            setError(copy.common.runActionTrustRequired, { tone: 'warning', timeoutMs: 5000 });
             return true;
         }
         const draft = createExampleDraft(example, locale, copy.common);
@@ -245,7 +285,6 @@ export function useWorkspaceExecution({
         if (!scriptId && !runId) return;
         cancellingRef.current = true;
         setCancelling(true);
-        setError('');
         try {
             if (scriptId) {
                 const cancelled = await post<Script>(
@@ -254,10 +293,12 @@ export function useWorkspaceExecution({
                 setScripts(current => ({ ...current, [cancelled.id]: cancelled }));
             } else if (runId) {
                 setRunForRun(runId, await post<Run>(`/runs/${encodeURIComponent(runId)}/cancel`));
-                setNotice('Cancellation requested. The server will confirm the final state.');
             }
         } catch (caught) {
-            setError(message(caught));
+            setError('Couldn’t confirm cancellation. Check the query status.', {
+                tone: 'warning',
+                detail: message(caught),
+            });
         } finally {
             cancellingRef.current = false;
             setCancelling(false);
@@ -294,16 +335,15 @@ export function useWorkspaceExecution({
         };
         setViewForDraft(draft.id, getSelectedView(), true);
         panels.revealPanelTemporarily('results', draft.id);
-        setNotice(`Opened retained run ${selected.queryId}. No query was rerun.`);
     };
 
     const openSqlDraft = (name: string, sql: string, run: boolean, reuseExisting = false) => {
         if (run && (busy || executionInFlightRef.current)) {
-            setError(copy.common.runActionWait);
+            setError(copy.common.runActionWait, { tone: 'warning', timeoutMs: 5000 });
             return;
         }
         if (run && !trusted) {
-            setError(copy.common.runActionTrustRequired);
+            setError(copy.common.runActionTrustRequired, { tone: 'warning', timeoutMs: 5000 });
             return;
         }
         if (
@@ -372,8 +412,6 @@ function createDraftExecutor({
     trackSchemaRefresh,
     editor,
     panels,
-    demoMode,
-    setNotice,
     loadHistory,
     evidence,
 }: {
@@ -394,8 +432,6 @@ function createDraftExecutor({
     trackSchemaRefresh: WorkspaceExecutionOptions['trackSchemaRefresh'];
     editor: WorkspaceExecutionOptions['editor'];
     panels: WorkspaceExecutionOptions['panels'];
-    demoMode: WorkspaceExecutionOptions['demoMode'];
-    setNotice: WorkspaceExecutionOptions['setNotice'];
     loadHistory: WorkspaceExecutionOptions['loadHistory'];
     evidence: WorkspaceExecutionOptions['evidence'];
 }) {
@@ -618,26 +654,6 @@ function createDraftExecutor({
                 if (isScript) await submitScript();
                 else await submitRun();
                 if (options.expandResults) panels.revealPanelTemporarily('results', draft.id);
-                let successNotice: string | undefined;
-
-                if (isScript) {
-                    if (demoMode) {
-                        successNotice =
-                            'Sample results were generated. Script SQL was not sent to ClickHouse.';
-                    } else {
-                        successNotice = 'Script submitted to the selected ClickHouse connection.';
-                    }
-                } else if (options.preview) {
-                    if (demoMode) {
-                        successNotice = 'Sample preview generated. SQL was not sent to ClickHouse.';
-                    } else {
-                        successNotice =
-                            'Table preview submitted to the selected ClickHouse connection.';
-                    }
-                } else {
-                    successNotice = undefined;
-                }
-                if (!isFrontendDemoPreview && successNotice) setNotice(successNotice);
                 void loadHistory().catch(() => undefined);
             },
             isScript ? 'script' : 'run',

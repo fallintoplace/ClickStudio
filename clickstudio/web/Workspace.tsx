@@ -29,7 +29,7 @@ import { PLAYGROUND_CONNECTION_ID } from './playground';
 import type { WorkspaceState } from './workspace-state';
 import { closeDraft, MAX_TABS, newDraft, reopenDraft, type Draft } from './workspace-state';
 
-import { WORKSPACE_TOAST_TIMEOUT_MS } from './useWorkspaceNotifications';
+import { WorkspaceToast } from './components/WorkspaceToast';
 import {
     focusEditor,
     helpParseDuration,
@@ -72,13 +72,11 @@ function openImportedSqlQuery(
     sql: string,
     openDraft: (draft: Draft) => boolean,
     markImported: (id: string) => void,
-    setNotice: (notice: string) => void,
 ) {
     const draft = newDraft(name, sql);
     const opened = openDraft(draft);
     if (opened) {
         markImported(draft.id);
-        setNotice(`${name} opened in a new query tab. It has not been run.`);
     }
     return opened;
 }
@@ -211,6 +209,8 @@ export function Workspace({
                 demoMode,
                 executionPending: Boolean(pendingExecution.execution),
                 cancelling,
+                draftFeedback: model.draftFeedback,
+                saveStatus: model.saveStatus,
             }}
             actions={{
                 onPatch: patch,
@@ -268,8 +268,18 @@ export function Workspace({
                 retainedExecutionResult: pendingExecution.retainedExecutionResult,
                 cancelling,
                 experience,
+                readFeedback:
+                    model.scriptReadFeedback ??
+                    model.evidence.runReadFeedback ??
+                    model.evidence.resultReadFeedback ??
+                    model.evidence.assetReadFeedback,
             }}
             actions={{
+                onRetryRead:
+                    !model.scriptReadFeedback &&
+                    (model.evidence.runReadFeedback || model.evidence.resultReadFeedback)
+                        ? model.evidence.retryRead
+                        : undefined,
                 onSelectView: nextView => {
                     setView(nextView);
                     if (nextView === 'insights') void perform(loadProfile, 'save');
@@ -374,6 +384,8 @@ function createInspectorProps({
         revisionLoading,
         revisionError,
         documentsReadError,
+        documentsError,
+        historyError,
         loadSchema,
         loadMoreSchema,
         loadHistory,
@@ -447,6 +459,10 @@ function createInspectorProps({
         search,
         setSearch,
         history: sortedHistory,
+        importFeedback: model.importedReveal.importFeedback,
+        historyError,
+        documentsError,
+        evidenceFeedback: model.evidence.assetReadFeedback,
         documents,
         revisions: revisionsDocumentId === active.serverId ? documentRevisions : [],
         revisionsDocumentId,
@@ -475,7 +491,7 @@ function createInspectorProps({
         onLoadMoreSchema: () => void loadMoreSchema(),
         importedTableTarget: importedReveal.importedTableTarget,
         onImportedTableRevealed: importedReveal.onImportedTableRevealed,
-        onRefreshHistory: () => void loadHistory(),
+        onRefreshHistory: () => void loadHistory().catch(() => undefined),
         onInsert: (value: string) => editor.current?.insert(value),
         onOpenSqlDraft: openSqlDraft,
         onTableDeleted: table =>
@@ -490,7 +506,7 @@ function createInspectorProps({
         connectionId: connection.id,
         sql: active.sql,
         trusted,
-        onRefreshDocuments: () => void loadDocuments(),
+        onRefreshDocuments: () => void loadDocuments().catch(() => undefined),
         onRefreshRevisions: () => void loadDocumentRevisions(active.serverId),
         onRestoreRevision: restoreDocumentRevision,
         assistantQuestion,
@@ -585,10 +601,8 @@ function renderWorkspaceLayout({
 
     const {
         inspectorDocked,
-        error,
-        setError,
-        notice,
-        setNotice,
+        toast,
+        dismissToast,
         storageError,
         inspector,
         drawerOpen,
@@ -634,40 +648,23 @@ function renderWorkspaceLayout({
         >
             <OverlayPortal>
                 <div className="toast-stack">
-                    {error && (
-                        <div className="toast toast-error animate-enter" role="alert">
-                            <span>!</span>
-                            {error}
-                            <button onClick={() => setError('')} aria-label="Dismiss error">
-                                <Icon name="close" />
-                            </button>
-                            <div
-                                key={error}
-                                className="toast-timer"
-                                style={{ animationDuration: `${WORKSPACE_TOAST_TIMEOUT_MS}ms` }}
-                                aria-hidden="true"
-                            />
-                        </div>
-                    )}
-                    {notice && (
-                        <div className="toast toast-success animate-enter" role="status">
-                            <span>✓</span>
-                            {notice}
-                            <button onClick={() => setNotice('')} aria-label="Dismiss message">
-                                <Icon name="close" />
-                            </button>
-                            <div
-                                key={notice}
-                                className="toast-timer"
-                                style={{ animationDuration: `${WORKSPACE_TOAST_TIMEOUT_MS}ms` }}
-                                aria-hidden="true"
-                            />
-                        </div>
+                    {toast && (
+                        <WorkspaceToast
+                            key={toast.id}
+                            notification={toast}
+                            onDismiss={dismissToast}
+                        />
                     )}
                     {storageError && (
-                        <div className="toast toast-error" role="alert">
-                            Local draft storage could not save changes: {storageError}
-                        </div>
+                        <WorkspaceToast
+                            notification={{
+                                id: 0,
+                                tone: 'error',
+                                timeoutMs: null,
+                                message:
+                                    'Drafts aren’t being saved in this browser. Export them before closing.',
+                            }}
+                        />
                     )}
                 </div>
             </OverlayPortal>
@@ -854,7 +851,6 @@ function renderWorkspaceLayout({
                         sql,
                         openNewDraft,
                         importedReveal.markImportedSqlDraft,
-                        setNotice,
                     )
                 }
                 onClose={() => setImportOpen(false)}
@@ -1094,7 +1090,8 @@ function renderDocumentTabs({
                             onRestore={draftId => {
                                 if (workspaceRef.current.tabs.length >= MAX_TABS) {
                                     setError(
-                                        `Close a tab before restoring one. This workspace supports ${MAX_TABS} open drafts.`,
+                                        `${MAX_TABS} tabs open. Close one to restore this draft.`,
+                                        { tone: 'warning', timeoutMs: 5000 },
                                     );
                                     return false;
                                 }

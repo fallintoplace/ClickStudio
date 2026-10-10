@@ -18,6 +18,8 @@ import type { WorkspaceViewState } from '../useWorkspaceViewState';
 import { SqlEditor, type EditorHandle } from './SqlEditor';
 import { Button, cx, Icon } from './ui';
 import { RunActionGroup } from './WorkspaceChrome';
+import { WorkspaceInlineNotice } from './WorkspaceInlineNotice';
+import type { WorkspaceFeedback } from '../useWorkspaceNotifications';
 
 export type WorkspaceQueryPanelState = Readonly<{
     active: Draft;
@@ -36,6 +38,8 @@ export type WorkspaceQueryPanelState = Readonly<{
     demoMode: boolean;
     executionPending: boolean;
     cancelling: boolean;
+    draftFeedback?: WorkspaceFeedback;
+    saveStatus: WorkspaceViewState['saveStatus'];
 }>;
 
 export type WorkspaceQueryPanelActions = Readonly<{
@@ -133,19 +137,26 @@ export function WorkspaceQueryPanel({
         </Button>
     );
     const saveButton = (
-        <Button
-            variant="secondary"
-            className="save-revision-button standard-save-button"
-            data-testid="save-query"
-            aria-label={copy.common.save}
-            aria-keyshortcuts="Control+S Meta+S"
-            title={`${copy.common.save} (Ctrl/Cmd+S)`}
-            onClick={() => void actions.onSave(active)}
-            disabled={Boolean(busy) || !active.name.trim()}
-        >
-            <Icon name="documents" />
-            {copy.common.save}
-        </Button>
+        <>
+            {state.saveStatus.state === 'saved' && (
+                <span className="save-inline-status" role="status">
+                    Saved
+                </span>
+            )}
+            <Button
+                variant="secondary"
+                className="save-revision-button standard-save-button"
+                data-testid="save-query"
+                aria-label={copy.common.save}
+                aria-keyshortcuts="Control+S Meta+S"
+                title={`${copy.common.save} (Ctrl/Cmd+S)`}
+                onClick={() => void actions.onSave(active)}
+                disabled={Boolean(busy) || !active.name.trim()}
+            >
+                <Icon name="documents" />
+                {copy.common.save}
+            </Button>
+        </>
     );
     const getTrustDescription = () => {
         if (demoMode) {
@@ -197,6 +208,7 @@ export function WorkspaceQueryPanel({
                 detached,
                 panels,
             })}
+            <WorkspaceInlineNotice feedback={state.draftFeedback} />
             <div
                 id="sql-editor-content"
                 className="panel-content editor-content"

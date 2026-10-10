@@ -21,6 +21,7 @@
     "web/workspace-layout.ts",
     "web/workspace-persistence.ts",
     "web/statement-outcome.ts",
+    "web/workspace-notification-policy.ts",
     "web/sql-error.ts",
     "web/result-provenance.ts",
     "web/visible-polling.ts",
