@@ -1,6 +1,6 @@
-import { CHART_KINDS } from '../../shared/chart-types';
-import type { Draft } from '../workspace-state';
-import type { Copy, Locale } from '../i18n';
+import { CHART_KINDS } from '../../shared/chart-types.js';
+import type { Draft } from '../workspace-state.js';
+import type { Copy, Locale } from '../i18n.js';
 
 export const chartKindOptions = CHART_KINDS.filter(kind => kind !== 'table').map(value => ({
     value,

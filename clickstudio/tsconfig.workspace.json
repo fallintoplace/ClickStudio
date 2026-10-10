@@ -1,10 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": [
-      "ES2022",
-      "DOM"
-    ],
+    "lib": ["ES2022", "DOM"],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "strict": true,
@@ -32,6 +29,8 @@
     "web/sql-examples.ts",
     "web/sql-examples-locales.ts",
     "web/components/workspace-help-model.ts",
+    "web/components/chart/chart-selection.ts",
+    "web/components/chart/chart-view-model.ts",
     "web/i18n.ts",
     "shared/evidence.ts",
     "shared/workspace-view.ts",

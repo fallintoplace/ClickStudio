@@ -478,3 +478,28 @@ test('Row-count custom titles survive axis and breakdown changes', async ({ page
     await expect(results.locator('.chart-bar')).toHaveCount(2);
     await expect(toolbar.getByRole('heading')).toHaveText(title);
 });
+
+test('Changing chart types keeps the type selector mounted and focused', async ({ page }) => {
+    await mockSnapshot(page, {
+        columns: [
+            { name: 'time', type: 'DateTime' },
+            { name: 'open', type: 'Float64' },
+            { name: 'high', type: 'Float64' },
+            { name: 'low', type: 'Float64' },
+            { name: 'close', type: 'Float64' },
+        ],
+        rows: [['2026-01-01 00:00:00', 10, 12, 9, 11]],
+    });
+    const results = await openChart(page);
+    const type = results.getByRole('combobox', { name: 'Type', exact: true });
+    const original = await type.elementHandle();
+    expect(original).not.toBeNull();
+    await type.focus();
+
+    for (const kind of ['bar', 'candlestick', 'line', 'bar']) {
+        await type.selectOption(kind);
+        await expect(type).toHaveValue(kind);
+        await expect(type).toBeFocused();
+        expect(await original!.evaluate(element => element.isConnected)).toBe(true);
+    }
+});
