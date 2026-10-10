@@ -22,7 +22,6 @@ type WorkspaceCommonTranslation = Pick<
     | 'failedSql'
     | 'previousResultsDescription'
     | 'workspaceMode'
-    | 'parserMode'
     | 'browse'
     | 'readOnly'
     | 'tables'
@@ -162,7 +161,6 @@ export const workspaceCommonTranslations: Record<
         failedSql: '失败的 SQL',
         previousResultsDescription: '最新查询失败。这些结果来自上次成功的执行。',
         workspaceMode: '工作区',
-        parserMode: '解析器',
         browse: '浏览',
         readOnly: '只读',
         tables: '表',

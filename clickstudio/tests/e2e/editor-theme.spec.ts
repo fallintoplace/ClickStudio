@@ -102,21 +102,28 @@ async function tokenContrast(page: Page, selected: boolean) {
     );
 }
 
-for (const parser of ['wasm', 'basic']) {
+for (const parser of ['ready', 'unavailable']) {
     test(`SQL tokens remain readable across themes and accents with the ${parser} parser`, async ({
         page,
     }) => {
-        await page.addInitScript(
-            parser => localStorage.setItem('clickstudio:parser-mode', parser),
-            parser,
-        );
+        if (parser === 'unavailable')
+            await page
+                .context()
+                .route('**/clickhouse-parser.wasm', route =>
+                    route.fulfill({ status: 503, body: 'Parser unavailable' }),
+                );
         await page.goto('/');
         await replaceSql(page, sql);
-        if (parser === 'wasm')
+        if (parser === 'ready')
             await expect(
                 page.locator('.cm-native-function').filter({ hasText: 'quantile' }),
             ).toBeVisible();
-        else await expect(page.locator('.cm-native-function')).toHaveCount(0);
+        else {
+            await expect(
+                page.getByRole('button', { name: 'Retry parser', exact: true }),
+            ).toBeVisible();
+            await expect(page.locator('.cm-native-function')).toHaveCount(0);
+        }
 
         for (const theme of ['Dark', 'Light']) {
             await page.getByRole('radio', { name: `${theme} theme`, exact: true }).click();

@@ -86,9 +86,6 @@
     flex: none;
     background: var(--line);
   }
-  .topbar-divider-short {
-    height: 26px;
-  }
   .topbar-spacer,
   .tabs-spacer,
   .rail-spacer {
@@ -510,10 +507,6 @@
     border-color: transparent;
     border-radius: var(--radius-shell);
     background: transparent;
-  }
-  .topbar-control-rail > .topbar-divider {
-    height: 23px;
-    opacity: 0.7;
   }
   .topbar-control-rail .topbar-preferences {
     align-items: center;
@@ -1258,14 +1251,8 @@
     gap: 2px;
     padding: 3px;
   }
-  .topbar-control-rail > .topbar-divider {
-    display: none;
-  }
   .topbar-control-rail > .experience-switch {
     order: 1;
-  }
-  .topbar-control-rail > .parser-switch {
-    order: 2;
   }
   .topbar-control-rail > .topbar-preferences {
     order: 3;

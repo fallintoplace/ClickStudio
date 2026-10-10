@@ -146,7 +146,6 @@ export const english = {
             'Could not refresh table details. Examples may use older schema.',
         sqlExamplesRefreshSchema: 'Refresh table details',
         workspaceMode: 'WORKSPACE',
-        parserMode: 'PARSER',
         browse: 'BROWSE',
         readOnly: 'Read only',
         tables: 'Tables',

@@ -118,7 +118,7 @@ test('Standard exposes assignment actions and can run a query without opening AI
     await expect(page.getByTestId('open-ai')).toBeVisible();
     await expect(page.getByTestId('save-query')).toBeVisible();
     await expect(page.locator('.editor-control-rail')).toBeVisible();
-    await expect(page.locator('.parser-switch')).toBeVisible();
+    await expect(page.locator('.parser-switch')).toHaveCount(0);
     await expect(results.getByRole('tab', { name: 'Chart', exact: true })).toBeVisible();
     await expect(results.getByRole('tab', { name: 'Insights', exact: true })).toBeVisible();
     await expect(
@@ -153,14 +153,79 @@ test('Experimental keeps one format action and opens AI from the workspace rail'
     await expect(page.locator('.assistant-panel')).toBeVisible();
 });
 
-test('Experimental Format uses the built-in formatter when WASM is not selected', async ({
+for (const experience of ['beginner', 'expert']) {
+    for (const preference of [null, 'basic']) {
+        test(`${experience} uses WASM with ${preference ?? 'no'} saved parser preference`, async ({
+            page,
+        }) => {
+            await page.addInitScript(
+                ({ experience, preference }) => {
+                    localStorage.setItem('clickstudio:experience', experience);
+                    if (preference === null) localStorage.removeItem('clickstudio:parser-mode');
+                    else localStorage.setItem('clickstudio:parser-mode', preference);
+                },
+                { experience, preference },
+            );
+            await page.goto('/');
+            await expect(page.locator('.parser-switch')).toHaveCount(0);
+            const banner = page.getByRole('banner');
+            await expect(banner.getByRole('radio', { name: 'WASM', exact: true })).toHaveCount(0);
+            await expect(
+                banner.getByRole('radio', { name: 'CodeMirror', exact: true }),
+            ).toHaveCount(0);
+            await replaceSql(page, 'select uniqExact(number) as value from numbers(3)');
+            await expect(page.locator('.cm-native-function').first()).toHaveText('uniqExact');
+            await page.getByTestId('format-sql').click();
+            await expect(page.locator('.cm-content .cm-line')).toHaveText([
+                'SELECT uniqExact(number) AS value',
+                'FROM numbers(3)',
+            ]);
+            await page.reload();
+            await expect(page.locator('.cm-native-function').first()).toHaveText('uniqExact');
+        });
+    }
+}
+
+test('Experimental Format stays available while WASM loads', async ({ page }) => {
+    let parserRequested = false;
+    let releaseParser!: () => void;
+    const pendingParser = new Promise<void>(resolve => {
+        releaseParser = resolve;
+    });
+    await page.addInitScript(() => localStorage.setItem('clickstudio:experience', 'expert'));
+    await page.context().route('**/clickhouse-parser.wasm', async route => {
+        parserRequested = true;
+        await pendingParser;
+        await route.continue();
+    });
+    try {
+        await page.goto('/');
+        await expect.poll(() => parserRequested).toBe(true);
+        await replaceSql(page, 'select 1 as value from numbers(1)');
+        await page.getByTestId('format-sql').click();
+        await expect(page.locator('.cm-content .cm-line')).toHaveText([
+            'select 1 as value',
+            'FROM numbers(1)',
+        ]);
+        releaseParser();
+        await openWorkspacePanel(page, 'parser');
+        await expect(page.getByText('Ready · local WebAssembly', { exact: true })).toBeVisible();
+    } finally {
+        releaseParser();
+    }
+});
+
+test('Experimental Format uses the built-in formatter when WASM is unavailable', async ({
     page,
 }) => {
-    await page.addInitScript(() => {
-        localStorage.setItem('clickstudio:experience', 'expert');
-        localStorage.setItem('clickstudio:parser-mode', 'basic');
-    });
+    await page.addInitScript(() => localStorage.setItem('clickstudio:experience', 'expert'));
+    await page
+        .context()
+        .route('**/clickhouse-parser.wasm', route =>
+            route.fulfill({ status: 503, body: 'Parser unavailable' }),
+        );
     await page.goto('/');
+    await expect(page.getByRole('button', { name: 'Retry parser', exact: true })).toBeVisible();
     await replaceSql(page, 'select 1 as value from numbers(1)');
     await page.getByTestId('format-sql').click();
     await expect(page.locator('.cm-content .cm-line')).toHaveText([

@@ -319,16 +319,6 @@
   background: var(--accent);
   transform: rotate(45deg);
 }
-.topbar .parser-mode-option.is-wasm > label::before {
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: var(--status-ring);
-  color: var(--accent);
-}
-.topbar .parser-mode-option.is-basic > label::before {
-  border-radius: 50%;
-  background: var(--muted);
-}
 .topbar .theme-switch {
   gap: 0;
   padding: 3px;

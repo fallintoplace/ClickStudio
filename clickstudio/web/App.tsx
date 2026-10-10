@@ -1,11 +1,4 @@
-import {
-    THEMES,
-    ACCENT_CHOICES,
-    EXPERIENCE_LEVELS,
-    PARSER_MODES,
-    type AccentChoice,
-    type ParserMode,
-} from './appearance-types';
+import { THEMES, ACCENT_CHOICES, EXPERIENCE_LEVELS, type AccentChoice } from './appearance-types';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, message, post } from './api';
 import { Button, cx, Icon } from './components/ui';
@@ -87,9 +80,6 @@ function App() {
     );
     const [experience, setExperience] = useState<ExperienceLevel>(() =>
         pref('clickstudio:experience', EXPERIENCE_LEVELS, 'beginner'),
-    );
-    const [parserMode, setParserMode] = useState<ParserMode>(() =>
-        pref('clickstudio:parser-mode', PARSER_MODES, 'wasm'),
     );
     const [session, setSession] = useState<Session>();
     const [connections, setConnections] = useState<Connected[]>([]);
@@ -180,9 +170,8 @@ function App() {
             localStorage.setItem('clickstudio:accent', accent);
             localStorage.setItem('clickstudio:locale', locale);
             localStorage.setItem('clickstudio:experience', experience);
-            localStorage.setItem('clickstudio:parser-mode', parserMode);
         } catch {}
-    }, [accent, dark, experience, locale, parserMode, theme]);
+    }, [accent, dark, experience, locale, theme]);
 
     const loadSession = useCallback(async () => {
         const next = await api<Session>('/session');
@@ -387,8 +376,6 @@ function App() {
                     copy,
                     experience,
                     setExperience,
-                    parserMode,
-                    setParserMode,
                     accent,
                     setAccent,
                     theme,
@@ -415,7 +402,7 @@ function App() {
                     testConnectionActionRef={testConnectionActionRef}
                     demoMode={session.demo}
                     experience={experience}
-                    nativeParserEnabled={parserMode === 'wasm'}
+                    nativeParserEnabled
                     dark={dark}
                     copy={copy}
                     locale={locale}
@@ -685,8 +672,6 @@ function renderAppearanceControls({
     copy,
     experience,
     setExperience,
-    parserMode,
-    setParserMode,
     accent,
     setAccent,
     theme,
@@ -695,8 +680,6 @@ function renderAppearanceControls({
     copy: ReturnType<typeof getCopy>;
     experience: 'beginner' | 'expert';
     setExperience: import('react').Dispatch<import('react').SetStateAction<'beginner' | 'expert'>>;
-    parserMode: 'wasm' | 'basic';
-    setParserMode: import('react').Dispatch<import('react').SetStateAction<'wasm' | 'basic'>>;
     accent: 'cyan' | 'clickhouse-yellow';
     setAccent: import('react').Dispatch<
         import('react').SetStateAction<'cyan' | 'clickhouse-yellow'>
@@ -736,38 +719,6 @@ function renderAppearanceControls({
                     />
                 </RadioGroup>
             </div>
-            {experience === 'expert' && (
-                <>
-                    <div className="topbar-divider topbar-divider-short" />
-                    <div className="experience-switch parser-switch">
-                        <span className="mode-caption">{copy.common.parserMode}</span>
-                        <RadioGroup
-                            className="navbar-mode-control"
-                            value={parserMode}
-                            onValueChange={value => {
-                                const mode = PARSER_MODES.find(mode => mode === value);
-                                if (mode) setParserMode(mode);
-                            }}
-                            aria-label={copy.common.parserMode}
-                            inline
-                            orientation="horizontal"
-                            dir="end"
-                        >
-                            <RadioGroup.Item
-                                value="wasm"
-                                className={`navbar-mode-option parser-mode-option is-wasm ${parserMode === 'wasm' ? 'is-active' : ''}`}
-                                label="WASM"
-                            />
-                            <RadioGroup.Item
-                                value="basic"
-                                className={`navbar-mode-option parser-mode-option is-basic ${parserMode === 'basic' ? 'is-active' : ''}`}
-                                label="CodeMirror"
-                            />
-                        </RadioGroup>
-                    </div>
-                    <div className="topbar-divider topbar-divider-short" />
-                </>
-            )}
             <div className="topbar-preferences">
                 <div className="accent-mode-control" role="group" aria-label={copy.app.accent}>
                     <button
