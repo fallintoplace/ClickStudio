@@ -794,6 +794,17 @@
     cursor: pointer;
     transition: 0.18s ease;
   }
+  .document-tab:not(.is-active):has(+ .document-tab:not(.is-active))::after {
+    position: absolute;
+    top: 50%;
+    right: -2px;
+    width: 1px;
+    height: 18px;
+    transform: translateY(-50%);
+    background: var(--line-bright);
+    content: "";
+    pointer-events: none;
+  }
   .document-tab-actions {
     position: relative;
     z-index: 1;
