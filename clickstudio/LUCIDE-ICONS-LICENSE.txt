@@ -1,4 +1,4 @@
-The SVG paths used for ClickStudio UI icons are from Lucide revision 70562c1ee1c4fdcf736fe97bc893fb8511927934.
+ClickStudio includes UI icon SVG paths from Lucide revision 70562c1ee1c4fdcf736fe97bc893fb8511927934.
 Source: https://github.com/lucide-icons/lucide
 
 ISC License
