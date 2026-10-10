@@ -162,7 +162,16 @@ function AssistantSqlProposalDiff({
                         </span>
                     </span>
                     <span className="sql-proposal-diff-chevron" aria-hidden="true">
-                        ⌄
+                        <svg viewBox="0 0 16 16" focusable="false">
+                            <path
+                                d="m4.5 6 3.5 4 3.5-4"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="1.5"
+                            />
+                        </svg>
                     </span>
                 </summary>
                 <ScrollEdgeFrame<HTMLPreElement> className="sql-proposal-diff-scroll-frame">

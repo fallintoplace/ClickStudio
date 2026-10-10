@@ -539,6 +539,32 @@ test('An older accepted proposal says which SQL will run', async ({ page }) => {
     await expect(page.getByTestId('assistant-proposal-summary')).toContainText(
         'Show event counts by day.',
     );
+    const sqlDiff = page.locator('.proposal-card').getByTestId('sql-proposal-diff');
+    const diffToggle = sqlDiff.locator(':scope > summary');
+    const diffCounts = sqlDiff.locator('.sql-proposal-diff-count');
+    const diffChevron = sqlDiff.locator('.sql-proposal-diff-chevron svg');
+    await expect(diffChevron).toHaveAttribute('viewBox', '0 0 16 16');
+    const expectDiffChevronLayout = async () => {
+        const [toggleBox, countsBox, chevronBox] = await Promise.all([
+            diffToggle.boundingBox(),
+            diffCounts.boundingBox(),
+            diffChevron.boundingBox(),
+        ]);
+        if (!toggleBox || !countsBox || !chevronBox)
+            throw new Error('SQL diff header elements should have layout boxes');
+        expect(chevronBox.x - (countsBox.x + countsBox.width)).toBeGreaterThan(0);
+        expect(chevronBox.x - (countsBox.x + countsBox.width)).toBeLessThan(16);
+        expect(
+            Math.abs(chevronBox.y + chevronBox.height / 2 - (toggleBox.y + toggleBox.height / 2)),
+        ).toBeLessThanOrEqual(1);
+        expect(toggleBox.x + toggleBox.width - (chevronBox.x + chevronBox.width)).toBeLessThan(13);
+    };
+    await expectDiffChevronLayout();
+    await diffToggle.click();
+    await expect(sqlDiff).not.toHaveAttribute('open');
+    await expectDiffChevronLayout();
+    await diffToggle.click();
+    await expect(sqlDiff).toHaveAttribute('open', '');
     await page.getByRole('button', { name: 'Use this query', exact: true }).click();
     await replaceSql(page, 'SELECT 999 AS newer_draft');
 

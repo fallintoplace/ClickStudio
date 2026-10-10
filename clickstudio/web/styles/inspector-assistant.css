@@ -1775,11 +1775,11 @@
     background: color-mix(in srgb, var(--page-raised) 76%, var(--panel));
   }
   .sql-proposal-diff-toggle {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
     min-width: 0;
     min-height: 35px;
     align-items: center;
-    justify-content: space-between;
     gap: 8px;
     padding: 5px 8px;
     list-style: none;
@@ -1821,7 +1821,6 @@
   .sql-proposal-diff-count {
     display: flex;
     min-width: 0;
-    flex: none;
     flex-wrap: wrap;
     justify-content: flex-end;
     gap: 4px;
@@ -1844,11 +1843,17 @@
     font-style: normal;
   }
   .sql-proposal-diff-chevron {
-    flex: none;
+    display: grid;
+    width: 16px;
+    height: 16px;
+    place-items: center;
     color: var(--muted);
-    font-size: 14px;
-    line-height: 1;
     transition: transform 0.16s ease;
+  }
+  .sql-proposal-diff-chevron svg {
+    display: block;
+    width: 14px;
+    height: 14px;
   }
   .sql-proposal-diff[open] .sql-proposal-diff-chevron {
     transform: rotate(180deg);
