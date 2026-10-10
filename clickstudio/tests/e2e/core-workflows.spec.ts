@@ -766,7 +766,7 @@ test('A failed saved run shows its submitted error in Output', async ({ page }) 
     }
 });
 
-test('Failed Output and editor markers stay usable in separate windows', async ({ page }) => {
+test('Failed output stays docked while editor markers open in a separate window', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await trust(page);
     await runQuery(page);
@@ -784,17 +784,12 @@ test('Failed Output and editor markers stay usable in separate windows', async (
     await expect(editor.locator('.cm-server-error-line')).toContainText('GROUP BY');
     await expect(editor.getByTestId('query-failure')).toHaveCount(0);
     await editor.close();
-    const outputOpened = page.waitForEvent('popup');
-    await page.getByRole('button', { name: 'Open results in a separate window', exact: true }).click();
-    const output = await outputOpened;
-    await output.setViewportSize({ width: 500, height: 400 });
-    await expect(output.getByTestId('query-failure')).toBeVisible();
-    await expect(output.locator('.is-context .result-failure-line > span:last-child')).toHaveText(['SELECT 1', 'GROUP BY\n^']);
-    await output.locator('.result-failure-diagnostics summary').click();
-    await expect(output.locator('.result-failure-detail')).toBeVisible();
-    await expect(output.getByRole('table')).toHaveCount(0);
-    await output.getByRole('button', { name: 'Close output', exact: true }).click();
-    await expect.poll(() => output.isClosed()).toBe(true);
+    await expect(page.getByTestId('query-failure')).toBeVisible();
+    await expect(page.locator('.is-context .result-failure-line > span:last-child')).toHaveText(['SELECT 1', 'GROUP BY\n^']);
+    await page.locator('.result-failure-diagnostics summary').click();
+    await expect(page.locator('.result-failure-detail')).toBeVisible();
+    await expect(page.getByRole('table')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Close output', exact: true }).click();
     await expect(page.locator('.results-surface')).toHaveCount(0);
     await page.locator('.query-failed-status').click();
     await expect(page.getByTestId('query-failure')).toBeVisible();
@@ -904,7 +899,7 @@ for (const legacyMode of ['floating', 'maximized']) test(`Saved ${legacyMode} pa
             await page.getByText(mode, { exact: true }).click();
             await expect(page.getByRole('button', { name: /^(Float|Maximize|Restore) (query|output) panel$/ })).toHaveCount(0);
             await expect(page.getByRole('button', { name: 'Open editor in a separate window', exact: true })).toBeVisible();
-            await expect(page.getByRole('button', { name: 'Open results in a separate window', exact: true })).toBeVisible();
+            await expect(page.getByRole('button', { name: 'Open results in a separate window', exact: true })).toHaveCount(0);
             await expect(page.locator('.workspace-panel-resize-handle')).toHaveCount(0);
         }
     }
@@ -914,7 +909,7 @@ for (const legacyMode of ['floating', 'maximized']) test(`Saved ${legacyMode} pa
     await expect(page.getByRole('separator', { name: 'Resize query and output panels', exact: true })).toHaveAttribute('aria-valuenow', '63');
 });
 
-for (const mode of ['Standard', 'Experimental']) test(`${mode} query and results still open in separate windows and return to the workspace`, async ({ page }) => {
+for (const mode of ['Standard', 'Experimental']) test(`${mode} query opens in a separate window while results stay in the workspace`, async ({ page }) => {
     await page.setViewportSize({ width: 1400, height: 1000 });
     await trust(page);
     await page.getByText(mode, { exact: true }).click();
@@ -939,33 +934,8 @@ for (const mode of ['Standard', 'Experimental']) test(`${mode} query and results
     await page.locator('button[aria-controls="sql-editor-content"]').click();
     await expect(page.locator('.cm-content')).toHaveText(editedSql);
 
-    await page.locator('button[aria-controls="query-results-content"]').click();
-    const resultsPopupPromise = page.waitForEvent('popup');
-    await page.getByRole('button', { name: 'Open results in a separate window', exact: true }).click();
-    const resultsPopup = await resultsPopupPromise;
-    await expect(resultsPopup.getByRole('table', { name: 'Retained query rows' })).toHaveText(retainedRows, { useInnerText: true });
-    await expect(resultsPopup.locator('.results-surface')).toHaveCSS('border-radius', '4px');
-    const popupFilter = await openResultFilter(resultsPopup.locator('.results-header'));
-    await expect(resultsPopup.locator('.results-header .result-row-count')).toHaveText('7 rows');
-    await expect(resultsPopup.locator('.table-pagination, .result-pagination')).toHaveCount(0);
-    await popupFilter.fill('2026-01-02');
-    await expect(resultsPopup.locator('tbody tr')).toHaveCount(1);
-    await expect(resultsPopup.locator('.result-row-count')).toHaveText('1 of 7 rows');
-    await popupFilter.fill('');
-    await expect(resultsPopup.locator('html')).toHaveAttribute('data-theme', 'click-light');
-    await expect(resultsPopup.getByRole('button', { name: /Float|Maximize|Restore/ })).toHaveCount(0);
-    await resultsPopup.close();
-    await expect(page.locator('.detached-results-placeholder')).toHaveCount(0);
-    await expect(page.locator('#query-results-content')).toBeHidden();
-    await page.locator('button[aria-controls="query-results-content"]').click();
+    await expect(page.getByRole('button', { name: 'Open results in a separate window', exact: true })).toHaveCount(0);
     await expect(page.getByRole('separator', { name: 'Resize query and output panels', exact: true })).toBeVisible();
-    await expect(page.locator('.results-surface').getByRole('table', { name: 'Retained query rows' })).toHaveText(retainedRows, { useInnerText: true });
-
-    const reopenedResultsPromise = page.waitForEvent('popup');
-    await page.getByRole('button', { name: 'Open results in a separate window', exact: true }).click();
-    const reopenedResults = await reopenedResultsPromise;
-    await reopenedResults.getByRole('button', { name: 'Dock results here', exact: true }).click();
-    await expect.poll(() => reopenedResults.isClosed()).toBe(true);
     await expect(page.locator('.results-surface').getByRole('table', { name: 'Retained query rows' })).toHaveText(retainedRows, { useInnerText: true });
 });
 
@@ -1734,10 +1704,8 @@ test('Scripts show each statement outcome and open that statement’s retained r
     await expect(page.locator('.cm-content')).toContainText('SELECT 1; SELECT fixture_error; SELECT 3;');
     await first.click();
 
-    const detachedResultsPromise = page.waitForEvent('popup');
-    await results.getByRole('button', { name: 'Open results in a separate window', exact: true }).click();
-    const detachedResults = await detachedResultsPromise;
-    await expect(detachedResults.locator('.results-title [data-run-status]')).toHaveAttribute('data-run-status', 'succeeded');
+    await expect(results.getByRole('table', { name: 'Retained query rows' })).toBeVisible();
+    await expect(page.locator('.execution-bar')).toHaveAttribute('data-run-status', 'succeeded');
 });
 
 test('Script errors without a statement run ID show the ClickHouse error and failed SQL', async ({ page }) => {

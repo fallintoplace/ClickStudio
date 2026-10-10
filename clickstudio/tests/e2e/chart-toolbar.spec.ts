@@ -195,29 +195,6 @@ test('Row-count charts use the compact toolbar and keep their counting explanati
     await expectToolbarFits(toolbar);
 });
 
-test('Detached charts open their dropdown in the popup document and preserve selection when docked', async ({ page }) => {
-    await mockSnapshot(page, {
-        columns: [{ name: 'city', type: 'String' }, { name: 'events', type: 'UInt64' }, { name: 'views', type: 'UInt64' }],
-        rows: [['Berlin', 10, 5], ['Warsaw', 15, 8]],
-    });
-    const results = await openChart(page);
-    const popupPromise = page.waitForEvent('popup');
-    await results.getByRole('button', { name: 'Open results in a separate window', exact: true }).click();
-    const popup = await popupPromise;
-    await popup.setViewportSize({ width: 640, height: 640 });
-    const toolbar = popup.locator('.chart-toolbar');
-    await toolbar.getByRole('button', { name: 'Measures', exact: true }).press('Enter');
-    const measures = popup.getByRole('dialog', { name: 'Measures', exact: true });
-    await expectPopoverFits(popup, measures);
-    await measures.getByLabel('views', { exact: true }).uncheck();
-    await expect(measures.getByLabel('events', { exact: true })).toBeDisabled();
-    await popup.keyboard.press('Escape');
-    await expect(toolbar.getByRole('button', { name: 'Measures', exact: true })).toBeFocused();
-    await popup.close();
-    await expect(results.locator('.chart-measure-summary')).toHaveText('events');
-    await expect(results.locator('.chart-bar')).toHaveCount(2);
-});
-
 test('Custom chart titles remain inline while explanations move to details', async ({ page }) => {
     const title = 'Events across European cities';
     await page.addInitScript(title => localStorage.setItem('clickstudio:workspace:demo:v1', JSON.stringify({

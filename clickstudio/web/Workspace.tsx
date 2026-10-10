@@ -229,7 +229,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
             onSelectScriptRun: runId => { setSelectedScriptResult(active.id, `${active.scriptId}:${runId}`); if (active.scriptId) scriptFollowRef.current = { scriptId: active.scriptId, enabled: false }; update(active.id, draft => ({ ...draft, activeRunId: runId })); setView('results'); },
             onSelectScriptError: () => { setSelectedScriptResult(active.id, ''); setView('results'); },
             onCloseOutput: () => { detachedResults.closeResults(); setOutputClosedForDraft(active.id, true); editor.current?.focus(); },
-            onOpenDetached: detachedResults.openResults, onDockDetached: detachedResults.dockResults, onCancel: () => void cancel(), onPage: setPage, onPatch: patch,
+            onDockDetached: detachedResults.dockResults, onCancel: () => void cancel(), onPage: setPage, onPatch: patch,
             onLoadProfile: () => void perform(loadProfile, 'save'), onLoadPipeline: () => void perform(loadPipeline, 'save'), onLoadFlamegraph: () => void perform(loadFlamegraph, 'save'),
             onRevealRange: (from, to) => {
                 panels.revealPanelTemporarily('query', active.id);

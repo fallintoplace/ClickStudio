@@ -52,7 +52,6 @@ export type WorkspaceResultsPanelActions = Readonly<{
     onSelectView: (view: ResultsView) => void;
     onSelectScriptRun: (runId: string) => void;
     onSelectScriptError: () => void;
-    onOpenDetached: () => void;
     onDockDetached: () => void;
     onCloseOutput: () => void;
     onCancel: () => void;
@@ -156,9 +155,7 @@ export function WorkspaceResultsPanel({
                 {!showFailure && run && resultTabs.length > 1 && <div className="results-tabs" role="tablist" aria-label={copy.common.workspaceOutput}>{resultTabs.map(tab => <button key={tab} role="tab" aria-selected={visibleResultsView === tab} type="button" onClick={() => actions.onSelectView(tab)}>{resultsTabLabel(tab, copy.common)}{tab === 'chart' && retainedSnapshot && <span className="suggested-dot"/>}</button>)}</div>}
                 <div ref={setTableToolbar} className="results-table-tools" hidden={panels.resultsCollapsed || showFailure}/>
                 {!showFailure && previousSuccessfulResult && visibleResultsView !== 'results' && !(visibleResultsView === 'chart' && snapshotChart?.config.kind === 'table') && <span className="result-previous-run" title={copy.common.previousResultsDescription}>{copy.common.previousRun}</span>}
-                {detached
-                    ? <Button variant="ghost" className="panel-window-button" aria-label={copy.common.dockResultsPanel} title={copy.common.dockResultsPanel} onClick={actions.onDockDetached}><Icon name="dock"/></Button>
-                    : !panels.compactViewport && <Button variant="ghost" className="panel-window-button" aria-label={copy.common.openResultsInNewWindow} title={copy.common.openResultsInNewWindow} onClick={actions.onOpenDetached}><Icon name="newWindow"/></Button>}
+                {detached && <Button variant="ghost" className="panel-window-button" aria-label={copy.common.dockResultsPanel} title={copy.common.dockResultsPanel} onClick={actions.onDockDetached}><Icon name="dock"/></Button>}
                 <Button variant="ghost" className="panel-collapse-button" aria-label={`${panels.resultsCollapsed ? copy.common.expand : copy.common.collapse} ${resultsPanelLabel}`} aria-expanded={!panels.resultsCollapsed} aria-controls="query-results-content" title={panels.resultsCollapsed ? copy.common.expandOutput : copy.common.collapseOutput} onClick={() => panels.setResultsCollapsed(value => !value)}><Icon className="panel-toggle-icon" name="chevron"/></Button>
                 {showFailure && <Button variant="ghost" className="panel-window-button" aria-label={copy.common.closeOutput} title={copy.common.closeOutput} onClick={actions.onCloseOutput}><Icon name="close"/></Button>}
             </div>

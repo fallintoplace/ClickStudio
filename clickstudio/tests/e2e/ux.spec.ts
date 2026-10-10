@@ -319,30 +319,3 @@ test('Paged truncated results keep header navigation when returning from Chart',
     await expect(header.locator('.result-completeness')).toContainText('Retained prefix · truncated');
     expect(runs()).toBe(1);
 });
-
-test('Detached results keep header pagination and return to the same page when docked', async ({ page }) => {
-    const runs = countRuns(page);
-    await mockPaginatedResult(page);
-    await trust(page);
-    await runButton(page).click();
-    const popupPromise = page.waitForEvent('popup');
-    await page.getByRole('button', { name: 'Open results in a separate window', exact: true }).click();
-    const popup = await popupPromise;
-    const header = popup.locator('.results-header');
-    const pagination = header.getByRole('navigation', { name: 'Result pagination', exact: true });
-    await expect(header.locator('.result-row-count')).toHaveText('1–200 / 450 rows');
-    await pagination.getByRole('button', { name: 'Last page', exact: true }).click();
-    await expect(header.locator('.result-row-count')).toHaveText('401–450 / 450 rows');
-    await (await openResultFilter(header)).fill('row-449');
-    await expect(header.locator('.result-row-count')).toHaveText('1 of 50 rows on this page');
-    await expect(popup.locator('tbody .row-number')).toHaveText('450');
-    await header.getByRole('button', { name: 'Clear row filter', exact: true }).click();
-    await popup.setViewportSize({ width: 640, height: 720 });
-    await expectResultsToolbarFits(header);
-    await expect(popup.locator('.table-pagination')).toHaveCount(0);
-    await popup.close();
-    const dockedHeader = page.locator('.results-header');
-    await expect(dockedHeader.getByRole('status', { name: 'Page 3 of 3', exact: true })).toBeVisible();
-    await expect(dockedHeader.locator('.result-row-count')).toHaveText('401–450 / 450 rows');
-    expect(runs()).toBe(1);
-});
