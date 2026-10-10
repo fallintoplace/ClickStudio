@@ -1209,7 +1209,7 @@
   .explain-index-meter {
     height: 4px;
     overflow: hidden;
-    border-radius: 99px;
+    border-radius: var(--radius-control);
     background: color-mix(in srgb, var(--line-bright) 74%, transparent);
   }
   .explain-index-meter > span {
@@ -2160,7 +2160,7 @@
     width: 58px;
     height: 9px;
     flex: none;
-    border-radius: 99px;
+    border-radius: var(--radius-control);
     background: linear-gradient(
       90deg,
       hsl(278 88% 60%),

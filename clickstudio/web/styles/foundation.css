@@ -88,8 +88,8 @@
   --radius-panel: 4px;
   --radius-control: 4px;
   --radius-label: 2px;
-  --radius-popover: 6px;
-  --radius-dialog: 8px;
+  --radius-popover: 4px;
+  --radius-dialog: 4px;
   --radius: var(--radius-panel);
   --radius-compact: var(--radius-control);
   --surface-glass: var(--page-raised);

@@ -11,7 +11,7 @@ test('Materialized views have selectable dependency edges and refresh details', 
         exact: true,
     });
     await expect(dialog).toContainText('SAMPLE DATA');
-    await expect(dialog).toHaveCSS('border-radius', '8px');
+    await expect(dialog).toHaveCSS('border-radius', '4px');
     await expect(dialog.locator('.native-lineage-node rect').first()).toHaveCSS('rx', '4px');
     await dialog
         .getByRole('button', { name: 'demo.monthly_report_mv: Refreshable MV', exact: true })

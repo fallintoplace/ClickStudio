@@ -87,7 +87,7 @@
   .workspace-panel-splitter::before {
     width: min(180px, 32%);
     height: 3px;
-    border-radius: 99px;
+    border-radius: var(--radius-control);
     background: var(--line-bright);
     content: "";
     transition:

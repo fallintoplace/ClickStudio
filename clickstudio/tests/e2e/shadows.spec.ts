@@ -200,14 +200,14 @@ for (const theme of ['Dark', 'Light'])
             await page.locator('.connection-trigger').click();
             const menu = page.getByRole('dialog', { name: 'Connection details', exact: true });
             await expect(menu).toBeVisible();
-            await expect(menu).toHaveCSS('border-radius', '6px');
+            await expect(menu).toHaveCSS('border-radius', '4px');
             const menuShadow = await shadow(menu);
             expect(menuShadow).not.toBe('none');
             await page.locator('.connection-trigger').click();
             await page.getByRole('button', { name: 'Help', exact: true }).click();
             const help = page.getByRole('dialog', { name: 'Explore ClickStudio', exact: true });
             await expect(help).toBeVisible();
-            await expect(help).toHaveCSS('border-radius', '8px');
+            await expect(help).toHaveCSS('border-radius', '4px');
             const dialogShadow = await shadow(help);
             expect(dialogShadow).not.toBe(menuShadow);
             const scrim = await backdrop(page.locator('.workspace-help-backdrop'));
@@ -259,7 +259,7 @@ for (const theme of ['Dark', 'Light'])
             await page.getByRole('button', { name: 'Export', exact: true }).click();
             const exportDialog = page.getByRole('dialog', { name: 'Export', exact: true });
             await expect(exportDialog).toBeVisible();
-            await expect(exportDialog).toHaveCSS('border-radius', '8px');
+            await expect(exportDialog).toHaveCSS('border-radius', '4px');
             await expect(exportDialog.locator('.export-option').first()).toHaveCSS(
                 'border-radius',
                 '4px',
@@ -277,7 +277,7 @@ for (const theme of ['Dark', 'Light'])
             await expect(importDialog).toBeVisible();
             await expect(importDialog).toHaveCSS('box-shadow', dialogShadow);
             expect(await backdrop(importDialog, true)).toEqual(scrim);
-            await expect(importDialog).toHaveCSS('border-radius', '8px');
+            await expect(importDialog).toHaveCSS('border-radius', '4px');
             const step = importDialog.locator('.import-step-item.is-current .import-step-number');
             await expect(step).toHaveCSS('border-radius', '2px');
             const stepColors = await step.evaluate(element => {
