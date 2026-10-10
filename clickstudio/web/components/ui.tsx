@@ -233,8 +233,9 @@ const iconPaths = {
     ),
     dock: (
         <>
-            <rect width="18" height="18" x="3" y="3" rx="2" />
-            <path d="M3 15h18" />
+            <path d="M15 15H9l6-6" />
+            <path d="M9 15V9" />
+            <rect x="3" y="3" width="18" height="18" rx="2" />
         </>
     ),
     plus: (
