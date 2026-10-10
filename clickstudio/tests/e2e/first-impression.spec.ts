@@ -86,11 +86,18 @@ test('Standard More keeps query history and saved queries before and after execu
     await expect(
         inspector.getByRole('heading', { name: 'Query history', exact: true }),
     ).toBeVisible();
+    await expect(inspector.getByRole('button', { name: 'Compare runs', exact: true })).toHaveCount(
+        0,
+    );
+    await expect(inspector.getByRole('button', { name: '↻ Refresh', exact: true })).toBeVisible();
 
     await page.getByTestId('run-button').click();
     await expect(
         page.getByRole('table', { name: 'Retained query rows', exact: true }),
     ).toBeVisible();
+    await expect(inspector.getByRole('button', { name: 'Compare runs', exact: true })).toHaveCount(
+        0,
+    );
     const saved = page.waitForResponse(
         response =>
             response.request().method() === 'POST' &&

@@ -328,15 +328,19 @@ export function InspectorPane({
                     <section className="inspector-section">
                         <div className="schema-heading">
                             <span>{copy.history.toUpperCase()}</span>
-                            <RunComparisonLauncher
-                                connectionId={connectionId}
-                                trusted={trusted}
-                                history={history}
-                                initialRun={run}
-                                profiles={comparisonProfiles}
-                                pipelines={comparisonPipelines}
-                                queryLogAvailable={connection.manifest?.queryLog.available === true}
-                            />
+                            {expert && (
+                                <RunComparisonLauncher
+                                    connectionId={connectionId}
+                                    trusted={trusted}
+                                    history={history}
+                                    initialRun={run}
+                                    profiles={comparisonProfiles}
+                                    pipelines={comparisonPipelines}
+                                    queryLogAvailable={
+                                        connection.manifest?.queryLog.available === true
+                                    }
+                                />
+                            )}
                             <Button
                                 variant="ghost"
                                 className="toolbar-small"
