@@ -126,7 +126,7 @@
     .document-tabs-scroll-button.is-right svg { transform: rotate(-90deg); }
     .document-tabs-scroll-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
     .document-tab:hover { background: var(--panel); color: var(--text-soft); }
-    .document-tab.is-active { border-color: var(--active-border); background: var(--panel); color: var(--text); box-shadow: inset 0 2px var(--accent); }
+    .document-tab.is-active { max-width: none; flex: 0 1 auto; border-color: var(--active-border); background: var(--panel); color: var(--text); box-shadow: inset 0 2px var(--accent); }
     .document-tab:focus-visible { outline: 2px solid var(--focus-color); outline-offset: 2px; }
     .document-tab-name { overflow: hidden; flex: 1; text-overflow: ellipsis; white-space: nowrap; }
     .document-tab-rename { min-width: 0; flex: 1; padding: 2px 4px; border: 1px solid color-mix(in srgb, var(--accent) 48%, var(--line)); border-radius: var(--radius-control); outline: none; background: var(--panel-raised); color: var(--text); font: inherit; }

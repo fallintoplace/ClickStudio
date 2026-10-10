@@ -51,6 +51,7 @@
     .detached-query-placeholder-content p { max-width: 390px; margin: 5px 0 0; color: var(--muted); font-size: 10px; line-height: 1.55; }
     .editor-heading { position: relative; display: flex; min-height: 54px; flex: none; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 15px; border-bottom: 1px solid var(--line); background: var(--panel-header); }
     .editor-file-heading, .editor-heading-actions { display: flex; min-width: 0; align-items: center; gap: 11px; }
+    .editor-file-heading { flex: 1 1 auto; }
     .editor-heading-actions { padding-right: 42px; }
     .editor-heading .panel-collapse-button { position: absolute; z-index: 1; top: 50%; right: 12px; flex: none; translate: 0 -50%; }
     .editor-heading-tools { display: flex; min-width: 0; align-items: center; gap: 2px; margin-inline: auto; padding: 2px; border: 1px solid var(--line); border-radius: var(--radius-control); background: color-mix(in srgb, var(--panel-raised) 58%, transparent); }
@@ -62,8 +63,8 @@
     .editor-rail-status .editor-mode-label { gap: 6px; color: var(--text-soft); font-size: 9px; }
     .file-type-icon { display: grid; width: 32px; height: 32px; flex: none; place-items: center; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--panel-raised); color: var(--signal-accent); font-family: var(--font-mono); font-size: 8px; font-weight: 800; letter-spacing: .03em; }
     .file-type-icon.small { width: 28px; height: 28px; font-size: 7px; }
-    .document-name { display: grid; min-width: 0; gap: 1px; }
-    .document-name input { width: min(30vw, 260px); padding: 0; border: 0; outline: none; background: transparent; color: var(--text); font-size: 13px; font-weight: 630; }
+    .document-name { display: grid; min-width: 0; flex: 1 1 auto; gap: 1px; }
+    .document-name input { width: 100%; min-width: 0; padding: 0; border: 0; outline: none; background: transparent; color: var(--text); font-size: 13px; font-weight: 630; }
     .document-name input:focus { outline: 0; }
     .editor-heading-actions { gap: 6px; }
     .panel-collapse-button { width: 29px; min-width: 29px; min-height: 29px; padding: 0; }
