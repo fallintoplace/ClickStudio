@@ -49,9 +49,7 @@
   background: color-mix(in srgb, var(--help-surface) 70%, var(--panel));
   font-size: var(--help-text-meta);
 }
-.workspace-help-dependencies
-  .native-lineage-meta-toolbar
-  .button-base:hover:not(:disabled) {
+.workspace-help-dependencies .native-lineage-meta-toolbar .button-base:hover:not(:disabled) {
   border-color: var(--help-selected-border);
   background: var(--help-selected-surface);
 }
@@ -84,10 +82,7 @@
     border-color 0.14s ease,
     box-shadow 0.14s ease;
 }
-.workspace-help-dependencies
-  .native-lineage-controls
-  .native-search
-  input:focus-visible {
+.workspace-help-dependencies .native-lineage-controls .native-search input:focus-visible {
   border-color: var(--help-selected-border);
   outline: none;
   box-shadow: var(--help-focus-ring);
@@ -157,10 +152,7 @@
       color-mix(in srgb, var(--accent) 7%, transparent),
       transparent 40%
     ),
-    linear-gradient(
-      color-mix(in srgb, var(--help-border) 22%, transparent) 1px,
-      transparent 1px
-    ),
+    linear-gradient(color-mix(in srgb, var(--help-border) 22%, transparent) 1px, transparent 1px),
     linear-gradient(
       90deg,
       color-mix(in srgb, var(--help-border) 22%, transparent) 1px,
@@ -191,11 +183,7 @@
 }
 .workspace-help-dependencies .native-lineage-node:hover rect,
 .workspace-help-dependencies .native-lineage-node:focus-visible rect {
-  fill: color-mix(
-    in srgb,
-    var(--help-selected-surface) 64%,
-    var(--panel-raised)
-  );
+  fill: color-mix(in srgb, var(--help-selected-surface) 64%, var(--panel-raised));
 }
 .workspace-help-dependencies .native-lineage-node.is-selected rect,
 .workspace-help-dependencies .native-lineage-node:focus-visible rect {
@@ -233,9 +221,7 @@
   font-size: 14px;
   line-height: 1.45;
 }
-.workspace-help-dependencies
-  .native-node-details.is-beginner
-  .native-node-explanation {
+.workspace-help-dependencies .native-node-details.is-beginner .native-node-explanation {
   margin: 7px 0 13px;
   font-size: var(--help-text-small);
   line-height: 1.5;
@@ -246,29 +232,20 @@
   gap: 8px;
   margin: 12px 0;
 }
-.workspace-help-dependencies
-  .native-node-details.is-beginner
-  .native-metrics
-  div {
+.workspace-help-dependencies .native-node-details.is-beginner .native-metrics div {
   min-width: 0;
   padding: 10px;
   border: 1px solid var(--help-border);
   border-radius: var(--help-radius-control);
   background: color-mix(in srgb, var(--help-code-surface) 74%, transparent);
 }
-.workspace-help-dependencies
-  .native-node-details.is-beginner
-  .native-metrics
-  dt {
+.workspace-help-dependencies .native-node-details.is-beginner .native-metrics dt {
   margin-bottom: 5px;
   font-size: 9px;
   letter-spacing: 0.045em;
   text-transform: uppercase;
 }
-.workspace-help-dependencies
-  .native-node-details.is-beginner
-  .native-metrics
-  dd {
+.workspace-help-dependencies .native-node-details.is-beginner .native-metrics dd {
   color: var(--accent);
   font-size: 20px;
   font-weight: 680;
@@ -276,38 +253,26 @@
 .workspace-help-dependencies .native-node-details.is-beginner > .native-notes {
   margin: 10px 0 0;
   padding: 9px 10px;
-  border-left: 2px solid
-    color-mix(in srgb, var(--accent) 58%, var(--help-border));
+  border-left: 2px solid color-mix(in srgb, var(--accent) 58%, var(--help-border));
   border-radius: 0 var(--radius-control) var(--radius-control) 0;
   background: color-mix(in srgb, var(--accent) 4%, var(--help-surface));
   font-size: var(--help-text-meta);
 }
-.workspace-help-dependencies
-  .native-node-details.is-beginner
-  .native-relationships {
+.workspace-help-dependencies .native-node-details.is-beginner .native-relationships {
   gap: 0;
   margin: 12px 0;
   border-color: var(--help-border);
 }
-.workspace-help-dependencies
-  .native-node-details.is-beginner
-  .native-relationships
-  p {
+.workspace-help-dependencies .native-node-details.is-beginner .native-relationships p {
   gap: 4px;
   margin: 0;
   padding: 9px 1px;
   border-bottom: 1px solid var(--help-border);
 }
-.workspace-help-dependencies
-  .native-node-details.is-beginner
-  .native-relationships
-  p:last-child {
+.workspace-help-dependencies .native-node-details.is-beginner .native-relationships p:last-child {
   border-bottom: 0;
 }
-.workspace-help-dependencies
-  .native-node-details.is-beginner
-  .native-relationships
-  span,
+.workspace-help-dependencies .native-node-details.is-beginner .native-relationships span,
 .workspace-help-dependencies .native-node-details.is-beginner details summary {
   font-size: var(--help-text-meta);
 }

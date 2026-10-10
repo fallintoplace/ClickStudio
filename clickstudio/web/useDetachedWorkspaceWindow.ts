@@ -8,20 +8,32 @@ export type DetachedWorkspaceWindow = Readonly<{
 
 function copyAttributes(source: Element, target: Element) {
     for (const attribute of Array.from(target.attributes)) target.removeAttribute(attribute.name);
-    for (const attribute of Array.from(source.attributes)) target.setAttribute(attribute.name, attribute.value);
+    for (const attribute of Array.from(source.attributes))
+        target.setAttribute(attribute.name, attribute.value);
 }
 
 function copyWorkspaceStyles(source: Document, target: Document) {
-    target.head.querySelectorAll('[data-clickstudio-detached-style]').forEach(node => node.remove());
-    for (const sourceNode of Array.from(source.head.querySelectorAll('style, link[rel~="stylesheet"]'))) {
+    target.head
+        .querySelectorAll('[data-clickstudio-detached-style]')
+        .forEach(node => node.remove());
+    for (const sourceNode of Array.from(
+        source.head.querySelectorAll('style, link[rel~="stylesheet"]'),
+    )) {
         const clone = sourceNode.cloneNode(true) as HTMLStyleElement | HTMLLinkElement;
         clone.setAttribute('data-clickstudio-detached-style', '');
-        if (clone.tagName === 'LINK') (clone as HTMLLinkElement).href = (sourceNode as HTMLLinkElement).href;
+        if (clone.tagName === 'LINK')
+            (clone as HTMLLinkElement).href = (sourceNode as HTMLLinkElement).href;
         target.head.append(clone);
     }
 }
 
-function prepareWorkspaceWindow(child: Window, title: string, experience: ExperienceLevel, rootClassName: string, label: string): HTMLDivElement {
+function prepareWorkspaceWindow(
+    child: Window,
+    title: string,
+    experience: ExperienceLevel,
+    rootClassName: string,
+    label: string,
+): HTMLDivElement {
     const source = document;
     const target = child.document;
     const html = target.documentElement;
@@ -29,7 +41,8 @@ function prepareWorkspaceWindow(child: Window, title: string, experience: Experi
     const body = target.body ?? html.appendChild(target.createElement('body'));
 
     target.head.replaceChildren();
-    for (const meta of Array.from(source.head.querySelectorAll('meta'))) head.append(meta.cloneNode(true));
+    for (const meta of Array.from(source.head.querySelectorAll('meta')))
+        head.append(meta.cloneNode(true));
     const base = target.createElement('base');
     base.setAttribute('data-clickstudio-editor-base', '');
     base.href = source.baseURI;
@@ -53,26 +66,35 @@ function useDetachedWorkspaceWindow(windowName: string, rootClassName: string, l
     const [detached, setDetached] = useState<DetachedWorkspaceWindow | null>(null);
     const detachedWindow = useRef<Window | null>(null);
 
-    const open = useCallback((title: string, experience: ExperienceLevel) => {
-        const current = detachedWindow.current;
-        if (current && !current.closed) {
-            current.focus();
-            return true;
-        }
+    const open = useCallback(
+        (title: string, experience: ExperienceLevel) => {
+            const current = detachedWindow.current;
+            if (current && !current.closed) {
+                current.focus();
+                return true;
+            }
 
-        const child = window.open('', windowName, 'popup=yes,width=1280,height=900');
-        if (!child) return false;
-        try {
-            const container = prepareWorkspaceWindow(child, `ClickStudio · ${title}`, experience, rootClassName, label);
-            detachedWindow.current = child;
-            setDetached({ window: child, container });
-            child.focus();
-            return true;
-        } catch {
-            child.close();
-            return false;
-        }
-    }, [label, rootClassName, windowName]);
+            const child = window.open('', windowName, 'popup=yes,width=1280,height=900');
+            if (!child) return false;
+            try {
+                const container = prepareWorkspaceWindow(
+                    child,
+                    `ClickStudio · ${title}`,
+                    experience,
+                    rootClassName,
+                    label,
+                );
+                detachedWindow.current = child;
+                setDetached({ window: child, container });
+                child.focus();
+                return true;
+            } catch {
+                child.close();
+                return false;
+            }
+        },
+        [label, rootClassName, windowName],
+    );
 
     const focus = useCallback(() => {
         const child = detachedWindow.current;
@@ -93,7 +115,9 @@ function useDetachedWorkspaceWindow(windowName: string, rootClassName: string, l
     const setTitle = useCallback((title: string) => {
         const child = detachedWindow.current;
         if (!child || child.closed) return;
-        try { child.document.title = `ClickStudio · ${title}`; } catch {}
+        try {
+            child.document.title = `ClickStudio · ${title}`;
+        } catch {}
     }, []);
 
     useEffect(() => {
@@ -110,11 +134,16 @@ function useDetachedWorkspaceWindow(windowName: string, rootClassName: string, l
         const observer = new MutationObserver(syncDocument);
         observer.observe(document.documentElement, { attributes: true });
         observer.observe(document.body, { attributes: true });
-        observer.observe(document.head, { attributes: true, characterData: true, childList: true, subtree: true });
+        observer.observe(document.head, {
+            attributes: true,
+            characterData: true,
+            childList: true,
+            subtree: true,
+        });
         const interval = window.setInterval(() => {
             if (child.closed) {
                 detachedWindow.current = null;
-                setDetached(current => current?.window === child ? null : current);
+                setDetached(current => (current?.window === child ? null : current));
             }
         }, 300);
         return () => {
@@ -123,15 +152,22 @@ function useDetachedWorkspaceWindow(windowName: string, rootClassName: string, l
         };
     }, [detached]);
 
-    useEffect(() => () => {
-        const child = detachedWindow.current;
-        detachedWindow.current = null;
-        if (child && !child.closed) child.close();
-    }, []);
+    useEffect(
+        () => () => {
+            const child = detachedWindow.current;
+            detachedWindow.current = null;
+            if (child && !child.closed) child.close();
+        },
+        [],
+    );
 
     return { detached, open, focus, dock, setTitle };
 }
 
 export function useDetachedEditorWindow() {
-    return useDetachedWorkspaceWindow('clickstudio-query-editor', 'detached-query-window-root workspace-root', 'Detached SQL editor');
+    return useDetachedWorkspaceWindow(
+        'clickstudio-query-editor',
+        'detached-query-window-root workspace-root',
+        'Detached SQL editor',
+    );
 }

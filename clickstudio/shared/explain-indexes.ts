@@ -34,11 +34,22 @@ function explainLines(rows: readonly (readonly unknown[])[]) {
         if (typeof value !== 'string') continue;
         if (value.length > remaining) {
             truncated = true;
-            lines.push(...value.slice(0, remaining).split(/\r?\n/).map(explainLine).filter((line): line is ExplainLine => Boolean(line)));
+            lines.push(
+                ...value
+                    .slice(0, remaining)
+                    .split(/\r?\n/)
+                    .map(explainLine)
+                    .filter((line): line is ExplainLine => Boolean(line)),
+            );
             break;
         }
         remaining -= value.length;
-        lines.push(...value.split(/\r?\n/).map(explainLine).filter((line): line is ExplainLine => Boolean(line)));
+        lines.push(
+            ...value
+                .split(/\r?\n/)
+                .map(explainLine)
+                .filter((line): line is ExplainLine => Boolean(line)),
+        );
     }
     return { lines, truncated };
 }
@@ -46,7 +57,10 @@ function explainLines(rows: readonly (readonly unknown[])[]) {
 function explainLine(value: string): ExplainLine | undefined {
     const deNumbered = value.replace(/^\s*\d+\.\s*[│|]\s?/, '');
     const indentText = deNumbered.match(/^\s*/)?.[0] ?? '';
-    const text = deNumbered.slice(indentText.length).replace(/\s*[│|]\s*$/, '').trimEnd();
+    const text = deNumbered
+        .slice(indentText.length)
+        .replace(/\s*[│|]\s*$/, '')
+        .trimEnd();
     if (!text.trim() || /^[┌┐└┘├┤┬┴┼─━│┃┆┊║]+$/.test(text.trim())) return undefined;
     return { indent: indentText.length, text: text.trim() };
 }
@@ -57,12 +71,12 @@ function ratio(value: string): ExplainIndexCount | undefined {
     const selected = match[1]!.replace(/[,_]/g, '');
     const total = match[2]!.replace(/[,_]/g, '');
     try {
-        const selectedValue = BigInt(selected), totalValue = BigInt(total);
+        const selectedValue = BigInt(selected),
+            totalValue = BigInt(total);
         if (totalValue <= 0n || selectedValue > totalValue) return undefined;
         const percent = Number((selectedValue * 1000n + totalValue / 2n) / totalValue) / 10;
         return { selected, total, percent };
-    }
-    catch {
+    } catch {
         return undefined;
     }
 }
@@ -77,7 +91,11 @@ function property(index: ExplainIndexStep, name: string, value: string) {
 
 function sourceLabel(lines: ExplainLine[], before: number) {
     for (let index = before; index >= 0; index--) {
-        if (/\bReadFrom(?:MergeTree|Merge|Remote|File|S3|URL|MySQL|PostgreSQL|SQLite|Bifurcate|Dictionary|Null|Numbers|System|Values|View)\b/i.test(lines[index]!.text))
+        if (
+            /\bReadFrom(?:MergeTree|Merge|Remote|File|S3|URL|MySQL|PostgreSQL|SQLite|Bifurcate|Dictionary|Null|Numbers|System|Values|View)\b/i.test(
+                lines[index]!.text,
+            )
+        )
             return lines[index]!.text.slice(0, 240);
         if (/^Indexes\s*:/i.test(lines[index]!.text)) return 'Table read';
     }
@@ -112,7 +130,13 @@ function indexSteps(lines: ExplainLine[], truncatedInput: boolean) {
         for (let lineIndex = cursor + 1; lineIndex < lines.length; lineIndex++) {
             const line = lines[lineIndex]!;
             if (line.indent <= heading.indent) break;
-            if (/^Indexes\s*:/i.test(line.text) || /\bReadFrom(?:MergeTree|Merge|Remote|File|S3|URL|MySQL|PostgreSQL|SQLite|Bifurcate|Dictionary|Null|Numbers|System|Values|View)\b/i.test(line.text)) break;
+            if (
+                /^Indexes\s*:/i.test(line.text) ||
+                /\bReadFrom(?:MergeTree|Merge|Remote|File|S3|URL|MySQL|PostgreSQL|SQLite|Bifurcate|Dictionary|Null|Numbers|System|Values|View)\b/i.test(
+                    line.text,
+                )
+            )
+                break;
             const separator = line.text.indexOf(':');
             if (separator >= 0) {
                 if (!current) continue;
@@ -137,7 +161,11 @@ function indexSteps(lines: ExplainLine[], truncatedInput: boolean) {
                     truncated = true;
                     break;
                 }
-                current = { id: `index-${sections.length}-${section.steps.length}`, type: line.text.slice(0, 160), properties: [] };
+                current = {
+                    id: `index-${sections.length}-${section.steps.length}`,
+                    type: line.text.slice(0, 160),
+                    properties: [],
+                };
                 section.steps.push(current);
                 parsedIndexCount++;
                 continue;
@@ -145,7 +173,8 @@ function indexSteps(lines: ExplainLine[], truncatedInput: boolean) {
             if (collectingKeys) keys.push(line.text);
             else if (current) {
                 const previous = current.properties.at(-1);
-                if (previous) previous.value = `${previous.value}\n${line.text}`.slice(0, MAX_PROPERTY_CHARS);
+                if (previous)
+                    previous.value = `${previous.value}\n${line.text}`.slice(0, MAX_PROPERTY_CHARS);
                 else property(current, 'Details', line.text);
             }
         }
@@ -160,7 +189,9 @@ function graphStatus(step: ExplainIndexStep) {
     return `${step.granules.percent}% remain`;
 }
 
-export function parseExplainIndexAnalysis(rows: readonly (readonly unknown[])[]): ExplainIndexAnalysis | undefined {
+export function parseExplainIndexAnalysis(
+    rows: readonly (readonly unknown[])[],
+): ExplainIndexAnalysis | undefined {
     const { lines, truncated: truncatedInput } = explainLines(rows);
     if (!lines.some(line => /^Indexes\s*:/i.test(line.text))) return undefined;
     const { sections, truncated } = indexSteps(lines, truncatedInput);
@@ -192,12 +223,24 @@ export function parseExplainIndexAnalysis(rows: readonly (readonly unknown[])[])
         }
         if (visibleSteps.length < section.steps.length) graphTruncated = true;
         const outputId = `index-output-${sectionIndex}`;
-        nodes.push({ id: outputId, label: 'Read selected granules', kind: 'output', status: 'planned' });
+        nodes.push({
+            id: outputId,
+            label: 'Read selected granules',
+            kind: 'output',
+            status: 'planned',
+        });
         edges.push({ source: previousId, target: outputId });
         if (visibleSteps.length < section.steps.length) break;
     }
     return {
-        pipeline: { available: true, source: 'explain_plan', nodes, edges, truncated: graphTruncated, notice: 'Index pruning facts are reported by ClickHouse EXPLAIN INDEXES.' },
+        pipeline: {
+            available: true,
+            source: 'explain_plan',
+            nodes,
+            edges,
+            truncated: graphTruncated,
+            notice: 'Index pruning facts are reported by ClickHouse EXPLAIN INDEXES.',
+        },
         steps,
         indexCount,
         truncated: graphTruncated,

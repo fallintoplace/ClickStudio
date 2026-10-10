@@ -1,5 +1,5 @@
 export const IMPORT_FORMATS = ['csv', 'json', 'ndjson'] as const;
-export type ImportFormat = typeof IMPORT_FORMATS[number];
+export type ImportFormat = (typeof IMPORT_FORMATS)[number];
 
 export const MAX_IMPORT_FILE_BYTES = 2_000_000;
 export const MAX_IMPORT_SOURCE_CHARS = 2_000_000;

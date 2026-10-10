@@ -36,7 +36,8 @@ export async function replaceSql(page: Page, sql: string) {
     await editor.focus();
     await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.insertText(sql);
-    await expect.poll(async () => (await editor.innerText()).replace(/\s/g, ''))
+    await expect
+        .poll(async () => (await editor.innerText()).replace(/\s/g, ''))
         .toContain(sql.replace(/\s/g, ''));
 }
 
@@ -66,7 +67,7 @@ export async function trustCurrentConnection(page: Page) {
     await expect(details).toBeVisible();
     const start = details.getByRole('button', { name: 'Start exploring', exact: true });
     if (await start.isVisible()) await start.click();
-    if (await trigger.getAttribute('aria-expanded') === 'true') await trigger.click();
+    if ((await trigger.getAttribute('aria-expanded')) === 'true') await trigger.click();
 }
 
 export async function runScript(page: Page) {

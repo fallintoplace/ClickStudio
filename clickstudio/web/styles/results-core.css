@@ -296,8 +296,7 @@
     --result-badge-tint: 8%;
     flex: 0 1 auto;
     padding: 1px 4px;
-    border: 1px solid
-      color-mix(in srgb, var(--result-type-accent) 28%, var(--line));
+    border: 1px solid color-mix(in srgb, var(--result-type-accent) 28%, var(--line));
     border-radius: var(--radius-label);
     background: color-mix(
       in srgb,

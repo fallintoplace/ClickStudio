@@ -1,10 +1,13 @@
 import { test, expect } from '@playwright/test';
 import { trust } from './helpers.js';
 
-test('SQL examples open in a new tab without changing or running the current query', async ({ page }) => {
+test('SQL examples open in a new tab without changing or running the current query', async ({
+    page,
+}) => {
     let runRequests = 0;
     page.on('request', request => {
-        if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/runs') runRequests++;
+        if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/runs')
+            runRequests++;
     });
 
     await trust(page);
@@ -13,7 +16,9 @@ test('SQL examples open in a new tab without changing or running the current que
     const originalName = await originalTab.getAttribute('aria-label');
     const originalSql = await page.locator('.cm-content').textContent();
     const collapseButton = page.getByRole('button', { name: 'Collapse SQL query', exact: true });
-    const collapseButtonRight = await collapseButton.evaluate(element => element.getBoundingClientRect().right);
+    const collapseButtonRight = await collapseButton.evaluate(
+        element => element.getBoundingClientRect().right,
+    );
     expect(collapseButtonRight).toBeLessThanOrEqual(page.viewportSize()!.width);
     await collapseButton.click();
     await expect(page.locator('#sql-editor-content')).toBeHidden();
@@ -56,7 +61,6 @@ test('SQL examples search handles no matches and Escape restores focus', async (
     await expect(trigger).toBeFocused();
 });
 
-
 test('Help tour exposes ClickStudio native workflows from one place', async ({ page }) => {
     await trust(page);
     await expect(page.getByRole('button', { name: 'Open observability' })).toHaveCount(0);
@@ -64,23 +68,43 @@ test('Help tour exposes ClickStudio native workflows from one place', async ({ p
     const dialog = page.getByRole('dialog', { name: 'Explore ClickStudio', exact: true });
     await expect(dialog).toBeVisible();
 
-    for (const section of ['tour', 'examples', 'workflows', 'monitoring', 'query', 'geo', 'explain', 'storage', 'dependencies', 'compare', 'reference'])
+    for (const section of [
+        'tour',
+        'examples',
+        'workflows',
+        'monitoring',
+        'query',
+        'geo',
+        'explain',
+        'storage',
+        'dependencies',
+        'compare',
+        'reference',
+    ])
         await expect(dialog.getByTestId('help-section-' + section)).toBeVisible();
 
-    const tabs = dialog.getByRole('tablist', { name: 'Explore ClickStudio sections' }).getByRole('tab');
+    const tabs = dialog
+        .getByRole('tablist', { name: 'Explore ClickStudio sections' })
+        .getByRole('tab');
     await expect(tabs.first()).toHaveAttribute('data-testid', 'help-section-tour');
     await expect(dialog.getByTestId('help-section-tour')).toHaveAttribute('aria-selected', 'true');
     await dialog.getByTestId('help-section-workflows').click();
     await expect(dialog.getByText('Bind typed values', { exact: true })).toBeVisible();
-    await expect(dialog.getByText(/executes all SQL in the editor and stops after the first error/)).toBeVisible();
+    await expect(
+        dialog.getByText(/executes all SQL in the editor and stops after the first error/),
+    ).toBeVisible();
 
     await dialog.getByTestId('help-section-monitoring').click();
     await expect(dialog.getByRole('heading', { name: 'Workload', exact: true })).toBeVisible();
     await expect(dialog.getByRole('heading', { name: 'Replication', exact: true })).toBeVisible();
 
     await dialog.getByTestId('help-section-geo').click();
-    await expect(dialog.getByText('Native geometry on a spatial canvas', { exact: true })).toBeVisible();
-    await expect(dialog.locator('.workspace-help-geo-copy code')).toContainText("(13.405, 52.52)::Point");
+    await expect(
+        dialog.getByText('Native geometry on a spatial canvas', { exact: true }),
+    ).toBeVisible();
+    await expect(dialog.locator('.workspace-help-geo-copy code')).toContainText(
+        '(13.405, 52.52)::Point',
+    );
     await expect(dialog.getByTestId('run-geo-example')).toBeVisible();
 
     await dialog.getByTestId('help-section-storage').click();

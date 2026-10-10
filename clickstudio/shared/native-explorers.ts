@@ -1,10 +1,23 @@
-import { buildMaterializedViewLineage, LINEAGE_TABLE_LIMIT, type LineageSnapshot } from './materialized-view-lineage.js';
+import {
+    buildMaterializedViewLineage,
+    LINEAGE_TABLE_LIMIT,
+    type LineageSnapshot,
+} from './materialized-view-lineage.js';
 import { metadataText, type MetadataReader } from './native-metadata.js';
-import { ACTIVITY_LIMIT, activityScopeNote, parseMergeActivity, parseMutationActivity, type MergeSnapshot, type MutationSnapshot } from './storage-activity.js';
+import {
+    ACTIVITY_LIMIT,
+    activityScopeNote,
+    parseMergeActivity,
+    parseMutationActivity,
+    type MergeSnapshot,
+    type MutationSnapshot,
+} from './storage-activity.js';
 
 export const NATIVE_EXPLORER_KINDS = ['lineage', 'merges', 'mutations'] as const;
-export type NativeExplorerKind = typeof NATIVE_EXPLORER_KINDS[number];
-export type NativeExplorerRequest = { kind: Extract<NativeExplorerKind, 'lineage'>; database: string } | { kind: Exclude<NativeExplorerKind, 'lineage'>; database: string; table: string };
+export type NativeExplorerKind = (typeof NATIVE_EXPLORER_KINDS)[number];
+export type NativeExplorerRequest =
+    | { kind: Extract<NativeExplorerKind, 'lineage'>; database: string }
+    | { kind: Exclude<NativeExplorerKind, 'lineage'>; database: string; table: string };
 
 export function isNativeExplorerKind(value: unknown): value is NativeExplorerKind {
     return NATIVE_EXPLORER_KINDS.some(kind => kind === value);
@@ -27,9 +40,17 @@ export function mutationActivityQuery(): string {
         ORDER BY is_done ASC, create_time DESC, mutation_id LIMIT ${ACTIVITY_LIMIT + 1}`;
 }
 export function lineageTablesQuery(columns: ReadonlySet<string>): string {
-    const targets = ['target_database', 'target_table'].map(column => columns.has(column) ? column : `'' AS ${column}`);
-    const loading = ['loading_dependencies_database', 'loading_dependencies_table'].map(column => columns.has(column) ? `arraySlice(t.${column}, 1, 64) AS ${column}` : `CAST([], 'Array(String)') AS ${column}`);
-    const loadingOverflow = columns.has('loading_dependencies_table') ? ' OR length(t.loading_dependencies_table) > 64' : '';
+    const targets = ['target_database', 'target_table'].map(column =>
+        columns.has(column) ? column : `'' AS ${column}`,
+    );
+    const loading = ['loading_dependencies_database', 'loading_dependencies_table'].map(column =>
+        columns.has(column)
+            ? `arraySlice(t.${column}, 1, 64) AS ${column}`
+            : `CAST([], 'Array(String)') AS ${column}`,
+    );
+    const loadingOverflow = columns.has('loading_dependencies_table')
+        ? ' OR length(t.loading_dependencies_table) > 64'
+        : '';
     return `SELECT database, name, engine, leftUTF8(t.create_table_query, 8192) AS create_table_query,
         lengthUTF8(t.create_table_query) > 8192 AS definition_truncated,
         arraySlice(t.dependencies_database, 1, 64) AS dependencies_database,
@@ -43,7 +64,9 @@ export function refreshActivityQuery(columns: ReadonlySet<string>): string {
     const timestamps = ['last_success_time', 'last_refresh_time', 'next_refresh_time'];
     const counters = ['last_success_duration_ms', 'read_rows', 'written_rows'];
     const fields = [
-        ...timestamps.map(name => `${columns.has(name) ? `toString(r.${name}, 'UTC')` : 'NULL'} AS ${name}`),
+        ...timestamps.map(
+            name => `${columns.has(name) ? `toString(r.${name}, 'UTC')` : 'NULL'} AS ${name}`,
+        ),
         ...counters.map(name => `${columns.has(name) ? `toString(r.${name})` : 'NULL'} AS ${name}`),
         `${columns.has('progress') ? 'r.progress' : 'NULL'} AS progress`,
         `${columns.has('exception') ? 'leftUTF8(r.exception, 4096)' : "''"} AS exception`,
@@ -53,30 +76,62 @@ export function refreshActivityQuery(columns: ReadonlySet<string>): string {
 }
 
 /** The reader accepts only these fixed queries and bound parameters, never user SQL. */
-export async function loadNativeExplorer(request: NativeExplorerRequest, read: MetadataReader, signal?: AbortSignal): Promise<NativeExplorerSnapshot> {
+export async function loadNativeExplorer(
+    request: NativeExplorerRequest,
+    read: MetadataReader,
+    signal?: AbortSignal,
+): Promise<NativeExplorerSnapshot> {
     signal?.throwIfAborted();
-    const parameters: Record<string, string> = request.kind === 'lineage' ? { database: request.database } : { database: request.database, table: request.table };
-    if (request.kind === 'merges') return parseMergeActivity(request.database, request.table, await read(mergeActivityQuery(), parameters));
-    if (request.kind === 'mutations') return parseMutationActivity(request.database, request.table, await read(mutationActivityQuery(), parameters));
-    const notes = [activityScopeNote, 'Solid edges are insert triggers and write targets. Dashed edges show refresh ordering or catalog-loading dependencies, not complete SELECT lineage.'];
+    const parameters: Record<string, string> =
+        request.kind === 'lineage'
+            ? { database: request.database }
+            : { database: request.database, table: request.table };
+    if (request.kind === 'merges')
+        return parseMergeActivity(
+            request.database,
+            request.table,
+            await read(mergeActivityQuery(), parameters),
+        );
+    if (request.kind === 'mutations')
+        return parseMutationActivity(
+            request.database,
+            request.table,
+            await read(mutationActivityQuery(), parameters),
+        );
+    const notes = [
+        activityScopeNote,
+        'Solid edges are insert triggers and write targets. Dashed edges show refresh ordering or catalog-loading dependencies, not complete SELECT lineage.',
+    ];
     let columns = new Set<string>();
     try {
-        const rows = await read("SELECT name FROM system.columns WHERE database = 'system' AND table = 'tables' LIMIT 500", {});
+        const rows = await read(
+            "SELECT name FROM system.columns WHERE database = 'system' AND table = 'tables' LIMIT 500",
+            {},
+        );
         columns = new Set(rows.map(row => metadataText(row.name)));
     } catch {
         signal?.throwIfAborted();
-        notes.push('Optional metadata-column discovery is unavailable. Targets use the CREATE header where possible.');
+        notes.push(
+            'Optional metadata-column discovery is unavailable. Targets use the CREATE header where possible.',
+        );
     }
     const rows = await read(lineageTablesQuery(columns), parameters);
     signal?.throwIfAborted();
     let refreshes: Awaited<ReturnType<MetadataReader>> = [];
     try {
-        const refreshColumns = await read("SELECT name FROM system.columns WHERE database = 'system' AND table = 'view_refreshes' LIMIT 100", {});
-        refreshes = await read(refreshActivityQuery(new Set(refreshColumns.map(row => metadataText(row.name)))), parameters);
-    }
-    catch {
+        const refreshColumns = await read(
+            "SELECT name FROM system.columns WHERE database = 'system' AND table = 'view_refreshes' LIMIT 100",
+            {},
+        );
+        refreshes = await read(
+            refreshActivityQuery(new Set(refreshColumns.map(row => metadataText(row.name)))),
+            parameters,
+        );
+    } catch {
         signal?.throwIfAborted();
-        notes.push('Refresh telemetry is unavailable to this reader or ClickHouse version. No refresh state is inferred.');
+        notes.push(
+            'Refresh telemetry is unavailable to this reader or ClickHouse version. No refresh state is inferred.',
+        );
     }
     signal?.throwIfAborted();
     return buildMaterializedViewLineage(request.database, rows, refreshes, notes);

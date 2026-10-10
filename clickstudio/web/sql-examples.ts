@@ -3,7 +3,22 @@ import { DEMO_PREVIEW_STARTERS } from './demo-preview.js';
 import { GEO_HELP_EXAMPLES } from './help-demos.js';
 import { PLAYGROUND_CONNECTION_ID, PLAYGROUND_STARTER_SQL } from './playground.js';
 
-export type SqlExampleCategory = 'basics' | 'aggregation' | 'timeSeries' | 'clickhouse' | 'writeOperations' | 'schema' | 'business' | 'observability' | 'operations' | 'engineering' | 'markets' | 'cities' | 'openSource' | 'internet' | 'datasets';
+export type SqlExampleCategory =
+    | 'basics'
+    | 'aggregation'
+    | 'timeSeries'
+    | 'clickhouse'
+    | 'writeOperations'
+    | 'schema'
+    | 'business'
+    | 'observability'
+    | 'operations'
+    | 'engineering'
+    | 'markets'
+    | 'cities'
+    | 'openSource'
+    | 'internet'
+    | 'datasets';
 
 export type SqlExample = {
     id: string;
@@ -19,13 +34,22 @@ export type SqlExample = {
 const playgroundExamples: SqlExample[] = [
     ...GEO_HELP_EXAMPLES,
     {
-        id: 'github-recent-events', name: 'Recent GitHub events', category: 'openSource',
-        description: 'Inspect real events, repositories, actors, and timestamps.', dataset: 'GitHub', sql: PLAYGROUND_STARTER_SQL,
+        id: 'github-recent-events',
+        name: 'Recent GitHub events',
+        category: 'openSource',
+        description: 'Inspect real events, repositories, actors, and timestamps.',
+        dataset: 'GitHub',
+        sql: PLAYGROUND_STARTER_SQL,
         chart: { kind: 'table', x: 0, ys: [], title: 'GitHub events' },
     },
     {
-        id: 'amazon-customer-review-health', name: 'Amazon Customer Review Health', category: 'business', dataset: 'Amazon Reviews', featuredOrder: 1,
-        description: 'Compare negative, neutral, and positive review share across high-volume product categories.',
+        id: 'amazon-customer-review-health',
+        name: 'Amazon Customer Review Health',
+        category: 'business',
+        dataset: 'Amazon Reviews',
+        featuredOrder: 1,
+        description:
+            'Compare negative, neutral, and positive review share across high-volume product categories.',
         sql: `SELECT
     product_category,
     round(100.0 * countIf(star_rating <= 2) / count(), 1) AS negative_pct,
@@ -41,8 +65,13 @@ LIMIT 12`,
         chart: { kind: 'bar', x: 0, ys: [1, 2, 3], title: 'Customer review health by category' },
     },
     {
-        id: 'otel-service-latency-slo', name: 'Service Latency SLO', category: 'observability', dataset: 'OpenTelemetry', featuredOrder: 2,
-        description: 'Track frontend p50, p95, and p99 server-span latency over the latest hour of telemetry.',
+        id: 'otel-service-latency-slo',
+        name: 'Service Latency SLO',
+        category: 'observability',
+        dataset: 'OpenTelemetry',
+        featuredOrder: 2,
+        description:
+            'Track frontend p50, p95, and p99 server-span latency over the latest hour of telemetry.',
         sql: `WITH (SELECT max(Timestamp) FROM otel_v2.otel_traces) AS latest
 SELECT
     toStartOfMinute(Timestamp) AS minute,
@@ -58,8 +87,13 @@ ORDER BY minute`,
         chart: { kind: 'line', x: 0, ys: [1, 2, 3], title: 'Frontend latency percentiles' },
     },
     {
-        id: 'ontime-flight-delay-operations', name: 'Flight Delay Operations', category: 'operations', dataset: 'US flights', featuredOrder: 3,
-        description: 'Spot seasonal departure-delay risk across nine years of US flight operations.',
+        id: 'ontime-flight-delay-operations',
+        name: 'Flight Delay Operations',
+        category: 'operations',
+        dataset: 'US flights',
+        featuredOrder: 3,
+        description:
+            'Spot seasonal departure-delay risk across nine years of US flight operations.',
         sql: `SELECT
     Year AS year,
     Month AS month,
@@ -68,11 +102,22 @@ FROM ontime.ontime
 WHERE Year BETWEEN 2000 AND 2008
 GROUP BY year, month
 ORDER BY year, month`,
-        chart: { kind: 'heatmap', x: 1, groupBy: 0, ys: [2], title: 'Departure delay rate by month' },
+        chart: {
+            kind: 'heatmap',
+            x: 1,
+            groupBy: 0,
+            ys: [2],
+            title: 'Departure delay rate by month',
+        },
     },
     {
-        id: 'stackoverflow-technology-trends', name: 'Developer Technology Trends', category: 'engineering', dataset: 'Stack Overflow', featuredOrder: 4,
-        description: 'Compare quarterly question volume for Python, JavaScript, Java, and Rust as a developer-interest signal.',
+        id: 'stackoverflow-technology-trends',
+        name: 'Developer Technology Trends',
+        category: 'engineering',
+        dataset: 'Stack Overflow',
+        featuredOrder: 4,
+        description:
+            'Compare quarterly question volume for Python, JavaScript, Java, and Rust as a developer-interest signal.',
         sql: `SELECT
     toStartOfQuarter(CreationDate) AS quarter,
     countIf(Tags LIKE '%<python>%') AS python,
@@ -85,11 +130,19 @@ WHERE PostTypeId = 'Question'
     AND CreationDate < toDateTime('2024-04-01 00:00:00')
 GROUP BY quarter
 ORDER BY quarter`,
-        chart: { kind: 'line', x: 0, ys: [1, 2, 3, 4], title: 'Quarterly technology question volume' },
+        chart: {
+            kind: 'line',
+            x: 0,
+            ys: [1, 2, 3, 4],
+            title: 'Quarterly technology question volume',
+        },
     },
     {
-        id: 'github-daily-activity', name: 'Daily activity', category: 'openSource',
-        description: 'Compare event volume and active actors over the last 30 days.', dataset: 'GitHub',
+        id: 'github-daily-activity',
+        name: 'Daily activity',
+        category: 'openSource',
+        description: 'Compare event volume and active actors over the last 30 days.',
+        dataset: 'GitHub',
         sql: `SELECT
     toDate(created_at) AS day,
     count() AS events,
@@ -101,8 +154,11 @@ ORDER BY day`,
         chart: { kind: 'line', x: 0, ys: [1, 2], title: 'Daily GitHub activity' },
     },
     {
-        id: 'github-top-star-events', name: 'Repositories getting starred', category: 'openSource',
-        description: 'Rank repositories by recent GitHub star events.', dataset: 'GitHub',
+        id: 'github-top-star-events',
+        name: 'Repositories getting starred',
+        category: 'openSource',
+        description: 'Rank repositories by recent GitHub star events.',
+        dataset: 'GitHub',
         sql: `SELECT
     repo_name,
     count() AS star_events
@@ -116,8 +172,11 @@ LIMIT 10`,
         chart: { kind: 'bar', x: 0, ys: [1], title: 'Star events by repository' },
     },
     {
-        id: 'github-pr-contributors', name: 'PR contributors by month', category: 'clickhouse',
-        description: 'Count distinct contributors to ClickHouse pull request activity.', dataset: 'GitHub',
+        id: 'github-pr-contributors',
+        name: 'PR contributors by month',
+        category: 'clickhouse',
+        description: 'Count distinct contributors to ClickHouse pull request activity.',
+        dataset: 'GitHub',
         sql: `SELECT
     toStartOfMonth(created_at) AS month,
     uniq(actor_login) AS contributors
@@ -131,8 +190,11 @@ ORDER BY month`,
         chart: { kind: 'line', x: 0, ys: [1], title: 'Monthly PR contributors' },
     },
     {
-        id: 'github-release-cadence', name: 'ClickHouse release cadence', category: 'openSource',
-        description: 'See how the project release pace changes by year.', dataset: 'GitHub',
+        id: 'github-release-cadence',
+        name: 'ClickHouse release cadence',
+        category: 'openSource',
+        description: 'See how the project release pace changes by year.',
+        dataset: 'GitHub',
         sql: `SELECT
     toStartOfYear(created_at) AS year,
     count() AS releases
@@ -145,8 +207,11 @@ ORDER BY year`,
         chart: { kind: 'bar', x: 0, ys: [1], title: 'Releases per year' },
     },
     {
-        id: 'github-issues-mentioning-clickhouse', name: 'Issues mentioning ClickHouse', category: 'openSource',
-        description: 'Track issue titles mentioning ClickHouse across repositories.', dataset: 'GitHub',
+        id: 'github-issues-mentioning-clickhouse',
+        name: 'Issues mentioning ClickHouse',
+        category: 'openSource',
+        description: 'Track issue titles mentioning ClickHouse across repositories.',
+        dataset: 'GitHub',
         sql: `SELECT
     toStartOfMonth(created_at) AS month,
     count() AS issues,
@@ -160,7 +225,10 @@ ORDER BY month`,
         chart: { kind: 'line', x: 0, ys: [1, 2], title: 'Issues mentioning ClickHouse' },
     },
     {
-        id: 'hackernews-daily-pulse', name: 'Stories and comments', category: 'internet', dataset: 'Hacker News',
+        id: 'hackernews-daily-pulse',
+        name: 'Stories and comments',
+        category: 'internet',
+        dataset: 'Hacker News',
         description: 'Compare daily stories and comments from the last 90 days.',
         sql: `SELECT
     toDate(time) AS day,
@@ -173,7 +241,11 @@ ORDER BY day`,
         chart: { kind: 'line', x: 0, ys: [1, 2], title: 'Hacker News activity' },
     },
     {
-        id: 'nyc-taxi-weekly-rhythm', name: 'Taxi trips by weekday and hour', category: 'cities', dataset: 'NYC Taxi', featuredOrder: 6,
+        id: 'nyc-taxi-weekly-rhythm',
+        name: 'Taxi trips by weekday and hour',
+        category: 'cities',
+        dataset: 'NYC Taxi',
+        featuredOrder: 6,
         description: 'Find rush-hour patterns across the week in a 168-cell heatmap.',
         sql: `SELECT
     toDayOfWeek(pickup_datetime) AS weekday,
@@ -182,10 +254,20 @@ ORDER BY day`,
 FROM nyc_taxi.trips_small
 GROUP BY weekday, hour
 ORDER BY weekday, hour`,
-        chart: { kind: 'heatmap', x: 1, groupBy: 0, ys: [2], title: 'Taxi pickups by weekday and hour' },
+        chart: {
+            kind: 'heatmap',
+            x: 1,
+            groupBy: 0,
+            ys: [2],
+            title: 'Taxi pickups by weekday and hour',
+        },
     },
     {
-        id: 'nyc-taxi-fare-distance', name: 'Fare vs. trip distance', category: 'cities', dataset: 'NYC Taxi', featuredOrder: 7,
+        id: 'nyc-taxi-fare-distance',
+        name: 'Fare vs. trip distance',
+        category: 'cities',
+        dataset: 'NYC Taxi',
+        featuredOrder: 7,
         description: 'Explore how trip distance relates to the metered fare.',
         sql: `SELECT
     trip_distance,
@@ -197,8 +279,12 @@ LIMIT 240`,
         chart: { kind: 'scatter', x: 0, ys: [1], title: 'Fare by trip distance' },
     },
     {
-        id: 'bluesky-activity-by-hour', name: 'Bluesky activity by hour', category: 'internet', dataset: 'Bluesky',
-        description: 'Compare posts, likes, and reposts across the day using ClickHouse hourly rollups.',
+        id: 'bluesky-activity-by-hour',
+        name: 'Bluesky activity by hour',
+        category: 'internet',
+        dataset: 'Bluesky',
+        description:
+            'Compare posts, likes, and reposts across the day using ClickHouse hourly rollups.',
         sql: `SELECT
     event,
     hour_of_day,
@@ -210,7 +296,10 @@ ORDER BY event, hour_of_day`,
         chart: { kind: 'heatmap', x: 1, groupBy: 0, ys: [2], title: 'Bluesky events by hour' },
     },
     {
-        id: 'stock-jnj-history', name: 'Johnson & Johnson price history', category: 'markets', dataset: 'Stock sample',
+        id: 'stock-jnj-history',
+        name: 'Johnson & Johnson price history',
+        category: 'markets',
+        dataset: 'Stock sample',
         description: 'Plot 180 historical trading sessions from the sample stock table.',
         sql: `SELECT
     date,
@@ -226,7 +315,10 @@ ORDER BY date`,
         chart: { kind: 'line', x: 0, ys: [1], title: 'JNJ historical price' },
     },
     {
-        id: 'pypi-package-downloads', name: 'Package downloads by month', category: 'datasets', dataset: 'PyPI',
+        id: 'pypi-package-downloads',
+        name: 'Package downloads by month',
+        category: 'datasets',
+        dataset: 'PyPI',
         description: 'Compare monthly downloads of pandas, Polars, and ClickHouse Python drivers.',
         sql: `SELECT
     month,
@@ -241,7 +333,10 @@ LIMIT 100`,
         chart: { kind: 'heatmap', x: 0, groupBy: 1, ys: [2], title: 'Monthly package downloads' },
     },
     {
-        id: 'stackoverflow-qa-volume', name: 'Stack Overflow Q&A volume', category: 'internet', dataset: 'Stack Overflow',
+        id: 'stackoverflow-qa-volume',
+        name: 'Stack Overflow Q&A volume',
+        category: 'internet',
+        dataset: 'Stack Overflow',
         description: 'See how monthly question and answer counts changed in the archive.',
         sql: `SELECT
     toStartOfMonth(CreationDate) AS month,
@@ -256,7 +351,10 @@ LIMIT 100`,
         chart: { kind: 'line', x: 0, ys: [1, 2], title: 'Monthly Stack Overflow Q&A' },
     },
     {
-        id: 'uk-house-prices-by-county', name: 'UK house prices by county', category: 'datasets', dataset: 'UK property data',
+        id: 'uk-house-prices-by-county',
+        name: 'UK house prices by county',
+        category: 'datasets',
+        dataset: 'UK property data',
         description: 'Rank counties by median sale price since 2020.',
         sql: `SELECT
     county,
@@ -272,7 +370,10 @@ LIMIT 12`,
         chart: { kind: 'bar', x: 0, ys: [1], title: 'Median sale price by county' },
     },
     {
-        id: 'imdb-ratings-by-year', name: 'Movie ratings by year', category: 'datasets', dataset: 'IMDb',
+        id: 'imdb-ratings-by-year',
+        name: 'Movie ratings by year',
+        category: 'datasets',
+        dataset: 'IMDb',
         description: 'Compare average IMDb ratings across movie release years.',
         sql: `SELECT
     year,
@@ -286,7 +387,10 @@ LIMIT 200`,
         chart: { kind: 'scatter', x: 0, ys: [1], title: 'Average movie rating by year' },
     },
     {
-        id: 'noaa-central-park-weather', name: 'New York weather patterns', category: 'datasets', dataset: 'NOAA weather',
+        id: 'noaa-central-park-weather',
+        name: 'New York weather patterns',
+        category: 'datasets',
+        dataset: 'NOAA weather',
         description: 'Explore monthly weather types recorded at Central Park from 2018 to 2022.',
         sql: `SELECT
     toStartOfMonth(date) AS month,
@@ -299,10 +403,19 @@ WHERE station_id = 'USW00094728'
 GROUP BY month, weatherType
 ORDER BY month, weatherType
 LIMIT 240`,
-        chart: { kind: 'heatmap', x: 0, groupBy: 1, ys: [2], title: 'Central Park weather by month' },
+        chart: {
+            kind: 'heatmap',
+            x: 0,
+            groupBy: 1,
+            ys: [2],
+            title: 'Central Park weather by month',
+        },
     },
     {
-        id: 'forex-eur-usd-monthly', name: 'EUR/USD monthly midpoint', category: 'markets', dataset: 'Forex',
+        id: 'forex-eur-usd-monthly',
+        name: 'EUR/USD monthly midpoint',
+        category: 'markets',
+        dataset: 'Forex',
         description: 'Follow historical monthly average bid/ask midpoints for EUR/USD.',
         sql: `SELECT
     toStartOfMonth(datetime) AS month,
@@ -317,8 +430,13 @@ ORDER BY month`,
         chart: { kind: 'line', x: 0, ys: [1], title: 'EUR/USD monthly midpoint' },
     },
     {
-        id: 'forex-eur-usd-market-view', name: 'EUR/USD Pro Market View', category: 'markets', dataset: 'Forex', featuredOrder: 5,
-        description: 'Build historical 15-minute midpoint candles with bid/ask, quote activity, and spread context.',
+        id: 'forex-eur-usd-market-view',
+        name: 'EUR/USD Pro Market View',
+        category: 'markets',
+        dataset: 'Forex',
+        featuredOrder: 5,
+        description:
+            'Build historical 15-minute midpoint candles with bid/ask, quote activity, and spread context.',
         sql: `WITH (bid + ask) / 2 AS mid
 SELECT
     toStartOfInterval(datetime, INTERVAL 15 MINUTE) AS time,
@@ -339,12 +457,27 @@ GROUP BY time
 ORDER BY time
 LIMIT 600`,
         chart: {
-            kind: 'candlestick', x: 0, ys: [], title: 'EUR/USD Pro Market View',
-            candlestick: { open: 1, high: 2, low: 3, close: 4, bid: 5, ask: 6, spread: 7, quoteActivity: 8 },
+            kind: 'candlestick',
+            x: 0,
+            ys: [],
+            title: 'EUR/USD Pro Market View',
+            candlestick: {
+                open: 1,
+                high: 2,
+                low: 3,
+                close: 4,
+                bid: 5,
+                ask: 6,
+                spread: 7,
+                quoteActivity: 8,
+            },
         },
     },
     {
-        id: 'nyc-taxi-fare-quantiles', name: 'Taxi fare percentiles by hour', category: 'clickhouse', dataset: 'NYC Taxi',
+        id: 'nyc-taxi-fare-quantiles',
+        name: 'Taxi fare percentiles by hour',
+        category: 'clickhouse',
+        dataset: 'NYC Taxi',
         description: 'Compare median and 95th-percentile fares by weekday and pickup hour.',
         sql: `SELECT
     toDayOfWeek(pickup_datetime) AS weekday,
@@ -357,10 +490,20 @@ WHERE trip_distance > 0
     AND fare_amount < 200
 GROUP BY weekday, hour
 ORDER BY weekday, hour`,
-        chart: { kind: 'heatmap', x: 1, groupBy: 0, ys: [2], title: 'Taxi fare percentiles by hour' },
+        chart: {
+            kind: 'heatmap',
+            x: 1,
+            groupBy: 0,
+            ys: [2],
+            title: 'Taxi fare percentiles by hour',
+        },
     },
     {
-        id: 'github-rolling-activity', name: 'GitHub activity with a rolling average', category: 'clickhouse', dataset: 'GitHub', featuredOrder: 8,
+        id: 'github-rolling-activity',
+        name: 'GitHub activity with a rolling average',
+        category: 'clickhouse',
+        dataset: 'GitHub',
+        featuredOrder: 8,
         description: 'Smooth daily ClickHouse repository activity with a seven-day window.',
         sql: `WITH daily AS (
     SELECT
@@ -377,34 +520,94 @@ SELECT
     round(avg(events) OVER (ORDER BY day ROWS BETWEEN 6 PRECEDING AND CURRENT ROW), 1) AS seven_day_average
 FROM daily
 ORDER BY day`,
-        chart: { kind: 'line', x: 0, ys: [1, 2], title: 'Daily GitHub events and seven-day average' },
+        chart: {
+            kind: 'line',
+            x: 0,
+            ys: [1, 2],
+            title: 'Daily GitHub events and seven-day average',
+        },
     },
 ];
 
 const demoStarterDetails: Record<string, Pick<SqlExample, 'description' | 'category'>> = {
-    'preview-starter-getting-started': { description: 'Explore daily activity, unique users, and attributed revenue.', category: 'timeSeries' },
-    'preview-starter-top-countries': { description: 'Compare event volume, unique users, and revenue across countries.', category: 'aggregation' },
-    'preview-starter-revenue-channel': { description: 'Compare completed orders and average value by channel.', category: 'aggregation' },
-    'preview-starter-latency': { description: 'Compare request volume with median and tail latency.', category: 'aggregation' },
-    'preview-starter-hourly': { description: 'Track hourly event volume and server errors.', category: 'timeSeries' },
-    'preview-starter-funnel': { description: 'Compare users across signup funnel steps.', category: 'aggregation' },
-    'preview-starter-device-engagement': { description: 'Compare sessions and conversion by device.', category: 'aggregation' },
-    'preview-starter-customer-value': { description: 'Compare average customer value by plan.', category: 'aggregation' },
-    'preview-starter-daily-rollup': { description: 'Use additive counts and revenue from a pre-aggregated table.', category: 'timeSeries' },
-    'preview-starter-latency-anomaly': { description: 'Compare p95 latency with a rolling baseline and alert threshold.', category: 'clickhouse' },
-    'preview-starter-latest-event': { description: 'Use argMax to find each user’s most recent event and page.', category: 'clickhouse' },
-    'preview-starter-top-pages-country': { description: 'Use LIMIT BY to find the top three pages in each country.', category: 'clickhouse' },
-    'preview-starter-distinct-estimates': { description: 'Compare an exact visitor count with a fast approximate count.', category: 'clickhouse' },
-    'preview-starter-monthly-revenue': { description: 'Compare completed orders and revenue month by month with conditional aggregates.', category: 'timeSeries' },
-    'preview-starter-channel-conversion': { description: 'Use countIf to calculate conversions and conversion rate for each channel.', category: 'clickhouse' },
-    'preview-starter-signup-cohorts': { description: 'Group new accounts into monthly cohorts and compare their plans and lifetime value.', category: 'timeSeries' },
-    'preview-starter-product-page-conversion': { description: 'Compare product page views with unique purchasers using conditional aggregates.', category: 'aggregation' },
+    'preview-starter-getting-started': {
+        description: 'Explore daily activity, unique users, and attributed revenue.',
+        category: 'timeSeries',
+    },
+    'preview-starter-top-countries': {
+        description: 'Compare event volume, unique users, and revenue across countries.',
+        category: 'aggregation',
+    },
+    'preview-starter-revenue-channel': {
+        description: 'Compare completed orders and average value by channel.',
+        category: 'aggregation',
+    },
+    'preview-starter-latency': {
+        description: 'Compare request volume with median and tail latency.',
+        category: 'aggregation',
+    },
+    'preview-starter-hourly': {
+        description: 'Track hourly event volume and server errors.',
+        category: 'timeSeries',
+    },
+    'preview-starter-funnel': {
+        description: 'Compare users across signup funnel steps.',
+        category: 'aggregation',
+    },
+    'preview-starter-device-engagement': {
+        description: 'Compare sessions and conversion by device.',
+        category: 'aggregation',
+    },
+    'preview-starter-customer-value': {
+        description: 'Compare average customer value by plan.',
+        category: 'aggregation',
+    },
+    'preview-starter-daily-rollup': {
+        description: 'Use additive counts and revenue from a pre-aggregated table.',
+        category: 'timeSeries',
+    },
+    'preview-starter-latency-anomaly': {
+        description: 'Compare p95 latency with a rolling baseline and alert threshold.',
+        category: 'clickhouse',
+    },
+    'preview-starter-latest-event': {
+        description: 'Use argMax to find each user’s most recent event and page.',
+        category: 'clickhouse',
+    },
+    'preview-starter-top-pages-country': {
+        description: 'Use LIMIT BY to find the top three pages in each country.',
+        category: 'clickhouse',
+    },
+    'preview-starter-distinct-estimates': {
+        description: 'Compare an exact visitor count with a fast approximate count.',
+        category: 'clickhouse',
+    },
+    'preview-starter-monthly-revenue': {
+        description:
+            'Compare completed orders and revenue month by month with conditional aggregates.',
+        category: 'timeSeries',
+    },
+    'preview-starter-channel-conversion': {
+        description: 'Use countIf to calculate conversions and conversion rate for each channel.',
+        category: 'clickhouse',
+    },
+    'preview-starter-signup-cohorts': {
+        description:
+            'Group new accounts into monthly cohorts and compare their plans and lifetime value.',
+        category: 'timeSeries',
+    },
+    'preview-starter-product-page-conversion': {
+        description:
+            'Compare product page views with unique purchasers using conditional aggregates.',
+        category: 'aggregation',
+    },
 };
 
 const demoExamples: SqlExample[] = DEMO_PREVIEW_STARTERS.map(starter => ({
     id: starter.id,
     name: starter.name.replace(/\.sql$/i, ''),
-    description: demoStarterDetails[starter.id]?.description ?? 'Explore the sample ClickHouse data.',
+    description:
+        demoStarterDetails[starter.id]?.description ?? 'Explore the sample ClickHouse data.',
     category: demoStarterDetails[starter.id]?.category ?? 'basics',
     sql: starter.sql,
     chart: starter.chart,
@@ -412,19 +615,25 @@ const demoExamples: SqlExample[] = DEMO_PREVIEW_STARTERS.map(starter => ({
 
 const genericExamples: SqlExample[] = [
     {
-        id: 'clickhouse-server-version', name: 'ClickHouse version', category: 'basics',
+        id: 'clickhouse-server-version',
+        name: 'ClickHouse version',
+        category: 'basics',
         description: 'Check which ClickHouse version serves this connection.',
         sql: 'SELECT version() AS clickhouse_version',
         chart: { kind: 'table', x: 0, ys: [], title: 'ClickHouse version' },
     },
     {
-        id: 'clickhouse-server-time', name: 'Server time', category: 'basics',
+        id: 'clickhouse-server-time',
+        name: 'Server time',
+        category: 'basics',
         description: 'Read the current time from the ClickHouse server.',
         sql: 'SELECT now() AS server_time',
         chart: { kind: 'table', x: 0, ys: [], title: 'Server time' },
     },
     {
-        id: 'clickhouse-numbers', name: 'Generate a number series', category: 'basics',
+        id: 'clickhouse-numbers',
+        name: 'Generate a number series',
+        category: 'basics',
         description: 'Use the numbers table function to create a small result set.',
         sql: `SELECT
     number,
@@ -437,7 +646,11 @@ ORDER BY number`,
 
 const generatedDataExamples: SqlExample[] = [
     {
-        id: 'cloud-generated-daily-activity', name: 'Daily activity from sample data', category: 'timeSeries', dataset: 'Generated data', featuredOrder: 1,
+        id: 'cloud-generated-daily-activity',
+        name: 'Daily activity from sample data',
+        category: 'timeSeries',
+        dataset: 'Generated data',
+        featuredOrder: 1,
         description: 'Explore a month of sample activity generated by SQL. No table is needed.',
         sql: `SELECT
     today() - (29 - number) AS day,
@@ -447,7 +660,11 @@ ORDER BY day`,
         chart: { kind: 'line', x: 0, ys: [1], title: 'Daily sample activity' },
     },
     {
-        id: 'cloud-generated-event-mix', name: 'Event mix from sample data', category: 'aggregation', dataset: 'Generated data', featuredOrder: 2,
+        id: 'cloud-generated-event-mix',
+        name: 'Event mix from sample data',
+        category: 'aggregation',
+        dataset: 'Generated data',
+        featuredOrder: 2,
         description: 'Use arrayJoin and GROUP BY to compare event types without a source table.',
         sql: `SELECT
     event,
@@ -460,7 +677,11 @@ ORDER BY events DESC, event`,
         chart: { kind: 'bar', x: 0, ys: [1], title: 'Event mix' },
     },
     {
-        id: 'cloud-generated-moving-average', name: 'Seven-day moving average', category: 'timeSeries', dataset: 'Generated data', featuredOrder: 3,
+        id: 'cloud-generated-moving-average',
+        name: 'Seven-day moving average',
+        category: 'timeSeries',
+        dataset: 'Generated data',
+        featuredOrder: 3,
         description: 'Smooth a generated daily series with a ClickHouse window function.',
         sql: `WITH daily AS (
     SELECT
@@ -487,7 +708,8 @@ function cloudWriteExamples(database: string): SqlExample[] {
         {
             id: 'cloud-write-create-demo',
             name: 'Create and seed a demo table',
-            description: 'Create a small MergeTree table and seed it with generated events. IF NOT EXISTS leaves an existing table unchanged. Requires CREATE permission.',
+            description:
+                'Create a small MergeTree table and seed it with generated events. IF NOT EXISTS leaves an existing table unchanged. Requires CREATE permission.',
             dataset: `${database}.${tableName}`,
             category: 'writeOperations',
             sql: `CREATE TABLE IF NOT EXISTS ${table}
@@ -511,7 +733,8 @@ FROM numbers(6)`,
         {
             id: 'cloud-write-insert-demo',
             name: 'Insert rows into the demo table',
-            description: 'Append two sample rows. Run the create example first; each run adds rows. Requires INSERT permission.',
+            description:
+                'Append two sample rows. Run the create example first; each run adds rows. Requires INSERT permission.',
             dataset: `${database}.${tableName}`,
             category: 'writeOperations',
             sql: `INSERT INTO ${table} (event_id, event_time, event_name, event_count)
@@ -537,16 +760,24 @@ function isDateColumn(column: Schema['columns'][number]) {
 }
 
 function isNumericColumn(column: Schema['columns'][number]) {
-    return /^(?:U?Int(?:8|16|32|64|128|256)|Float(?:32|64)|Decimal(?:32|64|128|256)?(?:\([^)]*\))?)(?:\b|$)/i.test(baseColumnType(column.type));
+    return /^(?:U?Int(?:8|16|32|64|128|256)|Float(?:32|64)|Decimal(?:32|64|128|256)?(?:\([^)]*\))?)(?:\b|$)/i.test(
+        baseColumnType(column.type),
+    );
 }
 
 function dimensionRank(column: Schema['columns'][number]) {
     const type = baseColumnType(column.type);
-    if (!/^(?:String|FixedString\(\d+\)|Enum(?:8|16)(?:\(.*\))?|UUID|IPv4|IPv6)$/i.test(type)) return 0;
+    if (!/^(?:String|FixedString\(\d+\)|Enum(?:8|16)(?:\(.*\))?|UUID|IPv4|IPv6)$/i.test(type))
+        return 0;
     const name = column.name.toLowerCase().replace(/[^a-z0-9]+/g, '_');
     if (/(?:^|_)(?:id|uuid|key|hash|token)(?:_|$)/.test(name)) return 0;
     const meaning = `${name} ${column.comment.toLowerCase()}`;
-    if (/(?:^|[^a-z0-9])(?:country|region|city|category|status|type|channel|source|event|product|artist|game|department|device|platform|browser|method|group|name|tag)(?:$|[^a-z0-9])/.test(meaning)) return 2;
+    if (
+        /(?:^|[^a-z0-9])(?:country|region|city|category|status|type|channel|source|event|product|artist|game|department|device|platform|browser|method|group|name|tag)(?:$|[^a-z0-9])/.test(
+            meaning,
+        )
+    )
+        return 2;
     return 1;
 }
 
@@ -554,19 +785,30 @@ function measureRank(column: Schema['columns'][number]) {
     if (!isNumericColumn(column)) return 0;
     const name = column.name.toLowerCase().replace(/[^a-z0-9]+/g, '_');
     if (/(?:^|_)(?:id|rank|sequence|seq)(?:_|$)/.test(name)) return 0;
-    const namedMeasure = /(?:^|_)(?:amount|revenue|sales|price|cost|population|quantity|count|events|trips|latency|duration|temperature|score|rating|bytes|size|distance|total|views|requests|downloads|orders|weight|height)(?:_|$)/.test(name);
-    const documentedMeasure = /\b(?:amount|revenue|sales|price|cost|population|quantity|count|events|trips|latency|duration|temperature|score|rating|bytes|size|distance|total|views|requests|downloads|orders|weight|height|currency|dollars?)\b/i.test(column.comment);
+    const namedMeasure =
+        /(?:^|_)(?:amount|revenue|sales|price|cost|population|quantity|count|events|trips|latency|duration|temperature|score|rating|bytes|size|distance|total|views|requests|downloads|orders|weight|height)(?:_|$)/.test(
+            name,
+        );
+    const documentedMeasure =
+        /\b(?:amount|revenue|sales|price|cost|population|quantity|count|events|trips|latency|duration|temperature|score|rating|bytes|size|distance|total|views|requests|downloads|orders|weight|height|currency|dollars?)\b/i.test(
+            column.comment,
+        );
     return namedMeasure ? 3 : documentedMeasure ? 2 : 0;
 }
 
 function columnForTable(schema: Schema, table: Schema['tables'][number]) {
-    return schema.columns.filter(column => column.database === table.database && column.table === table.name);
+    return schema.columns.filter(
+        column => column.database === table.database && column.table === table.name,
+    );
 }
 
 function compareTableRows(left: Schema['tables'][number], right: Schema['tables'][number]) {
     const leftRows = /^\d+$/.test(left.rowEstimate ?? '') ? BigInt(left.rowEstimate!) : undefined;
-    const rightRows = /^\d+$/.test(right.rowEstimate ?? '') ? BigInt(right.rowEstimate!) : undefined;
-    if (leftRows !== undefined && rightRows !== undefined && leftRows !== rightRows) return leftRows > rightRows ? -1 : 1;
+    const rightRows = /^\d+$/.test(right.rowEstimate ?? '')
+        ? BigInt(right.rowEstimate!)
+        : undefined;
+    if (leftRows !== undefined && rightRows !== undefined && leftRows !== rightRows)
+        return leftRows > rightRows ? -1 : 1;
     if (leftRows !== undefined && rightRows === undefined) return -1;
     if (leftRows === undefined && rightRows !== undefined) return 1;
     return 0;
@@ -579,14 +821,22 @@ function estimate(value: string | null | undefined) {
 function tableIsLarge(table: Schema['tables'][number]) {
     const rows = estimate(table.rowEstimate);
     const bytes = estimate(table.sizeBytes);
-    return (rows !== undefined && rows >= 1_000_000n) || (bytes !== undefined && bytes >= 268_435_456n);
+    return (
+        (rows !== undefined && rows >= 1_000_000n) || (bytes !== undefined && bytes >= 268_435_456n)
+    );
 }
 
 function hasLeadingTimeKey(table: Schema['tables'][number], time: Schema['columns'][number]) {
     const orderBy = table.orderBy?.trim().replace(/^tuple\s*/i, '');
-    const leadingOrderKey = orderBy?.match(/^\(?\s*`?([A-Za-z_][A-Za-z0-9_]*)`?(?:\s*,|\s*\)|$)/)?.[1];
+    const leadingOrderKey = orderBy?.match(
+        /^\(?\s*`?([A-Za-z_][A-Za-z0-9_]*)`?(?:\s*,|\s*\)|$)/,
+    )?.[1];
     if (leadingOrderKey?.toLowerCase() === time.name.toLowerCase()) return true;
-    return Boolean(table.partitionKey?.split(/[^A-Za-z0-9_]+/).some(part => part.toLowerCase() === time.name.toLowerCase()));
+    return Boolean(
+        table.partitionKey
+            ?.split(/[^A-Za-z0-9_]+/)
+            .some(part => part.toLowerCase() === time.name.toLowerCase()),
+    );
 }
 
 function canSample(table: Schema['tables'][number]) {
@@ -598,21 +848,35 @@ function usesRecentWindow(table: Schema['tables'][number], time: Schema['columns
 }
 
 function canAggregate(table: Schema['tables'][number], time?: Schema['columns'][number]) {
-    return !tableIsLarge(table) || canSample(table) || Boolean(time && hasLeadingTimeKey(table, time));
+    return (
+        !tableIsLarge(table) || canSample(table) || Boolean(time && hasLeadingTimeKey(table, time))
+    );
 }
 
-function timeSeriesExample(table: Schema['tables'][number], time: Schema['columns'][number], measure: Schema['columns'][number] | undefined): SqlExample {
+function timeSeriesExample(
+    table: Schema['tables'][number],
+    time: Schema['columns'][number],
+    measure: Schema['columns'][number] | undefined,
+): SqlExample {
     const tableName = `${quoteIdentifier(table.database)}.${quoteIdentifier(table.name)}`;
     const timeName = quoteIdentifier(time.name);
     const sampled = tableIsLarge(table) && canSample(table);
     const recent = usesRecentWindow(table, time);
     const aggregate = measure
-        ? /(?:temperature|latency|duration|score|rating|price|rate|percent|percentage|distance|weight|height)/i.test(`${measure.name} ${measure.comment}`) ? 'avg' : 'sum'
+        ? /(?:temperature|latency|duration|score|rating|price|rate|percent|percentage|distance|weight|height)/i.test(
+              `${measure.name} ${measure.comment}`,
+          )
+            ? 'avg'
+            : 'sum'
         : 'count';
     const measureValue = measure ? quoteIdentifier(measure.name) : undefined;
     const value = measure
-        ? aggregate === 'sum' && sampled ? `sum(${measureValue} * _sample_factor)` : `${aggregate}(${measureValue})`
-        : sampled ? 'sum(_sample_factor)' : 'count()';
+        ? aggregate === 'sum' && sampled
+            ? `sum(${measureValue} * _sample_factor)`
+            : `${aggregate}(${measureValue})`
+        : sampled
+          ? 'sum(_sample_factor)'
+          : 'count()';
     const valueAlias = measure ? 'metric_value' : 'row_count';
     const sampleNote = sampled ? ' (estimated sample)' : '';
     const name = `${measure ? `Daily ${measure.name}` : 'Daily rows'} in ${table.name}${sampleNote}`;
@@ -626,7 +890,9 @@ function timeSeriesExample(table: Schema['tables'][number], time: Schema['column
         `Show the latest 30 daily ${measure ? `${aggregate} of ${measure.name}` : 'row counts'} from ${table.database}.${table.name}.`,
         sampled ? 'Uses a roughly 100,000-row ClickHouse sample.' : '',
         timeFilter ? 'Filters to the last 30 days using the table time key.' : '',
-    ].filter(Boolean).join(' ');
+    ]
+        .filter(Boolean)
+        .join(' ');
     return {
         id: `cloud-time-series-${table.database}.${table.name}`,
         name,
@@ -639,7 +905,11 @@ function timeSeriesExample(table: Schema['tables'][number], time: Schema['column
     };
 }
 
-function categoryExample(table: Schema['tables'][number], column: Schema['columns'][number], featuredOrder: number): SqlExample {
+function categoryExample(
+    table: Schema['tables'][number],
+    column: Schema['columns'][number],
+    featuredOrder: number,
+): SqlExample {
     const sampled = tableIsLarge(table) && canSample(table);
     const name = `Top ${column.name} values in ${table.name}${sampled ? ' (estimated sample)' : ''}`;
     const field = quoteIdentifier(column.name);
@@ -657,13 +927,20 @@ function categoryExample(table: Schema['tables'][number], column: Schema['column
     };
 }
 
-function geoExample(table: Schema['tables'][number], columns: Schema['columns'][number][]): SqlExample | undefined {
+function geoExample(
+    table: Schema['tables'][number],
+    columns: Schema['columns'][number][],
+): SqlExample | undefined {
     if (tableIsLarge(table) && !canSample(table)) return undefined;
     const sampled = tableIsLarge(table) && canSample(table);
     const source = `${quoteIdentifier(table.database)}.${quoteIdentifier(table.name)}${sampled ? ' SAMPLE 100000' : ''}`;
     const sampleNote = sampled ? ' (sample)' : '';
-    const latitude = columns.find(column => isNumericColumn(column) && /^(?:lat|latitude)$/i.test(column.name));
-    const longitude = columns.find(column => isNumericColumn(column) && /^(?:lon|lng|longitude)$/i.test(column.name));
+    const latitude = columns.find(
+        column => isNumericColumn(column) && /^(?:lat|latitude)$/i.test(column.name),
+    );
+    const longitude = columns.find(
+        column => isNumericColumn(column) && /^(?:lon|lng|longitude)$/i.test(column.name),
+    );
     if (latitude && longitude) {
         const lat = quoteIdentifier(latitude.name);
         const lon = quoteIdentifier(longitude.name);
@@ -680,7 +957,11 @@ function geoExample(table: Schema['tables'][number], columns: Schema['columns'][
         };
     }
 
-    const point = columns.find(column => /^(?:Point|Ring|Polygon|MultiPolygon|LineString|Geometry)$/i.test(baseColumnType(column.type)));
+    const point = columns.find(column =>
+        /^(?:Point|Ring|Polygon|MultiPolygon|LineString|Geometry)$/i.test(
+            baseColumnType(column.type),
+        ),
+    );
     if (!point) return undefined;
     const field = quoteIdentifier(point.name);
     const name = `Preview ${point.name} locations in ${table.name}${sampleNote}`;
@@ -699,22 +980,45 @@ function geoExample(table: Schema['tables'][number], columns: Schema['columns'][
 function cloudFeaturedExamples(schema?: Schema) {
     const tables = (schema?.tables ?? [])
         .filter(table => !['system', 'information_schema'].includes(table.database.toLowerCase()))
-        .map((table, index) => ({ table, columns: schema ? columnForTable(schema, table) : [], index }))
-        .sort((left, right) => compareTableRows(left.table, right.table) || right.columns.length - left.columns.length || left.index - right.index);
+        .map((table, index) => ({
+            table,
+            columns: schema ? columnForTable(schema, table) : [],
+            index,
+        }))
+        .sort(
+            (left, right) =>
+                compareTableRows(left.table, right.table) ||
+                right.columns.length - left.columns.length ||
+                left.index - right.index,
+        );
 
     const timeExample = tables.flatMap(({ table, columns }) => {
-        const time = columns.filter(isDateColumn)
-            .sort((left, right) => Number(/(?:date|time|timestamp|_at$|^day$)/i.test(right.name)) - Number(/(?:date|time|timestamp|_at$|^day$)/i.test(left.name)))[0];
+        const time = columns
+            .filter(isDateColumn)
+            .sort(
+                (left, right) =>
+                    Number(/(?:date|time|timestamp|_at$|^day$)/i.test(right.name)) -
+                    Number(/(?:date|time|timestamp|_at$|^day$)/i.test(left.name)),
+            )[0];
         if (!time || !canAggregate(table, time)) return [];
-        const measure = columns.filter(column => measureRank(column) > 0)
+        const measure = columns
+            .filter(column => measureRank(column) > 0)
             .sort((left, right) => measureRank(right) - measureRank(left))[0];
         return [timeSeriesExample(table, time, measure)];
     })[0];
 
-    const categoryCandidates = tables.flatMap(({ table, columns, index }) => columns
-        .filter(column => dimensionRank(column) > 0 && canAggregate(table))
-        .map(column => ({ table, column, tableIndex: index, rank: dimensionRank(column) })))
-        .sort((left, right) => right.rank - left.rank || left.tableIndex - right.tableIndex || left.column.name.localeCompare(right.column.name));
+    const categoryCandidates = tables
+        .flatMap(({ table, columns, index }) =>
+            columns
+                .filter(column => dimensionRank(column) > 0 && canAggregate(table))
+                .map(column => ({ table, column, tableIndex: index, rank: dimensionRank(column) })),
+        )
+        .sort(
+            (left, right) =>
+                right.rank - left.rank ||
+                left.tableIndex - right.tableIndex ||
+                left.column.name.localeCompare(right.column.name),
+        );
     const categories: SqlExample[] = [];
     const featuredCategoryTables = new Set<string>();
     for (const candidate of categoryCandidates) {
@@ -724,7 +1028,8 @@ function cloudFeaturedExamples(schema?: Schema) {
         featuredCategoryTables.add(tableKey);
         if (categories.length === 2) break;
     }
-    const geo = tables.map(({ table, columns }) => geoExample(table, columns))
+    const geo = tables
+        .map(({ table, columns }) => geoExample(table, columns))
         .find((example): example is SqlExample => Boolean(example));
 
     return [timeExample, ...categories, geo]
@@ -732,7 +1037,10 @@ function cloudFeaturedExamples(schema?: Schema) {
         .map((example, index) => ({ ...example, featuredOrder: index + 1 }));
 }
 
-export function sqlExamplesFor(connection: Pick<Connection, 'id' | 'dataSource'> & Partial<Pick<Connection, 'database'>>, schema?: Schema): SqlExample[] {
+export function sqlExamplesFor(
+    connection: Pick<Connection, 'id' | 'dataSource'> & Partial<Pick<Connection, 'database'>>,
+    schema?: Schema,
+): SqlExample[] {
     if (connection.id === PLAYGROUND_CONNECTION_ID) return playgroundExamples;
     if (connection.dataSource === 'fixture') return [...demoExamples, ...GEO_HELP_EXAMPLES];
 
@@ -749,26 +1057,47 @@ export function sqlExamplesFor(connection: Pick<Connection, 'id' | 'dataSource'>
         }));
 
     const featured = cloudFeaturedExamples(schema);
-    const noUserTables = schema && !schema.tables.some(table => !['system', 'information_schema'].includes(table.database.toLowerCase()));
+    const noUserTables =
+        schema &&
+        !schema.tables.some(
+            table => !['system', 'information_schema'].includes(table.database.toLowerCase()),
+        );
     const featuredExamples = featured.length
         ? featured
         : tableExamples.length
-            ? []
-            : noUserTables
-                ? generatedDataExamples
-                : schema
-                    ? genericExamples.map((example, index) => ({ ...example, featuredOrder: index + 1 }))
-                    : [];
-    const orderedTableExamples = !featured.length && tableExamples.length
-        ? tableExamples.map((example, index) => index === 0 ? { ...example, featuredOrder: 1 } : example)
-        : tableExamples;
-    const cloudGeoExamples = GEO_HELP_EXAMPLES.map(example => ({ ...example, featuredOrder: undefined }));
-    const primaryFeaturedCount = featuredExamples.length || orderedTableExamples.filter(example => example.featuredOrder !== undefined).length;
+          ? []
+          : noUserTables
+            ? generatedDataExamples
+            : schema
+              ? genericExamples.map((example, index) => ({ ...example, featuredOrder: index + 1 }))
+              : [];
+    const orderedTableExamples =
+        !featured.length && tableExamples.length
+            ? tableExamples.map((example, index) =>
+                  index === 0 ? { ...example, featuredOrder: 1 } : example,
+              )
+            : tableExamples;
+    const cloudGeoExamples = GEO_HELP_EXAMPLES.map(example => ({
+        ...example,
+        featuredOrder: undefined,
+    }));
+    const primaryFeaturedCount =
+        featuredExamples.length ||
+        orderedTableExamples.filter(example => example.featuredOrder !== undefined).length;
     const database = connection.database?.trim();
-    const writeExamples = database && connection.dataSource === 'clickhouse'
-        ? cloudWriteExamples(database)
-            .map((example, index) => ({ ...example, featuredOrder: primaryFeaturedCount + index + 1 }))
-        : [];
+    const writeExamples =
+        database && connection.dataSource === 'clickhouse'
+            ? cloudWriteExamples(database).map((example, index) => ({
+                  ...example,
+                  featuredOrder: primaryFeaturedCount + index + 1,
+              }))
+            : [];
 
-    return [...orderedTableExamples, ...featuredExamples, ...genericExamples, ...cloudGeoExamples, ...writeExamples];
+    return [
+        ...orderedTableExamples,
+        ...featuredExamples,
+        ...genericExamples,
+        ...cloudGeoExamples,
+        ...writeExamples,
+    ];
 }

@@ -31,7 +31,23 @@ export interface MergeTreePartsSnapshot {
 
 export const MAX_MERGETREE_PARTS = 1_000;
 export const MAX_PARTS_PER_STATUS = MAX_MERGETREE_PARTS / 2;
-const partColumns = ['partition', 'name', 'is_active', 'rows', 'marks', 'compressed_bytes', 'uncompressed_bytes', 'level', 'min_block_number', 'max_block_number', 'modified_at', 'disk_name', 'total_parts', 'active_parts', 'inactive_parts'] as const;
+const partColumns = [
+    'partition',
+    'name',
+    'is_active',
+    'rows',
+    'marks',
+    'compressed_bytes',
+    'uncompressed_bytes',
+    'level',
+    'min_block_number',
+    'max_block_number',
+    'modified_at',
+    'disk_name',
+    'total_parts',
+    'active_parts',
+    'inactive_parts',
+] as const;
 
 export function mergeTreePartsQuery() {
     return `SELECT partition, name, toUInt8(active) AS is_active,
@@ -73,14 +89,25 @@ function sum(values: readonly string[]) {
 }
 
 function rowRecord(value: unknown): Record<string, unknown> | undefined {
-    if (Array.isArray(value)) return Object.fromEntries(partColumns.map((key, index) => [key, value[index]]));
+    if (Array.isArray(value))
+        return Object.fromEntries(partColumns.map((key, index) => [key, value[index]]));
     if (value === null || typeof value !== 'object') return undefined;
     return value as Record<string, unknown>;
 }
 
-export function parseMergeTreeParts(database: string, table: string, input: readonly unknown[], maxParts = MAX_MERGETREE_PARTS): MergeTreePartsSnapshot {
-    const boundedLimit = Number.isSafeInteger(maxParts) ? Math.min(MAX_MERGETREE_PARTS, Math.max(1, maxParts)) : MAX_MERGETREE_PARTS;
-    const candidates = input.slice(0, boundedLimit + 1).map(rowRecord).filter((row): row is Record<string, unknown> => Boolean(row));
+export function parseMergeTreeParts(
+    database: string,
+    table: string,
+    input: readonly unknown[],
+    maxParts = MAX_MERGETREE_PARTS,
+): MergeTreePartsSnapshot {
+    const boundedLimit = Number.isSafeInteger(maxParts)
+        ? Math.min(MAX_MERGETREE_PARTS, Math.max(1, maxParts))
+        : MAX_MERGETREE_PARTS;
+    const candidates = input
+        .slice(0, boundedLimit + 1)
+        .map(rowRecord)
+        .filter((row): row is Record<string, unknown> => Boolean(row));
     const sourceRows = candidates.slice(0, boundedLimit);
     const parts = sourceRows.map(row => {
         const level = Number(nonNegativeInteger(row.level));
@@ -110,16 +137,28 @@ export function parseMergeTreeParts(database: string, table: string, input: read
     const sampledActive = parts.filter(part => part.active).length;
     const sampledInactive = parts.length - sampledActive;
     const activeParts = first ? nonNegativeInteger(first.active_parts ?? first.activeParts) : '0';
-    const inactiveParts = first ? nonNegativeInteger(first.inactive_parts ?? first.inactiveParts) : '0';
-    const hasStatusTotals = Boolean(first && (first.active_parts !== undefined || first.activeParts !== undefined || first.inactive_parts !== undefined || first.inactiveParts !== undefined));
-    const truncated = input.length > boundedLimit
-        || (explicitTotal !== '0' && BigInt(explicitTotal) > BigInt(parts.length))
-        || (hasStatusTotals && (BigInt(activeParts) > BigInt(sampledActive) || BigInt(inactiveParts) > BigInt(sampledInactive)));
+    const inactiveParts = first
+        ? nonNegativeInteger(first.inactive_parts ?? first.inactiveParts)
+        : '0';
+    const hasStatusTotals = Boolean(
+        first &&
+        (first.active_parts !== undefined ||
+            first.activeParts !== undefined ||
+            first.inactive_parts !== undefined ||
+            first.inactiveParts !== undefined),
+    );
+    const truncated =
+        input.length > boundedLimit ||
+        (explicitTotal !== '0' && BigInt(explicitTotal) > BigInt(parts.length)) ||
+        (hasStatusTotals &&
+            (BigInt(activeParts) > BigInt(sampledActive) ||
+                BigInt(inactiveParts) > BigInt(sampledInactive)));
     return {
         database: database.slice(0, 128),
         table: table.slice(0, 128),
         parts,
-        totalParts: explicitTotal === '0' ? String(parts.length + (truncated ? 1 : 0)) : explicitTotal,
+        totalParts:
+            explicitTotal === '0' ? String(parts.length + (truncated ? 1 : 0)) : explicitTotal,
         activeParts: hasStatusTotals ? activeParts : String(sampledActive),
         inactiveParts: hasStatusTotals ? inactiveParts : String(sampledInactive),
         truncated,
@@ -134,7 +173,10 @@ export function partMetric(part: MergeTreePart, metric: PartsMetric) {
 
 export function scalePartMetrics(parts: readonly MergeTreePart[], metric: PartsMetric) {
     const values = parts.map(part => partMetric(part, metric));
-    const maxBits = values.reduce((max, value) => Math.max(max, value === 0n ? 0 : value.toString(2).length), 0);
+    const maxBits = values.reduce(
+        (max, value) => Math.max(max, value === 0n ? 0 : value.toString(2).length),
+        0,
+    );
     const shift = BigInt(Math.max(0, maxBits - 48));
     return values.map(value => {
         if (value === 0n) return 0;
@@ -143,8 +185,11 @@ export function scalePartMetrics(parts: readonly MergeTreePart[], metric: PartsM
     });
 }
 
-export function formatCompressionRatio(part: Pick<MergeTreePart, 'compressedBytes' | 'uncompressedBytes'>) {
-    const compressed = BigInt(part.compressedBytes), uncompressed = BigInt(part.uncompressedBytes);
+export function formatCompressionRatio(
+    part: Pick<MergeTreePart, 'compressedBytes' | 'uncompressedBytes'>,
+) {
+    const compressed = BigInt(part.compressedBytes),
+        uncompressed = BigInt(part.uncompressedBytes);
     if (compressed <= 0n || uncompressed <= 0n) return '—';
     const ratio = Number((uncompressed * 100n) / compressed) / 100;
     return Number.isFinite(ratio) ? `${ratio.toFixed(ratio < 10 ? 2 : 1)}×` : '—';

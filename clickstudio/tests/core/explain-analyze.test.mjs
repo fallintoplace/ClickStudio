@@ -36,8 +36,12 @@ test('Native EXPLAIN ANALYZE output becomes summary metrics and a measured data-
     const evidence = parseExplainAnalyze(output);
     assert.ok(evidence);
     assert.deepEqual(evidence.summary, {
-        totalTime: '29.32 ms', planningTime: '1.74 ms', executionTime: '27.58 ms',
-        readRows: '22.67 million', readBytes: '22.67 MB', peakMemory: '42.13 MiB',
+        totalTime: '29.32 ms',
+        planningTime: '1.74 ms',
+        executionTime: '27.58 ms',
+        readRows: '22.67 million',
+        readBytes: '22.67 MB',
+        peakMemory: '42.13 MiB',
     });
     assert.equal(evidence.pipeline.source, 'explain_analyze');
     assert.equal(evidence.pipeline.nodes.length, 5);
@@ -67,12 +71,16 @@ test('Native EXPLAIN ANALYZE output becomes summary metrics and a measured data-
 });
 
 test('Parser tolerates unknown future operators and summary-only output', () => {
-    const future = parseExplainAnalyze(`Query summary:\nTime: 2 ms (planning 1 ms · execution 1 ms)\nOutput: x\n└──NewProcessor (future)`);
+    const future = parseExplainAnalyze(
+        `Query summary:\nTime: 2 ms (planning 1 ms · execution 1 ms)\nOutput: x\n└──NewProcessor (future)`,
+    );
     assert.ok(future);
     assert.equal(future.pipeline.nodes[0].label, 'NewProcessor (future)');
     assert.equal(future.pipeline.nodes[0].kind, 'stage');
 
-    const summaryOnly = parseExplainAnalyze('Query summary:\nTime: 2 ms (planning 1 ms · execution 1 ms)');
+    const summaryOnly = parseExplainAnalyze(
+        'Query summary:\nTime: 2 ms (planning 1 ms · execution 1 ms)',
+    );
     assert.ok(summaryOnly);
     assert.equal(summaryOnly.pipeline.nodes.length, 0);
     assert.equal(summaryOnly.summary.executionTime, '1 ms');
@@ -81,13 +89,27 @@ test('Parser tolerates unknown future operators and summary-only output', () => 
 test('Parser skips framing borders and rejects malformed output safely', () => {
     const evidence = parseExplainAnalyze(output);
     assert.ok(evidence);
-    assert.equal(evidence.pipeline.nodes.some(node => node.label.startsWith('┌') || node.label.startsWith('─')), false);
-    for (const value of [undefined, null, '', 'not a ClickHouse explain', '{}', ' '.repeat(2_000_001)])
+    assert.equal(
+        evidence.pipeline.nodes.some(
+            node => node.label.startsWith('┌') || node.label.startsWith('─'),
+        ),
+        false,
+    );
+    for (const value of [
+        undefined,
+        null,
+        '',
+        'not a ClickHouse explain',
+        '{}',
+        ' '.repeat(2_000_001),
+    ])
         assert.equal(parseExplainAnalyze(value), undefined);
 });
 
 test('Runtime graph node count is bounded and reports truncation', () => {
-    const operators = Array.from({ length: 300 }, (_, index) => `└──FutureOperator${index}`).join('\n');
+    const operators = Array.from({ length: 300 }, (_, index) => `└──FutureOperator${index}`).join(
+        '\n',
+    );
     const evidence = parseExplainAnalyze(`Output: x\nRoot\n${operators}`);
     assert.ok(evidence);
     assert.equal(evidence.pipeline.nodes.length, 240);

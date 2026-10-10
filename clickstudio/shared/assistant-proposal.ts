@@ -1,4 +1,11 @@
-import { ASSISTANT_ACTIONS, EVALUATION_STATUSES, QUALITY_CHECK_IDS, PROPOSAL_DECISIONS, FINDING_SEVERITIES, type FindingSeverity } from './assistant-types.js';
+import {
+    ASSISTANT_ACTIONS,
+    EVALUATION_STATUSES,
+    QUALITY_CHECK_IDS,
+    PROPOSAL_DECISIONS,
+    FINDING_SEVERITIES,
+    type FindingSeverity,
+} from './assistant-types.js';
 import type {
     AssistantAction,
     AssistantSource,
@@ -38,11 +45,22 @@ function parseSources(value: unknown): AssistantSource[] | undefined {
     if (!Array.isArray(value) || value.length > 20) return undefined;
     const sources: AssistantSource[] = [];
     for (const source of value) {
-        if (!isRecord(source) || typeof source.title !== 'string' || source.title.length > 512 ||
-            typeof source.url !== 'string' || source.url.length > 2_048) return undefined;
+        if (
+            !isRecord(source) ||
+            typeof source.title !== 'string' ||
+            source.title.length > 512 ||
+            typeof source.url !== 'string' ||
+            source.url.length > 2_048
+        )
+            return undefined;
         try {
             const url = new URL(source.url);
-            if ((url.protocol !== 'http:' && url.protocol !== 'https:') || url.username || url.password) return undefined;
+            if (
+                (url.protocol !== 'http:' && url.protocol !== 'https:') ||
+                url.username ||
+                url.password
+            )
+                return undefined;
             sources.push({ title: source.title, url: url.href });
         } catch {
             return undefined;
@@ -59,10 +77,18 @@ function parseFindings(value: unknown): ProposalContent['findings'] | undefined 
     if (!Array.isArray(value)) return undefined;
     const findings: ProposalContent['findings'] = [];
     for (const finding of value) {
-        if (!isRecord(finding) ||
+        if (
+            !isRecord(finding) ||
             !isFindingSeverity(finding.severity) ||
-            typeof finding.message !== 'string' || typeof finding.evidence !== 'string') return undefined;
-        findings.push({ severity: finding.severity, message: finding.message, evidence: finding.evidence });
+            typeof finding.message !== 'string' ||
+            typeof finding.evidence !== 'string'
+        )
+            return undefined;
+        findings.push({
+            severity: finding.severity,
+            message: finding.message,
+            evidence: finding.evidence,
+        });
     }
     return findings;
 }
@@ -71,22 +97,43 @@ function parseAlternatives(value: unknown): ProposalAlternative[] | undefined {
     if (!Array.isArray(value) || value.length > 4) return undefined;
     const alternatives: ProposalAlternative[] = [];
     for (const option of value) {
-        if (!isRecord(option) || typeof option.title !== 'string' || !option.title.trim() || option.title.length > 120 ||
-            typeof option.summary !== 'string' || option.summary.length > 1_000 ||
-            typeof option.sql !== 'string' || !option.sql.trim() || option.sql.length > 100_000) return undefined;
+        if (
+            !isRecord(option) ||
+            typeof option.title !== 'string' ||
+            !option.title.trim() ||
+            option.title.length > 120 ||
+            typeof option.summary !== 'string' ||
+            option.summary.length > 1_000 ||
+            typeof option.sql !== 'string' ||
+            !option.sql.trim() ||
+            option.sql.length > 100_000
+        )
+            return undefined;
         alternatives.push({ title: option.title, summary: option.summary, sql: option.sql });
     }
     return alternatives;
 }
 
 function parseQuality(value: unknown): ProposalQuality | undefined {
-    if (!isRecord(value) || typeof value.evaluatorVersion !== 'string' || typeof value.evaluatedAt !== 'string' ||
-        !isEvaluationStatus(value.status) || typeof value.score !== 'number' || !Number.isFinite(value.score) ||
-        !Array.isArray(value.checks)) return undefined;
+    if (
+        !isRecord(value) ||
+        typeof value.evaluatorVersion !== 'string' ||
+        typeof value.evaluatedAt !== 'string' ||
+        !isEvaluationStatus(value.status) ||
+        typeof value.score !== 'number' ||
+        !Number.isFinite(value.score) ||
+        !Array.isArray(value.checks)
+    )
+        return undefined;
     const checks: ProposalQualityCheck[] = [];
     for (const check of value.checks) {
-        if (!isRecord(check) || !isQualityCheckId(check.id) ||
-            !isEvaluationStatus(check.status) || typeof check.message !== 'string') return undefined;
+        if (
+            !isRecord(check) ||
+            !isQualityCheckId(check.id) ||
+            !isEvaluationStatus(check.status) ||
+            typeof check.message !== 'string'
+        )
+            return undefined;
         checks.push({ id: check.id, status: check.status, message: check.message });
     }
     return {
@@ -99,19 +146,32 @@ function parseQuality(value: unknown): ProposalQuality | undefined {
 }
 
 export function parseAssistantProposal(value: unknown): Proposal | undefined {
-    if (!isRecord(value) || typeof value.id !== 'string' || typeof value.owner !== 'string' ||
-        typeof value.connectionId !== 'string' || !isAssistantAction(value.action) ||
-        typeof value.createdAt !== 'string' || typeof value.baseSql !== 'string' ||
-        typeof value.responseId !== 'string' || typeof value.model !== 'string' ||
-        typeof value.promptVersion !== 'string' || !isStringArray(value.contextSummary) ||
-        typeof value.summary !== 'string' || (value.sql !== null && typeof value.sql !== 'string') ||
-        !isStringArray(value.assumptions) || !isStringArray(value.tables) || !isStringArray(value.caveats) ||
+    if (
+        !isRecord(value) ||
+        typeof value.id !== 'string' ||
+        typeof value.owner !== 'string' ||
+        typeof value.connectionId !== 'string' ||
+        !isAssistantAction(value.action) ||
+        typeof value.createdAt !== 'string' ||
+        typeof value.baseSql !== 'string' ||
+        typeof value.responseId !== 'string' ||
+        typeof value.model !== 'string' ||
+        typeof value.promptVersion !== 'string' ||
+        !isStringArray(value.contextSummary) ||
+        typeof value.summary !== 'string' ||
+        (value.sql !== null && typeof value.sql !== 'string') ||
+        !isStringArray(value.assumptions) ||
+        !isStringArray(value.tables) ||
+        !isStringArray(value.caveats) ||
         (value.clarification !== null && typeof value.clarification !== 'string') ||
-        !isProposalDecision(value.decision)) return undefined;
+        !isProposalDecision(value.decision)
+    )
+        return undefined;
 
     const findings = parseFindings(value.findings);
     if (!findings) return undefined;
-    const alternatives = value.alternatives === undefined ? [] : parseAlternatives(value.alternatives);
+    const alternatives =
+        value.alternatives === undefined ? [] : parseAlternatives(value.alternatives);
     if (!alternatives || (alternatives.length > 0 && value.sql === null)) return undefined;
     const sources = value.sources === undefined ? undefined : parseSources(value.sources);
     if (value.sources !== undefined && !sources) return undefined;

@@ -52,38 +52,37 @@ class ClickHouseNativeParser {
     }
 
     private ensureWorker(): Worker {
-        if (this.worker)
-            return this.worker;
-        const worker = new Worker(new URL('./clickhouse-native-parser.worker.ts', import.meta.url), {
-            type: 'module',
-            name: 'clickhouse-native-parser',
-        });
-        worker.addEventListener('message', (event: MessageEvent<NativeParserReply | NativeParserWorkerStatus>) => {
-            const data = event.data;
-            if (data.kind === 'status') {
-                this.setStatus(data.status, data.reason);
-                return;
-            }
-            if (data.kind === 'parseMany') {
-                const pending = this.pendingParses.get(data.id);
-                if (!pending)
+        if (this.worker) return this.worker;
+        const worker = new Worker(
+            new URL('./clickhouse-native-parser.worker.ts', import.meta.url),
+            {
+                type: 'module',
+                name: 'clickhouse-native-parser',
+            },
+        );
+        worker.addEventListener(
+            'message',
+            (event: MessageEvent<NativeParserReply | NativeParserWorkerStatus>) => {
+                const data = event.data;
+                if (data.kind === 'status') {
+                    this.setStatus(data.status, data.reason);
                     return;
-                this.pendingParses.delete(data.id);
-                if (data.ok)
-                    pending.resolve(data.results);
-                else
-                    pending.reject(new Error(data.message));
-                return;
-            }
-            const pending = this.pendingFormats.get(data.id);
-            if (!pending)
-                return;
-            this.pendingFormats.delete(data.id);
-            if (data.ok)
-                pending.resolve(data.results);
-            else
-                pending.reject(new Error(data.message));
-        });
+                }
+                if (data.kind === 'parseMany') {
+                    const pending = this.pendingParses.get(data.id);
+                    if (!pending) return;
+                    this.pendingParses.delete(data.id);
+                    if (data.ok) pending.resolve(data.results);
+                    else pending.reject(new Error(data.message));
+                    return;
+                }
+                const pending = this.pendingFormats.get(data.id);
+                if (!pending) return;
+                this.pendingFormats.delete(data.id);
+                if (data.ok) pending.resolve(data.results);
+                else pending.reject(new Error(data.message));
+            },
+        );
         worker.addEventListener('error', event => {
             this.setStatus('unavailable', event.message || 'Native parser worker failed');
             this.rejectPending(this.reason);
@@ -92,10 +91,17 @@ class ClickHouseNativeParser {
         return worker;
     }
 
-    private request<T>(kind: NativeParserRequest['kind'], sql: string[], pending: Map<number, Pending<T>>): Promise<T[]> {
+    private request<T>(
+        kind: NativeParserRequest['kind'],
+        sql: string[],
+        pending: Map<number, Pending<T>>,
+    ): Promise<T[]> {
         if (this.state === 'unavailable')
-            return Promise.reject(new Error(this.reason || 'ClickHouse native parser is unavailable'));
-        const worker = this.ensureWorker(), id = this.nextId++;
+            return Promise.reject(
+                new Error(this.reason || 'ClickHouse native parser is unavailable'),
+            );
+        const worker = this.ensureWorker(),
+            id = this.nextId++;
         return new Promise<T[]>((resolve, reject) => {
             pending.set(id, { resolve, reject });
             const message: NativeParserRequest = { id, kind, sql };
@@ -104,21 +110,17 @@ class ClickHouseNativeParser {
     }
 
     private setStatus(status: NativeParserStatus, reason = '') {
-        if (status === this.state && reason === this.reason)
-            return;
+        if (status === this.state && reason === this.reason) return;
         this.state = status;
         this.reason = reason;
-        for (const listener of this.listeners)
-            listener(status);
+        for (const listener of this.listeners) listener(status);
         if (status === 'unavailable')
             this.rejectPending(reason || 'ClickHouse native parser is unavailable');
     }
 
     private rejectPending(message: string) {
-        for (const request of this.pendingParses.values())
-            request.reject(new Error(message));
-        for (const request of this.pendingFormats.values())
-            request.reject(new Error(message));
+        for (const request of this.pendingParses.values()) request.reject(new Error(message));
+        for (const request of this.pendingFormats.values()) request.reject(new Error(message));
         this.pendingParses.clear();
         this.pendingFormats.clear();
     }

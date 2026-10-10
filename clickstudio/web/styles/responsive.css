@@ -61,9 +61,7 @@
     grid-column: 2;
     grid-row: 1;
   }
-  .workspace-root.has-inspector-dock
-    .workspace-layout
-    > .inspector-pane.is-docked-inspector {
+  .workspace-root.has-inspector-dock .workspace-layout > .inspector-pane.is-docked-inspector {
     display: flex;
     grid-column: 3;
     grid-row: 1;
@@ -83,9 +81,7 @@
     grid-column: 2;
     grid-row: 1;
   }
-  .workspace-root.has-inspector-dock
-    .workspace-layout
-    > .inspector-pane.is-docked-inspector {
+  .workspace-root.has-inspector-dock .workspace-layout > .inspector-pane.is-docked-inspector {
     grid-column: 2;
     grid-row: 2;
     min-height: 300px;

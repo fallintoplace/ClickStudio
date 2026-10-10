@@ -24,8 +24,11 @@ AI_SENSITIVE_COLUMNS=password,token,secret,api_key
 try {
     writeFileSync('.env', data, { flag: 'wx', mode: 0o600 });
     console.log('Created private .env. Read CLICKSTUDIO_TOKEN from that file to sign in.');
-}
-catch (error) {
-    console.error(error.code === 'EEXIST' ? '.env already exists; it was not overwritten.' : 'Could not create .env.');
+} catch (error) {
+    console.error(
+        error.code === 'EEXIST'
+            ? '.env already exists; it was not overwritten.'
+            : 'Could not create .env.',
+    );
     process.exitCode = 1;
 }

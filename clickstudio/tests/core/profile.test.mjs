@@ -3,13 +3,24 @@ import assert from 'node:assert/strict';
 import { buildQueryProfile, parsePipelineResult } from '../../.core-build/shared/profile.js';
 
 const run = {
-    id: 'run-1', queryId: 'query-1', sql: 'SELECT count() FROM events', elapsedMs: 17,
-    rowCount: 1, bytes: 8, status: 'succeeded', progress: { readRows: '1200', readBytes: '4096', elapsedMs: 17 },
+    id: 'run-1',
+    queryId: 'query-1',
+    sql: 'SELECT count() FROM events',
+    elapsedMs: 17,
+    rowCount: 1,
+    bytes: 8,
+    status: 'succeeded',
+    progress: { readRows: '1200', readBytes: '4096', elapsedMs: 17 },
     limits: { memory: 1_000_000 },
 };
 
 function profile(pipelineEvidence) {
-    return buildQueryProfile(run, [], { queryLogAvailable: true, pipelineAvailable: true, pipelineEvidence, notice: 'fixture profile' });
+    return buildQueryProfile(run, [], {
+        queryLogAvailable: true,
+        pipelineAvailable: true,
+        pipelineEvidence,
+        notice: 'fixture profile',
+    });
 }
 
 test('native ClickHouse DOT preserves operator topology, labels, and parallel lanes', () => {
@@ -31,32 +42,79 @@ test('native ClickHouse DOT preserves operator topology, labels, and parallel la
     ]).pipeline;
 
     assert.equal(result.source, 'explain_pipeline');
-    assert.deepEqual(result.nodes.map(node => node.label), ['ReadFromMergeTree (default.events)', 'FilterTransform × 8', 'Resize 8 → 1', 'Output']);
-    assert.deepEqual(result.nodes.map(node => node.kind), ['read', 'filter', 'resize', 'output']);
+    assert.deepEqual(
+        result.nodes.map(node => node.label),
+        ['ReadFromMergeTree (default.events)', 'FilterTransform × 8', 'Resize 8 → 1', 'Output'],
+    );
+    assert.deepEqual(
+        result.nodes.map(node => node.kind),
+        ['read', 'filter', 'resize', 'output'],
+    );
     assert.equal(result.nodes[1].parallelism, 8);
     assert.equal(result.nodes[1].status, 'planned');
     assert.equal(result.nodes[0].rows, '1200');
-    assert.deepEqual(result.edges.map(({ source, target, label }) => [source, target, label]), [
-        ['read', 'filter', '× 8'], ['filter', 'resize', '8 → 1'], ['resize', 'output', undefined],
-    ]);
+    assert.deepEqual(
+        result.edges.map(({ source, target, label }) => [source, target, label]),
+        [
+            ['read', 'filter', '× 8'],
+            ['filter', 'resize', '8 → 1'],
+            ['resize', 'output', undefined],
+        ],
+    );
     assert.match(result.notice, /Per-node runtime counters are not available/);
 });
 
 test('DOT edge chains and implicit nodes remain connected', () => {
-    const result = profile(['digraph { a -> b -> c [label="lane"]; b [label="FilterTransform"]; }']).pipeline;
-    assert.deepEqual(result.nodes.map(node => node.id), ['a', 'b', 'c']);
-    assert.deepEqual(result.nodes.map(node => node.label), ['a', 'FilterTransform', 'c']);
-    assert.deepEqual(result.edges.map(edge => [edge.source, edge.target, edge.label]), [['a', 'b', 'lane'], ['b', 'c', 'lane']]);
+    const result = profile([
+        'digraph { a -> b -> c [label="lane"]; b [label="FilterTransform"]; }',
+    ]).pipeline;
+    assert.deepEqual(
+        result.nodes.map(node => node.id),
+        ['a', 'b', 'c'],
+    );
+    assert.deepEqual(
+        result.nodes.map(node => node.label),
+        ['a', 'FilterTransform', 'c'],
+    );
+    assert.deepEqual(
+        result.edges.map(edge => [edge.source, edge.target, edge.label]),
+        [
+            ['a', 'b', 'lane'],
+            ['b', 'c', 'lane'],
+        ],
+    );
 });
 
 test('legacy indented EXPLAIN PIPELINE output still builds a linear graph', () => {
-    const result = profile(['(Fixture pipeline)', '  ReadFromFixture × 1', '    ExpressionTransform × 1', '      Output × 1']).pipeline;
-    assert.deepEqual(result.nodes.map(node => node.label), ['(Fixture pipeline)', 'ReadFromFixture', 'ExpressionTransform', 'Output']);
-    assert.deepEqual(result.edges.map(edge => [edge.source, edge.target]), [['pipeline-1', 'pipeline-2'], ['pipeline-2', 'pipeline-3'], ['pipeline-3', 'pipeline-4']]);
+    const result = profile([
+        '(Fixture pipeline)',
+        '  ReadFromFixture × 1',
+        '    ExpressionTransform × 1',
+        '      Output × 1',
+    ]).pipeline;
+    assert.deepEqual(
+        result.nodes.map(node => node.label),
+        ['(Fixture pipeline)', 'ReadFromFixture', 'ExpressionTransform', 'Output'],
+    );
+    assert.deepEqual(
+        result.edges.map(edge => [edge.source, edge.target]),
+        [
+            ['pipeline-1', 'pipeline-2'],
+            ['pipeline-2', 'pipeline-3'],
+            ['pipeline-3', 'pipeline-4'],
+        ],
+    );
 });
 
 test('large native plans are explicitly bounded for the UI', () => {
-    const lines = ['digraph {', ...Array.from({ length: 245 }, (_, index) => `n${index} [label="ExpressionTransform ${index}"];`), '}'];
+    const lines = [
+        'digraph {',
+        ...Array.from(
+            { length: 245 },
+            (_, index) => `n${index} [label="ExpressionTransform ${index}"];`,
+        ),
+        '}',
+    ];
     const result = profile(lines).pipeline;
     assert.equal(result.nodes.length, 240);
     assert.equal(result.truncated, true);
@@ -75,10 +133,26 @@ test('pipeline result graph parses processor topology without inventing run meas
     ]);
     assert.ok(result);
     assert.equal(result.source, 'explain_pipeline');
-    assert.deepEqual(result.nodes.map(node => node.label), ['ReadFromMergeTree_0', 'FilterTransform_1', 'AggregatingTransform_2']);
-    assert.deepEqual(result.edges.map(({ source, target }) => [source, target]), [['n0', 'n1'], ['n1', 'n2']]);
+    assert.deepEqual(
+        result.nodes.map(node => node.label),
+        ['ReadFromMergeTree_0', 'FilterTransform_1', 'AggregatingTransform_2'],
+    );
+    assert.deepEqual(
+        result.edges.map(({ source, target }) => [source, target]),
+        [
+            ['n0', 'n1'],
+            ['n1', 'n2'],
+        ],
+    );
     assert.ok(result.nodes.every(node => node.status === 'planned'));
-    assert.ok(result.nodes.every(node => node.durationMs === undefined && node.rows === undefined && node.bytes === undefined));
+    assert.ok(
+        result.nodes.every(
+            node =>
+                node.durationMs === undefined &&
+                node.rows === undefined &&
+                node.bytes === undefined,
+        ),
+    );
     assert.match(result.notice, /Per-node runtime counters are not available/);
 });
 

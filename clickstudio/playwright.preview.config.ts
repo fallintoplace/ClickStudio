@@ -18,7 +18,12 @@ export default defineConfig({
         screenshot: 'only-on-failure',
         storageState: {
             cookies: [],
-            origins: [{ origin: baseURL, localStorage: [{ name: 'clickstudio:experience', value: 'expert' }] }],
+            origins: [
+                {
+                    origin: baseURL,
+                    localStorage: [{ name: 'clickstudio:experience', value: 'expert' }],
+                },
+            ],
         },
     },
     webServer: {

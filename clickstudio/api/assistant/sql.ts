@@ -1,9 +1,20 @@
 import { MAX_SQL_CHARS } from '../../shared/query-limits.js';
 import { randomUUID } from 'node:crypto';
 import type { Proposal } from '../../shared/types.js';
-import { ASSISTANT_REQUEST_TIMEOUT_MS, ASSISTANT_TIMEOUT_MESSAGE, buildContext, PROMPT_VERSION, validateAssistantConversation, validateProposal, type PreparedContext } from '../../core/assistant.js';
+import {
+    ASSISTANT_REQUEST_TIMEOUT_MS,
+    ASSISTANT_TIMEOUT_MESSAGE,
+    buildContext,
+    PROMPT_VERSION,
+    validateAssistantConversation,
+    validateProposal,
+    type PreparedContext,
+} from '../../core/assistant.js';
 import { evaluateProposal } from '../../core/assistant-evaluation.js';
-import { assistantResultFrom as resultFrom, assistantSchemaFrom as schemaFrom } from '../../core/assistant-input.js';
+import {
+    assistantResultFrom as resultFrom,
+    assistantSchemaFrom as schemaFrom,
+} from '../../core/assistant-input.js';
 import { AppError } from '../../core/errors.js';
 import { OpenAIDriver } from '../../server/openai.js';
 
@@ -26,15 +37,18 @@ function fail(code: string, message: string, status = 400): Response {
 
 function field(value: unknown, name: string, max: number, allowEmpty = false): string {
     if (typeof value !== 'string' || value.length > max || (!allowEmpty && !value.trim()))
-        throw new AppError(400, 'INVALID_REQUEST', `${name} must be a string under ${max.toLocaleString()} characters.`);
+        throw new AppError(
+            400,
+            'INVALID_REQUEST',
+            `${name} must be a string under ${max.toLocaleString()} characters.`,
+        );
     return value;
 }
 
 function allowRequest(ip: string): boolean {
     const day = new Date().toISOString().slice(0, 10);
     if (!requestsByIp.has(ip) && requestsByIp.size >= 2_000) {
-        for (const [key, value] of requestsByIp)
-            if (value.day !== day) requestsByIp.delete(key);
+        for (const [key, value] of requestsByIp) if (value.day !== day) requestsByIp.delete(key);
         if (requestsByIp.size >= 2_000) return false;
     }
     const current = requestsByIp.get(ip);
@@ -44,16 +58,33 @@ function allowRequest(ip: string): boolean {
 }
 
 async function post(request: Request): Promise<Response> {
-    if (request.method !== 'POST') return fail('METHOD_NOT_ALLOWED', 'Use POST to ask the ClickHouse assistant.', 405);
-    if (request.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase() !== 'application/json')
+    if (request.method !== 'POST')
+        return fail('METHOD_NOT_ALLOWED', 'Use POST to ask the ClickHouse assistant.', 405);
+    if (
+        request.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase() !==
+        'application/json'
+    )
         return fail('CONTENT_TYPE', 'Send the assistant request as JSON.', 415);
     const origin = request.headers.get('origin');
-    if (!origin || origin !== new URL(request.url).origin || request.headers.get('x-clickstudio-intent') !== '1')
-        return fail('ORIGIN', 'This endpoint accepts requests from the ClickStudio site only.', 403);
+    if (
+        !origin ||
+        origin !== new URL(request.url).origin ||
+        request.headers.get('x-clickstudio-intent') !== '1'
+    )
+        return fail(
+            'ORIGIN',
+            'This endpoint accepts requests from the ClickStudio site only.',
+            403,
+        );
     const length = Number(request.headers.get('content-length'));
-    if (Number.isFinite(length) && length > MAX_BODY_BYTES) return fail('REQUEST_SIZE', 'The assistant request is too large.', 413);
+    if (Number.isFinite(length) && length > MAX_BODY_BYTES)
+        return fail('REQUEST_SIZE', 'The assistant request is too large.', 413);
     if (!process.env.OPENAI_API_KEY?.trim())
-        return fail('AI_UNAVAILABLE', 'Add OPENAI_API_KEY to the Vercel project environment to enable the assistant.', 503);
+        return fail(
+            'AI_UNAVAILABLE',
+            'Add OPENAI_API_KEY to the Vercel project environment to enable the assistant.',
+            503,
+        );
 
     let raw: string;
     try {
@@ -61,7 +92,8 @@ async function post(request: Request): Promise<Response> {
     } catch {
         return fail('REQUEST_BODY', 'Could not read the request body.');
     }
-    if (Buffer.byteLength(raw) > MAX_BODY_BYTES) return fail('REQUEST_SIZE', 'The assistant request is too large.', 413);
+    if (Buffer.byteLength(raw) > MAX_BODY_BYTES)
+        return fail('REQUEST_SIZE', 'The assistant request is too large.', 413);
 
     let body: unknown;
     try {
@@ -77,26 +109,60 @@ async function post(request: Request): Promise<Response> {
         const question = field(body.question, 'Question', 4_000);
         const conversation = validateAssistantConversation(body.conversation);
         const sql = field(body.sql, 'SQL', MAX_SQL_CHARS, true);
-        const database = body.database === undefined ? undefined : field(body.database, 'Database', 128);
+        const database =
+            body.database === undefined ? undefined : field(body.database, 'Database', 128);
         const schema = schemaFrom(body.schema, connectionId);
         const includeRun = body.includeRun === true;
         if (includeRun) field(body.runId, 'Run ID', 200);
-        const result = includeRun && body.result !== undefined ? resultFrom(body.result) : undefined;
-        const evidenceSql = includeRun && body.evidenceSql !== undefined
-            ? field(body.evidenceSql, 'Selected run SQL', MAX_SQL_CHARS, true)
-            : undefined;
-        const error = includeRun && body.error !== undefined
-            ? field(body.error, 'Selected run error', 3_000, true)
-            : undefined;
-        const serverVersion = typeof body.serverVersion === 'string' ? body.serverVersion.slice(0, 128) : undefined;
-        const built = buildContext({ connectionId, database, action: 'ask', question, conversation, sql, schema, result, evidenceSql, error, serverVersion,
-            sensitiveColumns: (process.env.AI_SENSITIVE_COLUMNS ?? 'password,token,secret,api_key').split(',').map(name => name.trim()) });
-        const ip = request.headers.get('x-real-ip')?.trim() || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-        if (!allowRequest(ip)) return fail('AI_RATE_LIMIT', 'This network has reached the temporary assistant request limit. Try again later.', 429);
+        const result =
+            includeRun && body.result !== undefined ? resultFrom(body.result) : undefined;
+        const evidenceSql =
+            includeRun && body.evidenceSql !== undefined
+                ? field(body.evidenceSql, 'Selected run SQL', MAX_SQL_CHARS, true)
+                : undefined;
+        const error =
+            includeRun && body.error !== undefined
+                ? field(body.error, 'Selected run error', 3_000, true)
+                : undefined;
+        const serverVersion =
+            typeof body.serverVersion === 'string' ? body.serverVersion.slice(0, 128) : undefined;
+        const built = buildContext({
+            connectionId,
+            database,
+            action: 'ask',
+            question,
+            conversation,
+            sql,
+            schema,
+            result,
+            evidenceSql,
+            error,
+            serverVersion,
+            sensitiveColumns: (process.env.AI_SENSITIVE_COLUMNS ?? 'password,token,secret,api_key')
+                .split(',')
+                .map(name => name.trim()),
+        });
+        const ip =
+            request.headers.get('x-real-ip')?.trim() ||
+            request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+            'unknown';
+        if (!allowRequest(ip))
+            return fail(
+                'AI_RATE_LIMIT',
+                'This network has reached the temporary assistant request limit. Try again later.',
+                429,
+            );
         const context: PreparedContext = {
-            id: randomUUID(), owner: 'vercel-session', connectionId, action: 'ask', createdAt: new Date().toISOString(),
-            expiresAt: new Date(Date.now() + 60_000).toISOString(), baseSql: sql, ...built,
-            evaluationSchema: { tables: schema.tables, truncated: schema.truncated }, state: 'running',
+            id: randomUUID(),
+            owner: 'vercel-session',
+            connectionId,
+            action: 'ask',
+            createdAt: new Date().toISOString(),
+            expiresAt: new Date(Date.now() + 60_000).toISOString(),
+            baseSql: sql,
+            ...built,
+            evaluationSchema: { tables: schema.tables, truncated: schema.truncated },
+            state: 'running',
         };
         const driver = new OpenAIDriver(process.env.OPENAI_API_KEY, MODEL);
         timeoutSignal = AbortSignal.timeout(ASSISTANT_REQUEST_TIMEOUT_MS);
@@ -106,17 +172,31 @@ async function post(request: Request): Promise<Response> {
         const content = validateProposal(response.content);
         const proposal: Proposal = {
             ...content,
-            id: randomUUID(), owner: 'vercel-session', connectionId, action: 'ask', createdAt: new Date().toISOString(),
-            baseSql: sql, responseId: response.responseId, model: driver.model, promptVersion: PROMPT_VERSION,
-            contextSummary: built.summary, decision: 'pending',
-            quality: evaluateProposal(content, 'ask', { schema: { tables: schema.tables, truncated: schema.truncated } }),
+            id: randomUUID(),
+            owner: 'vercel-session',
+            connectionId,
+            action: 'ask',
+            createdAt: new Date().toISOString(),
+            baseSql: sql,
+            responseId: response.responseId,
+            model: driver.model,
+            promptVersion: PROMPT_VERSION,
+            contextSummary: built.summary,
+            decision: 'pending',
+            quality: evaluateProposal(content, 'ask', {
+                schema: { tables: schema.tables, truncated: schema.truncated },
+            }),
         };
         return json(proposal, 201);
     } catch (error) {
         if (request.signal.aborted) return new Response(null, { status: 499 });
         if (timeoutSignal?.aborted) return fail('AI_TIMEOUT', ASSISTANT_TIMEOUT_MESSAGE, 504);
         if (error instanceof AppError) return fail(error.code, error.message, error.status);
-        return fail('AI_PROVIDER_ERROR', 'The assistant request failed. No SQL was applied or run.', 502);
+        return fail(
+            'AI_PROVIDER_ERROR',
+            'The assistant request failed. No SQL was applied or run.',
+            502,
+        );
     }
 }
 

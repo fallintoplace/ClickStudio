@@ -20,7 +20,10 @@ export function startVisiblePolling(
 
     function schedule() {
         if (!stopped && visible() && intervalMs !== undefined)
-            timer = setTimeout(() => { timer = undefined; void refresh(); }, intervalMs);
+            timer = setTimeout(() => {
+                timer = undefined;
+                void refresh();
+            }, intervalMs);
     }
 
     async function refresh() {

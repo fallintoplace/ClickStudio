@@ -54,11 +54,17 @@ type WorkspaceExecutionOptions = {
 };
 
 export function createExampleDraft(example: SqlExample, locale: Locale, copy: Copy['common']) {
-    const name = example.category === 'schema'
-        ? copy.examplePreviewTable.replace('{table}', example.name.replace(/^Preview /, ''))
-        : localizeSqlExample(example, locale).name;
+    const name =
+        example.category === 'schema'
+            ? copy.examplePreviewTable.replace('{table}', example.name.replace(/^Preview /, ''))
+            : localizeSqlExample(example, locale).name;
     const draft = newDraft(`${name}.sql`, example.sql);
-    draft.chart = { ...example.chart, title: locale === 'en' ? example.chart.title : name, ys: [...example.chart.ys], ...(example.chart.candlestick ? { candlestick: { ...example.chart.candlestick } } : {}) };
+    draft.chart = {
+        ...example.chart,
+        title: locale === 'en' ? example.chart.title : name,
+        ys: [...example.chart.ys],
+        ...(example.chart.candlestick ? { candlestick: { ...example.chart.candlestick } } : {}),
+    };
     return draft;
 }
 
@@ -77,40 +83,83 @@ function activateMatchingPreviewDraft(
 }
 
 export function useWorkspaceExecution({
-    active, connection, trusted, experience, demoMode, locale, copy, onSelectConnection,
-    workspaceRef, setWorkspace, editor, update, panels, evidence, importedReveal,
-    pendingExecution, script, setScripts, scriptFollowRef, trackSchemaRefresh, loadHistory,
-    busy, setBusy, setCancelling, setExampleChartRunId, setError, setNotice,
-    clearFailedQueryError, storeFailedQueryError, setOutputClosedForDraft, setViewForDraft,
+    active,
+    connection,
+    trusted,
+    experience,
+    demoMode,
+    locale,
+    copy,
+    onSelectConnection,
+    workspaceRef,
+    setWorkspace,
+    editor,
+    update,
+    panels,
+    evidence,
+    importedReveal,
+    pendingExecution,
+    script,
+    setScripts,
+    scriptFollowRef,
+    trackSchemaRefresh,
+    loadHistory,
+    busy,
+    setBusy,
+    setCancelling,
+    setExampleChartRunId,
+    setError,
+    setNotice,
+    clearFailedQueryError,
+    storeFailedQueryError,
+    setOutputClosedForDraft,
+    setViewForDraft,
 }: WorkspaceExecutionOptions) {
     const executionFailureRef = useRef<string | undefined>(undefined);
     const executionInFlightRef = useRef(false);
     const cancellingRef = useRef(false);
-    const { run, resultPage, page, setRunForRun } = evidence;
+    const { run, setRunForRun } = evidence;
 
     const perform = async (task: () => Promise<void>, kind: BusyAction = 'save') => {
         if (busy) return;
-        setBusy(kind); setError(''); setNotice('');
-        try { await task(); }
-        catch (caught) {
+        setBusy(kind);
+        setError('');
+        setNotice('');
+        try {
+            await task();
+        } catch (caught) {
             if (executionFailureRef.current) {
                 const failedDraftId = executionFailureRef.current;
                 executionFailureRef.current = undefined;
-                if (workspaceRef.current.activeId !== failedDraftId) setError(copy.common.queryFailed);
+                if (workspaceRef.current.activeId !== failedDraftId)
+                    setError(copy.common.queryFailed);
             } else setError(message(caught));
+        } finally {
+            setBusy('');
         }
-        finally { setBusy(''); }
     };
     const performExecution = async (task: () => Promise<void>, kind: BusyAction = 'run') => {
         if (executionInFlightRef.current) return;
         executionInFlightRef.current = true;
-        try { await perform(task, kind); }
-        finally { executionInFlightRef.current = false; }
+        try {
+            await perform(task, kind);
+        } finally {
+            executionInFlightRef.current = false;
+        }
     };
 
     const addDraft = (draft: Draft) => {
-        if (workspaceRef.current.tabs.length >= MAX_TABS) { setError(`Close a tab before creating another. This workspace supports ${MAX_TABS} open drafts.`); return false; }
-        setWorkspace(current => ({ ...current, tabs: [...current.tabs, draft], activeId: draft.id }));
+        if (workspaceRef.current.tabs.length >= MAX_TABS) {
+            setError(
+                `Close a tab before creating another. This workspace supports ${MAX_TABS} open drafts.`,
+            );
+            return false;
+        }
+        setWorkspace(current => ({
+            ...current,
+            tabs: [...current.tabs, draft],
+            activeId: draft.id,
+        }));
         return true;
     };
     const openNewDraft = (draft: Draft, revealQuery = false) => {
@@ -127,126 +176,68 @@ export function useWorkspaceExecution({
         panels.revealPanelTemporarily('results', failure.draftId);
     };
 
-    const executeSqlForDraft = (draft: Draft, sql: string, options: {
-        kind?: RunKind;
-        view?: ResultsView;
-        sourceRange?: { from: number; to: number };
-        draftSql?: string;
-        expandResults?: boolean;
-        trackChartRun?: boolean;
-        preview?: boolean;
-    } = {}) => {
-        const kind = options.kind ?? 'query';
-        let statements: ReturnType<typeof splitSql> = [];
-        let parseError: unknown;
-        let parseFailed = false;
-        try { statements = splitSql(sql); }
-        catch (caught) { parseFailed = true; parseError = caught; }
-        const isScript = kind === 'query' && statements.length > 1;
-        const statement = isScript ? undefined : statements[0];
-        const draftSql = options.draftSql ?? draft.sql;
-        const sourceRange = options.sourceRange ?? (sql === draft.sql && statement ? statement : undefined);
-
-        return performExecution(async () => {
-            if (parseFailed) throw parseError;
-            if (!trusted) throw new Error('Review and trust this read only connection before running SQL.');
-            if (isScript && connection.manifest?.scripts.available !== true)
-                throw new Error(connection.manifest?.scripts.reason ?? 'Scripts are unavailable on this connection.');
-            if (kind === 'explain' && connection.manifest?.explain.available === false)
-                throw new Error(connection.manifest.explain.reason ?? 'EXPLAIN is unavailable on this connection.');
-            const explainPlan = connection.manifest?.explainPlan ?? connection.manifest?.explain;
-            if (kind === 'plan' && explainPlan?.available === false)
-                throw new Error(explainPlan.reason ?? 'EXPLAIN PLAN is unavailable on this connection.');
-            const explainPipeline = connection.manifest?.explainPipeline ?? connection.manifest?.pipeline;
-            if (kind === 'pipeline' && explainPipeline?.available === false)
-                throw new Error(explainPipeline.reason ?? 'EXPLAIN PIPELINE is unavailable on this connection.');
-            const explainAnalyze = connection.manifest?.explainAnalyze;
-            if (kind === 'analyze' && explainAnalyze?.available === false)
-                throw new Error(explainAnalyze.reason ?? 'EXPLAIN ANALYZE is unavailable on this connection.');
-            if (statements.length === 0) throw new Error('Write or select a SQL statement before running it.');
-            if (!isScript && statements.length > 1)
-                throw new Error('This action accepts exactly one SQL statement.');
-            if (parameterNames(sql).length && connection.manifest?.parameters.available === false)
-                throw new Error(connection.manifest.parameters.reason ?? 'Query parameters are unavailable on this connection.');
-
-            const importedSqlBaseline = await importedReveal.captureImportedSqlBaseline(draft.id, isScript ? statements.some(item => isSchemaChangingSql(item.sql)) : Boolean(statement && isSchemaChangingSql(statement.sql)));
-
-            const payload = {
-                clientRequestId: crypto.randomUUID(), connectionId: connection.id, documentId: draft.serverId,
-                sql: isScript ? sql : statement!.sql, parameters: draft.parameters,
-                parentRunId: draft.parentRunId, kind, limits: { rows: connection.limits.rows || DEFAULT_LIMITS.rows, seconds: connection.limits.seconds || DEFAULT_LIMITS.seconds },
-                tags: { workspace: 'clickstudio', experience },
-                ...(!isScript && sourceRange ? { sourceFrom: sourceRange.from, sourceTo: sourceRange.to } : {}),
-            };
-            clearFailedQueryError(draft.id);
-            setOutputClosedForDraft(draft.id, false, true);
-            const previousResult = draft.id === active.id && run && terminal(run) && resultPage
-                ? { draftId: draft.id, run, page: resultPage, pageIndex: page }
-                : undefined;
-
-            if (isScript) {
-                pendingExecution.start(payload.clientRequestId, draft.id, payload.sql, previousResult);
-                let created: Script;
-                try {
-                    created = await post<Script>('/scripts', { ...payload, stopOnError: true });
-                } catch (caught) {
-                    pendingExecution.clear(payload.clientRequestId);
-                    recordFailedQueryError({ draftId: draft.id, draftSql, statementSql: payload.sql, sourceFrom: 0, error: apiErrorDetail(caught) });
-                    throw caught;
-                }
-                pendingExecution.acceptScript(payload.clientRequestId, created.id);
-                importedReveal.rememberImportedSqlScript(draft.id, created.id, importedSqlBaseline);
-                scriptFollowRef.current = { scriptId: created.id, enabled: true };
-                setScripts(current => ({ ...current, [created.id]: created }));
-                const first = created.statements.find(item => item.runId);
-                update(draft.id, current => first?.runId
-                    ? { ...current, activeRunId: first.runId, scriptId: created.id, runIds: rememberRunIds(current.runIds, [first.runId]) }
-                    : { ...current, scriptId: created.id });
-                setViewForDraft(draft.id, 'results', true);
-                if (options.trackChartRun) setExampleChartRunId(undefined);
-            } else {
-                pendingExecution.start(payload.clientRequestId, draft.id, payload.sql, previousResult);
-                let created: Run;
-                try {
-                    created = await post<Run>('/runs', payload);
-                } catch (caught) {
-                    pendingExecution.clear(payload.clientRequestId);
-                    if (statement) recordFailedQueryError({ draftId: draft.id, draftSql, statementSql: statement.sql, sourceFrom: sourceRange?.from ?? 0, error: apiErrorDetail(caught) });
-                    throw caught;
-                }
-                pendingExecution.acceptRun(payload.clientRequestId, created.id);
-                if (connection.dataSource === 'clickhouse' && connection.readonly === false && statement && isSchemaChangingSql(statement.sql))
-                    trackSchemaRefresh(created.id, draft.id, importedSqlBaseline);
-                setRunForRun(created.id, created, true);
-                setViewForDraft(draft.id, kind === 'explain' ? 'indexes' : kind === 'plan' ? 'plan' : kind === 'pipeline' ? 'pipeline' : kind === 'analyze' ? 'runtime' : options.view ?? 'results', true);
-                update(draft.id, current => ({ ...current, activeRunId: created.id, scriptId: undefined, runIds: rememberRunIds(current.runIds, [created.id]) }));
-                if (draft.id === active.id) editor.current?.focus();
-                if (options.trackChartRun) setExampleChartRunId(options.view === 'chart' ? created.id : undefined);
-            }
-            if (options.expandResults) panels.revealPanelTemporarily('results', draft.id);
-            const successNotice = isScript
-                ? demoMode ? 'Sample results were generated. Script SQL was not sent to ClickHouse.' : 'Script submitted to the selected ClickHouse connection.'
-                : options.preview ? demoMode ? 'Sample preview generated. SQL was not sent to ClickHouse.' : 'Table preview submitted to the selected ClickHouse connection.'
-                    : undefined;
-            if (!isFrontendDemoPreview && successNotice) setNotice(successNotice);
-            void loadHistory().catch(() => undefined);
-        }, isScript ? 'script' : 'run');
-    };
+    const executeSqlForDraft = createDraftExecutor({
+        performExecution,
+        trusted,
+        connection,
+        importedReveal,
+        experience,
+        clearFailedQueryError,
+        setOutputClosedForDraft,
+        active,
+        pendingExecution,
+        recordFailedQueryError,
+        scriptFollowRef,
+        setScripts,
+        update,
+        setViewForDraft,
+        setExampleChartRunId,
+        trackSchemaRefresh,
+        editor,
+        panels,
+        demoMode,
+        setNotice,
+        loadHistory,
+        evidence,
+    });
 
     const runExample = (example: SqlExample, output: 'results' | 'chart' | 'map') => {
-        if (busy || executionInFlightRef.current) { setError(copy.common.runActionWait); return true; }
-        if (!trusted) { setError(copy.common.runActionTrustRequired); return true; }
+        if (busy || executionInFlightRef.current) {
+            setError(copy.common.runActionWait);
+            return true;
+        }
+        if (!trusted) {
+            setError(copy.common.runActionTrustRequired);
+            return true;
+        }
         const draft = createExampleDraft(example, locale, copy.common);
         if (!openNewDraft(draft, true)) return true;
-        void executeSqlForDraft(draft, draft.sql, { view: output, expandResults: true, trackChartRun: true });
+        void executeSqlForDraft(draft, draft.sql, {
+            view: output,
+            expandResults: true,
+            trackChartRun: true,
+        });
         return true;
     };
 
     const execute = (kind: RunKind = 'query', sqlOverride?: string) => {
-        const editorSnapshot = editor.current?.snapshot() ?? { sql: active.sql, from: active.from, to: active.to };
-        const selection = editorSnapshot.to > editorSnapshot.from ? editorSnapshot.sql.slice(editorSnapshot.from, editorSnapshot.to) : undefined;
-        const selected = selectedStatement(editorSnapshot.sql, editorSnapshot.from, editorSnapshot.to);
-        const sql = sqlOverride ?? (kind === 'query' ? selection ?? editorSnapshot.sql : selected?.sql ?? '');
+        const editorSnapshot = editor.current?.snapshot() ?? {
+            sql: active.sql,
+            from: active.from,
+            to: active.to,
+        };
+        const selection =
+            editorSnapshot.to > editorSnapshot.from
+                ? editorSnapshot.sql.slice(editorSnapshot.from, editorSnapshot.to)
+                : undefined;
+        const selected = selectedStatement(
+            editorSnapshot.sql,
+            editorSnapshot.from,
+            editorSnapshot.to,
+        );
+        const sql =
+            sqlOverride ??
+            (kind === 'query' ? (selection ?? editorSnapshot.sql) : (selected?.sql ?? ''));
         const sourceRange = sqlOverride === undefined && !selection ? selected : undefined;
         return executeSqlForDraft(active, sql, { kind, sourceRange, draftSql: editorSnapshot.sql });
     };
@@ -261,7 +252,9 @@ export function useWorkspaceExecution({
         setError('');
         try {
             if (scriptId) {
-                const cancelled = await post<Script>(`/scripts/${encodeURIComponent(scriptId)}/cancel`);
+                const cancelled = await post<Script>(
+                    `/scripts/${encodeURIComponent(scriptId)}/cancel`,
+                );
                 setScripts(current => ({ ...current, [cancelled.id]: cancelled }));
             } else if (runId) {
                 setRunForRun(runId, await post<Run>(`/runs/${encodeURIComponent(runId)}/cancel`));
@@ -276,37 +269,358 @@ export function useWorkspaceExecution({
     };
 
     const openRun = (selected: Run) => {
-        if (selected.connectionId !== connection.id) { onSelectConnection(selected.connectionId); return; }
-        const draft = newDraft(`${selected.kind === 'query' ? 'Query' : selected.kind.toUpperCase()} ${new Date(selected.createdAt).toLocaleTimeString()}.sql`, selected.sql);
+        if (selected.connectionId !== connection.id) {
+            onSelectConnection(selected.connectionId);
+            return;
+        }
+        const draft = newDraft(
+            `${selected.kind === 'query' ? 'Query' : selected.kind.toUpperCase()} ${new Date(selected.createdAt).toLocaleTimeString()}.sql`,
+            selected.sql,
+        );
         draft.parameters = selected.parameters;
         draft.activeRunId = selected.id;
         draft.runIds = [selected.id];
         if (!addDraft(draft)) return;
-        setViewForDraft(draft.id, selected.kind === 'plan' ? 'plan' : selected.kind === 'pipeline' ? 'pipeline' : selected.kind === 'analyze' ? 'runtime' : 'results', true);
+        setViewForDraft(
+            draft.id,
+            selected.kind === 'plan'
+                ? 'plan'
+                : selected.kind === 'pipeline'
+                  ? 'pipeline'
+                  : selected.kind === 'analyze'
+                    ? 'runtime'
+                    : 'results',
+            true,
+        );
         panels.revealPanelTemporarily('results', draft.id);
         setNotice(`Opened retained run ${selected.queryId}. No query was rerun.`);
     };
 
     const openSqlDraft = (name: string, sql: string, run: boolean, reuseExisting = false) => {
-        if (run && (busy || executionInFlightRef.current)) { setError(copy.common.runActionWait); return; }
-        if (run && !trusted) { setError(copy.common.runActionTrustRequired); return; }
-        if (run && reuseExisting && activateMatchingPreviewDraft(
-            workspaceRef.current.tabs, name, sql,
-            id => setWorkspace(current => ({ ...current, activeId: id })),
-            draft => { void executeSqlForDraft(draft, draft.sql, { expandResults: true, trackChartRun: true, preview: true }); },
-        )) return;
+        if (run && (busy || executionInFlightRef.current)) {
+            setError(copy.common.runActionWait);
+            return;
+        }
+        if (run && !trusted) {
+            setError(copy.common.runActionTrustRequired);
+            return;
+        }
+        if (
+            run &&
+            reuseExisting &&
+            activateMatchingPreviewDraft(
+                workspaceRef.current.tabs,
+                name,
+                sql,
+                id => setWorkspace(current => ({ ...current, activeId: id })),
+                draft => {
+                    void executeSqlForDraft(draft, draft.sql, {
+                        expandResults: true,
+                        trackChartRun: true,
+                        preview: true,
+                    });
+                },
+            )
+        )
+            return;
         const draft = newDraft(name, sql);
         if (!openNewDraft(draft, !run)) return;
         if (!run) {
             window.requestAnimationFrame(() => editor.current?.focus());
             return;
         }
-        void executeSqlForDraft(draft, draft.sql, { expandResults: true, trackChartRun: true, preview: true });
+        void executeSqlForDraft(draft, draft.sql, {
+            expandResults: true,
+            trackChartRun: true,
+            preview: true,
+        });
     };
     const startBlankSql = () => {
         if (!openNewDraft(newDraft(), true)) return false;
         window.requestAnimationFrame(() => editor.current?.focus());
         return true;
     };
-    return { perform, execute, runExample, cancel, openRun, openNewDraft, openSqlDraft, startBlankSql, addDraft };
+    return {
+        perform,
+        execute,
+        runExample,
+        cancel,
+        openRun,
+        openNewDraft,
+        openSqlDraft,
+        startBlankSql,
+        addDraft,
+    };
+}
+
+function createDraftExecutor({
+    performExecution,
+    trusted,
+    connection,
+    importedReveal,
+    experience,
+    clearFailedQueryError,
+    setOutputClosedForDraft,
+    active,
+    pendingExecution,
+    recordFailedQueryError,
+    scriptFollowRef,
+    setScripts,
+    update,
+    setViewForDraft,
+    setExampleChartRunId,
+    trackSchemaRefresh,
+    editor,
+    panels,
+    demoMode,
+    setNotice,
+    loadHistory,
+    evidence,
+}: {
+    performExecution: (task: () => Promise<void>, kind?: BusyAction) => Promise<void>;
+    trusted: WorkspaceExecutionOptions['trusted'];
+    connection: WorkspaceExecutionOptions['connection'];
+    importedReveal: WorkspaceExecutionOptions['importedReveal'];
+    experience: WorkspaceExecutionOptions['experience'];
+    clearFailedQueryError: WorkspaceExecutionOptions['clearFailedQueryError'];
+    setOutputClosedForDraft: WorkspaceExecutionOptions['setOutputClosedForDraft'];
+    active: WorkspaceExecutionOptions['active'];
+    pendingExecution: WorkspaceExecutionOptions['pendingExecution'];
+    recordFailedQueryError: (failure: FailedQueryError) => void;
+    scriptFollowRef: WorkspaceExecutionOptions['scriptFollowRef'];
+    setScripts: WorkspaceExecutionOptions['setScripts'];
+    update: WorkspaceExecutionOptions['update'];
+    setViewForDraft: WorkspaceExecutionOptions['setViewForDraft'];
+    setExampleChartRunId: WorkspaceExecutionOptions['setExampleChartRunId'];
+    trackSchemaRefresh: WorkspaceExecutionOptions['trackSchemaRefresh'];
+    editor: WorkspaceExecutionOptions['editor'];
+    panels: WorkspaceExecutionOptions['panels'];
+    demoMode: WorkspaceExecutionOptions['demoMode'];
+    setNotice: WorkspaceExecutionOptions['setNotice'];
+    loadHistory: WorkspaceExecutionOptions['loadHistory'];
+    evidence: WorkspaceExecutionOptions['evidence'];
+}) {
+    const { run, resultPage, page, setRunForRun } = evidence;
+
+    return (
+        draft: Draft,
+        sql: string,
+        options: {
+            kind?: RunKind;
+            view?: ResultsView;
+            sourceRange?: { from: number; to: number };
+            draftSql?: string;
+            expandResults?: boolean;
+            trackChartRun?: boolean;
+            preview?: boolean;
+        } = {},
+    ) => {
+        const kind = options.kind ?? 'query';
+        let statements: ReturnType<typeof splitSql> = [];
+        let parseError: unknown;
+        let parseFailed = false;
+        try {
+            statements = splitSql(sql);
+        } catch (caught) {
+            parseFailed = true;
+            parseError = caught;
+        }
+        const isScript = kind === 'query' && statements.length > 1;
+        const statement = isScript ? undefined : statements[0];
+        const draftSql = options.draftSql ?? draft.sql;
+        const sourceRange =
+            options.sourceRange ?? (sql === draft.sql && statement ? statement : undefined);
+
+        return performExecution(
+            async () => {
+                if (parseFailed) throw parseError;
+                if (!trusted)
+                    throw new Error(
+                        'Review and trust this read only connection before running SQL.',
+                    );
+                if (isScript && connection.manifest?.scripts.available !== true)
+                    throw new Error(
+                        connection.manifest?.scripts.reason ??
+                            'Scripts are unavailable on this connection.',
+                    );
+                if (kind === 'explain' && connection.manifest?.explain.available === false)
+                    throw new Error(
+                        connection.manifest.explain.reason ??
+                            'EXPLAIN is unavailable on this connection.',
+                    );
+                const explainPlan =
+                    connection.manifest?.explainPlan ?? connection.manifest?.explain;
+                if (kind === 'plan' && explainPlan?.available === false)
+                    throw new Error(
+                        explainPlan.reason ?? 'EXPLAIN PLAN is unavailable on this connection.',
+                    );
+                const explainPipeline =
+                    connection.manifest?.explainPipeline ?? connection.manifest?.pipeline;
+                if (kind === 'pipeline' && explainPipeline?.available === false)
+                    throw new Error(
+                        explainPipeline.reason ??
+                            'EXPLAIN PIPELINE is unavailable on this connection.',
+                    );
+                const explainAnalyze = connection.manifest?.explainAnalyze;
+                if (kind === 'analyze' && explainAnalyze?.available === false)
+                    throw new Error(
+                        explainAnalyze.reason ??
+                            'EXPLAIN ANALYZE is unavailable on this connection.',
+                    );
+                if (statements.length === 0)
+                    throw new Error('Write or select a SQL statement before running it.');
+                if (!isScript && statements.length > 1)
+                    throw new Error('This action accepts exactly one SQL statement.');
+                if (
+                    parameterNames(sql).length &&
+                    connection.manifest?.parameters.available === false
+                )
+                    throw new Error(
+                        connection.manifest.parameters.reason ??
+                            'Query parameters are unavailable on this connection.',
+                    );
+
+                const importedSqlBaseline = await importedReveal.captureImportedSqlBaseline(
+                    draft.id,
+                    isScript
+                        ? statements.some(item => isSchemaChangingSql(item.sql))
+                        : Boolean(statement && isSchemaChangingSql(statement.sql)),
+                );
+
+                const payload = {
+                    clientRequestId: crypto.randomUUID(),
+                    connectionId: connection.id,
+                    documentId: draft.serverId,
+                    sql: isScript ? sql : statement!.sql,
+                    parameters: draft.parameters,
+                    parentRunId: draft.parentRunId,
+                    kind,
+                    limits: {
+                        rows: connection.limits.rows || DEFAULT_LIMITS.rows,
+                        seconds: connection.limits.seconds || DEFAULT_LIMITS.seconds,
+                    },
+                    tags: { workspace: 'clickstudio', experience },
+                    ...(!isScript && sourceRange
+                        ? { sourceFrom: sourceRange.from, sourceTo: sourceRange.to }
+                        : {}),
+                };
+                clearFailedQueryError(draft.id);
+                setOutputClosedForDraft(draft.id, false, true);
+                const previousResult =
+                    draft.id === active.id && run && terminal(run) && resultPage
+                        ? { draftId: draft.id, run, page: resultPage, pageIndex: page }
+                        : undefined;
+
+                if (isScript) {
+                    pendingExecution.start(
+                        payload.clientRequestId,
+                        draft.id,
+                        payload.sql,
+                        previousResult,
+                    );
+                    let created: Script;
+                    try {
+                        created = await post<Script>('/scripts', { ...payload, stopOnError: true });
+                    } catch (caught) {
+                        pendingExecution.clear(payload.clientRequestId);
+                        recordFailedQueryError({
+                            draftId: draft.id,
+                            draftSql,
+                            statementSql: payload.sql,
+                            sourceFrom: 0,
+                            error: apiErrorDetail(caught),
+                        });
+                        throw caught;
+                    }
+                    pendingExecution.acceptScript(payload.clientRequestId, created.id);
+                    importedReveal.rememberImportedSqlScript(
+                        draft.id,
+                        created.id,
+                        importedSqlBaseline,
+                    );
+                    scriptFollowRef.current = { scriptId: created.id, enabled: true };
+                    setScripts(current => ({ ...current, [created.id]: created }));
+                    const first = created.statements.find(item => item.runId);
+                    update(draft.id, current =>
+                        first?.runId
+                            ? {
+                                  ...current,
+                                  activeRunId: first.runId,
+                                  scriptId: created.id,
+                                  runIds: rememberRunIds(current.runIds, [first.runId]),
+                              }
+                            : { ...current, scriptId: created.id },
+                    );
+                    setViewForDraft(draft.id, 'results', true);
+                    if (options.trackChartRun) setExampleChartRunId(undefined);
+                } else {
+                    pendingExecution.start(
+                        payload.clientRequestId,
+                        draft.id,
+                        payload.sql,
+                        previousResult,
+                    );
+                    let created: Run;
+                    try {
+                        created = await post<Run>('/runs', payload);
+                    } catch (caught) {
+                        pendingExecution.clear(payload.clientRequestId);
+                        if (statement)
+                            recordFailedQueryError({
+                                draftId: draft.id,
+                                draftSql,
+                                statementSql: statement.sql,
+                                sourceFrom: sourceRange?.from ?? 0,
+                                error: apiErrorDetail(caught),
+                            });
+                        throw caught;
+                    }
+                    pendingExecution.acceptRun(payload.clientRequestId, created.id);
+                    if (
+                        connection.dataSource === 'clickhouse' &&
+                        connection.readonly === false &&
+                        statement &&
+                        isSchemaChangingSql(statement.sql)
+                    )
+                        trackSchemaRefresh(created.id, draft.id, importedSqlBaseline);
+                    setRunForRun(created.id, created, true);
+                    setViewForDraft(
+                        draft.id,
+                        kind === 'explain'
+                            ? 'indexes'
+                            : kind === 'plan'
+                              ? 'plan'
+                              : kind === 'pipeline'
+                                ? 'pipeline'
+                                : kind === 'analyze'
+                                  ? 'runtime'
+                                  : (options.view ?? 'results'),
+                        true,
+                    );
+                    update(draft.id, current => ({
+                        ...current,
+                        activeRunId: created.id,
+                        scriptId: undefined,
+                        runIds: rememberRunIds(current.runIds, [created.id]),
+                    }));
+                    if (draft.id === active.id) editor.current?.focus();
+                    if (options.trackChartRun)
+                        setExampleChartRunId(options.view === 'chart' ? created.id : undefined);
+                }
+                if (options.expandResults) panels.revealPanelTemporarily('results', draft.id);
+                const successNotice = isScript
+                    ? demoMode
+                        ? 'Sample results were generated. Script SQL was not sent to ClickHouse.'
+                        : 'Script submitted to the selected ClickHouse connection.'
+                    : options.preview
+                      ? demoMode
+                          ? 'Sample preview generated. SQL was not sent to ClickHouse.'
+                          : 'Table preview submitted to the selected ClickHouse connection.'
+                      : undefined;
+                if (!isFrontendDemoPreview && successNotice) setNotice(successNotice);
+                void loadHistory().catch(() => undefined);
+            },
+            isScript ? 'script' : 'run',
+        );
+    };
 }

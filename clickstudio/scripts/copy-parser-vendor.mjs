@@ -15,5 +15,8 @@ if (process.argv[2] === '--web-preview') {
     cpSync(resolve(parserVendor, 'SOURCE.md'), resolve(license, 'SOURCE.md'));
 } else {
     mkdirSync(resolve(packageRoot, 'dist/vendor'), { recursive: true });
-    cpSync(parserVendor, resolve(packageRoot, 'dist/vendor/clickhouse-parser'), { recursive: true, force: true });
+    cpSync(parserVendor, resolve(packageRoot, 'dist/vendor/clickhouse-parser'), {
+        recursive: true,
+        force: true,
+    });
 }

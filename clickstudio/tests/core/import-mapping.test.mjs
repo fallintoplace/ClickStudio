@@ -14,13 +14,16 @@ test('Integer mappings preserve the full UInt64 range', () => {
 });
 
 test('Integer mappings reject date text with the source and destination in the error', () => {
-    assert.throws(() => mapValue('2026-01-01', 'UInt64'), error => {
-        assert.equal(error.code, 'IMPORT_VALUE_TYPE');
-        assert.match(error.message, /row 1/);
-        assert.match(error.message, /source.*2026-01-01/);
-        assert.match(error.message, /target.*UInt64/);
-        return true;
-    });
+    assert.throws(
+        () => mapValue('2026-01-01', 'UInt64'),
+        error => {
+            assert.equal(error.code, 'IMPORT_VALUE_TYPE');
+            assert.match(error.message, /row 1/);
+            assert.match(error.message, /source.*2026-01-01/);
+            assert.match(error.message, /target.*UInt64/);
+            return true;
+        },
+    );
 });
 
 test('Integer mappings reject unsigned negatives and values outside integer bounds', () => {

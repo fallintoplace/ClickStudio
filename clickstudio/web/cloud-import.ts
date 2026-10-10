@@ -13,12 +13,15 @@ export function cloudImportDatabases(schema?: Schema): string[] {
 
 export function preferredCloudImportDatabase(schema: Schema, currentDatabase: string): string {
     const databases = cloudImportDatabases(schema);
-    return databases.includes(currentDatabase) ? currentDatabase : databases[0] ?? '';
+    return databases.includes(currentDatabase) ? currentDatabase : (databases[0] ?? '');
 }
 
 export function cloudImportTargets(schema: Schema): string[] {
     return schema.tables
-        .filter((table: SchemaTable) => isValidTableDatabase(table.database) && !nonInsertableEngines.has(table.engine))
+        .filter(
+            (table: SchemaTable) =>
+                isValidTableDatabase(table.database) && !nonInsertableEngines.has(table.engine),
+        )
         .map(table => `${table.database}.${table.name}`);
 }
 
@@ -34,12 +37,18 @@ function isCalendarDate(value: string) {
 }
 
 function isDateTime(value: string) {
-    if (!/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?$/.test(value)) return false;
+    if (!/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?$/.test(value))
+        return false;
     return Number.isFinite(Date.parse(value.replace(' ', 'T')));
 }
 
-export function inferCloudImportType(rows: Record<string, Json>[], column: string): CreateTableColumnType {
-    const rawValues = rows.map(row => row[column]).filter((value): value is Json => value !== null && value !== undefined);
+export function inferCloudImportType(
+    rows: Record<string, Json>[],
+    column: string,
+): CreateTableColumnType {
+    const rawValues = rows
+        .map(row => row[column])
+        .filter((value): value is Json => value !== null && value !== undefined);
     if (rawValues.length > 0 && rawValues.every(value => typeof value === 'boolean')) return 'Bool';
     const values = rawValues.map(textValue);
     if (values.some(value => value === undefined || value === '')) return 'String';
@@ -47,33 +56,68 @@ export function inferCloudImportType(rows: Record<string, Json>[], column: strin
     if (!nonEmpty.length) return 'String';
     if (nonEmpty.every(isCalendarDate)) return 'Date';
     if (nonEmpty.every(isDateTime)) return 'DateTime';
-    if (nonEmpty.every(value => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value))) return 'UUID';
+    if (
+        nonEmpty.every(value =>
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+                value,
+            ),
+        )
+    )
+        return 'UUID';
     if (nonEmpty.every(value => /^-?\d+(?:\.\d+)?$/.test(value))) {
-        if (nonEmpty.every(value => /^\d+$/.test(value)) && nonEmpty.every(value => BigInt(value) <= 18_446_744_073_709_551_615n)) return 'UInt64';
-        if (nonEmpty.every(value => /^-?\d+$/.test(value)) && nonEmpty.every(value => BigInt(value) >= -9_223_372_036_854_775_808n && BigInt(value) <= 9_223_372_036_854_775_807n)) return 'Int64';
+        if (
+            nonEmpty.every(value => /^\d+$/.test(value)) &&
+            nonEmpty.every(value => BigInt(value) <= 18_446_744_073_709_551_615n)
+        )
+            return 'UInt64';
+        if (
+            nonEmpty.every(value => /^-?\d+$/.test(value)) &&
+            nonEmpty.every(
+                value =>
+                    BigInt(value) >= -9_223_372_036_854_775_808n &&
+                    BigInt(value) <= 9_223_372_036_854_775_807n,
+            )
+        )
+            return 'Int64';
         if (nonEmpty.every(value => /^-?\d+$/.test(value))) return 'String';
         const decimals = nonEmpty.map(value => value.split('.')[1]?.length ?? 0);
-        if (decimals.every(length => length <= 2) && nonEmpty.every(value => value.replace('-', '').replace('.', '').length <= 18)) return 'Decimal(18, 2)';
+        if (
+            decimals.every(length => length <= 2) &&
+            nonEmpty.every(value => value.replace('-', '').replace('.', '').length <= 18)
+        )
+            return 'Decimal(18, 2)';
         return 'Float64';
     }
     return 'String';
 }
 
-export function inferCloudImportColumns(rows: Record<string, Json>[], columns: string[]): CloudImportColumn[] {
+export function inferCloudImportColumns(
+    rows: Record<string, Json>[],
+    columns: string[],
+): CloudImportColumn[] {
     const used = new Set<string>();
     return columns.map((source, index) => {
-        const normalized = source.replace(/[^A-Za-z0-9_]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 120);
-        const base = normalized && /^[A-Za-z_]/.test(normalized) ? normalized : `column_${index + 1}`;
+        const normalized = source
+            .replace(/[^A-Za-z0-9_]+/g, '_')
+            .replace(/^_+|_+$/g, '')
+            .slice(0, 120);
+        const base =
+            normalized && /^[A-Za-z_]/.test(normalized) ? normalized : `column_${index + 1}`;
         let name = base;
         let suffix = 2;
-        while (used.has(name)) name = `${base.slice(0, 120 - String(suffix).length - 1)}_${suffix++}`;
+        while (used.has(name))
+            name = `${base.slice(0, 120 - String(suffix).length - 1)}_${suffix++}`;
         used.add(name);
         return { source, name, type: inferCloudImportType(rows, source) };
     });
 }
 
 export function suggestCloudTableName(fileName: string) {
-    const base = fileName.replace(/\.[^.]+$/, '').replace(/[^A-Za-z0-9_]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 120);
+    const base = fileName
+        .replace(/\.[^.]+$/, '')
+        .replace(/[^A-Za-z0-9_]+/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .slice(0, 120);
     const safe = base || 'imported_data';
     return /^[A-Za-z_]/.test(safe) ? safe : `import_${safe}`;
 }

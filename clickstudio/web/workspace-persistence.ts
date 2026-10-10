@@ -1,6 +1,7 @@
 import type { WorkspaceState } from './workspace-state.js';
 
-export const STORAGE_ERROR = 'Browser draft storage is unavailable or full. Export your local drafts before closing this page.';
+export const STORAGE_ERROR =
+    'Browser draft storage is unavailable or full. Export your local drafts before closing this page.';
 export interface WorkspaceWriter {
     schedule: (state: WorkspaceState) => void;
     flush: () => boolean;
@@ -18,7 +19,10 @@ export function createWorkspaceWriter(
     let timer: ReturnType<typeof setTimeout> | undefined;
     let saved: string | undefined;
     let disposed = false;
-    const cancelTimer = () => { if (timer !== undefined) clearTimeout(timer); timer = undefined; };
+    const cancelTimer = () => {
+        if (timer !== undefined) clearTimeout(timer);
+        timer = undefined;
+    };
     const flush = () => {
         cancelTimer();
         if (!pending) return true;

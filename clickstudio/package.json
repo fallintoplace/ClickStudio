@@ -30,14 +30,16 @@
     "coverage:workspace": "tsc -p tsconfig.workspace.json && node --test --experimental-test-coverage --test-coverage-lines=70 --test-coverage-functions=65 --test-coverage-branches=60 --test-coverage-include='.workspace-build/web/**/*.js' --test-coverage-include='.workspace-build/shared/assistant-proposal.js' --test-coverage-include='.workspace-build/shared/evidence.js' --test-coverage-include='.workspace-build/shared/types.js' --test-coverage-include='.workspace-build/shared/workspace-view.js' tests/workspace/*.test.mjs",
     "coverage": "npm run coverage:core && npm run coverage:workspace",
     "review": "npm run check:syntax && npm run typecheck && npm run lint && npm run coverage && npm run build:app",
-    "lint": "eslint . --max-warnings=0 && npm run lint:css",
+    "lint": "eslint . --max-warnings=0 && npm run lint:css && npm run format:check",
     "lint:fix": "eslint . --fix",
     "build:preview": "VITE_DEMO_MODE=true vite build && node scripts/copy-parser-vendor.mjs --web-preview",
     "test:e2e:preview": "playwright test --config playwright.preview.config.ts",
-    "lint:css": "stylelint \"web/**/*.css\" --report-needless-disables --report-invalid-scope-disables --max-warnings 0 && prettier --check \"web/**/*.css\"",
+    "lint:css": "stylelint \"web/**/*.css\" --report-needless-disables --report-invalid-scope-disables --max-warnings 0",
     "format:css": "prettier --write \"web/**/*.css\"",
     "test:e2e:styles": "playwright test tests/e2e/css-appearance.spec.ts",
-    "test:e2e:styles:update": "node scripts/update-style-reference.mjs"
+    "test:e2e:styles:update": "node scripts/update-style-reference.mjs",
+    "format": "prettier --write \"**/*.{js,mjs,cjs,ts,tsx,css}\"",
+    "format:check": "prettier --check \"**/*.{js,mjs,cjs,ts,tsx,css}\""
   },
   "dependencies": {
     "@clickhouse/click-ui": "^0.12.0",
@@ -76,6 +78,7 @@
     "@modelcontextprotocol/client": "^2.3.0",
     "@modelcontextprotocol/sdk": "^1.32.0",
     "@playwright/test": "^1.55.0",
+    "@stylistic/eslint-plugin": "^5.10.0",
     "@tailwindcss/vite": "^4.1.12",
     "@types/d3": "^7.4.3",
     "@types/express": "^5.0.3",

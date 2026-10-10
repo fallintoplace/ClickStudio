@@ -3,9 +3,55 @@ import { test, expect, type Page, type Route } from '@playwright/test';
 const schema = {
     connectionId: 'live',
     fetchedAt: '2026-09-23T00:00:00.000Z',
-    tables: [{ database: 'analytics', name: 'events', engine: 'MergeTree', orderBy: '(tenant_id, day)', primaryKey: 'tenant_id, day', partitionKey: 'toYYYYMM(day)', samplingKey: 'tenant_id', ttlConfigured: true, rowEstimate: '1200000', sizeBytes: '1610612736', uncompressedBytes: '4294967296', parts: '20', activeParts: '18', projections: [{ name: 'by_day', type: 'Normal', sortingKey: 'day' }], skipIndexes: [{ name: 'tenant_bloom', type: 'bloom_filter', expression: 'tenant_id', granularity: '4' }] }],
-    columns: [{ database: 'analytics', table: 'events', name: 'day', type: 'Date', defaultKind: '', comment: 'Event date' }],
-    dictionaries: [{ database: 'analytics', name: 'campaign_lookup', status: 'LOADED', type: 'Hashed', keyColumns: 'campaign_id UInt64', attributeColumns: 'campaign_name String', elementCount: '18240', memoryBytes: '5242880', lastSuccessfulUpdate: '2026-09-23 08:15:00' }],
+    tables: [
+        {
+            database: 'analytics',
+            name: 'events',
+            engine: 'MergeTree',
+            orderBy: '(tenant_id, day)',
+            primaryKey: 'tenant_id, day',
+            partitionKey: 'toYYYYMM(day)',
+            samplingKey: 'tenant_id',
+            ttlConfigured: true,
+            rowEstimate: '1200000',
+            sizeBytes: '1610612736',
+            uncompressedBytes: '4294967296',
+            parts: '20',
+            activeParts: '18',
+            projections: [{ name: 'by_day', type: 'Normal', sortingKey: 'day' }],
+            skipIndexes: [
+                {
+                    name: 'tenant_bloom',
+                    type: 'bloom_filter',
+                    expression: 'tenant_id',
+                    granularity: '4',
+                },
+            ],
+        },
+    ],
+    columns: [
+        {
+            database: 'analytics',
+            table: 'events',
+            name: 'day',
+            type: 'Date',
+            defaultKind: '',
+            comment: 'Event date',
+        },
+    ],
+    dictionaries: [
+        {
+            database: 'analytics',
+            name: 'campaign_lookup',
+            status: 'LOADED',
+            type: 'Hashed',
+            keyColumns: 'campaign_id UInt64',
+            attributeColumns: 'campaign_name String',
+            elementCount: '18240',
+            memoryBytes: '5242880',
+            lastSuccessfulUpdate: '2026-09-23 08:15:00',
+        },
+    ],
     warnings: [],
     truncated: false,
 };
@@ -13,12 +59,52 @@ const schema = {
 async function mockLiveWorkspace(page: Page, respondToSchema: (route: Route) => Promise<void>) {
     let trusted = true;
     let schemaRequests = 0;
-    await page.route('**/api/session', route => route.fulfill({ json: { principal: { id: 'test-owner', role: 'owner' }, requiresLogin: false, demo: false } }));
-    await page.route('**/api/connections', route => route.fulfill({ json: [{
-        id: 'live', name: 'Test database', host: 'https://clickhouse.example', database: 'analytics', username: 'reader', readonly: true, trusted,
-        limits: { rows: 5000, bytes: 2000000, seconds: 30, memory: 536870912, threads: 4 },
-        manifest: { version: 1, serverVersion: '26.1', testedAt: '2026-09-23T00:00:00.000Z', schema: { available: true }, progress: { available: true }, cancellation: { available: true }, explain: { available: true }, pipeline: { available: true }, queryLog: { available: true }, documentation: { available: false }, import: { available: false }, scripts: { available: true }, parameters: { available: true } },
-    }] }));
+    await page.route('**/api/session', route =>
+        route.fulfill({
+            json: {
+                principal: { id: 'test-owner', role: 'owner' },
+                requiresLogin: false,
+                demo: false,
+            },
+        }),
+    );
+    await page.route('**/api/connections', route =>
+        route.fulfill({
+            json: [
+                {
+                    id: 'live',
+                    name: 'Test database',
+                    host: 'https://clickhouse.example',
+                    database: 'analytics',
+                    username: 'reader',
+                    readonly: true,
+                    trusted,
+                    limits: {
+                        rows: 5000,
+                        bytes: 2000000,
+                        seconds: 30,
+                        memory: 536870912,
+                        threads: 4,
+                    },
+                    manifest: {
+                        version: 1,
+                        serverVersion: '26.1',
+                        testedAt: '2026-09-23T00:00:00.000Z',
+                        schema: { available: true },
+                        progress: { available: true },
+                        cancellation: { available: true },
+                        explain: { available: true },
+                        pipeline: { available: true },
+                        queryLog: { available: true },
+                        documentation: { available: false },
+                        import: { available: false },
+                        scripts: { available: true },
+                        parameters: { available: true },
+                    },
+                },
+            ],
+        }),
+    );
     await page.route('**/api/connections/live/trust', async route => {
         trusted = Boolean((route.request().postDataJSON() as { trusted?: unknown }).trusted);
         await route.fulfill({ json: { trusted } });
@@ -31,12 +117,19 @@ async function mockLiveWorkspace(page: Page, respondToSchema: (route: Route) => 
     await page.route('**/api/documents**', route => route.fulfill({ json: [] }));
     await page.goto('/');
     await expect(page.getByTestId('run-button')).toBeEnabled();
-    return { get schemaRequests() { return schemaRequests; } };
+    return {
+        get schemaRequests() {
+            return schemaRequests;
+        },
+    };
 }
 
 async function revokeAccess(page: Page) {
     await page.locator('.connection-trigger').click();
-    await page.getByRole('dialog', { name: 'Connection details' }).getByRole('button', { name: 'Turn off read-only access', exact: true }).click();
+    await page
+        .getByRole('dialog', { name: 'Connection details' })
+        .getByRole('button', { name: 'Turn off read-only access', exact: true })
+        .click();
     await expect(page.locator('.connection-quick-status')).toHaveText('Review needed');
     await expect(page.getByText('Schema is private', { exact: true })).toBeVisible();
 }
@@ -54,7 +147,8 @@ async function hoverToken(page: Page, token: string) {
         const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
         let node: Node | null;
         while ((node = walker.nextNode())) {
-            const text = node.textContent ?? '', start = text.indexOf(value);
+            const text = node.textContent ?? '',
+                start = text.indexOf(value);
             if (start < 0) continue;
             const range = document.createRange();
             range.setStart(node, start);
@@ -86,7 +180,9 @@ test('Revoking trust removes loaded schema from editor completion and hover', as
     await expect(page.locator('.sql-hover')).toHaveCount(0);
 });
 
-test('Object explorer shows ClickHouse metadata, searchable children, and generated SQL', async ({ page }) => {
+test('Object explorer shows ClickHouse metadata, searchable children, and generated SQL', async ({
+    page,
+}) => {
     await mockLiveWorkspace(page, route => route.fulfill({ json: schema }));
 
     await expect(page.getByRole('tree', { name: 'Objects' })).toBeVisible();
@@ -128,76 +224,125 @@ test('Object explorer shows ClickHouse metadata, searchable children, and genera
 });
 
 test('Object explorer explains when the loaded schema has no visible objects', async ({ page }) => {
-    await mockLiveWorkspace(page, route => route.fulfill({ json: { ...schema, tables: [], columns: [], dictionaries: [] } }));
+    await mockLiveWorkspace(page, route =>
+        route.fulfill({ json: { ...schema, tables: [], columns: [], dictionaries: [] } }),
+    );
 
     await expect(page.getByText('No objects found.', { exact: true })).toBeVisible();
-    await expect(page.getByText('No tables, views, or dictionaries are visible for this connection.', { exact: true })).toBeVisible();
+    await expect(
+        page.getByText('No tables, views, or dictionaries are visible for this connection.', {
+            exact: true,
+        }),
+    ).toBeVisible();
     await expect(page.getByText('ClickHouse metadata unavailable', { exact: true })).toHaveCount(0);
 
     const search = page.getByTestId('schema-search');
     await search.fill('events');
     await expect(page.getByText('No objects match this search.', { exact: true })).toBeVisible();
-    await expect(page.getByText('Try a different name, type, engine, index, or column.', { exact: true })).toBeVisible();
+    await expect(
+        page.getByText('Try a different name, type, engine, index, or column.', { exact: true }),
+    ).toBeVisible();
 
     await search.fill('   ');
     await expect(page.getByText('No objects found.', { exact: true })).toBeVisible();
 });
 
 test('Object explorer keeps metadata failures separate from an empty schema', async ({ page }) => {
-    await mockLiveWorkspace(page, route => route.fulfill({
-        status: 403,
-        json: { error: { code: 'CLICKHOUSE_PERMISSION', message: 'Not enough privileges to read system.tables' } },
-    }));
+    await mockLiveWorkspace(page, route =>
+        route.fulfill({
+            status: 403,
+            json: {
+                error: {
+                    code: 'CLICKHOUSE_PERMISSION',
+                    message: 'Not enough privileges to read system.tables',
+                },
+            },
+        }),
+    );
 
-    await expect(page.locator('.callout-error')).toContainText('Not enough privileges to read system.tables');
+    await expect(page.locator('.callout-error')).toContainText(
+        'Not enough privileges to read system.tables',
+    );
     await expect(page.getByText('No objects found.', { exact: true })).toHaveCount(0);
     await expect(page.getByText('ClickHouse metadata unavailable', { exact: true })).toHaveCount(0);
 });
 
-test('Object explorer keeps the partial-schema notice beside an empty loaded page', async ({ page }) => {
-    await mockLiveWorkspace(page, route => route.fulfill({
-        json: { ...schema, tables: [], columns: [], dictionaries: [], truncated: true, pagination: { tables: 0 } },
-    }));
+test('Object explorer keeps the partial-schema notice beside an empty loaded page', async ({
+    page,
+}) => {
+    await mockLiveWorkspace(page, route =>
+        route.fulfill({
+            json: {
+                ...schema,
+                tables: [],
+                columns: [],
+                dictionaries: [],
+                truncated: true,
+                pagination: { tables: 0 },
+            },
+        }),
+    );
 
     await expect(page.getByText('No objects found.', { exact: true })).toBeVisible();
     await expect(page.getByText(/Showing part of this schema/)).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Load more metadata', exact: true })).toBeVisible();
+    await expect(
+        page.getByRole('button', { name: 'Load more metadata', exact: true }),
+    ).toBeVisible();
 });
 
-test('Standard hides advanced object actions and keeps the object header balanced', async ({ page }) => {
+test('Standard hides advanced object actions and keeps the object header balanced', async ({
+    page,
+}) => {
     await page.addInitScript(() => localStorage.setItem('clickstudio:experience', 'beginner'));
     await mockLiveWorkspace(page, route => route.fulfill({ json: schema }));
     await page.locator('.icon-rail').getByRole('button', { name: 'Objects', exact: true }).click();
 
     const heading = page.locator('.object-heading');
-    await expect(heading.getByRole('button', { name: 'View dependencies', exact: true })).toHaveCount(0);
+    await expect(
+        heading.getByRole('button', { name: 'View dependencies', exact: true }),
+    ).toHaveCount(0);
     const count = heading.locator(':scope > span');
     const refresh = heading.getByRole('button', { name: 'Refresh', exact: true });
     await expect(count).toContainText('OBJECTS');
     await expect(refresh).toBeVisible();
 
     const [headingBounds, countBounds, refreshBounds] = await Promise.all([
-        heading.boundingBox(), count.boundingBox(), refresh.boundingBox(),
+        heading.boundingBox(),
+        count.boundingBox(),
+        refresh.boundingBox(),
     ]);
     expect(headingBounds).not.toBeNull();
     expect(countBounds).not.toBeNull();
     expect(refreshBounds).not.toBeNull();
     expect(countBounds!.x - headingBounds!.x).toBeLessThanOrEqual(4);
-    expect(headingBounds!.x + headingBounds!.width - refreshBounds!.x - refreshBounds!.width).toBeLessThanOrEqual(4);
+    expect(
+        headingBounds!.x + headingBounds!.width - refreshBounds!.x - refreshBounds!.width,
+    ).toBeLessThanOrEqual(4);
 
     await page.getByText('events', { exact: true }).first().click();
     const details = page.getByLabel('Selected object');
     await expect(details.getByRole('button', { name: 'Preview rows', exact: true })).toBeVisible();
-    await expect(details.getByRole('button', { name: 'Generate SELECT', exact: true })).toBeVisible();
-    await expect(details.getByRole('button', { name: 'Visualize parts', exact: true })).toHaveCount(0);
+    await expect(
+        details.getByRole('button', { name: 'Generate SELECT', exact: true }),
+    ).toBeVisible();
+    await expect(details.getByRole('button', { name: 'Visualize parts', exact: true })).toHaveCount(
+        0,
+    );
     await expect(page.locator('.object-reference-actions')).toHaveCount(0);
 });
 
-test('Preview Rows reuses the same draft and keeps the saved query panel preference', async ({ page }) => {
+test('Preview Rows reuses the same draft and keeps the saved query panel preference', async ({
+    page,
+}) => {
     await mockLiveWorkspace(page, route => route.fulfill({ json: schema }));
     await page.route('**/api/runs**', async route => {
         if (route.request().method() === 'POST') {
-            await route.fulfill({ status: 503, json: { error: { code: 'MOCK_RUN_FAILURE', message: 'The preview request is mocked.' } } });
+            await route.fulfill({
+                status: 503,
+                json: {
+                    error: { code: 'MOCK_RUN_FAILURE', message: 'The preview request is mocked.' },
+                },
+            });
             return;
         }
         await route.fallback();
@@ -209,25 +354,39 @@ test('Preview Rows reuses the same draft and keeps the saved query panel prefere
     await expect(page.locator('#sql-editor-content')).toBeHidden();
     await page.getByText('events', { exact: true }).first().click();
     await page.getByRole('button', { name: 'Preview rows', exact: true }).click();
-    await expect(sqlTabs.getByRole('tab').last()).toHaveAttribute('aria-label', 'Preview events.sql');
+    await expect(sqlTabs.getByRole('tab').last()).toHaveAttribute(
+        'aria-label',
+        'Preview events.sql',
+    );
     await expect(page.locator('#sql-editor-content')).toBeHidden();
 
     await sqlTabs.getByRole('tab', { name: originalTabName!, exact: true }).click();
     await expect(page.locator('#sql-editor-content')).toBeHidden();
 
     await page.getByText('events', { exact: true }).first().click();
-    const repeatedRun = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/runs');
+    const repeatedRun = page.waitForResponse(
+        response =>
+            response.request().method() === 'POST' &&
+            new URL(response.url()).pathname === '/api/runs',
+    );
     await page.getByRole('button', { name: 'Preview rows', exact: true }).click();
     await repeatedRun;
     await expect(sqlTabs.getByRole('tab')).toHaveCount(2);
-    await expect(sqlTabs.getByRole('tab', { name: 'Preview events.sql', exact: true })).toHaveCount(1);
+    await expect(sqlTabs.getByRole('tab', { name: 'Preview events.sql', exact: true })).toHaveCount(
+        1,
+    );
 });
 
 test('Preview Rows keeps an edited preview draft and opens a fresh one', async ({ page }) => {
     await mockLiveWorkspace(page, route => route.fulfill({ json: schema }));
     await page.route('**/api/runs**', async route => {
         if (route.request().method() === 'POST') {
-            await route.fulfill({ status: 503, json: { error: { code: 'MOCK_RUN_FAILURE', message: 'The preview request is mocked.' } } });
+            await route.fulfill({
+                status: 503,
+                json: {
+                    error: { code: 'MOCK_RUN_FAILURE', message: 'The preview request is mocked.' },
+                },
+            });
             return;
         }
         await route.fallback();
@@ -235,7 +394,11 @@ test('Preview Rows keeps an edited preview draft and opens a fresh one', async (
 
     const sqlTabs = page.getByRole('tablist', { name: 'SQL documents', exact: true });
     await page.getByText('events', { exact: true }).first().click();
-    const firstRun = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/runs');
+    const firstRun = page.waitForResponse(
+        response =>
+            response.request().method() === 'POST' &&
+            new URL(response.url()).pathname === '/api/runs',
+    );
     await page.getByRole('button', { name: 'Preview rows', exact: true }).click();
     await firstRun;
     const previewTabs = sqlTabs.getByRole('tab', { name: 'Preview events.sql', exact: true });
@@ -246,7 +409,11 @@ test('Preview Rows keeps an edited preview draft and opens a fresh one', async (
     await replaceSql(page, 'SELECT 42');
 
     await page.getByText('events', { exact: true }).first().click();
-    const secondRun = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/runs');
+    const secondRun = page.waitForResponse(
+        response =>
+            response.request().method() === 'POST' &&
+            new URL(response.url()).pathname === '/api/runs',
+    );
     await page.getByRole('button', { name: 'Preview rows', exact: true }).click();
     await secondRun;
     await expect(previewTabs).toHaveCount(2);
@@ -258,22 +425,48 @@ test('Preview Rows keeps an edited preview draft and opens a fresh one', async (
     await expect(page.locator('.cm-content')).toContainText('FROM `analytics`.`events`');
 });
 
-test('Deleting a table preserves its cached preview rows without a status pill', async ({ page }) => {
+test('Deleting a table preserves its cached preview rows without a status pill', async ({
+    page,
+}) => {
     let tableExists = true;
-    await mockLiveWorkspace(page, route => route.fulfill({ json: {
-        ...schema,
-        tables: tableExists ? schema.tables : [],
-        columns: tableExists ? schema.columns : [],
-    } }));
+    await mockLiveWorkspace(page, route =>
+        route.fulfill({
+            json: {
+                ...schema,
+                tables: tableExists ? schema.tables : [],
+                columns: tableExists ? schema.columns : [],
+            },
+        }),
+    );
 
     const previewSql = 'SELECT *\nFROM `analytics`.`events`\nLIMIT 100;';
     const run = {
-        dataSource: 'clickhouse', id: 'deleted-source-run', queryId: 'deleted-source-query', owner: 'test-owner', connectionId: 'live',
-        sql: previewSql, kind: 'query', parameters: {}, limits: { rows: 5000, bytes: 2000000, seconds: 30, memory: 536870912, threads: 4 },
-        tags: {}, status: 'succeeded', createdAt: '2026-09-29T08:00:00.000Z', startedAt: '2026-09-29T08:00:00.000Z',
-        finishedAt: '2026-09-29T08:00:00.000Z', elapsedMs: 1, rowCount: 1, bytes: 8, columns: [{ name: 'day', type: 'Date' }],
-        warnings: [], sequence: 1, resultExpiresAt: '2027-01-01T00:00:00.000Z', resultState: 'reopenable',
-        requestedBy: 'test-owner', executedAs: 'test-reader', permissionSnapshot: { readonly: true, role: 'owner' }, retryPolicy: 'never',
+        dataSource: 'clickhouse',
+        id: 'deleted-source-run',
+        queryId: 'deleted-source-query',
+        owner: 'test-owner',
+        connectionId: 'live',
+        sql: previewSql,
+        kind: 'query',
+        parameters: {},
+        limits: { rows: 5000, bytes: 2000000, seconds: 30, memory: 536870912, threads: 4 },
+        tags: {},
+        status: 'succeeded',
+        createdAt: '2026-09-29T08:00:00.000Z',
+        startedAt: '2026-09-29T08:00:00.000Z',
+        finishedAt: '2026-09-29T08:00:00.000Z',
+        elapsedMs: 1,
+        rowCount: 1,
+        bytes: 8,
+        columns: [{ name: 'day', type: 'Date' }],
+        warnings: [],
+        sequence: 1,
+        resultExpiresAt: '2027-01-01T00:00:00.000Z',
+        resultState: 'reopenable',
+        requestedBy: 'test-owner',
+        executedAs: 'test-reader',
+        permissionSnapshot: { readonly: true, role: 'owner' },
+        retryPolicy: 'never',
     };
     await page.route('**/api/runs**', async route => {
         const url = new URL(route.request().url());
@@ -286,10 +479,20 @@ test('Deleting a table preserves its cached preview rows without a status pill',
             return;
         }
         if (url.pathname === `/api/runs/${run.id}/result`) {
-            await route.fulfill({ json: {
-                runId: run.id, queryId: run.queryId, columns: run.columns, rows: [['2026-09-29']], completeness: 'complete',
-                createdAt: run.createdAt, expiresAt: run.resultExpiresAt, offset: 0, totalRows: 1, nextOffset: null,
-            } });
+            await route.fulfill({
+                json: {
+                    runId: run.id,
+                    queryId: run.queryId,
+                    columns: run.columns,
+                    rows: [['2026-09-29']],
+                    completeness: 'complete',
+                    createdAt: run.createdAt,
+                    expiresAt: run.resultExpiresAt,
+                    offset: 0,
+                    totalRows: 1,
+                    nextOffset: null,
+                },
+            });
             return;
         }
         if (url.pathname === `/api/runs/${run.id}`) {
@@ -314,8 +517,14 @@ test('Deleting a table preserves its cached preview rows without a status pill',
 
     await page.getByRole('button', { name: 'Delete table', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Delete table', exact: true });
-    await dialog.getByRole('textbox', { name: 'Type analytics.events to confirm' }).fill('analytics.events');
-    const deleteRequest = page.waitForRequest(request => request.method() === 'DELETE' && new URL(request.url()).pathname === '/api/connections/live/tables');
+    await dialog
+        .getByRole('textbox', { name: 'Type analytics.events to confirm' })
+        .fill('analytics.events');
+    const deleteRequest = page.waitForRequest(
+        request =>
+            request.method() === 'DELETE' &&
+            new URL(request.url()).pathname === '/api/connections/live/tables',
+    );
     await dialog.getByRole('button', { name: 'Delete table', exact: true }).click();
     await deleteRequest;
 
@@ -326,18 +535,73 @@ test('Deleting a table preserves its cached preview rows without a status pill',
     await expect(restoredResults.locator('.result-provenance-header')).toHaveCount(0);
 });
 
-test('MergeTree storage opens a selectable, metric-switchable D3 parts explorer', async ({ page }) => {
+test('MergeTree storage opens a selectable, metric-switchable D3 parts explorer', async ({
+    page,
+}) => {
     await mockLiveWorkspace(page, route => route.fulfill({ json: schema }));
-    await page.route('**/api/connections/live/table-parts', route => route.fulfill({ json: {
-        database: 'analytics', table: 'events',
-        parts: [
-            { active: true, partition: '2026-09', name: '202609_1_1_0', rows: '120000', marks: '15', compressedBytes: '4096', uncompressedBytes: '8192', level: 0, minBlockNumber: '1', maxBlockNumber: '1', modifiedAt: '2026-09-24 08:00:00', diskName: 'default' },
-            { active: true, partition: '2026-09', name: '202609_2_2_0', rows: '80000', marks: '10', compressedBytes: '2048', uncompressedBytes: '4096', level: 0, minBlockNumber: '2', maxBlockNumber: '2', modifiedAt: '2026-09-24 08:10:00', diskName: 'default' },
-            { active: false, partition: '2026-09', name: '202609_3_3_0', rows: '35000', marks: '5', compressedBytes: '512', uncompressedBytes: '1024', level: 0, minBlockNumber: '3', maxBlockNumber: '3', modifiedAt: '2026-09-24 08:12:00', diskName: 'cold' },
-        ],
-        totalParts: '3', activeParts: '2', inactiveParts: '1', truncated: false, measuredAt: '2026-09-24T08:10:00.000Z',
-        totals: { rows: '235000', marks: '30', compressedBytes: '6656', uncompressedBytes: '13312' },
-    } }));
+    await page.route('**/api/connections/live/table-parts', route =>
+        route.fulfill({
+            json: {
+                database: 'analytics',
+                table: 'events',
+                parts: [
+                    {
+                        active: true,
+                        partition: '2026-09',
+                        name: '202609_1_1_0',
+                        rows: '120000',
+                        marks: '15',
+                        compressedBytes: '4096',
+                        uncompressedBytes: '8192',
+                        level: 0,
+                        minBlockNumber: '1',
+                        maxBlockNumber: '1',
+                        modifiedAt: '2026-09-24 08:00:00',
+                        diskName: 'default',
+                    },
+                    {
+                        active: true,
+                        partition: '2026-09',
+                        name: '202609_2_2_0',
+                        rows: '80000',
+                        marks: '10',
+                        compressedBytes: '2048',
+                        uncompressedBytes: '4096',
+                        level: 0,
+                        minBlockNumber: '2',
+                        maxBlockNumber: '2',
+                        modifiedAt: '2026-09-24 08:10:00',
+                        diskName: 'default',
+                    },
+                    {
+                        active: false,
+                        partition: '2026-09',
+                        name: '202609_3_3_0',
+                        rows: '35000',
+                        marks: '5',
+                        compressedBytes: '512',
+                        uncompressedBytes: '1024',
+                        level: 0,
+                        minBlockNumber: '3',
+                        maxBlockNumber: '3',
+                        modifiedAt: '2026-09-24 08:12:00',
+                        diskName: 'cold',
+                    },
+                ],
+                totalParts: '3',
+                activeParts: '2',
+                inactiveParts: '1',
+                truncated: false,
+                measuredAt: '2026-09-24T08:10:00.000Z',
+                totals: {
+                    rows: '235000',
+                    marks: '30',
+                    compressedBytes: '6656',
+                    uncompressedBytes: '13312',
+                },
+            },
+        }),
+    );
 
     await page.getByText('events', { exact: true }).first().click();
     await page.getByRole('button', { name: 'Visualize parts', exact: true }).click();
@@ -359,21 +623,33 @@ test('MergeTree storage opens a selectable, metric-switchable D3 parts explorer'
 
     const metricControl = dialog.getByRole('group', { name: 'MergeTree parts' });
     await metricControl.getByRole('button', { name: 'Rows', exact: true }).click();
-    await expect(metricControl.getByRole('button', { name: 'Rows', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await expect(metricControl.getByRole('button', { name: 'Rows', exact: true })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+    );
     await dialog.getByRole('button', { name: 'Zoom into partition 2026-09', exact: true }).click();
     await expect(dialog.locator('.parts-breadcrumb')).toContainText('2026-09');
-    await dialog.getByRole('group', { name: 'Part map' }).getByRole('button', { name: 'Galaxy', exact: true }).click();
+    await dialog
+        .getByRole('group', { name: 'Part map' })
+        .getByRole('button', { name: 'Galaxy', exact: true })
+        .click();
     await expect(dialog.locator('.parts-graph-viewport')).toHaveClass(/is-galaxy/);
 
     await dialog.getByRole('button', { name: 'Close', exact: true }).last().click();
     await expect(dialog).toHaveCount(0);
 });
 
-test('A schema response arriving after trust is revoked cannot restore editor metadata', async ({ page }) => {
+test('A schema response arriving after trust is revoked cannot restore editor metadata', async ({
+    page,
+}) => {
     let releaseSchema!: () => void;
     let notifyStarted!: () => void;
-    const gate = new Promise<void>(resolve => { releaseSchema = resolve; });
-    const started = new Promise<void>(resolve => { notifyStarted = resolve; });
+    const gate = new Promise<void>(resolve => {
+        releaseSchema = resolve;
+    });
+    const started = new Promise<void>(resolve => {
+        notifyStarted = resolve;
+    });
     const state = await mockLiveWorkspace(page, async route => {
         notifyStarted();
         await gate;

@@ -52,7 +52,15 @@ export function useDetachedQueryEditor({
         detached.container.classList.toggle('is-beginner', experience === 'beginner');
         detached.container.classList.toggle('is-expert', experience === 'expert');
         setTitle(activeName);
-    }, [activeName, clearTemporaryPanelReveal, detached, editorRef, experience, setPanelLayout, setTitle]);
+    }, [
+        activeName,
+        clearTemporaryPanelReveal,
+        detached,
+        editorRef,
+        experience,
+        setPanelLayout,
+        setTitle,
+    ]);
 
     const openEditor = useCallback(() => {
         if (!open(activeName, experience)) {
@@ -62,7 +70,18 @@ export function useDetachedQueryEditor({
         revealPanelTemporarily('query', activeDraftId);
         setPanelLayout(current => ({ ...current, query: { ...current.query, mode: 'docked' } }));
         setNotice(copy.queryWindowOpened);
-    }, [activeDraftId, activeName, copy.queryWindowBlocked, copy.queryWindowOpened, experience, open, revealPanelTemporarily, setError, setNotice, setPanelLayout]);
+    }, [
+        activeDraftId,
+        activeName,
+        copy.queryWindowBlocked,
+        copy.queryWindowOpened,
+        experience,
+        open,
+        revealPanelTemporarily,
+        setError,
+        setNotice,
+        setPanelLayout,
+    ]);
 
     const dockEditor = useCallback(() => {
         dock();

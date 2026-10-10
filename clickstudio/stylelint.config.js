@@ -3,7 +3,10 @@ export default {
         'at-rule-no-unknown': [true, { ignoreAtRules: ['theme'] }],
         'block-no-empty': true,
         'color-no-invalid-hex': true,
-        'declaration-block-no-duplicate-properties': [true, { ignore: ['consecutive-duplicates-with-different-values'] }],
+        'declaration-block-no-duplicate-properties': [
+            true,
+            { ignore: ['consecutive-duplicates-with-different-values'] },
+        ],
         'declaration-no-important': true,
         'declaration-property-value-no-unknown': true,
         'function-no-unknown': true,

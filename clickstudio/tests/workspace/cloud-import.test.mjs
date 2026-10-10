@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cloudImportTargets, inferCloudImportColumns, inferCloudImportType, suggestCloudTableName } from '../../.workspace-build/web/cloud-import.js';
+import {
+    cloudImportTargets,
+    inferCloudImportColumns,
+    inferCloudImportType,
+    suggestCloudTableName,
+} from '../../.workspace-build/web/cloud-import.js';
 
 test('Cloud import targets include tables and exclude view engines', () => {
     const schema = {
@@ -17,8 +22,22 @@ test('Cloud import targets include tables and exclude view engines', () => {
 
 test('Cloud schema inference handles dates, integer bounds, decimals, UUIDs, and string fallback', () => {
     const rows = [
-        { day: '2026-09-21', count: '12', signed: '-2', price: '12.40', id: '550e8400-e29b-41d4-a716-446655440000', label: 'north' },
-        { day: '2026-09-22', count: '18', signed: '0', price: '3.10', id: '550e8400-e29b-41d4-a716-446655440001', label: 'south' },
+        {
+            day: '2026-09-21',
+            count: '12',
+            signed: '-2',
+            price: '12.40',
+            id: '550e8400-e29b-41d4-a716-446655440000',
+            label: 'north',
+        },
+        {
+            day: '2026-09-22',
+            count: '18',
+            signed: '0',
+            price: '3.10',
+            id: '550e8400-e29b-41d4-a716-446655440001',
+            label: 'south',
+        },
     ];
 
     assert.deepEqual(inferCloudImportColumns(rows, Object.keys(rows[0])), [
@@ -36,15 +55,25 @@ test('Cloud schema inference handles dates, integer bounds, decimals, UUIDs, and
 
 test('Cloud schema inference recognizes JSON booleans, including nullable values', () => {
     assert.equal(inferCloudImportType([{ enabled: true }, { enabled: false }], 'enabled'), 'Bool');
-    assert.equal(inferCloudImportType([{ enabled: true }, { enabled: null }, { enabled: false }], 'enabled'), 'Bool');
-    assert.deepEqual(inferCloudImportColumns([{ enabled: true }, { enabled: false }], ['enabled']), [
-        { source: 'enabled', name: 'enabled', type: 'Bool' },
-    ]);
+    assert.equal(
+        inferCloudImportType([{ enabled: true }, { enabled: null }, { enabled: false }], 'enabled'),
+        'Bool',
+    );
+    assert.deepEqual(
+        inferCloudImportColumns([{ enabled: true }, { enabled: false }], ['enabled']),
+        [{ source: 'enabled', name: 'enabled', type: 'Bool' }],
+    );
 });
 
 test('Cloud schema inference keeps Boolean-looking strings and mixed types as String', () => {
-    assert.equal(inferCloudImportType([{ enabled: 'true' }, { enabled: 'false' }], 'enabled'), 'String');
-    assert.equal(inferCloudImportType([{ enabled: true }, { enabled: 'false' }], 'enabled'), 'String');
+    assert.equal(
+        inferCloudImportType([{ enabled: 'true' }, { enabled: 'false' }], 'enabled'),
+        'String',
+    );
+    assert.equal(
+        inferCloudImportType([{ enabled: true }, { enabled: 'false' }], 'enabled'),
+        'String',
+    );
     assert.equal(inferCloudImportType([{ enabled: true }, { enabled: 1 }], 'enabled'), 'String');
     assert.equal(inferCloudImportType([{ enabled: null }, { enabled: null }], 'enabled'), 'String');
 });
@@ -58,5 +87,8 @@ test('Cloud table suggestion creates a safe name from a file name', () => {
 test('New table column names are safe and unique after normalization', () => {
     const columns = inferCloudImportColumns([{}], ['1 event', 'first name', 'first-name']);
 
-    assert.deepEqual(columns.map(column => column.name), ['column_1', 'first_name', 'first_name_2']);
+    assert.deepEqual(
+        columns.map(column => column.name),
+        ['column_1', 'first_name', 'first_name_2'],
+    );
 });

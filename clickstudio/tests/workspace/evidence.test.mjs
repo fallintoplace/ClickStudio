@@ -8,9 +8,15 @@ for (const [title, left, right, expected] of [
     ['Changed parameter makes evidence stale', { value: 'before' }, { value: 'after' }, false],
     ['Missing key is not an empty value', { value: '' }, {}, false],
     ['Additional parameter is detected', {}, { value: '' }, false],
-    ['UInt64 strings remain exact', { n: '18446744073709551615' }, { n: '18446744073709551614' }, false],
+    [
+        'UInt64 strings remain exact',
+        { n: '18446744073709551615' },
+        { n: '18446744073709551614' },
+        false,
+    ],
     ['Only own keys participate', { toString: 'x' }, {}, false],
-]) test(title, () => assert.equal(sameParameters(left, right), expected));
+])
+    test(title, () => assert.equal(sameParameters(left, right), expected));
 
 test('Draft matching checks both SQL and bound values without mutating evidence', () => {
     const run = Object.freeze({ sql: 'SELECT {n:UInt64}', parameters: Object.freeze({ n: '1' }) });

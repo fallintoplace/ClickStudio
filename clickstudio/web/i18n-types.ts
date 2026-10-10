@@ -6,7 +6,7 @@ export type Locale = (typeof allLocales)[number];
 type WidenStrings<T> = T extends string
     ? string
     : T extends object
-        ? { -readonly [Key in keyof T]: WidenStrings<T[Key]> }
-        : T;
+      ? { -readonly [Key in keyof T]: WidenStrings<T[Key]> }
+      : T;
 
 export type Copy = WidenStrings<typeof english>;

@@ -42,12 +42,16 @@ export interface ReplicationSnapshot {
 
 type Row = Record<string, unknown>;
 
-const stringValue = (value: unknown, fallback = '') => value === undefined || value === null ? fallback : String(value);
+const stringValue = (value: unknown, fallback = '') =>
+    value === undefined || value === null ? fallback : String(value);
 const numericValue = (value: unknown) => {
     const number = Number(value);
-    return Number.isFinite(number) && number > 0 ? Math.min(Number.MAX_SAFE_INTEGER, Math.floor(number)) : 0;
+    return Number.isFinite(number) && number > 0
+        ? Math.min(Number.MAX_SAFE_INTEGER, Math.floor(number))
+        : 0;
 };
-const booleanValue = (value: unknown) => value === true || value === 1 || value === '1' || value === 'true';
+const booleanValue = (value: unknown) =>
+    value === true || value === 1 || value === '1' || value === 'true';
 
 export function replicationReplicasQuery() {
     return `SELECT database, table, replica_name, is_leader, is_readonly, is_session_expired,
@@ -68,32 +72,52 @@ export function replicationQueueQuery() {
     LIMIT 501`;
 }
 
-export function parseReplicationSnapshot(connectionId: string, capabilities: ReplicationCapabilities, replicaRows: readonly Row[], queueRows: readonly Row[]): ReplicationSnapshot {
-    const replicas = replicaRows.slice(0, 500).map(row => ({
-        database: stringValue(row.database),
-        table: stringValue(row.table),
-        replicaName: stringValue(row.replica_name),
-        leader: booleanValue(row.is_leader),
-        readonly: booleanValue(row.is_readonly),
-        sessionExpired: booleanValue(row.is_session_expired),
-        absoluteDelay: numericValue(row.absolute_delay),
-        queueSize: numericValue(row.queue_size),
-        insertsInQueue: numericValue(row.inserts_in_queue),
-        mergesInQueue: numericValue(row.merges_in_queue),
-        futureParts: numericValue(row.future_parts),
-        totalReplicas: numericValue(row.total_replicas),
-        activeReplicas: numericValue(row.active_replicas),
-    })).filter(replica => replica.database.length > 0 && replica.table.length > 0);
-    const queue = queueRows.slice(0, 500).map(row => ({
-        database: stringValue(row.database),
-        table: stringValue(row.table),
-        type: stringValue(row.type),
-        entries: numericValue(row.entries),
-        oldestAt: stringValue(row.oldest_at),
-        maxTries: numericValue(row.max_tries),
-        errors: numericValue(row.errors),
-        postponed: numericValue(row.postponed),
-        executing: numericValue(row.executing),
-    })).filter(group => group.database.length > 0 && group.table.length > 0 && group.type.length > 0);
-    return { connectionId, scope: 'local-node', capabilities, replicas, queue, truncated: replicaRows.length > 500 || queueRows.length > 500 };
+export function parseReplicationSnapshot(
+    connectionId: string,
+    capabilities: ReplicationCapabilities,
+    replicaRows: readonly Row[],
+    queueRows: readonly Row[],
+): ReplicationSnapshot {
+    const replicas = replicaRows
+        .slice(0, 500)
+        .map(row => ({
+            database: stringValue(row.database),
+            table: stringValue(row.table),
+            replicaName: stringValue(row.replica_name),
+            leader: booleanValue(row.is_leader),
+            readonly: booleanValue(row.is_readonly),
+            sessionExpired: booleanValue(row.is_session_expired),
+            absoluteDelay: numericValue(row.absolute_delay),
+            queueSize: numericValue(row.queue_size),
+            insertsInQueue: numericValue(row.inserts_in_queue),
+            mergesInQueue: numericValue(row.merges_in_queue),
+            futureParts: numericValue(row.future_parts),
+            totalReplicas: numericValue(row.total_replicas),
+            activeReplicas: numericValue(row.active_replicas),
+        }))
+        .filter(replica => replica.database.length > 0 && replica.table.length > 0);
+    const queue = queueRows
+        .slice(0, 500)
+        .map(row => ({
+            database: stringValue(row.database),
+            table: stringValue(row.table),
+            type: stringValue(row.type),
+            entries: numericValue(row.entries),
+            oldestAt: stringValue(row.oldest_at),
+            maxTries: numericValue(row.max_tries),
+            errors: numericValue(row.errors),
+            postponed: numericValue(row.postponed),
+            executing: numericValue(row.executing),
+        }))
+        .filter(
+            group => group.database.length > 0 && group.table.length > 0 && group.type.length > 0,
+        );
+    return {
+        connectionId,
+        scope: 'local-node',
+        capabilities,
+        replicas,
+        queue,
+        truncated: replicaRows.length > 500 || queueRows.length > 500,
+    };
 }

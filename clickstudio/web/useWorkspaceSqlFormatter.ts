@@ -13,18 +13,31 @@ export function useWorkspaceSqlFormatter(
     nativeParserEnabled: boolean,
     nativeParserStatus: NativeParserStatus,
 ) {
-    return useCallback(async (formatter: WorkspaceFormatter) => {
-        const draftId = active.id, sourceSql = active.sql;
-        const applyBuiltIn = () => setWorkspace(current => current.activeId !== draftId ? current : ({ ...current,
-            tabs: current.tabs.map(draft => draft.id === draftId && draft.sql === sourceSql ? { ...draft, sql: formatSql(sourceSql) } : draft),
-        }));
-        if (formatter === 'builtin') {
-            applyBuiltIn();
-            return;
-        }
-        if (!nativeParserEnabled || nativeParserStatus !== 'ready') return;
-        const result = await editor.current?.formatNative();
-        if (result === 'unavailable' || result === 'fallback')
-            applyBuiltIn();
-    }, [active.id, active.sql, editor, nativeParserEnabled, nativeParserStatus, setWorkspace]);
+    return useCallback(
+        async (formatter: WorkspaceFormatter) => {
+            const draftId = active.id,
+                sourceSql = active.sql;
+            const applyBuiltIn = () =>
+                setWorkspace(current =>
+                    current.activeId !== draftId
+                        ? current
+                        : {
+                              ...current,
+                              tabs: current.tabs.map(draft =>
+                                  draft.id === draftId && draft.sql === sourceSql
+                                      ? { ...draft, sql: formatSql(sourceSql) }
+                                      : draft,
+                              ),
+                          },
+                );
+            if (formatter === 'builtin') {
+                applyBuiltIn();
+                return;
+            }
+            if (!nativeParserEnabled || nativeParserStatus !== 'ready') return;
+            const result = await editor.current?.formatNative();
+            if (result === 'unavailable' || result === 'fallback') applyBuiltIn();
+        },
+        [active.id, active.sql, editor, nativeParserEnabled, nativeParserStatus, setWorkspace],
+    );
 }

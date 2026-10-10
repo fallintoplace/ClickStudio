@@ -2,9 +2,19 @@ import { useCallback, useRef } from 'react';
 import type { Result, Run } from '../shared/types';
 import { api } from './api';
 
-type SnapshotSetter = (target: string, next: Result | ((current: Result | undefined) => Result), allowInactive?: boolean) => void;
+type SnapshotSetter = (
+    target: string,
+    next: Result | ((current: Result | undefined) => Result),
+    allowInactive?: boolean,
+) => void;
 
-export function useResultSnapshot({ activeRunId, run, snapshot, setSnapshotForRun, onSnapshot }: {
+export function useResultSnapshot({
+    activeRunId,
+    run,
+    snapshot,
+    setSnapshotForRun,
+    onSnapshot,
+}: {
     activeRunId?: string;
     run?: Run;
     snapshot?: Result;
@@ -15,7 +25,13 @@ export function useResultSnapshot({ activeRunId, run, snapshot, setSnapshotForRu
     const onSnapshotRef = useRef(onSnapshot);
     onSnapshotRef.current = onSnapshot;
     return useCallback(async () => {
-        if (!activeRunId || snapshot?.runId === activeRunId || !run || run.resultState !== 'reopenable') return;
+        if (
+            !activeRunId ||
+            snapshot?.runId === activeRunId ||
+            !run ||
+            run.resultState !== 'reopenable'
+        )
+            return;
         const runId = activeRunId;
         let request = requests.current.get(runId);
         if (!request) {

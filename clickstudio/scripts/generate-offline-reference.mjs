@@ -6,7 +6,9 @@ const referenceRoot = process.argv[2];
 const sourceRevision = process.argv[3];
 
 if (!referenceRoot || !sourceRevision) {
-    throw new Error('Usage: node scripts/generate-offline-reference.mjs <ClickHouse docs/reference directory> <source commit>');
+    throw new Error(
+        'Usage: node scripts/generate-offline-reference.mjs <ClickHouse docs/reference directory> <source commit>',
+    );
 }
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -18,8 +20,9 @@ async function markdownFiles(directory) {
     for (const item of await readdir(directory, { withFileTypes: true })) {
         if (item.name.startsWith('_') || item.name === 'navigation.json') continue;
         const absolutePath = path.join(directory, item.name);
-        if (item.isDirectory()) output.push(...await markdownFiles(absolutePath));
-        else if (/\.mdx?$/.test(item.name) && !/^(?:index|README)\.mdx?$/i.test(item.name)) output.push(absolutePath);
+        if (item.isDirectory()) output.push(...(await markdownFiles(absolutePath)));
+        else if (/\.mdx?$/.test(item.name) && !/^(?:index|README)\.mdx?$/i.test(item.name))
+            output.push(absolutePath);
     }
     return output.sort();
 }
@@ -31,10 +34,17 @@ function readYamlValue(frontmatter, key) {
     const first = lines[start].slice(key.length + 1).trim();
     const valueLines = [first];
     if (first === '|' || first === '>') {
-        for (let index = start + 1; index < lines.length && /^\s+/.test(lines[index]); index++) valueLines.push(lines[index].trim());
-        return valueLines.slice(1).join(first === '>' ? ' ' : '\n').trim();
+        for (let index = start + 1; index < lines.length && /^\s+/.test(lines[index]); index++)
+            valueLines.push(lines[index].trim());
+        return valueLines
+            .slice(1)
+            .join(first === '>' ? ' ' : '\n')
+            .trim();
     }
-    if ((first.startsWith("'") && !first.endsWith("'")) || (first.startsWith('"') && !first.endsWith('"'))) {
+    if (
+        (first.startsWith("'") && !first.endsWith("'")) ||
+        (first.startsWith('"') && !first.endsWith('"'))
+    ) {
         const quote = first[0];
         for (let index = start + 1; index < lines.length; index++) {
             valueLines.push(lines[index].trim());
@@ -42,9 +52,14 @@ function readYamlValue(frontmatter, key) {
         }
     }
     let value = valueLines.join(' ').trim();
-    if (value.startsWith("'") && value.endsWith("'")) value = value.slice(1, -1).replaceAll("''", "'");
+    if (value.startsWith("'") && value.endsWith("'"))
+        value = value.slice(1, -1).replaceAll("''", "'");
     else if (value.startsWith('"') && value.endsWith('"')) {
-        try { value = JSON.parse(value); } catch { value = value.slice(1, -1); }
+        try {
+            value = JSON.parse(value);
+        } catch {
+            value = value.slice(1, -1);
+        }
     }
     return value.replace(/\s+/g, ' ').trim();
 }
@@ -63,7 +78,8 @@ function categoryFor(relativePath) {
         return 'Function';
     }
     if (parts[0] === 'data-types') return 'Data Type';
-    if (parts[0] === 'engines') return parts[1] === 'database-engines' ? 'Database Engine' : 'Table Engine';
+    if (parts[0] === 'engines')
+        return parts[1] === 'database-engines' ? 'Database Engine' : 'Table Engine';
     if (parts[0] === 'formats') return 'Format';
     if (parts[0] === 'settings') {
         if (parts[1] === 'server-settings') return 'Server Setting';
@@ -87,7 +103,10 @@ function cleanContent(value) {
         .replace(/^export\s+.*$/gm, '')
         .replace(/^\s*<\/?[A-Z][\w.]*\b[^>]*>\s*$/gm, '')
         .replace(/^\s*\{[^\n]*\}\s*$/gm, '')
-        .replace(/\]\((\/(?:reference|sql-reference|operations)\/[^)]+)\)/g, '] (https://clickhouse.com/docs$1)')
+        .replace(
+            /\]\((\/(?:reference|sql-reference|operations)\/[^)]+)\)/g,
+            '] (https://clickhouse.com/docs$1)',
+        )
         .replace(/\]\s+\(/g, '](')
         .replace(/\n{3,}/g, '\n\n')
         .trim();
@@ -106,7 +125,14 @@ function excerptFor(frontmatter, body) {
         .replace(/^#{1,6}\s+.*$/gm, '')
         .split(/\n\s*\n/)
         .map(part => part.trim())
-        .filter(part => part && !part.split('\n').every(line => /^\s*\|/.test(line)) && !/^\*\*(?:See also|Syntax|Arguments|Returned value|Examples|Example)\*\*$/i.test(part));
+        .filter(
+            part =>
+                part &&
+                !part.split('\n').every(line => /^\s*\|/.test(line)) &&
+                !/^\*\*(?:See also|Syntax|Arguments|Returned value|Examples|Example)\*\*$/i.test(
+                    part,
+                ),
+        );
     const paragraphs = [];
     let length = 0;
     for (const paragraph of [frontDescription, ...prose]) {
@@ -117,8 +143,12 @@ function excerptFor(frontmatter, body) {
         if (trimmed) paragraphs.push(trimmed);
         length += trimmed.length;
     }
-    const sql = codeBlocks(body).filter(block => /^sql(?:\s|$)/i.test(block.info) && block.code.length <= 1800);
-    const example = sql.find(block => /title\s*=\s*["']?Query\b/i.test(block.info)) ?? sql.find(block => block.code.length <= 1000);
+    const sql = codeBlocks(body).filter(
+        block => /^sql(?:\s|$)/i.test(block.info) && block.code.length <= 1800,
+    );
+    const example =
+        sql.find(block => /title\s*=\s*["']?Query\b/i.test(block.info)) ??
+        sql.find(block => block.code.length <= 1000);
     if (example) paragraphs.push(`**Example**\n\n\`\`\`sql\n${example.code}\n\`\`\``);
     return cleanContent(paragraphs.join('\n\n'));
 }
@@ -128,13 +158,19 @@ function sectionSegments(body) {
     return headings.map((heading, index) => ({
         title: heading[1].replace(/\s+\{#[^}]+\}$/, '').trim(),
         anchor: heading[2] ?? '',
-        body: body.slice(heading.index + heading[0].length, headings[index + 1]?.index ?? body.length),
+        body: body.slice(
+            heading.index + heading[0].length,
+            headings[index + 1]?.index ?? body.length,
+        ),
     }));
 }
 
 function nameFor(category, title, relativePath) {
     let name = title || path.basename(relativePath, path.extname(relativePath));
-    name = name.replace(/^system\./i, '').replace(/\s+(?:table|database) engine$/i, '').trim();
+    name = name
+        .replace(/^system\./i, '')
+        .replace(/\s+(?:table|database) engine$/i, '')
+        .trim();
     if (category === 'SQL Syntax') return 'SQL syntax';
     return name;
 }
@@ -168,21 +204,31 @@ for (const file of await markdownFiles(referenceRoot)) {
     const source = await readFile(file, 'utf8');
     const { frontmatter, body: rawBody } = splitDocument(source);
     const title = readYamlValue(frontmatter, 'title');
-    const body = rawBody.replace(/\{\/\*AUTOGENERATED_START\*\/\}/, '').replace(/\{\/\*AUTOGENERATED_END\*\/\}/, '');
+    const body = rawBody
+        .replace(/\{\/\*AUTOGENERATED_START\*\/\}/, '')
+        .replace(/\{\/\*AUTOGENERATED_END\*\/\}/, '');
     const sourcePath = readYamlValue(frontmatter, 'slug');
-    const sourceUrl = sourcePath ? `https://clickhouse.com/docs${sourcePath.replace(/\/$/, '')}` : `https://github.com/ClickHouse/ClickHouse/blob/${sourceRevision}/docs/reference/${relativePath.split(path.sep).join('/')}`;
+    const sourceUrl = sourcePath
+        ? `https://clickhouse.com/docs${sourcePath.replace(/\/$/, '')}`
+        : `https://github.com/ClickHouse/ClickHouse/blob/${sourceRevision}/docs/reference/${relativePath.split(path.sep).join('/')}`;
 
     if (type.endsWith('Setting')) {
-        const sections = sectionSegments(body).filter(section => section.anchor && /^[\w.*-]+$/.test(section.anchor));
+        const sections = sectionSegments(body).filter(
+            section => section.anchor && /^[\w.*-]+$/.test(section.anchor),
+        );
         if (sections.length) {
-            for (const section of sections) addEntry(section.anchor, type, excerptFor(frontmatter, section.body), sourceUrl);
+            for (const section of sections)
+                addEntry(section.anchor, type, excerptFor(frontmatter, section.body), sourceUrl);
             continue;
         }
     }
 
     if (type === 'Data Type' && /int-uint\.mdx?$/i.test(relativePath)) {
-        const integerNames = [...body.matchAll(/^\|\s*`((?:U?Int)(?:8|16|32|64|128|256))`\s*\|/gm)].map(match => match[1]);
-        for (const name of new Set(integerNames)) addEntry(name, type, excerptFor(frontmatter, body), sourceUrl);
+        const integerNames = [
+            ...body.matchAll(/^\|\s*`((?:U?Int)(?:8|16|32|64|128|256))`\s*\|/gm),
+        ].map(match => match[1]);
+        for (const name of new Set(integerNames))
+            addEntry(name, type, excerptFor(frontmatter, body), sourceUrl);
         continue;
     }
 
@@ -194,12 +240,17 @@ for (const file of await markdownFiles(referenceRoot)) {
     const aliasLines = [...source.matchAll(/(?:\*\*)?Aliases?(?:\*\*)?:[^\n]*/gi)];
     for (const line of aliasLines) {
         for (const alias of line[0].matchAll(/`([^`]+)`/g)) {
-            if (/^[A-Za-z_][\w]*$/.test(alias[1]) && alias[1].toLowerCase() !== name.toLowerCase()) addEntry(alias[1], type, description, sourceUrl);
+            if (/^[A-Za-z_][\w]*$/.test(alias[1]) && alias[1].toLowerCase() !== name.toLowerCase())
+                addEntry(alias[1], type, description, sourceUrl);
         }
     }
 }
 
-const uniqueEntries = [...new Map(entries.map(entry => [`${entry.type}\u0000${entry.name}`, entry])).values()]
-    .sort((left, right) => left.type.localeCompare(right.type) || left.name.localeCompare(right.name));
-await writeFile(outputPath, `${JSON.stringify({ source: 'ClickHouse documentation', sourceRevision, license: 'CC BY-NC-SA 4.0', entries: uniqueEntries })}\n`);
+const uniqueEntries = [
+    ...new Map(entries.map(entry => [`${entry.type}\u0000${entry.name}`, entry])).values(),
+].sort((left, right) => left.type.localeCompare(right.type) || left.name.localeCompare(right.name));
+await writeFile(
+    outputPath,
+    `${JSON.stringify({ source: 'ClickHouse documentation', sourceRevision, license: 'CC BY-NC-SA 4.0', entries: uniqueEntries })}\n`,
+);
 console.log(`Wrote ${uniqueEntries.length} offline reference entries to ${outputPath}`);

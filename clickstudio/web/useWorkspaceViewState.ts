@@ -60,7 +60,10 @@ export function useWorkspaceViewState({
     nativeParseSnapshot?: NativeParseSnapshot;
     snapshot?: Result;
 }) {
-    const sortedHistory = useMemo(() => [...history].sort((a, b) => b.createdAt.localeCompare(a.createdAt)), [history]);
+    const sortedHistory = useMemo(
+        () => [...history].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+        [history],
+    );
     const savedDocument = documents.find(document => document.id === active.serverId);
     const saveStatus = draftSaveStatus(active, connection.id, savedDocument, {
         saving: Boolean(savingDraftIds[active.id]),
@@ -68,74 +71,168 @@ export function useWorkspaceViewState({
         readError: documentsReadError,
     });
     const statementCount = safeStatementCount(active.sql);
-    const failedScriptStatement = script?.statements.find(statement => statement.status === 'failed' && statement.error);
-    const unrecordedScriptFailure = failedScriptStatement && !failedScriptStatement.runId && !scriptResultSelected ? failedScriptStatement : undefined;
-    const failureError = failedQueryError?.error ?? unrecordedScriptFailure?.error ?? (run?.status === 'failed' ? run.error : undefined);
-    const failureSql = failedQueryError?.statementSql ?? unrecordedScriptFailure?.sql ?? (run?.status === 'failed' ? run.sql : undefined);
-    const statementError = failureError && !failedQueryError && !unrecordedScriptFailure && failureError.position !== undefined && run?.sourceFrom !== undefined
-        ? { ...failureError, position: failureError.position - run.sourceFrom }
-        : failureError;
-    const failureRange = failureSql && statementError ? sqlErrorRange(failureSql, statementError) : undefined;
+    const failedScriptStatement = script?.statements.find(
+        statement => statement.status === 'failed' && statement.error,
+    );
+    const unrecordedScriptFailure =
+        failedScriptStatement && !failedScriptStatement.runId && !scriptResultSelected
+            ? failedScriptStatement
+            : undefined;
+    const failureError =
+        failedQueryError?.error ??
+        unrecordedScriptFailure?.error ??
+        (run?.status === 'failed' ? run.error : undefined);
+    const failureSql =
+        failedQueryError?.statementSql ??
+        unrecordedScriptFailure?.sql ??
+        (run?.status === 'failed' ? run.sql : undefined);
+    const statementError =
+        failureError &&
+        !failedQueryError &&
+        !unrecordedScriptFailure &&
+        failureError.position !== undefined &&
+        run?.sourceFrom !== undefined
+            ? { ...failureError, position: failureError.position - run.sourceFrom }
+            : failureError;
+    const failureRange =
+        failureSql && statementError ? sqlErrorRange(failureSql, statementError) : undefined;
     const selectedRunStatement = safeSelectedStatement(active.sql, active.from, active.to);
-    const runErrorContext = run?.error && (run.sql === active.sql || run.sql === selectedRunStatement?.sql || (run.sourceFrom !== undefined && active.sql.slice(run.sourceFrom, run.sourceFrom + run.sql.length) === run.sql))
-        ? { draftId: active.id, draftSql: active.sql, statementSql: run.sql, sourceFrom: run.sourceFrom ?? (run.sql === active.sql ? 0 : selectedRunStatement?.from ?? 0), error: run.error }
-        : undefined;
-    const requestErrorContext = failedQueryError?.draftId === active.id && failedQueryError.draftSql === active.sql ? failedQueryError : undefined;
+    const runErrorContext =
+        run?.error &&
+        (run.sql === active.sql ||
+            run.sql === selectedRunStatement?.sql ||
+            (run.sourceFrom !== undefined &&
+                active.sql.slice(run.sourceFrom, run.sourceFrom + run.sql.length) === run.sql))
+            ? {
+                  draftId: active.id,
+                  draftSql: active.sql,
+                  statementSql: run.sql,
+                  sourceFrom:
+                      run.sourceFrom ??
+                      (run.sql === active.sql ? 0 : (selectedRunStatement?.from ?? 0)),
+                  error: run.error,
+              }
+            : undefined;
+    const requestErrorContext =
+        failedQueryError?.draftId === active.id && failedQueryError.draftSql === active.sql
+            ? failedQueryError
+            : undefined;
     const editorErrorContext = requestErrorContext ?? runErrorContext;
     const editorErrorRange = editorErrorContext
-        ? sqlErrorRangeInDraft(active.sql, editorErrorContext.statementSql, editorErrorContext.sourceFrom, editorErrorContext.error, editorErrorContext === runErrorContext && run?.sourceFrom !== undefined ? 'draft' : 'statement')
+        ? sqlErrorRangeInDraft(
+              active.sql,
+              editorErrorContext.statementSql,
+              editorErrorContext.sourceFrom,
+              editorErrorContext.error,
+              editorErrorContext === runErrorContext && run?.sourceFrom !== undefined
+                  ? 'draft'
+                  : 'statement',
+          )
         : undefined;
     const submittedDraft = failedQueryError?.draftSql ?? runErrorContext?.draftSql;
     const submittedOffset = failedQueryError?.sourceFrom ?? runErrorContext?.sourceFrom ?? 0;
-    const failureLocation = failureSql && failureRange
-        ? submittedDraft && submittedDraft.slice(submittedOffset, submittedOffset + failureSql.length) === failureSql
-            ? sqlErrorLineColumn(submittedDraft, submittedOffset + failureRange.from)
-            : sqlErrorLineColumn(failureSql, failureRange.from)
-        : undefined;
-    const invalidatedSource = run && active.activeRunId === run.id && active.invalidatedSource?.runId === run.id
-        ? active.invalidatedSource
-        : undefined;
-    const resultChange = useMemo(() => run ? retainedResultChange(run, { sql: active.sql, parameters: active.parameters, connectionId: connection.id }) : undefined, [run, active.sql, active.parameters, connection.id]);
+    const failureLocation =
+        failureSql && failureRange
+            ? submittedDraft &&
+              submittedDraft.slice(submittedOffset, submittedOffset + failureSql.length) ===
+                  failureSql
+                ? sqlErrorLineColumn(submittedDraft, submittedOffset + failureRange.from)
+                : sqlErrorLineColumn(failureSql, failureRange.from)
+            : undefined;
+    const invalidatedSource =
+        run && active.activeRunId === run.id && active.invalidatedSource?.runId === run.id
+            ? active.invalidatedSource
+            : undefined;
+    const resultChange = useMemo(
+        () =>
+            run
+                ? retainedResultChange(run, {
+                      sql: active.sql,
+                      parameters: active.parameters,
+                      connectionId: connection.id,
+                  })
+                : undefined,
+        [run, active.sql, active.parameters, connection.id],
+    );
     const staleResult = Boolean(invalidatedSource || resultChange);
-    const staleResultLabel = invalidatedSource ? copy.common.sourceDeleted
-        : resultChange === 'query' ? copy.common.queryChanged
-        : resultChange === 'parameters' ? copy.common.parametersChanged
-        : resultChange === 'connection' ? copy.common.connectionChanged : undefined;
+    const staleResultLabel = invalidatedSource
+        ? copy.common.sourceDeleted
+        : resultChange === 'query'
+          ? copy.common.queryChanged
+          : resultChange === 'parameters'
+            ? copy.common.parametersChanged
+            : resultChange === 'connection'
+              ? copy.common.connectionChanged
+              : undefined;
     const staleResultReason = invalidatedSource
         ? `The source table ${invalidatedSource.database}.${invalidatedSource.table} was deleted after this run.`
-        : resultChange === 'query' ? copy.common.queryChangedDescription
-        : resultChange === 'parameters' ? copy.common.parametersChangedDescription
-        : resultChange === 'connection' ? copy.common.connectionChangedDescription : undefined;
-    const requestedResultsView = experience === 'beginner' && view === 'insights' ? 'results' : view;
+        : resultChange === 'query'
+          ? copy.common.queryChangedDescription
+          : resultChange === 'parameters'
+            ? copy.common.parametersChangedDescription
+            : resultChange === 'connection'
+              ? copy.common.connectionChangedDescription
+              : undefined;
+    const requestedResultsView =
+        experience === 'beginner' && view === 'insights' ? 'results' : view;
     const sqlMapStatement = safeSelectedStatement(active.sql, active.from, active.from);
     const queryTreeCapability = connection.manifest?.queryTree ?? connection.manifest?.explain;
-    const queryTreeAvailable = trusted && !unsupportedParameters && queryTreeCapability?.available !== false;
-    const queryTreeUnavailableReason = !trusted ? copy.common.runActionTrustRequired
-        : unsupportedParameters ? connection.manifest?.parameters.reason ?? copy.common.runActionRemoveParameters
-            : queryTreeCapability?.reason;
-    const sqlMapParseStatement = sqlMapStatement && nativeParseSnapshot?.statements.find(statement =>
-        statement.from === sqlMapStatement.from
-        && statement.to === sqlMapStatement.to
-        && active.sql.slice(statement.from, statement.to) === statement.sql);
+    const queryTreeAvailable =
+        trusted && !unsupportedParameters && queryTreeCapability?.available !== false;
+    const queryTreeUnavailableReason = !trusted
+        ? copy.common.runActionTrustRequired
+        : unsupportedParameters
+          ? (connection.manifest?.parameters.reason ?? copy.common.runActionRemoveParameters)
+          : queryTreeCapability?.reason;
+    const sqlMapParseStatement =
+        sqlMapStatement &&
+        nativeParseSnapshot?.statements.find(
+            statement =>
+                statement.from === sqlMapStatement.from &&
+                statement.to === sqlMapStatement.to &&
+                active.sql.slice(statement.from, statement.to) === statement.sql,
+        );
     const resultTabs = resultsViews(run, experience);
-    const visibleResultsView = resultTabs.includes(requestedResultsView) ? requestedResultsView : 'results';
+    const visibleResultsView = resultTabs.includes(requestedResultsView)
+        ? requestedResultsView
+        : 'results';
     const retainedSnapshot = run && snapshot?.runId === run.id ? snapshot : undefined;
     const explainPlanOutput = run?.kind === 'plan' ? retainedSnapshot?.rows[0]?.[0] : undefined;
     const explainPlan = useMemo(() => parseExplainPlan(explainPlanOutput), [explainPlanOutput]);
     const explainIndexRows = run?.kind === 'explain' ? retainedSnapshot?.rows : undefined;
-    const explainIndexAnalysis = useMemo(() => explainIndexRows ? parseExplainIndexAnalysis(explainIndexRows) : undefined, [explainIndexRows]);
+    const explainIndexAnalysis = useMemo(
+        () => (explainIndexRows ? parseExplainIndexAnalysis(explainIndexRows) : undefined),
+        [explainIndexRows],
+    );
     const pipelineOutputRows = run?.kind === 'pipeline' ? retainedSnapshot?.rows : undefined;
-    const pipelineResult = useMemo(() => pipelineOutputRows
-        ? parsePipelineResult(pipelineOutputRows.map(row => row[0]).filter((value): value is string => typeof value === 'string'))
-        : undefined, [pipelineOutputRows]);
-    const analyzeOutput = run?.kind === 'analyze'
-        ? retainedSnapshot?.rows.map(row => row[0]).filter((value): value is string => typeof value === 'string').join('\n')
-        : undefined;
+    const pipelineResult = useMemo(
+        () =>
+            pipelineOutputRows
+                ? parsePipelineResult(
+                      pipelineOutputRows
+                          .map(row => row[0])
+                          .filter((value): value is string => typeof value === 'string'),
+                  )
+                : undefined,
+        [pipelineOutputRows],
+    );
+    const analyzeOutput =
+        run?.kind === 'analyze'
+            ? retainedSnapshot?.rows
+                  .map(row => row[0])
+                  .filter((value): value is string => typeof value === 'string')
+                  .join('\n')
+            : undefined;
     const analyzeEvidence = useMemo(() => parseExplainAnalyze(analyzeOutput), [analyzeOutput]);
     const resultsTitle = resultsViewTitle(visibleResultsView, copy.common);
-    const resultsEyebrow = visibleResultsView === 'sqlmap' ? copy.common.queryVisualization : copy.common.workspaceOutput;
+    const resultsEyebrow =
+        visibleResultsView === 'sqlmap'
+            ? copy.common.queryVisualization
+            : copy.common.workspaceOutput;
     const resultsPanelLabel = resultPanelAriaLabel(visibleResultsView, copy.common);
-    const snapshotChart = retainedSnapshot ? recommendChart(retainedSnapshot.columns, retainedSnapshot.rows) : undefined;
+    const snapshotChart = retainedSnapshot
+        ? recommendChart(retainedSnapshot.columns, retainedSnapshot.rows)
+        : undefined;
 
     return {
         sortedHistory,

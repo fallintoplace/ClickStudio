@@ -35,13 +35,25 @@ test('Authentication and theme chrome is localized for every selectable locale',
 
     for (const locale of nonEnglishLocales) {
         const copy = getCopy(locale);
-        assert.notEqual(copy.auth.privateWorkspace, english.auth.privateWorkspace, `${locale} private workspace`);
+        assert.notEqual(
+            copy.auth.privateWorkspace,
+            english.auth.privateWorkspace,
+            `${locale} private workspace`,
+        );
         assert.notEqual(copy.auth.unavailable, english.auth.unavailable, `${locale} unavailable`);
         assert.notEqual(copy.auth.retry, english.auth.retry, `${locale} retry`);
-        assert.notEqual(copy.auth.credentialsNotice, english.auth.credentialsNotice, `${locale} credentials notice`);
+        assert.notEqual(
+            copy.auth.credentialsNotice,
+            english.auth.credentialsNotice,
+            `${locale} credentials notice`,
+        );
         assert.notEqual(copy.app.accent, english.app.accent, `${locale} accent label`);
         assert.notEqual(copy.app.cyanAccent, english.app.cyanAccent, `${locale} cyan accent label`);
-        assert.notEqual(copy.app.clickhouseYellowAccent, english.app.clickhouseYellowAccent, `${locale} ClickHouse yellow accent label`);
+        assert.notEqual(
+            copy.app.clickhouseYellowAccent,
+            english.app.clickhouseYellowAccent,
+            `${locale} ClickHouse yellow accent label`,
+        );
         const localizedThemes = themeOptions(copy);
         assert.notEqual(localizedThemes[0].label, englishThemes[0].label, `${locale} dark theme`);
         assert.notEqual(localizedThemes[1].label, englishThemes[1].label, `${locale} light theme`);
@@ -54,7 +66,8 @@ function flattenStrings(value, prefix = '') {
         const path = prefix ? `${prefix}.${key}` : key;
         if (typeof child === 'string') result.set(path, child);
         else if (child && typeof child === 'object') {
-            for (const [nestedPath, text] of flattenStrings(child, path)) result.set(nestedPath, text);
+            for (const [nestedPath, text] of flattenStrings(child, path))
+                result.set(nestedPath, text);
         }
     }
     return result;
@@ -72,7 +85,11 @@ test('Localized copy preserves the English key shape and placeholder contracts',
         const localized = flattenStrings(getCopy(locale));
         assert.deepEqual([...localized.keys()].sort(), englishPaths, `${locale} copy shape`);
         for (const [path, englishText] of english) {
-            assert.deepEqual(placeholders(localized.get(path) ?? ''), placeholders(englishText), `${locale}.${path}`);
+            assert.deepEqual(
+                placeholders(localized.get(path) ?? ''),
+                placeholders(englishText),
+                `${locale}.${path}`,
+            );
         }
     }
 });

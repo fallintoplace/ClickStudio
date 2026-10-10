@@ -8,9 +8,10 @@ import {
 } from './demo-preview';
 import { newDraft, recover, SAMPLE_SQL, type WorkspaceState } from './workspace-state';
 
-export const workspaceStateKey = (connectionId: string) => `clickstudio:workspace:${connectionId}:v1`;
+export const workspaceStateKey = (connectionId: string) =>
+    `clickstudio:workspace:${connectionId}:v1`;
 
-function previewStarterDraft(starter: typeof DEMO_PREVIEW_INITIAL_STARTERS[number]) {
+function previewStarterDraft(starter: (typeof DEMO_PREVIEW_INITIAL_STARTERS)[number]) {
     const runId = demoPreviewStarterRunId(starter.id);
     return {
         ...newDraft(starter.name, starter.sql),
@@ -26,32 +27,38 @@ export function initialWorkspaceState(connectionId: string): WorkspaceState {
     const recovered = recover(workspaceStateKey(connectionId));
     if (!isFrontendDemoPreview) return recovered;
     if (!recovered.tabs.length) return recovered;
-    const activeId = recovered.tabs.find(tab => tab.id === recovered.activeId)?.id ?? recovered.tabs[0]!.id;
+    const activeId =
+        recovered.tabs.find(tab => tab.id === recovered.activeId)?.id ?? recovered.tabs[0]!.id;
     const active = recovered.tabs.find(tab => tab.id === activeId)!;
-    const isStarterDraft = active.name === 'Getting started.sql'
-        && (active.sql.trim() === SAMPLE_SQL.trim() || active.sql.trim() === DEMO_PREVIEW_SQL.trim())
-        && (!active.serverId || active.serverId === DEMO_PREVIEW_STARTER_DOCUMENT_ID);
-    if (!isStarterDraft || recovered.tabs.length !== 1 || recovered.closedTabs?.length) return recovered;
+    const isStarterDraft =
+        active.name === 'Getting started.sql' &&
+        (active.sql.trim() === SAMPLE_SQL.trim() ||
+            active.sql.trim() === DEMO_PREVIEW_SQL.trim()) &&
+        (!active.serverId || active.serverId === DEMO_PREVIEW_STARTER_DOCUMENT_ID);
+    if (!isStarterDraft || recovered.tabs.length !== 1 || recovered.closedTabs?.length)
+        return recovered;
 
     if (connectionId === 'playground') {
         return {
             ...recovered,
-            tabs: [{
-                ...active,
-                name: PLAYGROUND_PREVIEW_STARTER.name,
-                sql: PLAYGROUND_PREVIEW_STARTER.sql,
-                serverId: undefined,
-                baseRevision: undefined,
-                chart: { ...PLAYGROUND_PREVIEW_STARTER.chart, ys: [] },
-                runIds: [],
-                activeRunId: undefined,
-                scriptId: undefined,
-                parentRunId: undefined,
-                parentDocumentId: undefined,
-                kind: 'query',
-                metric: undefined,
-                dependencies: [],
-            }],
+            tabs: [
+                {
+                    ...active,
+                    name: PLAYGROUND_PREVIEW_STARTER.name,
+                    sql: PLAYGROUND_PREVIEW_STARTER.sql,
+                    serverId: undefined,
+                    baseRevision: undefined,
+                    chart: { ...PLAYGROUND_PREVIEW_STARTER.chart, ys: [] },
+                    runIds: [],
+                    activeRunId: undefined,
+                    scriptId: undefined,
+                    parentRunId: undefined,
+                    parentDocumentId: undefined,
+                    kind: 'query',
+                    metric: undefined,
+                    dependencies: [],
+                },
+            ],
         };
     }
 

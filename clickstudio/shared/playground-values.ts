@@ -4,7 +4,10 @@ import { parseNativeGeoText } from './geo.js';
 
 function nullableType(type: string) {
     let value = type;
-    while ((value.startsWith('Nullable(') || value.startsWith('LowCardinality(')) && value.endsWith(')')) {
+    while (
+        (value.startsWith('Nullable(') || value.startsWith('LowCardinality(')) &&
+        value.endsWith(')')
+    ) {
         if (value.startsWith('Nullable(')) return true;
         value = value.slice(value.indexOf('(') + 1, -1);
     }
@@ -22,9 +25,12 @@ export function decodeClickHouseStringValue(value: string, type: string, nullMar
     if (/^(?:U?Int(?:8|16|32|64|128|256))$/.test(base) && /^-?\d+$/.test(value)) {
         try {
             const integer = BigInt(value);
-            if (integer <= BigInt(Number.MAX_SAFE_INTEGER) && integer >= BigInt(Number.MIN_SAFE_INTEGER))
+            if (
+                integer <= BigInt(Number.MAX_SAFE_INTEGER) &&
+                integer >= BigInt(Number.MIN_SAFE_INTEGER)
+            )
                 return Number(value);
-        } catch { }
+        } catch {}
         return value;
     }
     if (/^(?:Float(?:32|64)|BFloat16)$/.test(base)) {

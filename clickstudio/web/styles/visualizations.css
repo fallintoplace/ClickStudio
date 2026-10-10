@@ -496,10 +496,7 @@
         color-mix(in srgb, var(--line-bright) 24%, transparent) 1px,
         transparent 1px
       ),
-      linear-gradient(
-        color-mix(in srgb, var(--line-bright) 24%, transparent) 1px,
-        transparent 1px
-      );
+      linear-gradient(color-mix(in srgb, var(--line-bright) 24%, transparent) 1px, transparent 1px);
     background-size: 32px 32px;
     content: "";
     opacity: 0.42;
@@ -2060,31 +2057,19 @@
     vector-effect: non-scaling-stroke;
   }
   .geo-feature.is-area {
-    fill: color-mix(
-      in srgb,
-      hsl(var(--geo-hue) 88% 58%) var(--geo-intensity),
-      var(--panel-raised)
-    );
+    fill: color-mix(in srgb, hsl(var(--geo-hue) 88% 58%) var(--geo-intensity), var(--panel-raised));
     stroke: color-mix(in srgb, hsl(var(--geo-hue) 88% 64%) 75%, var(--text));
     stroke-width: 1;
   }
   .geo-feature.is-line {
     fill: none;
-    stroke: color-mix(
-      in srgb,
-      hsl(var(--geo-hue) 88% 58%) var(--geo-intensity),
-      var(--text-soft)
-    );
+    stroke: color-mix(in srgb, hsl(var(--geo-hue) 88% 58%) var(--geo-intensity), var(--text-soft));
     stroke-width: 2.4;
     stroke-linecap: round;
     stroke-linejoin: round;
   }
   .geo-point {
-    fill: color-mix(
-      in srgb,
-      hsl(var(--geo-hue) 88% 58%) var(--geo-intensity),
-      var(--panel-raised)
-    );
+    fill: color-mix(in srgb, hsl(var(--geo-hue) 88% 58%) var(--geo-intensity), var(--panel-raised));
     stroke: hsl(var(--geo-hue) 88% 70%);
     stroke-width: 1.5;
   }
@@ -2103,11 +2088,7 @@
   }
   .geo-point-label rect {
     fill: color-mix(in srgb, var(--panel) 94%, transparent);
-    stroke: color-mix(
-      in srgb,
-      hsl(var(--geo-hue) 88% 60%) 52%,
-      var(--line-bright)
-    );
+    stroke: color-mix(in srgb, hsl(var(--geo-hue) 88% 60%) 52%, var(--line-bright));
     stroke-width: 0.8;
     vector-effect: non-scaling-stroke;
   }
@@ -2265,8 +2246,7 @@
   box-shadow: none;
 }
 
-:root[data-theme="click-light"]
-  :is(.insights-mode-tabs button[aria-selected="true"]) {
+:root[data-theme="click-light"] :is(.insights-mode-tabs button[aria-selected="true"]) {
   border-color: var(--active-border);
   background: var(--active-surface);
   color: var(--text);

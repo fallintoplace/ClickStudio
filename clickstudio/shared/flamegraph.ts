@@ -3,9 +3,9 @@ export const MAX_FLAMEGRAPH_DEPTH = 32;
 export const MAX_FLAMEGRAPH_NODES = 4000;
 
 export const FLAMEGRAPH_TRACE_TYPES = ['CPU', 'Real'] as const;
-export type FlamegraphTraceType = typeof FLAMEGRAPH_TRACE_TYPES[number];
+export type FlamegraphTraceType = (typeof FLAMEGRAPH_TRACE_TYPES)[number];
 export const FLAMEGRAPH_SOURCES = ['symbolized', 'addresses'] as const;
-export type FlamegraphSource = typeof FLAMEGRAPH_SOURCES[number];
+export type FlamegraphSource = (typeof FLAMEGRAPH_SOURCES)[number];
 export function isFlamegraphSource(value: unknown): value is FlamegraphSource {
     return FLAMEGRAPH_SOURCES.some(source => source === value);
 }
@@ -52,15 +52,17 @@ const sampleCount = (value: unknown) => {
     return Number.isSafeInteger(count) && count > 0 ? count : 0;
 };
 const typeValue = (value: unknown) => FLAMEGRAPH_TRACE_TYPES.find(type => type === value);
-const stringArray = (value: unknown) => Array.isArray(value) ? value : [];
+const stringArray = (value: unknown) => (Array.isArray(value) ? value : []);
 
 export function flamegraphQuery(source: FlamegraphSource) {
-    const symbols = source === 'symbolized'
-        ? `arraySlice(arrayReverse(symbols), 1, ${MAX_FLAMEGRAPH_DEPTH})`
-        : `arrayMap(frame -> substringUTF8(demangle(addressToSymbol(frame)), 1, 128), arraySlice(arrayReverse(trace), 1, ${MAX_FLAMEGRAPH_DEPTH}))`;
-    const lines = source === 'symbolized'
-        ? `arraySlice(arrayReverse(lines), 1, ${MAX_FLAMEGRAPH_DEPTH})`
-        : `arrayMap(frame -> substringUTF8(addressToLine(frame), 1, 128), arraySlice(arrayReverse(trace), 1, ${MAX_FLAMEGRAPH_DEPTH}))`;
+    const symbols =
+        source === 'symbolized'
+            ? `arraySlice(arrayReverse(symbols), 1, ${MAX_FLAMEGRAPH_DEPTH})`
+            : `arrayMap(frame -> substringUTF8(demangle(addressToSymbol(frame)), 1, 128), arraySlice(arrayReverse(trace), 1, ${MAX_FLAMEGRAPH_DEPTH}))`;
+    const lines =
+        source === 'symbolized'
+            ? `arraySlice(arrayReverse(lines), 1, ${MAX_FLAMEGRAPH_DEPTH})`
+            : `arrayMap(frame -> substringUTF8(addressToLine(frame), 1, 128), arraySlice(arrayReverse(trace), 1, ${MAX_FLAMEGRAPH_DEPTH}))`;
     const grouping = source === 'symbolized' ? 'trace_type, symbols, lines' : 'trace_type, trace';
     return `SELECT toString(trace_type) AS trace_type,
         arrayMap(frame -> substringUTF8(frame, 1, 128), ${symbols}) AS symbols,
@@ -76,16 +78,32 @@ export function flamegraphQuery(source: FlamegraphSource) {
 }
 
 function mutableRoot(type: FlamegraphTraceType): MutableFrame {
-    return { id: `${type}:root`, name: type === 'CPU' ? 'CPU samples' : 'Wall-clock samples', samples: 0, selfSamples: 0, children: new Map<string, MutableFrame>() };
+    return {
+        id: `${type}:root`,
+        name: type === 'CPU' ? 'CPU samples' : 'Wall-clock samples',
+        samples: 0,
+        selfSamples: 0,
+        children: new Map<string, MutableFrame>(),
+    };
 }
 
 function freezeFrame(frame: MutableFrame): FlamegraphFrame {
-    const children = [...frame.children.values()].map(freezeFrame).sort((left, right) => right.samples - left.samples || left.name.localeCompare(right.name) || (left.location ?? '').localeCompare(right.location ?? ''));
+    const children = [...frame.children.values()]
+        .map(freezeFrame)
+        .sort(
+            (left, right) =>
+                right.samples - left.samples ||
+                left.name.localeCompare(right.name) ||
+                (left.location ?? '').localeCompare(right.location ?? ''),
+        );
     return { ...frame, children };
 }
 
 export function parseFlamegraphRows(queryId: string, rows: readonly Row[]): FlamegraphSnapshot {
-    const roots: Record<FlamegraphTraceType, MutableFrame> = { CPU: mutableRoot('CPU'), Real: mutableRoot('Real') };
+    const roots: Record<FlamegraphTraceType, MutableFrame> = {
+        CPU: mutableRoot('CPU'),
+        Real: mutableRoot('Real'),
+    };
     const samples: Record<FlamegraphTraceType, number> = { CPU: 0, Real: 0 };
     let symbolizedSamples = 0;
     let nodeCount = 2;
@@ -97,7 +115,9 @@ export function parseFlamegraphRows(queryId: string, rows: readonly Row[]): Flam
         samples[type] = Math.min(Number.MAX_SAFE_INTEGER, samples[type] + count);
         const names = stringArray(row.symbols).slice(0, MAX_FLAMEGRAPH_DEPTH).map(safeLabel);
         const locations = stringArray(row.lines).slice(0, MAX_FLAMEGRAPH_DEPTH).map(safeLabel);
-        const path = names.map((name, index) => ({ name, location: locations[index] || undefined })).filter(frame => frame.name.length > 0);
+        const path = names
+            .map((name, index) => ({ name, location: locations[index] || undefined }))
+            .filter(frame => frame.name.length > 0);
         if (!path.length) continue;
         symbolizedSamples = Math.min(Number.MAX_SAFE_INTEGER, symbolizedSamples + count);
         let parent = roots[type];
@@ -106,8 +126,18 @@ export function parseFlamegraphRows(queryId: string, rows: readonly Row[]): Flam
             const key = `${frame.name}\u0000${frame.location ?? ''}`;
             let child = parent.children.get(key);
             if (!child) {
-                if (nodeCount >= MAX_FLAMEGRAPH_NODES) { truncated = true; break; }
-                child = { id: `${type}:${nodeCount++}`, name: frame.name, location: frame.location, samples: 0, selfSamples: 0, children: new Map<string, MutableFrame>() };
+                if (nodeCount >= MAX_FLAMEGRAPH_NODES) {
+                    truncated = true;
+                    break;
+                }
+                child = {
+                    id: `${type}:${nodeCount++}`,
+                    name: frame.name,
+                    location: frame.location,
+                    samples: 0,
+                    selfSamples: 0,
+                    children: new Map<string, MutableFrame>(),
+                };
                 parent.children.set(key, child);
             }
             child.samples = Math.min(Number.MAX_SAFE_INTEGER, child.samples + count);

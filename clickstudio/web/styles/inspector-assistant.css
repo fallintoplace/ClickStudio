@@ -61,8 +61,7 @@
     color: var(--accent);
     box-shadow: var(--active-inset);
   }
-  .inspector-tabs.is-browser-tabs
-    > button.is-assistant-tab[aria-pressed="true"] {
+  .inspector-tabs.is-browser-tabs > button.is-assistant-tab[aria-pressed="true"] {
     border-color: color-mix(in srgb, var(--violet) 36%, var(--line));
     background: color-mix(in srgb, var(--violet) 10%, var(--panel));
     color: var(--violet);
@@ -148,9 +147,7 @@
     background: var(--panel-hover);
     color: var(--text);
   }
-  .inspector-tabs.is-browser-tabs
-    .inspector-more-menu
-    button[aria-pressed="true"] {
+  .inspector-tabs.is-browser-tabs .inspector-more-menu button[aria-pressed="true"] {
     color: var(--accent);
   }
   .inspector-tabs.is-browser-tabs .inspector-more-menu button svg {
@@ -610,11 +607,7 @@
     align-content: space-between;
     gap: 8px;
     padding: 11px 12px;
-    border-color: color-mix(
-      in srgb,
-      var(--object-detail-accent) 25%,
-      var(--line)
-    );
+    border-color: color-mix(in srgb, var(--object-detail-accent) 25%, var(--line));
     border-radius: var(--radius-panel);
     background: var(--page);
   }
@@ -630,11 +623,7 @@
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
     gap: 8px;
     padding: 9px;
-    border-color: color-mix(
-      in srgb,
-      var(--object-detail-accent) 25%,
-      var(--line)
-    );
+    border-color: color-mix(in srgb, var(--object-detail-accent) 25%, var(--line));
     border-radius: var(--radius-panel);
     background: var(--page);
   }
@@ -659,11 +648,7 @@
   .object-details .schema-view-target {
     min-height: 42px;
     padding: 9px 11px;
-    border-color: color-mix(
-      in srgb,
-      var(--object-detail-accent) 25%,
-      var(--line)
-    );
+    border-color: color-mix(in srgb, var(--object-detail-accent) 25%, var(--line));
     border-radius: var(--radius-panel);
     background: var(--page);
   }
@@ -1749,8 +1734,8 @@
     gap: 4px;
     padding: 8px 10px;
     border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--line));
-    border-radius: var(--radius-control) var(--radius-control)
-      var(--radius-control) var(--radius-control);
+    border-radius: var(--radius-control) var(--radius-control) var(--radius-control)
+      var(--radius-control);
     background: color-mix(in srgb, var(--accent) 7%, var(--panel-raised));
   }
   .assistant-user-message > span,
@@ -2345,8 +2330,7 @@
     min-height: 0;
     flex: 1;
   }
-  .beginner-workspace-content:not(.has-run).is-query-collapsed
-    > .editor-surface {
+  .beginner-workspace-content:not(.has-run).is-query-collapsed > .editor-surface {
     flex: none;
   }
   .beginner-workspace-content.has-run {
@@ -2799,13 +2783,7 @@
     bottom: 0;
     left: 0;
     height: 2px;
-    background: linear-gradient(
-      90deg,
-      transparent,
-      var(--accent),
-      #fff6,
-      var(--accent)
-    );
+    background: linear-gradient(90deg, transparent, var(--accent), #fff6, var(--accent));
     box-shadow: none;
   }
   .is-running .execution-progress-line {
@@ -2920,15 +2898,8 @@
     position: absolute;
     inset: 0;
     background-image:
-      linear-gradient(
-        color-mix(in srgb, var(--text) 5%, transparent) 1px,
-        transparent 1px
-      ),
-      linear-gradient(
-        90deg,
-        color-mix(in srgb, var(--text) 5%, transparent) 1px,
-        transparent 1px
-      );
+      linear-gradient(color-mix(in srgb, var(--text) 5%, transparent) 1px, transparent 1px),
+      linear-gradient(90deg, color-mix(in srgb, var(--text) 5%, transparent) 1px, transparent 1px);
     background-size: 44px 44px;
     content: "";
     mask-image: radial-gradient(ellipse at center, #000, transparent 73%);
@@ -3117,16 +3088,14 @@
   }
 } /* Light theme */
 
-:root[data-theme="click-light"]
-  :is(.inspector-tabs > button[aria-pressed="true"]) {
+:root[data-theme="click-light"] :is(.inspector-tabs > button[aria-pressed="true"]) {
   border-color: var(--active-border);
   background: var(--active-surface);
   color: var(--text);
   box-shadow: none;
 }
 
-:root[data-theme="click-light"]
-  :is(.inspector-header, .inspector-tabs, .execution-bar) {
+:root[data-theme="click-light"] :is(.inspector-header, .inspector-tabs, .execution-bar) {
   background: var(--panel-raised);
 }
 

@@ -633,10 +633,7 @@
 /* Light theme */
 
 :root[data-theme="click-light"]
-  :is(
-    .native-tabs button[aria-pressed="true"],
-    .native-tabs button[aria-selected="true"]
-  ) {
+  :is(.native-tabs button[aria-pressed="true"], .native-tabs button[aria-selected="true"]) {
   border-color: var(--active-border);
   background: var(--active-surface);
   color: var(--text);

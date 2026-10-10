@@ -1,7 +1,16 @@
 import { type Column, type Json, type Row, type Schema } from '../shared/types.js';
-import { EXPLORATION_FORMAT_ERROR, hasTopLevelOutputFormat, lexSql, splitSql } from '../shared/sql.js';
+import {
+    EXPLORATION_FORMAT_ERROR,
+    hasTopLevelOutputFormat,
+    lexSql,
+    splitSql,
+} from '../shared/sql.js';
 import { isSchema } from '../shared/schema.js';
-import { mergeTreePartsQuery, parseMergeTreeParts, type MergeTreePartsSnapshot } from '../shared/parts.js';
+import {
+    mergeTreePartsQuery,
+    parseMergeTreeParts,
+    type MergeTreePartsSnapshot,
+} from '../shared/parts.js';
 import { decodeClickHouseStringValue } from '../shared/playground-values.js';
 import { ClickHouseError, createClient } from '@clickhouse/client-web';
 import { PLAYGROUND_CONNECTION_ID, PLAYGROUND_URL } from '../shared/playground.js';
@@ -31,7 +40,10 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
     value !== null && typeof value === 'object' && !Array.isArray(value);
 
 const playgroundClient = createClient({
-    url: PLAYGROUND_URL, username: PLAYGROUND_USER, password: '', database: 'github',
+    url: PLAYGROUND_URL,
+    username: PLAYGROUND_USER,
+    password: '',
+    database: 'github',
     request_timeout: REQUEST_TIMEOUT_MS,
 });
 
@@ -39,7 +51,12 @@ let playgroundServerVersion: string | undefined;
 let playgroundServerVersionRequest: Promise<string | undefined> | undefined;
 
 export class PlaygroundError extends Error {
-    constructor(public readonly code: string, message: string) { super(message); }
+    constructor(
+        public readonly code: string,
+        message: string,
+    ) {
+        super(message);
+    }
 }
 
 export type PlaygroundQueryResult = {
@@ -54,7 +71,11 @@ export type PlaygroundQueryResult = {
 function valueForType(value: unknown, type: string): Json {
     if (value === null) return null;
     if (typeof value === 'boolean' || typeof value === 'number') return value;
-    if (typeof value !== 'string') throw new PlaygroundError('INVALID_PLAYGROUND_RESPONSE', 'ClickHouse Playground returned a value with an unsupported type.');
+    if (typeof value !== 'string')
+        throw new PlaygroundError(
+            'INVALID_PLAYGROUND_RESPONSE',
+            'ClickHouse Playground returned a value with an unsupported type.',
+        );
     return decodeClickHouseStringValue(value, type, NULL_MARKER);
 }
 
@@ -69,17 +90,34 @@ function parseCompactRows(body: string) {
     } catch {
         throw parsePlaygroundError(body);
     }
-    if (!Array.isArray(names) || !names.every(name => typeof name === 'string') ||
-        !Array.isArray(types) || !types.every(type => typeof type === 'string') || names.length !== types.length)
-        throw new PlaygroundError('INVALID_PLAYGROUND_RESPONSE', 'ClickHouse Playground returned invalid column metadata.');
+    if (
+        !Array.isArray(names) ||
+        !names.every(name => typeof name === 'string') ||
+        !Array.isArray(types) ||
+        !types.every(type => typeof type === 'string') ||
+        names.length !== types.length
+    )
+        throw new PlaygroundError(
+            'INVALID_PLAYGROUND_RESPONSE',
+            'ClickHouse Playground returned invalid column metadata.',
+        );
 
     const columns = names.map((name, index) => ({ name, type: types[index] as string }));
     const rows = lines.slice(2).map((line, rowIndex) => {
         let values: unknown;
-        try { values = JSON.parse(line); }
-        catch { throw new PlaygroundError('INVALID_PLAYGROUND_RESPONSE', `ClickHouse Playground returned an invalid row at position ${rowIndex + 1}.`); }
+        try {
+            values = JSON.parse(line);
+        } catch {
+            throw new PlaygroundError(
+                'INVALID_PLAYGROUND_RESPONSE',
+                `ClickHouse Playground returned an invalid row at position ${rowIndex + 1}.`,
+            );
+        }
         if (!Array.isArray(values) || values.length !== columns.length)
-            throw new PlaygroundError('INVALID_PLAYGROUND_RESPONSE', `ClickHouse Playground returned an invalid row at position ${rowIndex + 1}.`);
+            throw new PlaygroundError(
+                'INVALID_PLAYGROUND_RESPONSE',
+                `ClickHouse Playground returned an invalid row at position ${rowIndex + 1}.`,
+            );
         return values.map((value, columnIndex) => valueForType(value, columns[columnIndex]!.type));
     });
     return { columns, rows };
@@ -88,27 +126,54 @@ function parseCompactRows(body: string) {
 function parsePlaygroundError(body: string, status?: number) {
     const trimmed = body.trim();
     const match = trimmed.match(/^(?:Code:\s*(\d+)\.\s*)?(?:DB::Exception:\s*)?([\s\S]*)$/);
-    const code = match?.[1] ? `CLICKHOUSE_${match[1]}` : status ? `PLAYGROUND_HTTP_${status}` : 'PLAYGROUND_QUERY_ERROR';
-    const message = (match?.[2] ?? trimmed).replace(/\s+\(version [^)]+\)\s*$/, '').trim().slice(0, 1_500);
+    const code = match?.[1]
+        ? `CLICKHOUSE_${match[1]}`
+        : status
+          ? `PLAYGROUND_HTTP_${status}`
+          : 'PLAYGROUND_QUERY_ERROR';
+    const message = (match?.[2] ?? trimmed)
+        .replace(/\s+\(version [^)]+\)\s*$/, '')
+        .trim()
+        .slice(0, 1_500);
     return new PlaygroundError(code, message || 'ClickHouse Playground could not run this query.');
 }
 
 function validateQuery(sql: string) {
     const statements = splitSql(sql);
-    if (statements.length !== 1) throw new PlaygroundError('SINGLE_STATEMENT', 'Run one SQL statement at a time on the public Playground.');
-    if (hasTopLevelOutputFormat(statements[0]!.sql)) throw new PlaygroundError('READ_ONLY_SQL', EXPLORATION_FORMAT_ERROR);
-    const command = lexSql(statements[0]!.sql).find(token => token.kind === 'word')?.text.toUpperCase();
+    if (statements.length !== 1)
+        throw new PlaygroundError(
+            'SINGLE_STATEMENT',
+            'Run one SQL statement at a time on the public Playground.',
+        );
+    if (hasTopLevelOutputFormat(statements[0]!.sql))
+        throw new PlaygroundError('READ_ONLY_SQL', EXPLORATION_FORMAT_ERROR);
+    const command = lexSql(statements[0]!.sql)
+        .find(token => token.kind === 'word')
+        ?.text.toUpperCase();
     if (!command || !['SELECT', 'WITH', 'SHOW', 'DESCRIBE', 'DESC', 'EXPLAIN'].includes(command))
-        throw new PlaygroundError('READ_ONLY_SQL', 'The public Playground connection accepts read-only SQL only.');
+        throw new PlaygroundError(
+            'READ_ONLY_SQL',
+            'The public Playground connection accepts read-only SQL only.',
+        );
 }
 
-async function executePlaygroundQuery(sql: string, signal: AbortSignal | undefined, maxRows: number, maxBytes: number, queryParams: Record<string, string> = {}): Promise<PlaygroundQueryResult> {
-    if (!sql.trim()) throw new PlaygroundError('EMPTY_QUERY', 'Write a SQL statement before running it.');
+async function executePlaygroundQuery(
+    sql: string,
+    signal: AbortSignal | undefined,
+    maxRows: number,
+    maxBytes: number,
+    queryParams: Record<string, string> = {},
+): Promise<PlaygroundQueryResult> {
+    if (!sql.trim())
+        throw new PlaygroundError('EMPTY_QUERY', 'Write a SQL statement before running it.');
     validateQuery(sql);
 
     const controller = new AbortController();
     let timedOut = false;
-    const timeout = window.setTimeout(() => { timedOut = true; controller.abort(); }, REQUEST_TIMEOUT_MS);
+    const timeout = window.setTimeout(() => {
+        timedOut = true;
+        controller.abort();
+    }, REQUEST_TIMEOUT_MS);
     const abortRequest = () => controller.abort(signal?.reason);
     signal?.addEventListener('abort', abortRequest, { once: true });
     const startedAt = performance.now();
@@ -129,28 +194,51 @@ async function executePlaygroundQuery(sql: string, signal: AbortSignal | undefin
         });
         const body = await response.text();
         const bytes = new TextEncoder().encode(body).byteLength;
-        if (bytes > maxBytes) throw new PlaygroundError('PLAYGROUND_RESPONSE_TOO_LARGE', 'The Playground result is too large to display. Add a LIMIT and try again.');
+        if (bytes > maxBytes)
+            throw new PlaygroundError(
+                'PLAYGROUND_RESPONSE_TOO_LARGE',
+                'The Playground result is too large to display. Add a LIMIT and try again.',
+            );
         const parsed = parseCompactRows(body);
-        const mayBeTruncated = parsed.rows.length >= maxRows || bytes >= maxBytes * RESPONSE_BYTE_WARNING_THRESHOLD;
+        const mayBeTruncated =
+            parsed.rows.length >= maxRows || bytes >= maxBytes * RESPONSE_BYTE_WARNING_THRESHOLD;
         const summaryHeader = response.response_headers['x-clickhouse-summary'];
         const summary = typeof summaryHeader === 'string' ? summaryHeader : undefined;
         let summaryElapsed = 0;
         try {
             const parsedSummary: unknown = summary ? JSON.parse(summary) : undefined;
-            summaryElapsed = isRecord(parsedSummary) ? Number(parsedSummary.elapsed_ns) / 1_000_000 : 0;
-        } catch { }
+            summaryElapsed = isRecord(parsedSummary)
+                ? Number(parsedSummary.elapsed_ns) / 1_000_000
+                : 0;
+        } catch {}
         return {
-            ...parsed, queryId: response.query_id || queryId, bytes,
-            elapsedMs: Number.isFinite(summaryElapsed) && summaryElapsed > 0 ? summaryElapsed : performance.now() - startedAt,
+            ...parsed,
+            queryId: response.query_id || queryId,
+            bytes,
+            elapsedMs:
+                Number.isFinite(summaryElapsed) && summaryElapsed > 0
+                    ? summaryElapsed
+                    : performance.now() - startedAt,
             truncated: mayBeTruncated,
         };
     } catch (error) {
         if (error instanceof PlaygroundError) throw error;
         if (error instanceof ClickHouseError)
             throw new PlaygroundError(`CLICKHOUSE_${error.code}`, error.message);
-        if (timedOut) throw new PlaygroundError('PLAYGROUND_TIMEOUT', 'ClickHouse Playground did not respond within 65 seconds.');
-        if (controller.signal.aborted) throw new PlaygroundError('PLAYGROUND_REQUEST_ABORTED', 'The ClickHouse Playground request was interrupted.');
-        throw new PlaygroundError('PLAYGROUND_UNAVAILABLE', 'Could not reach ClickHouse Playground. Check the network and try again.');
+        if (timedOut)
+            throw new PlaygroundError(
+                'PLAYGROUND_TIMEOUT',
+                'ClickHouse Playground did not respond within 65 seconds.',
+            );
+        if (controller.signal.aborted)
+            throw new PlaygroundError(
+                'PLAYGROUND_REQUEST_ABORTED',
+                'The ClickHouse Playground request was interrupted.',
+            );
+        throw new PlaygroundError(
+            'PLAYGROUND_UNAVAILABLE',
+            'Could not reach ClickHouse Playground. Check the network and try again.',
+        );
     } finally {
         window.clearTimeout(timeout);
         signal?.removeEventListener('abort', abortRequest);
@@ -164,33 +252,56 @@ export function queryPlayground(sql: string, signal?: AbortSignal) {
 export function loadPlaygroundServerVersion(): Promise<string | undefined> {
     if (playgroundServerVersion) return Promise.resolve(playgroundServerVersion);
     if (playgroundServerVersionRequest) return playgroundServerVersionRequest;
-    const request = queryPlayground('SELECT version() AS version').then(result => {
-        const version = result.rows[0]?.[0];
-        if (typeof version !== 'string' || !version.trim()) return undefined;
-        playgroundServerVersion = version.trim();
-        return playgroundServerVersion;
-    }).catch(() => undefined).finally(() => {
-        if (!playgroundServerVersion && playgroundServerVersionRequest === request)
-            playgroundServerVersionRequest = undefined;
-    });
+    const request = queryPlayground('SELECT version() AS version')
+        .then(result => {
+            const version = result.rows[0]?.[0];
+            if (typeof version !== 'string' || !version.trim()) return undefined;
+            playgroundServerVersion = version.trim();
+            return playgroundServerVersion;
+        })
+        .catch(() => undefined)
+        .finally(() => {
+            if (!playgroundServerVersion && playgroundServerVersionRequest === request)
+                playgroundServerVersionRequest = undefined;
+        });
     playgroundServerVersionRequest = request;
     return request;
 }
 
 export async function queryPlaygroundQueryTree(sql: string, signal?: AbortSignal) {
     validateQuery(sql);
-    const result = await executePlaygroundQuery(`EXPLAIN QUERY TREE\n${sql}`, signal, 4_000, 4_000_000);
+    const result = await executePlaygroundQuery(
+        `EXPLAIN QUERY TREE\n${sql}`,
+        signal,
+        4_000,
+        4_000_000,
+    );
     if (result.truncated)
-        throw new PlaygroundError('PLAYGROUND_ANALYZER_TOO_LARGE', 'The ClickHouse analyzer tree is too large to display. Simplify the statement and try again.');
+        throw new PlaygroundError(
+            'PLAYGROUND_ANALYZER_TOO_LARGE',
+            'The ClickHouse analyzer tree is too large to display. Simplify the statement and try again.',
+        );
     return result;
 }
 
-export function queryPlaygroundWithParams(sql: string, queryParams: Record<string, string>, signal?: AbortSignal) {
+export function queryPlaygroundWithParams(
+    sql: string,
+    queryParams: Record<string, string>,
+    signal?: AbortSignal,
+) {
     return executePlaygroundQuery(sql, signal, MAX_RESULT_ROWS, MAX_RESPONSE_BYTES, queryParams);
 }
 
-export async function loadPlaygroundTableParts(database: string, table: string, signal?: AbortSignal): Promise<MergeTreePartsSnapshot> {
-    const result = await queryPlaygroundWithParams(mergeTreePartsQuery(), { database, table }, signal);
+export async function loadPlaygroundTableParts(
+    database: string,
+    table: string,
+    signal?: AbortSignal,
+): Promise<MergeTreePartsSnapshot> {
+    const result = await queryPlaygroundWithParams(
+        mergeTreePartsQuery(),
+        { database, table },
+        signal,
+    );
     return parseMergeTreeParts(database, table, result.rows);
 }
 
@@ -206,18 +317,33 @@ WHERE database NOT IN ('system', 'INFORMATION_SCHEMA', 'information_schema')
 ORDER BY database, table, position
 LIMIT ${SCHEMA_MAX_COLUMNS + 1}`;
 
-const text = (value: Json | undefined) => value === null || value === undefined ? '' : String(value);
-const nullableText = (value: Json | undefined) => value === null || value === undefined ? null : String(value);
+const text = (value: Json | undefined) =>
+    value === null || value === undefined ? '' : String(value);
+const nullableText = (value: Json | undefined) =>
+    value === null || value === undefined ? null : String(value);
 
 function cachedSchema(): Schema | undefined {
     try {
         const stored: unknown = JSON.parse(localStorage.getItem(SCHEMA_CACHE_KEY) ?? 'null');
-        if (!isRecord(stored) || typeof stored.savedAt !== 'number' || !Number.isFinite(stored.savedAt)) return undefined;
+        if (
+            !isRecord(stored) ||
+            typeof stored.savedAt !== 'number' ||
+            !Number.isFinite(stored.savedAt)
+        )
+            return undefined;
         const age = Date.now() - stored.savedAt;
         const schema = stored.schema;
-        if (age < 0 || age > SCHEMA_CACHE_AGE_MS || !isSchema(schema) || schema.connectionId !== PLAYGROUND_CONNECTION_ID) return undefined;
+        if (
+            age < 0 ||
+            age > SCHEMA_CACHE_AGE_MS ||
+            !isSchema(schema) ||
+            schema.connectionId !== PLAYGROUND_CONNECTION_ID
+        )
+            return undefined;
         return schema;
-    } catch { return undefined; }
+    } catch {
+        return undefined;
+    }
 }
 
 export async function loadPlaygroundSchema(signal?: AbortSignal, refresh = false): Promise<Schema> {
@@ -232,21 +358,40 @@ export async function loadPlaygroundSchema(signal?: AbortSignal, refresh = false
     ]);
     const tableRows = tableResult.rows.slice(0, SCHEMA_MAX_TABLES);
     const columnRows = columnResult.rows.slice(0, SCHEMA_MAX_COLUMNS);
-    const truncated = tableResult.rows.length >= MAX_RESULT_ROWS || columnResult.rows.length >= MAX_RESULT_ROWS;
+    const truncated =
+        tableResult.rows.length >= MAX_RESULT_ROWS || columnResult.rows.length >= MAX_RESULT_ROWS;
     const schema: Schema = {
-        connectionId: PLAYGROUND_CONNECTION_ID, fetchedAt: new Date().toISOString(),
+        connectionId: PLAYGROUND_CONNECTION_ID,
+        fetchedAt: new Date().toISOString(),
         tables: tableRows.map(row => ({
-            database: text(row[0]), name: text(row[1]), engine: text(row[2]),
-            orderBy: text(row[3]), primaryKey: text(row[4]), partitionKey: text(row[5]), samplingKey: text(row[6]),
-            rowEstimate: nullableText(row[7]), sizeBytes: nullableText(row[8]), uncompressedBytes: nullableText(row[9]),
+            database: text(row[0]),
+            name: text(row[1]),
+            engine: text(row[2]),
+            orderBy: text(row[3]),
+            primaryKey: text(row[4]),
+            partitionKey: text(row[5]),
+            samplingKey: text(row[6]),
+            rowEstimate: nullableText(row[7]),
+            sizeBytes: nullableText(row[8]),
+            uncompressedBytes: nullableText(row[9]),
         })),
         columns: columnRows.map(row => ({
-            database: text(row[0]), table: text(row[1]), name: text(row[2]), type: text(row[3]),
-            defaultKind: text(row[4]), comment: text(row[5]),
+            database: text(row[0]),
+            table: text(row[1]),
+            name: text(row[2]),
+            type: text(row[3]),
+            defaultKind: text(row[4]),
+            comment: text(row[5]),
         })),
-        warnings: truncated ? [`The public Playground returned its ${MAX_RESULT_ROWS.toLocaleString()}-row limit. Some tables or columns may be missing.`] : [],
+        warnings: truncated
+            ? [
+                  `The public Playground returned its ${MAX_RESULT_ROWS.toLocaleString()}-row limit. Some tables or columns may be missing.`,
+              ]
+            : [],
         truncated,
     };
-    try { localStorage.setItem(SCHEMA_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), schema })); } catch { }
+    try {
+        localStorage.setItem(SCHEMA_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), schema }));
+    } catch {}
     return schema;
 }

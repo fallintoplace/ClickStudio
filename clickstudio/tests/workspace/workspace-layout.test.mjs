@@ -19,15 +19,21 @@ test('panel geometry stays recoverable inside the viewport', () => {
 });
 
 test('saved layouts are validated and normalized on recovery', () => {
-    const recovered = recoverWorkspacePanelLayout(JSON.stringify({
-        splitRatio: 0.99,
-        query: { mode: 'floating', geometry: { x: 3000, y: 2000, width: 650, height: 400 } },
-        results: { mode: 'wat', geometry: { x: 10, y: 10, width: 10, height: 10 } },
-    }), viewport);
+    const recovered = recoverWorkspacePanelLayout(
+        JSON.stringify({
+            splitRatio: 0.99,
+            query: { mode: 'floating', geometry: { x: 3000, y: 2000, width: 650, height: 400 } },
+            results: { mode: 'wat', geometry: { x: 10, y: 10, width: 10, height: 10 } },
+        }),
+        viewport,
+    );
     assert.equal(recovered.splitRatio, 0.75);
     assert.equal(recovered.query.mode, 'docked');
     assert.equal(recovered.query.collapsed, false);
-    assert.equal(recovered.query.geometry.x + recovered.query.geometry.width, viewport.width - PANEL_MARGIN);
+    assert.equal(
+        recovered.query.geometry.x + recovered.query.geometry.width,
+        viewport.width - PANEL_MARGIN,
+    );
     assert.equal(recovered.results.mode, 'docked');
     assert.equal(recovered.results.collapsed, false);
     assert.equal(recovered.results.geometry.width, PANEL_MIN_WIDTH);
@@ -35,29 +41,39 @@ test('saved layouts are validated and normalized on recovery', () => {
 });
 
 test('saved collapsed panel preferences survive recovery', () => {
-    const recovered = recoverWorkspacePanelLayout(JSON.stringify({
-        query: { mode: 'docked', collapsed: true },
-        results: { mode: 'floating', collapsed: false },
-    }), viewport);
+    const recovered = recoverWorkspacePanelLayout(
+        JSON.stringify({
+            query: { mode: 'docked', collapsed: true },
+            results: { mode: 'floating', collapsed: false },
+        }),
+        viewport,
+    );
     assert.equal(recovered.query.collapsed, true);
     assert.equal(recovered.results.collapsed, false);
     assert.equal(recovered.results.mode, 'docked');
 });
 
-for (const mode of ['floating', 'maximized']) test(`saved ${mode} panels dock while preserving their preferences`, () => {
-    const recovered = recoverWorkspacePanelLayout(JSON.stringify({
-        version: 1,
-        splitRatio: 0.63,
-        query: { mode, collapsed: true },
-        results: { mode, collapsed: false },
-    }), viewport);
-    assert.equal(recovered.query.mode, 'docked');
-    assert.equal(recovered.results.mode, 'docked');
-    assert.equal(recovered.query.collapsed, true);
-    assert.equal(recovered.results.collapsed, false);
-    assert.equal(recovered.splitRatio, 0.63);
-    assert.deepEqual(recoverWorkspacePanelLayout(JSON.stringify(recovered), viewport), recovered);
-});
+for (const mode of ['floating', 'maximized'])
+    test(`saved ${mode} panels dock while preserving their preferences`, () => {
+        const recovered = recoverWorkspacePanelLayout(
+            JSON.stringify({
+                version: 1,
+                splitRatio: 0.63,
+                query: { mode, collapsed: true },
+                results: { mode, collapsed: false },
+            }),
+            viewport,
+        );
+        assert.equal(recovered.query.mode, 'docked');
+        assert.equal(recovered.results.mode, 'docked');
+        assert.equal(recovered.query.collapsed, true);
+        assert.equal(recovered.results.collapsed, false);
+        assert.equal(recovered.splitRatio, 0.63);
+        assert.deepEqual(
+            recoverWorkspacePanelLayout(JSON.stringify(recovered), viewport),
+            recovered,
+        );
+    });
 
 test('viewport normalization docks legacy modes without resetting collapse or split preferences', () => {
     const layout = defaultWorkspacePanelLayout(viewport);

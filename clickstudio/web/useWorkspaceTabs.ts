@@ -1,12 +1,29 @@
-import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import {
+    useCallback,
+    useEffect,
+    useRef,
+    useState,
+    type Dispatch,
+    type SetStateAction,
+} from 'react';
 import { newDraft, type Draft, type WorkspaceState } from './workspace-state';
 
-export function useWorkspaceTabs(workspace: WorkspaceState, setWorkspace: Dispatch<SetStateAction<WorkspaceState>>) {
+export function useWorkspaceTabs(
+    workspace: WorkspaceState,
+    setWorkspace: Dispatch<SetStateAction<WorkspaceState>>,
+) {
     const emptyDraft = useRef<Draft | null>(null);
     if (workspace.tabs.length) emptyDraft.current = null;
-    const active = workspace.tabs.find(tab => tab.id === workspace.activeId) ?? workspace.tabs[0] ?? (emptyDraft.current ??= newDraft());
+    const active =
+        workspace.tabs.find(tab => tab.id === workspace.activeId) ??
+        workspace.tabs[0] ??
+        (emptyDraft.current ??= newDraft());
     const tabScrollerRef = useRef<HTMLDivElement>(null);
-    const [tabScrollState, setTabScrollState] = useState({ overflow: false, canScrollLeft: false, canScrollRight: false });
+    const [tabScrollState, setTabScrollState] = useState({
+        overflow: false,
+        canScrollLeft: false,
+        canScrollRight: false,
+    });
     const [renamingTabId, setRenamingTabId] = useState<string>();
     const [tabRenameValue, setTabRenameValue] = useState('');
     const cancelTabRenameOnBlur = useRef(false);
@@ -21,21 +38,28 @@ export function useWorkspaceTabs(workspace: WorkspaceState, setWorkspace: Dispat
             canScrollLeft: scroller.scrollLeft > 1,
             canScrollRight: scroller.scrollLeft < maxScrollLeft - 1,
         };
-        setTabScrollState(current => current.overflow === next.overflow
-            && current.canScrollLeft === next.canScrollLeft
-            && current.canScrollRight === next.canScrollRight ? current : next);
+        setTabScrollState(current =>
+            current.overflow === next.overflow &&
+            current.canScrollLeft === next.canScrollLeft &&
+            current.canScrollRight === next.canScrollRight
+                ? current
+                : next,
+        );
     }, []);
 
-    const scrollTabs = useCallback((direction: -1 | 1) => {
-        const scroller = tabScrollerRef.current;
-        if (!scroller) return;
-        const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        scroller.scrollBy({
-            left: direction * Math.max(180, scroller.clientWidth * 0.65),
-            behavior: reducedMotion ? 'auto' : 'smooth',
-        });
-        if (reducedMotion) window.requestAnimationFrame(updateTabScrollState);
-    }, [updateTabScrollState]);
+    const scrollTabs = useCallback(
+        (direction: -1 | 1) => {
+            const scroller = tabScrollerRef.current;
+            if (!scroller) return;
+            const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            scroller.scrollBy({
+                left: direction * Math.max(180, scroller.clientWidth * 0.65),
+                behavior: reducedMotion ? 'auto' : 'smooth',
+            });
+            if (reducedMotion) window.requestAnimationFrame(updateTabScrollState);
+        },
+        [updateTabScrollState],
+    );
 
     const revealActiveTab = useCallback(() => {
         const scroller = tabScrollerRef.current;
@@ -58,14 +82,15 @@ export function useWorkspaceTabs(workspace: WorkspaceState, setWorkspace: Dispat
             updateTabScrollState();
             revealActiveTab();
         };
-        const observer = tabBar && typeof ResizeObserver !== 'undefined'
-            ? new ResizeObserver(() => {
-                updateTabScrollState();
-                const width = tabBar.clientWidth;
-                if (observedWidth !== undefined && width !== observedWidth) revealActiveTab();
-                observedWidth = width;
-            })
-            : undefined;
+        const observer =
+            tabBar && typeof ResizeObserver !== 'undefined'
+                ? new ResizeObserver(() => {
+                      updateTabScrollState();
+                      const width = tabBar.clientWidth;
+                      if (observedWidth !== undefined && width !== observedWidth) revealActiveTab();
+                      observedWidth = width;
+                  })
+                : undefined;
         if (tabBar) observer?.observe(tabBar);
         window.addEventListener('resize', handleResize);
         return () => {
@@ -89,7 +114,11 @@ export function useWorkspaceTabs(workspace: WorkspaceState, setWorkspace: Dispat
         setTabRenameValue(draft.name);
         setRenamingTabId(draft.id);
     };
-    const finishTabRename = (draftId: string, value: string, restoreFocus = false): Draft | undefined => {
+    const finishTabRename = (
+        draftId: string,
+        value: string,
+        restoreFocus = false,
+    ): Draft | undefined => {
         let renamedDraft: Draft | undefined;
         if (cancelTabRenameOnBlur.current) {
             cancelTabRenameOnBlur.current = false;
@@ -100,18 +129,25 @@ export function useWorkspaceTabs(workspace: WorkspaceState, setWorkspace: Dispat
                 renamedDraft = { ...draft, name };
                 setWorkspace(current => ({
                     ...current,
-                    tabs: current.tabs.map(item => item.id === draftId ? { ...item, name } : item),
+                    tabs: current.tabs.map(item =>
+                        item.id === draftId ? { ...item, name } : item,
+                    ),
                 }));
             }
         }
-        setRenamingTabId(current => current === draftId ? undefined : current);
-        if (restoreFocus) window.requestAnimationFrame(() => document.getElementById(`document-tab-${draftId}`)?.focus());
+        setRenamingTabId(current => (current === draftId ? undefined : current));
+        if (restoreFocus)
+            window.requestAnimationFrame(() =>
+                document.getElementById(`document-tab-${draftId}`)?.focus(),
+            );
         return renamedDraft;
     };
     const cancelTabRename = (draftId: string) => {
         cancelTabRenameOnBlur.current = true;
-        setRenamingTabId(current => current === draftId ? undefined : current);
-        window.requestAnimationFrame(() => document.getElementById(`document-tab-${draftId}`)?.focus());
+        setRenamingTabId(current => (current === draftId ? undefined : current));
+        window.requestAnimationFrame(() =>
+            document.getElementById(`document-tab-${draftId}`)?.focus(),
+        );
     };
 
     return {

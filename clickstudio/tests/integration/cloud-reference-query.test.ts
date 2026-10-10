@@ -3,9 +3,13 @@ import assert from 'node:assert/strict';
 import { queryRows } from '../../api/cloud.ts';
 
 test('Cloud reference queries raise the row cap without changing other inspector queries', async () => {
-    const settings: Array<{ clickhouse_settings?: { max_result_rows?: string; max_result_bytes?: string } }> = [];
+    const settings: Array<{
+        clickhouse_settings?: { max_result_rows?: string; max_result_bytes?: string };
+    }> = [];
     const client = {
-        async query(options: { clickhouse_settings?: { max_result_rows?: string; max_result_bytes?: string } }) {
+        async query(options: {
+            clickhouse_settings?: { max_result_rows?: string; max_result_bytes?: string };
+        }) {
             settings.push(options);
             return { json: async () => [] };
         },

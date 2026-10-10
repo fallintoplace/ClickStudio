@@ -39,29 +39,58 @@ export function useImportJobPolling({
             if (polling) return;
             polling = true;
             try {
-                const next = cloudImport && job.queryId
-                    ? await checkClickHouseCloudImport(job.queryId, job.table, job.rows, job.deduplicationToken)
-                    : job.reconciliationRequired
-                        ? await post<ImportJob>(`/imports/${encodeURIComponent(job.id)}/reconcile`)
-                        : await api<ImportJob>(`/imports/${encodeURIComponent(job.id)}`);
+                const next =
+                    cloudImport && job.queryId
+                        ? await checkClickHouseCloudImport(
+                              job.queryId,
+                              job.table,
+                              job.rows,
+                              job.deduplicationToken,
+                          )
+                        : job.reconciliationRequired
+                          ? await post<ImportJob>(
+                                `/imports/${encodeURIComponent(job.id)}/reconcile`,
+                            )
+                          : await api<ImportJob>(`/imports/${encodeURIComponent(job.id)}`);
                 if (!current) return;
                 setJob(next);
-                setRecoverableJobs(items => next.status === 'succeeded' || next.reviewedAt
-                    ? items.filter(item => item.id !== next.id)
-                    : items.map(item => item.id === next.id ? next : item));
+                setRecoverableJobs(items =>
+                    next.status === 'succeeded' || next.reviewedAt
+                        ? items.filter(item => item.id !== next.id)
+                        : items.map(item => (item.id === next.id ? next : item)),
+                );
                 setBusy('');
                 if (next.status === 'succeeded') onSucceededRef.current(next);
-                else if (next.status === 'unknown' && next.tableExists) onNeedsInspectionRef.current(next);
+                else if (next.status === 'unknown' && next.tableExists)
+                    onNeedsInspectionRef.current(next);
             } catch (caught) {
                 if (current) setError(`Could not refresh import status: ${message(caught)}`);
             } finally {
                 polling = false;
             }
         };
-        const timer = window.setInterval(() => void poll(), job.reconciliationRequired ? 1500 : 900);
+        const timer = window.setInterval(
+            () => void poll(),
+            job.reconciliationRequired ? 1500 : 900,
+        );
         return () => {
             current = false;
             window.clearInterval(timer);
         };
-    }, [open, step, cloudImport, job?.id, job?.queryId, job?.deduplicationToken, job?.table, job?.rows, job?.status, job?.reconciliationRequired, setBusy, setError, setJob, setRecoverableJobs]);
+    }, [
+        open,
+        step,
+        cloudImport,
+        job?.id,
+        job?.queryId,
+        job?.deduplicationToken,
+        job?.table,
+        job?.rows,
+        job?.status,
+        job?.reconciliationRequired,
+        setBusy,
+        setError,
+        setJob,
+        setRecoverableJobs,
+    ]);
 }

@@ -15,11 +15,24 @@ test('Playground decoding restores ClickHouse Point values from string format', 
 test('Playground decoding restores nested ClickHouse geo values', () => {
     assert.deepEqual(
         decodeClickHouseStringValue('[(13.405,52.52),(2.3522,48.8566)]', 'LineString', NULL_MARKER),
-        [[13.405, 52.52], [2.3522, 48.8566]],
+        [
+            [13.405, 52.52],
+            [2.3522, 48.8566],
+        ],
     );
     assert.deepEqual(
-        decodeClickHouseStringValue('[[(13.4,52.5),(13.5,52.6),(13.4,52.5)]]', 'Polygon', NULL_MARKER),
-        [[[13.4, 52.5], [13.5, 52.6], [13.4, 52.5]]],
+        decodeClickHouseStringValue(
+            '[[(13.4,52.5),(13.5,52.6),(13.4,52.5)]]',
+            'Polygon',
+            NULL_MARKER,
+        ),
+        [
+            [
+                [13.4, 52.5],
+                [13.5, 52.6],
+                [13.4, 52.5],
+            ],
+        ],
     );
 });
 
@@ -39,7 +52,10 @@ test('Playground geo decoding feeds the spatial explorer retained-row model', ()
     const prepared = prepareGeoFeatures([row], columns, recommendation);
     assert.equal(prepared.totalFeatures, 1);
     assert.equal(prepared.invalidRows, 0);
-    assert.deepEqual(prepared.features[0]?.geometry, { type: 'Point', coordinates: [13.405, 52.52] });
+    assert.deepEqual(prepared.features[0]?.geometry, {
+        type: 'Point',
+        coordinates: [13.405, 52.52],
+    });
     assert.equal(prepared.features[0]?.label, 'Berlin');
     assert.equal(prepared.features[0]?.measure, 120);
 });
@@ -60,8 +76,5 @@ test('Playground decoding keeps wide integers exact and nullable markers null', 
         decodeClickHouseStringValue('18446744073709551615', 'UInt64', NULL_MARKER),
         '18446744073709551615',
     );
-    assert.equal(
-        decodeClickHouseStringValue(NULL_MARKER, 'Nullable(Point)', NULL_MARKER),
-        null,
-    );
+    assert.equal(decodeClickHouseStringValue(NULL_MARKER, 'Nullable(Point)', NULL_MARKER), null);
 });

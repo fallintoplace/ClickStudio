@@ -33,14 +33,27 @@ type RuntimeNode = {
     parent?: string;
 };
 
-const stripFrame = (line: string) => line.replace(/^\s*[│┃]\s?/u, '').replace(/^[│┃\s]+/u, '').trim();
+const stripFrame = (line: string) =>
+    line
+        .replace(/^\s*[│┃]\s?/u, '')
+        .replace(/^[│┃\s]+/u, '')
+        .trim();
 const durationMs = (value: string): number | undefined => {
     const match = value.match(/^\s*(\d+(?:\.\d+)?)\s*(ns|us|µs|μs|ms|s)\s*$/i);
     if (!match) return undefined;
     const amount = Number(match[1]);
     if (!Number.isFinite(amount)) return undefined;
     const unit = match[2]!.toLowerCase();
-    return amount * (unit === 'ns' ? 0.000001 : unit === 'us' || unit === 'µs' || unit === 'μs' ? 0.001 : unit === 's' ? 1000 : 1);
+    return (
+        amount *
+        (unit === 'ns'
+            ? 0.000001
+            : unit === 'us' || unit === 'µs' || unit === 'μs'
+              ? 0.001
+              : unit === 's'
+                ? 1000
+                : 1)
+    );
 };
 
 function nodeKind(label: string): ProfilePipelineNodeKind {
@@ -57,14 +70,22 @@ function nodeKind(label: string): ProfilePipelineNodeKind {
 
 function metricNumber(text: string | undefined): number | undefined {
     if (!text) return undefined;
-    const match = text.replaceAll(',', '').match(/^\s*(\d+(?:\.\d+)?)\s*(k|m|b|t|thousand|million|billion|trillion)?/i);
+    const match = text
+        .replaceAll(',', '')
+        .match(/^\s*(\d+(?:\.\d+)?)\s*(k|m|b|t|thousand|million|billion|trillion)?/i);
     if (!match) return undefined;
     const number = Number(match[1]);
     const suffix = (match[2] ?? '').toLowerCase();
-    const factor = suffix === 'k' || suffix === 'thousand' ? 1e3
-        : suffix === 'm' || suffix === 'million' ? 1e6
-            : suffix === 'b' || suffix === 'billion' ? 1e9
-                : suffix === 't' || suffix === 'trillion' ? 1e12 : 1;
+    const factor =
+        suffix === 'k' || suffix === 'thousand'
+            ? 1e3
+            : suffix === 'm' || suffix === 'million'
+              ? 1e6
+              : suffix === 'b' || suffix === 'billion'
+                ? 1e9
+                : suffix === 't' || suffix === 'trillion'
+                  ? 1e12
+                  : 1;
     const value = number * factor;
     return Number.isFinite(value) ? value : undefined;
 }
@@ -73,7 +94,9 @@ function parseSummary(lines: readonly string[]): ExplainAnalyzeSummary {
     const summary: ExplainAnalyzeSummary = {};
     for (const line of lines) {
         const value = stripFrame(line);
-        const time = value.match(/^Time:\s*(.+?)\s*\(planning\s+(.+?)\s*[·,]\s*execution\s+(.+?)\s*\)$/i);
+        const time = value.match(
+            /^Time:\s*(.+?)\s*\(planning\s+(.+?)\s*[·,]\s*execution\s+(.+?)\s*\)$/i,
+        );
         if (time) {
             summary.totalTime = time[1]!.trim();
             summary.planningTime = time[2]!.trim();
@@ -98,7 +121,8 @@ function parseSummary(lines: readonly string[]): ExplainAnalyzeSummary {
 
 function applyIo(node: RuntimeNode, value: string) {
     const sections = value.replace(/^I\/O:\s*/i, '').split(/\s+[·,]\s+/, 2);
-    const pair = (section: string | undefined) => section?.split(/\s*(?:→|->)\s*/, 2).map(item => item.trim());
+    const pair = (section: string | undefined) =>
+        section?.split(/\s*(?:→|->)\s*/, 2).map(item => item.trim());
     const rowPair = pair(sections[0] ?? '');
     if (rowPair?.length === 2 && /^rows?\b/i.test(rowPair[0]!)) {
         node.inputRows = rowPair[0]!.replace(/^rows?\s*/i, '');
@@ -112,7 +136,9 @@ function applyIo(node: RuntimeNode, value: string) {
 }
 
 function applyTiming(node: RuntimeNode, value: string) {
-    const time = value.match(/\btime\s+((?:\d+(?:\.\d+)?)\s*(?:ns|us|µs|μs|ms|s))\s*(?:\((\d+(?:\.\d+)?)%\))?/i);
+    const time = value.match(
+        /\btime\s+((?:\d+(?:\.\d+)?)\s*(?:ns|us|µs|μs|ms|s))\s*(?:\((\d+(?:\.\d+)?)%\))?/i,
+    );
     if (time) {
         const elapsed = durationMs(time[1]!);
         if (elapsed !== undefined) node.durationMs = (node.durationMs ?? 0) + elapsed;
@@ -127,7 +153,9 @@ function applyTiming(node: RuntimeNode, value: string) {
 }
 
 function isNodeMetadata(value: string) {
-    return /^(?:Time:|Read:|Peak memory:|Output:|I\/O:|time\b|Stage\b|Keys:|Aggregates:|Skip merging:|Filter column:|Read type:|Parts:|Granules:|Indexes:|PrimaryKey\b|Skip\b|Condition:|Name:|Description:|Ranges:|Projections:|Column:)/i.test(value);
+    return /^(?:Time:|Read:|Peak memory:|Output:|I\/O:|time\b|Stage\b|Keys:|Aggregates:|Skip merging:|Filter column:|Read type:|Parts:|Granules:|Indexes:|PrimaryKey\b|Skip\b|Condition:|Name:|Description:|Ranges:|Projections:|Column:)/i.test(
+        value,
+    );
 }
 
 function visibleText(lines: readonly string[]) {
@@ -135,18 +163,30 @@ function visibleText(lines: readonly string[]) {
 }
 
 export function parseExplainAnalyze(input: unknown): ExplainAnalyzeEvidence | undefined {
-    const text = typeof input === 'string'
-        ? input
-        : Array.isArray(input)
-            ? input.map(value => typeof value === 'string' ? value : Array.isArray(value) ? value.map(String).join(' ') : '').join('\n')
-            : '';
+    const text =
+        typeof input === 'string'
+            ? input
+            : Array.isArray(input)
+              ? input
+                    .map(value =>
+                        typeof value === 'string'
+                            ? value
+                            : Array.isArray(value)
+                              ? value.map(String).join(' ')
+                              : '',
+                    )
+                    .join('\n')
+              : '';
     if (!text.trim()) return undefined;
     const boundedText = text.slice(0, MAX_OUTPUT_CHARS);
     const allLines = boundedText.split(/\r?\n/);
     const lines = allLines.slice(0, MAX_OUTPUT_LINES);
     const summary = parseSummary(lines);
     const outputIndex = lines.findIndex(line => /^Output:/i.test(stripFrame(line)));
-    const hasExplainShape = outputIndex >= 0 || Object.values(summary).some(Boolean) || lines.some(line => /^([ │]*)[├└]──/u.test(line));
+    const hasExplainShape =
+        outputIndex >= 0 ||
+        Object.values(summary).some(Boolean) ||
+        lines.some(line => /^([ │]*)[├└]──/u.test(line));
     if (!hasExplainShape) return undefined;
     const scanFrom = outputIndex < 0 ? 0 : outputIndex + 1;
     const stack: RuntimeNode[] = [];
@@ -161,8 +201,17 @@ export function parseExplainAnalyze(input: unknown): ExplainAnalyzeEvidence | un
         if (branch) {
             const level = Math.max(1, Math.ceil(branch[1]!.length / 3));
             const parent = stack[level - 1];
-            const node: RuntimeNode = { id: `runtime-${nodes.length}`, label: branch[2]!.trim(), kind: nodeKind(branch[2]!.trim()), detail: [], ...(parent ? { parent: parent.id } : {}) };
-            if (nodes.length >= MAX_RUNTIME_NODES) { truncated = true; break; }
+            const node: RuntimeNode = {
+                id: `runtime-${nodes.length}`,
+                label: branch[2]!.trim(),
+                kind: nodeKind(branch[2]!.trim()),
+                detail: [],
+                ...(parent ? { parent: parent.id } : {}),
+            };
+            if (nodes.length >= MAX_RUNTIME_NODES) {
+                truncated = true;
+                break;
+            }
             while (stack.length > level) stack.pop();
             nodes.push(node);
             stack[level] = node;
@@ -170,7 +219,12 @@ export function parseExplainAnalyze(input: unknown): ExplainAnalyzeEvidence | un
             continue;
         }
         if (!started) {
-            if (!content || isNodeMetadata(content) || /^(?:Output|Query summary|Indexes):?$/i.test(content)) continue;
+            if (
+                !content ||
+                isNodeMetadata(content) ||
+                /^(?:Output|Query summary|Indexes):?$/i.test(content)
+            )
+                continue;
             if (/^[┌┐└├─]+$/.test(content)) continue;
             const label = content.replace(/^[│┃]\s*/u, '').trim();
             if (!label || label.length > 400) continue;
@@ -186,23 +240,27 @@ export function parseExplainAnalyze(input: unknown): ExplainAnalyzeEvidence | un
         if (/^I\/O:/i.test(metadata)) applyIo(current, metadata);
         else if (/\btime\s+\d/i.test(metadata)) {
             const stage = metadata.match(/^Stage\s*\(([^)]+)\)\s*:/i)?.[1];
-            const timing = metadata.match(/time\s+(\d+(?:\.\d+)?\s*(?:ns|us|µs|μs|ms|s)(?:\s*\(\d+(?:\.\d+)?%\))?)/i)?.[1];
+            const timing = metadata.match(
+                /time\s+(\d+(?:\.\d+)?\s*(?:ns|us|µs|μs|ms|s)(?:\s*\(\d+(?:\.\d+)?%\))?)/i,
+            )?.[1];
             if (timing) current.detail.push(`${stage ? `${stage}: ` : ''}${timing}`.slice(0, 180));
             applyTiming(current, metadata);
-        }
-        else if (!isNodeMetadata(metadata) && metadata.length < 400)
+        } else if (!isNodeMetadata(metadata) && metadata.length < 400)
             current.detail.push(metadata);
     }
 
     if (!nodes.length && !summary.totalTime && !summary.executionTime) return undefined;
-    const flowFor = (node: RuntimeNode) => metricNumber(node.outputRows) ?? metricNumber(node.inputRows) ?? 0;
+    const flowFor = (node: RuntimeNode) =>
+        metricNumber(node.outputRows) ?? metricNumber(node.inputRows) ?? 0;
     const largestFlow = nodes.reduce((largest, node) => Math.max(largest, flowFor(node)), 0);
     const graphNodes = nodes.map(node => ({
         id: node.id,
         label: node.label.slice(0, 160),
         kind: node.kind,
         status: 'measured' as const,
-        ...(node.detail.length ? { detail: node.detail.slice(0, 12).join(' · ').slice(0, 600) } : {}),
+        ...(node.detail.length
+            ? { detail: node.detail.slice(0, 12).join(' · ').slice(0, 600) }
+            : {}),
         ...(node.durationMs === undefined ? {} : { durationMs: node.durationMs }),
         ...(node.timePercent === undefined ? {} : { timePercent: node.timePercent }),
         ...(node.parallelism === undefined ? {} : { parallelism: node.parallelism }),
@@ -210,18 +268,30 @@ export function parseExplainAnalyze(input: unknown): ExplainAnalyzeEvidence | un
         ...(node.outputRows === undefined ? {} : { outputRows: node.outputRows }),
         ...(node.inputBytes === undefined ? {} : { inputBytes: node.inputBytes }),
         ...(node.outputBytes === undefined ? {} : { outputBytes: node.outputBytes }),
-        ...((node.inputRows ?? node.outputRows) === undefined ? {} : { rows: node.inputRows ?? node.outputRows }),
-        ...((node.inputBytes ?? node.outputBytes) === undefined ? {} : { bytes: node.inputBytes ?? node.outputBytes }),
+        ...((node.inputRows ?? node.outputRows) === undefined
+            ? {}
+            : { rows: node.inputRows ?? node.outputRows }),
+        ...((node.inputBytes ?? node.outputBytes) === undefined
+            ? {}
+            : { bytes: node.inputBytes ?? node.outputBytes }),
     }));
     const edges = nodes.flatMap(node => {
         if (!node.parent) return [];
         const flow = flowFor(node);
-        return [{
-            source: node.id,
-            target: node.parent,
-            ...((node.outputRows && metricNumber(node.outputRows)) || node.inputRows ? { label: `${node.outputRows && metricNumber(node.outputRows) ? node.outputRows : node.inputRows} rows` } : {}),
-            ...(largestFlow <= 0 ? {} : { flow: Math.max(0.08, Math.min(1, flow / largestFlow)) }),
-        }];
+        return [
+            {
+                source: node.id,
+                target: node.parent,
+                ...((node.outputRows && metricNumber(node.outputRows)) || node.inputRows
+                    ? {
+                          label: `${node.outputRows && metricNumber(node.outputRows) ? node.outputRows : node.inputRows} rows`,
+                      }
+                    : {}),
+                ...(largestFlow <= 0
+                    ? {}
+                    : { flow: Math.max(0.08, Math.min(1, flow / largestFlow)) }),
+            },
+        ];
     });
     const pipeline: ProfilePipeline = {
         available: graphNodes.length > 0,

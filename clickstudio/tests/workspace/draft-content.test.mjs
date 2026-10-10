@@ -3,13 +3,37 @@ import assert from 'node:assert/strict';
 import { draftSaveStatus, sameSavedContent } from '../../.workspace-build/shared/workspace-view.js';
 import { draftFromDocument, recoverDraft } from '../../.workspace-build/web/workspace-state.js';
 
-const candlestick = { open: 0, high: 1, low: 2, close: 3, bid: 4, ask: 5, spread: 6, quoteActivity: 7 };
+const candlestick = {
+    open: 0,
+    high: 1,
+    low: 2,
+    close: 3,
+    bid: 4,
+    ask: 5,
+    spread: 6,
+    quoteActivity: 7,
+};
 function savedDocument(chartOptions = {}) {
     return {
-        id: 'document-1', owner: 'owner', connectionId: 'demo', name: 'Prices.sql', sql: 'SELECT 1',
-        revision: 3, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z',
-        parameters: {}, kind: 'query', dependencies: [],
-        chart: { kind: 'candlestick', x: 0, ys: [], title: 'Prices', candlestick: { ...candlestick }, ...chartOptions },
+        id: 'document-1',
+        owner: 'owner',
+        connectionId: 'demo',
+        name: 'Prices.sql',
+        sql: 'SELECT 1',
+        revision: 3,
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+        parameters: {},
+        kind: 'query',
+        dependencies: [],
+        chart: {
+            kind: 'candlestick',
+            x: 0,
+            ys: [],
+            title: 'Prices',
+            candlestick: { ...candlestick },
+            ...chartOptions,
+        },
     };
 }
 
@@ -22,7 +46,9 @@ test('Candlestick property order does not mark a saved draft as changed', () => 
 });
 
 test('Recovering candlestick settings preserves saved status after reordering their keys', () => {
-    const saved = savedDocument({ candlestick: Object.fromEntries(Object.entries(candlestick).reverse()) });
+    const saved = savedDocument({
+        candlestick: Object.fromEntries(Object.entries(candlestick).reverse()),
+    });
     const draft = recoverDraft(JSON.parse(JSON.stringify(draftFromDocument(saved))));
     assert.ok(draft);
     assert.notDeepEqual(Object.keys(draft.chart.candlestick), Object.keys(saved.chart.candlestick));
@@ -53,7 +79,13 @@ test('Missing candlestick settings stay distinct from an explicitly empty config
     assert.equal(sameSavedContent(draft, saved), true);
     draft.chart.candlestick = {};
     assert.equal(sameSavedContent(draft, saved), false);
-    assert.equal(sameSavedContent(draftFromDocument(savedDocument({ candlestick: undefined })), savedDocument({ candlestick: {} })), false);
+    assert.equal(
+        sameSavedContent(
+            draftFromDocument(savedDocument({ candlestick: undefined })),
+            savedDocument({ candlestick: {} }),
+        ),
+        false,
+    );
 });
 
 test('Opening a saved document does not share editable arrays or nested settings', () => {
@@ -61,7 +93,15 @@ test('Opening a saved document does not share editable arrays or nested settings
     saved.parameters = { n: '9007199254740993' };
     saved.dependencies = ['source-1'];
     saved.kind = 'metric';
-    saved.metric = { definition: 'Price', grain: 'day', dimensions: ['symbol'], timezone: 'UTC', filters: '', nullTreatment: 'ignore', sourceColumns: ['price'] };
+    saved.metric = {
+        definition: 'Price',
+        grain: 'day',
+        dimensions: ['symbol'],
+        timezone: 'UTC',
+        filters: '',
+        nullTreatment: 'ignore',
+        sourceColumns: ['price'],
+    };
     const original = structuredClone(saved);
     const draft = draftFromDocument(saved);
     draft.parameters.n = '0';

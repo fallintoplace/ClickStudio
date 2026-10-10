@@ -40,8 +40,7 @@ export function parseExplainPlan(input: unknown): ExplainPlan | undefined {
     let parsed: unknown;
     try {
         parsed = JSON.parse(input) as unknown;
-    }
-    catch {
+    } catch {
         return undefined;
     }
 
@@ -51,7 +50,10 @@ export function parseExplainPlan(input: unknown): ExplainPlan | undefined {
 
     let nodeCount = 0;
     let truncated = false;
-    const parseNode = (raw: Record<string, unknown>, depth: number): ExplainPlanNode | undefined => {
+    const parseNode = (
+        raw: Record<string, unknown>,
+        depth: number,
+    ): ExplainPlanNode | undefined => {
         if (nodeCount >= MAX_PLAN_NODES) {
             truncated = true;
             return undefined;
@@ -61,17 +63,18 @@ export function parseExplainPlan(input: unknown): ExplainPlan | undefined {
             return { type: 'Depth limit reached', properties: [], children: [] };
         }
         nodeCount++;
-        const type = typeof raw['Node Type'] === 'string' && raw['Node Type'].trim()
-            ? raw['Node Type'].slice(0, 160)
-            : 'Unknown step';
+        const type =
+            typeof raw['Node Type'] === 'string' && raw['Node Type'].trim()
+                ? raw['Node Type'].slice(0, 160)
+                : 'Unknown step';
         const id = typeof raw['Node Id'] === 'string' ? raw['Node Id'].slice(0, 160) : undefined;
-        const description = typeof raw.Description === 'string' ? raw.Description.slice(0, 4_000) : undefined;
+        const description =
+            typeof raw.Description === 'string' ? raw.Description.slice(0, 4_000) : undefined;
         const properties = Object.entries(raw)
             .filter(([name]) => !PLAN_NODE_KEYS.has(name))
             .slice(0, 100)
             .map(([name, value]) => ({ name: name.slice(0, 160), value: value as Json }));
-        if (Object.keys(raw).length - PLAN_NODE_KEYS.size > properties.length)
-            truncated = true;
+        if (Object.keys(raw).length - PLAN_NODE_KEYS.size > properties.length) truncated = true;
         const rawChildren = Array.isArray(raw.Plans) ? raw.Plans : [];
         const children: ExplainPlanNode[] = [];
         for (const child of rawChildren) {
@@ -83,7 +86,13 @@ export function parseExplainPlan(input: unknown): ExplainPlan | undefined {
                 break;
             }
         }
-        return { type, ...(id ? { id } : {}), ...(description ? { description } : {}), properties, children };
+        return {
+            type,
+            ...(id ? { id } : {}),
+            ...(description ? { description } : {}),
+            properties,
+            children,
+        };
     };
 
     const root = parseNode(rows[0].Plan, 0);

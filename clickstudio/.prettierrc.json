@@ -1,0 +1,13 @@
+{
+  "printWidth": 100,
+  "overrides": [
+    {
+      "files": "*.{js,mjs,cjs,ts,tsx}",
+      "options": {
+        "tabWidth": 4,
+        "singleQuote": true,
+        "arrowParens": "avoid"
+      }
+    }
+  ]
+}

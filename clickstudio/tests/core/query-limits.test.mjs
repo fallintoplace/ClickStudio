@@ -7,7 +7,13 @@ test('SQL validation accepts 200,000 characters even when UTF-8 requires more by
     const sql = "SELECT '" + 'é'.repeat(199_991) + "'";
     assert.equal(sql.length, 200_000);
     assert.ok(Buffer.byteLength(sql) > 200_000);
-    const input = { clientRequestId: 'request', connectionId: 'local', sql, sourceFrom: 0, sourceTo: sql.length };
+    const input = {
+        clientRequestId: 'request',
+        connectionId: 'local',
+        sql,
+        sourceFrom: 0,
+        sourceTo: sql.length,
+    };
     assert.equal(runRequest(input).sql, sql);
     assert.equal(runRequest(input).sourceTo, 200_000);
     assert.throws(() => runRequest({ ...input, sql: sql + ' ' }), { code: 'INVALID_REQUEST' });
@@ -15,7 +21,13 @@ test('SQL validation accepts 200,000 characters even when UTF-8 requires more by
 });
 
 test('Result pages accept 1,000 rows and reject larger counts', async t => {
-    const f = fixture({ execute: async () => ({ columns: [{ name: 'value', type: 'String' }], rows: Array.from({ length: 450 }, (_, index) => [String(index)]), truncated: false }) });
+    const f = fixture({
+        execute: async () => ({
+            columns: [{ name: 'value', type: 'String' }],
+            rows: Array.from({ length: 450 }, (_, index) => [String(index)]),
+            truncated: false,
+        }),
+    });
     t.after(() => f.runs.close());
     const run = f.runs.submit(owner, f.request());
     await f.runs.wait(owner, run.id);
@@ -35,7 +47,9 @@ test('Scripts accept 50 statements and reject the 51st before executing', async 
     const f = fixture();
     t.after(() => f.runs.close());
     const sql = Array.from({ length: 50 }, () => 'SELECT 1;').join('\n');
-    assert.throws(() => f.runs.submitScript(owner, f.request({ sql: sql + '\nSELECT 1;' })), { code: 'SCRIPT_SIZE' });
+    assert.throws(() => f.runs.submitScript(owner, f.request({ sql: sql + '\nSELECT 1;' })), {
+        code: 'SCRIPT_SIZE',
+    });
     assert.equal(f.calls.length, 0);
     const script = f.runs.submitScript(owner, f.request({ sql }));
     assert.equal(script.statements.length, 50);

@@ -11,7 +11,10 @@ function encodeRows(rows: Record<string, string>[], format: ImportFormat): strin
     if (format === 'json') return JSON.stringify(rows);
     if (format === 'ndjson') return rows.map(row => JSON.stringify(row)).join('\n');
     const columns = Object.keys(rows[0]!);
-    return [columns.join(','), ...rows.map(row => columns.map(column => row[column]).join(','))].join('\n');
+    return [
+        columns.join(','),
+        ...rows.map(row => columns.map(column => row[column]).join(',')),
+    ].join('\n');
 }
 
 for (const format of ['csv', 'json', 'ndjson'] as const) {
@@ -28,10 +31,15 @@ for (const format of ['csv', 'json', 'ndjson'] as const) {
     });
 
     test(`${format} imports accept 200 columns and reject a 201st column in both parsers`, () => {
-        const row = Object.fromEntries(Array.from({ length: 200 }, (_, index) => [`column_${index}`, 'value']));
+        const row = Object.fromEntries(
+            Array.from({ length: 200 }, (_, index) => [`column_${index}`, 'value']),
+        );
         for (const parse of Object.values(parsers)) {
             assert.equal(parse(encodeRows([row], format), format).columns.length, 200);
-            assert.throws(() => parse(encodeRows([{ ...row, extra: 'value' }], format), format), /1–200/);
+            assert.throws(
+                () => parse(encodeRows([{ ...row, extra: 'value' }], format), format),
+                /1–200/,
+            );
         }
     });
 
@@ -39,7 +47,10 @@ for (const format of ['csv', 'json', 'ndjson'] as const) {
         const name = 'n'.repeat(256);
         for (const parse of Object.values(parsers)) {
             assert.equal(parse(encodeRows([{ [name]: 'value' }], format), format).columns[0], name);
-            assert.throws(() => parse(encodeRows([{ [name + 'n']: 'value' }], format), format), /column names|field name/);
+            assert.throws(
+                () => parse(encodeRows([{ [name + 'n']: 'value' }], format), format),
+                /column names|field name/,
+            );
         }
     });
 
@@ -60,13 +71,38 @@ for (const format of ['csv', 'json', 'ndjson'] as const) {
 }
 
 test('Import mapping accepts 200 unique destinations and rejects a 201st mapping', () => {
-    const columns = Array.from({ length: 201 }, (_, index) => ({ name: `column_${index}`, type: 'String', defaultKind: '' }));
+    const columns = Array.from({ length: 201 }, (_, index) => ({
+        name: `column_${index}`,
+        type: 'String',
+        defaultKind: '',
+    }));
     const row = Object.fromEntries(columns.map(column => [column.name, 'value']));
-    const fields = Object.fromEntries(columns.slice(0, 200).map(column => [column.name, column.name]));
-    assert.equal(Object.keys(mapImportRows([row], Object.keys(row), fields, columns.slice(0, 200)).rows[0]!).length, 200);
-    assert.throws(() => mapImportRows([row], Object.keys(row), { ...fields, column_200: 'column_200' }, columns), { code: 'IMPORT_MAPPING' });
+    const fields = Object.fromEntries(
+        columns.slice(0, 200).map(column => [column.name, column.name]),
+    );
+    assert.equal(
+        Object.keys(mapImportRows([row], Object.keys(row), fields, columns.slice(0, 200)).rows[0]!)
+            .length,
+        200,
+    );
+    assert.throws(
+        () =>
+            mapImportRows(
+                [row],
+                Object.keys(row),
+                { ...fields, column_200: 'column_200' },
+                columns,
+            ),
+        { code: 'IMPORT_MAPPING' },
+    );
 });
 
 test('Import mapping still rejects duplicate destinations below the column limit', () => {
-    assert.throws(() => mapImportRows([{ a: '1', b: '2' }], ['a', 'b'], { a: 'value', b: 'value' }, [{ name: 'value', type: 'String', defaultKind: '' }]), { code: 'IMPORT_MAPPING' });
+    assert.throws(
+        () =>
+            mapImportRows([{ a: '1', b: '2' }], ['a', 'b'], { a: 'value', b: 'value' }, [
+                { name: 'value', type: 'String', defaultKind: '' },
+            ]),
+        { code: 'IMPORT_MAPPING' },
+    );
 });

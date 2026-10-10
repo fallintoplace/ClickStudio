@@ -45,10 +45,8 @@
   border-color: var(--focus-color);
 }
 
-:root[data-theme="click-light"]
-  :is(input, select, textarea)[aria-invalid="true"],
-:root[data-theme="click-light"]
-  :is(input, select, textarea)[aria-invalid="true"]:focus {
+:root[data-theme="click-light"] :is(input, select, textarea)[aria-invalid="true"],
+:root[data-theme="click-light"] :is(input, select, textarea)[aria-invalid="true"]:focus {
   border-color: var(--red);
 }
 

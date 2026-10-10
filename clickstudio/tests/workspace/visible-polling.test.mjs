@@ -36,14 +36,22 @@ function environment(t, initialVisibility = 'visible') {
 
 function deferred() {
     let resolve, reject;
-    const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
+    const promise = new Promise((yes, no) => {
+        resolve = yes;
+        reject = no;
+    });
     return { promise, resolve, reject };
 }
 
 test('Visible polling refreshes immediately and repeats after the interval', async t => {
     const env = environment(t);
     let calls = 0;
-    env.start(async () => { calls++; }, { intervalMs: 15000 });
+    env.start(
+        async () => {
+            calls++;
+        },
+        { intervalMs: 15000 },
+    );
     assert.equal(calls, 1);
     await setImmediate();
     await env.tick(14999);
@@ -55,7 +63,12 @@ test('Visible polling refreshes immediately and repeats after the interval', asy
 test('Delayed polling preserves the first refresh interval', async t => {
     const env = environment(t);
     let calls = 0;
-    env.start(async () => { calls++; }, { intervalMs: 1500, immediate: false });
+    env.start(
+        async () => {
+            calls++;
+        },
+        { intervalMs: 1500, immediate: false },
+    );
     assert.equal(calls, 0);
     await env.tick(1499);
     assert.equal(calls, 0);
@@ -66,7 +79,12 @@ test('Delayed polling preserves the first refresh interval', async t => {
 test('A hidden page makes no periodic requests and refreshes on return', async t => {
     const env = environment(t, 'hidden');
     let calls = 0;
-    env.start(async () => { calls++; }, { intervalMs: 15000 });
+    env.start(
+        async () => {
+            calls++;
+        },
+        { intervalMs: 15000 },
+    );
     await env.tick(3600000);
     assert.equal(calls, 0);
     env.visibility('visible');
@@ -79,7 +97,12 @@ test('A hidden page makes no periodic requests and refreshes on return', async t
 test('Hiding the page clears the pending timer without creating a second loop', async t => {
     const env = environment(t);
     let calls = 0;
-    env.start(async () => { calls++; }, { intervalMs: 15000 });
+    env.start(
+        async () => {
+            calls++;
+        },
+        { intervalMs: 15000 },
+    );
     await setImmediate();
     await env.tick(14000);
     env.visibility('hidden');
@@ -98,7 +121,12 @@ test('A slow periodic request cannot overlap the next refresh', async t => {
     const env = environment(t);
     const first = deferred();
     let calls = 0;
-    env.start(async () => { if (++calls === 1) await first.promise; }, { intervalMs: 1500 });
+    env.start(
+        async () => {
+            if (++calls === 1) await first.promise;
+        },
+        { intervalMs: 1500 },
+    );
     await env.tick(60000);
     assert.equal(calls, 1);
     first.resolve();
@@ -113,10 +141,13 @@ test('Returning before an aborted request settles waits and then refreshes immed
     const env = environment(t);
     const first = deferred();
     const signals = [];
-    env.start(async signal => {
-        signals.push(signal);
-        if (signals.length === 1) await first.promise;
-    }, { intervalMs: 5000 });
+    env.start(
+        async signal => {
+            signals.push(signal);
+            if (signals.length === 1) await first.promise;
+        },
+        { intervalMs: 5000 },
+    );
     env.visibility('hidden');
     assert.equal(signals[0].aborted, true);
     env.visibility('visible');
@@ -134,7 +165,12 @@ test('An aborted request that settles while hidden does not schedule more work',
     const env = environment(t);
     const first = deferred();
     let calls = 0;
-    env.start(async () => { if (++calls === 1) await first.promise; }, { intervalMs: 5000 });
+    env.start(
+        async () => {
+            if (++calls === 1) await first.promise;
+        },
+        { intervalMs: 5000 },
+    );
     env.visibility('hidden');
     first.reject(new Error('Request aborted'));
     await setImmediate();
@@ -148,7 +184,13 @@ test('Repeated visible events do not abort or overlap a pending refresh', async 
     const env = environment(t);
     const pending = deferred();
     const signals = [];
-    env.start(async signal => { signals.push(signal); await pending.promise; }, { intervalMs: 5000 });
+    env.start(
+        async signal => {
+            signals.push(signal);
+            await pending.promise;
+        },
+        { intervalMs: 5000 },
+    );
     env.visibility('visible');
     env.visibility('visible');
     assert.equal(signals.length, 1);
@@ -162,12 +204,15 @@ test('Repeated visible events do not abort or overlap a pending refresh', async 
 test('Both synchronous failures and rejected requests leave periodic refreshes working', async t => {
     const env = environment(t);
     let calls = 0;
-    env.start(() => {
-        calls++;
-        if (calls === 1) throw new Error('Synchronous failure');
-        if (calls === 2) return Promise.reject(new Error('Request failed'));
-        return Promise.resolve();
-    }, { intervalMs: 1500 });
+    env.start(
+        () => {
+            calls++;
+            if (calls === 1) throw new Error('Synchronous failure');
+            if (calls === 2) return Promise.reject(new Error('Request failed'));
+            return Promise.resolve();
+        },
+        { intervalMs: 1500 },
+    );
     await setImmediate();
     await env.tick(1500);
     assert.equal(calls, 2);
@@ -178,7 +223,9 @@ test('Both synchronous failures and rejected requests leave periodic refreshes w
 test('One-shot metadata refreshes on visibility changes without periodic polling', async t => {
     const env = environment(t);
     let calls = 0;
-    env.start(async () => { calls++; });
+    env.start(async () => {
+        calls++;
+    });
     await setImmediate();
     await env.tick(60000);
     assert.equal(calls, 1);
@@ -193,7 +240,12 @@ test('One-shot metadata refreshes on visibility changes without periodic polling
 test('Stopping clears pending timers and removes the visibility listener', async t => {
     const env = environment(t);
     let calls = 0;
-    const stop = env.start(async () => { calls++; }, { intervalMs: 15000 });
+    const stop = env.start(
+        async () => {
+            calls++;
+        },
+        { intervalMs: 15000 },
+    );
     await setImmediate();
     assert.equal(getEventListeners(env.page, 'visibilitychange').length, 1);
     stop();
@@ -209,7 +261,13 @@ test('Stopping aborts in-flight work and prevents a late response from restartin
     const env = environment(t);
     const pending = deferred();
     const signals = [];
-    const stop = env.start(async signal => { signals.push(signal); await pending.promise; }, { intervalMs: 1500 });
+    const stop = env.start(
+        async signal => {
+            signals.push(signal);
+            await pending.promise;
+        },
+        { intervalMs: 1500 },
+    );
     stop();
     assert.equal(signals[0].aborted, true);
     pending.resolve();
@@ -223,7 +281,12 @@ test('Stopping aborts in-flight work and prevents a late response from restartin
 test('Stopping before a delayed first refresh starts no request', async t => {
     const env = environment(t);
     let calls = 0;
-    const stop = env.start(async () => { calls++; }, { intervalMs: 1500, immediate: false });
+    const stop = env.start(
+        async () => {
+            calls++;
+        },
+        { intervalMs: 1500, immediate: false },
+    );
     stop();
     await env.tick(60000);
     assert.equal(calls, 0);
@@ -231,9 +294,20 @@ test('Stopping before a delayed first refresh starts no request', async t => {
 
 test('Independent polling scopes do not cancel each other', async t => {
     const env = environment(t);
-    let first = 0, second = 0;
-    const stopFirst = env.start(async () => { first++; }, { intervalMs: 1500 });
-    env.start(async () => { second++; }, { intervalMs: 5000 });
+    let first = 0,
+        second = 0;
+    const stopFirst = env.start(
+        async () => {
+            first++;
+        },
+        { intervalMs: 1500 },
+    );
+    env.start(
+        async () => {
+            second++;
+        },
+        { intervalMs: 5000 },
+    );
     await setImmediate();
     stopFirst();
     await env.tick(5000);

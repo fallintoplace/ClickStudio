@@ -7,10 +7,13 @@ export function isSystemDatabaseName(database: string) {
 }
 
 export function canDropTableTarget(database: string, table: string) {
-    const validName = (value: string) => value.length > 0 && value.length <= 128 && [...value].every(character => {
-        const code = character.charCodeAt(0);
-        return code >= 0x20 && code !== 0x7f;
-    });
+    const validName = (value: string) =>
+        value.length > 0 &&
+        value.length <= 128 &&
+        [...value].every(character => {
+            const code = character.charCodeAt(0);
+            return code >= 0x20 && code !== 0x7f;
+        });
     return validName(database) && validName(table) && !isSystemDatabaseName(database);
 }
 
@@ -31,8 +34,12 @@ export function sqlReferencesQualifiedTable(sql: string, database: string, table
     }
 
     const qualifiedName = [quoteIdentifier(database), '.', quoteIdentifier(table)];
-    return tokens.some((token, index) => token.kind === 'word' && /^(?:from|join)$/i.test(token.text)
-        && qualifiedName.every((part, offset) => tokens[index + offset + 1]?.text === part));
+    return tokens.some(
+        (token, index) =>
+            token.kind === 'word' &&
+            /^(?:from|join)$/i.test(token.text) &&
+            qualifiedName.every((part, offset) => tokens[index + offset + 1]?.text === part),
+    );
 }
 
 export function isViewEngine(engine: string) {

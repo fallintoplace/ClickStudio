@@ -1,1 +1,5 @@
-export { BUNDLED_REFERENCE, findBundledReference, searchBundledReference } from '../shared/reference-data.js';
+export {
+    BUNDLED_REFERENCE,
+    findBundledReference,
+    searchBundledReference,
+} from '../shared/reference-data.js';

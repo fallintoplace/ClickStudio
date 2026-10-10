@@ -4,11 +4,24 @@ import { queryRows } from '../../api/cloud.js';
 import { connectClickHouseCloud, disconnectClickHouseCloud } from '../../web/cloud-connection.js';
 
 test('Cloud connections advertise their query budget while inspector requests keep their larger row cap', async t => {
-    t.mock.method(globalThis, 'fetch', async () => Response.json({ host: 'service.clickhouse.cloud:8443', serverVersion: '25.1' }));
+    t.mock.method(globalThis, 'fetch', async () =>
+        Response.json({ host: 'service.clickhouse.cloud:8443', serverVersion: '25.1' }),
+    );
     t.after(() => disconnectClickHouseCloud());
-    const connection = await connectClickHouseCloud({ host: 'service.clickhouse.cloud:8443', database: 'default', username: 'reader', password: 'fixture-password' });
+    const connection = await connectClickHouseCloud({
+        host: 'service.clickhouse.cloud:8443',
+        database: 'default',
+        username: 'reader',
+        password: 'fixture-password',
+    });
     assert.equal(connection.id, 'clickhouse-cloud');
-    assert.deepEqual(connection.limits, { rows: 1000, bytes: 2000000, seconds: 45, memory: 536870912, threads: 4 });
+    assert.deepEqual(connection.limits, {
+        rows: 1000,
+        bytes: 2000000,
+        seconds: 45,
+        memory: 536870912,
+        threads: 4,
+    });
 
     const requests: Array<{ clickhouse_settings?: Record<string, unknown> }> = [];
     const client = {

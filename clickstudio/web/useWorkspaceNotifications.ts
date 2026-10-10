@@ -6,21 +6,27 @@ function useTimedMessage(timeoutMs: number) {
     const [value, setValue] = useState('');
     const timerRef = useRef<number | undefined>(undefined);
 
-    const setMessage = useCallback((message: string) => {
-        if (timerRef.current !== undefined) window.clearTimeout(timerRef.current);
-        timerRef.current = undefined;
-        setValue(message);
-        if (message) {
-            timerRef.current = window.setTimeout(() => {
-                timerRef.current = undefined;
-                setValue('');
-            }, timeoutMs);
-        }
-    }, [timeoutMs]);
+    const setMessage = useCallback(
+        (message: string) => {
+            if (timerRef.current !== undefined) window.clearTimeout(timerRef.current);
+            timerRef.current = undefined;
+            setValue(message);
+            if (message) {
+                timerRef.current = window.setTimeout(() => {
+                    timerRef.current = undefined;
+                    setValue('');
+                }, timeoutMs);
+            }
+        },
+        [timeoutMs],
+    );
 
-    useEffect(() => () => {
-        if (timerRef.current !== undefined) window.clearTimeout(timerRef.current);
-    }, []);
+    useEffect(
+        () => () => {
+            if (timerRef.current !== undefined) window.clearTimeout(timerRef.current);
+        },
+        [],
+    );
 
     return [value, setMessage] as const;
 }

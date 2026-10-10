@@ -1,16 +1,31 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { english } from '../../.workspace-build/web/i18n-english.js';
-import { categoryLabel, chartLabel, exampleText, helpSections } from '../../.workspace-build/web/components/workspace-help-model.js';
+import {
+    categoryLabel,
+    chartLabel,
+    exampleText,
+    helpSections,
+} from '../../.workspace-build/web/components/workspace-help-model.js';
 
 const copy = english.common;
 
 test('experimental help topics stay grouped after the standard help topics', () => {
     const sections = helpSections(copy);
-    const experimental = sections.filter(section => section.experimental).map(section => section.id);
+    const experimental = sections
+        .filter(section => section.experimental)
+        .map(section => section.id);
     const firstExperimentalIndex = sections.findIndex(section => section.experimental);
 
-    assert.deepEqual(experimental, ['monitoring', 'query', 'geo', 'explain', 'storage', 'dependencies', 'compare']);
+    assert.deepEqual(experimental, [
+        'monitoring',
+        'query',
+        'geo',
+        'explain',
+        'storage',
+        'dependencies',
+        'compare',
+    ]);
     assert.ok(firstExperimentalIndex > 0);
     assert.ok(sections.slice(0, firstExperimentalIndex).every(section => !section.experimental));
     assert.ok(sections.slice(firstExperimentalIndex).every(section => section.experimental));
@@ -64,20 +79,58 @@ test('chart labels cover every chart kind and unknown kinds', () => {
 });
 
 test('schema examples use table copy while other examples preserve or localize their text', () => {
-    assert.deepEqual(exampleText({ id: 'events', name: 'Preview events', description: 'ignored', category: 'schema' }, 'en', copy), {
-        name: 'Preview events',
-        description: copy.exampleReadRows,
-    });
-    assert.deepEqual(exampleText({ id: 'events', name: 'events', description: 'ignored', category: 'schema' }, 'en', copy), {
-        name: 'Preview events',
-        description: copy.exampleReadRows,
-    });
-    assert.deepEqual(exampleText({ id: 'clickhouse-server-version', name: 'Server version', description: 'Read the version', category: 'clickhouse' }, 'zh', copy), {
-        name: 'ClickHouse 版本',
-        description: '查看此连接所使用的 ClickHouse 版本。',
-    });
-    assert.deepEqual(exampleText({ id: 'unknown-example', name: 'Unknown example', description: 'No translation', category: 'basics' }, 'zh', copy), {
-        name: 'Unknown example',
-        description: 'No translation',
-    });
+    assert.deepEqual(
+        exampleText(
+            { id: 'events', name: 'Preview events', description: 'ignored', category: 'schema' },
+            'en',
+            copy,
+        ),
+        {
+            name: 'Preview events',
+            description: copy.exampleReadRows,
+        },
+    );
+    assert.deepEqual(
+        exampleText(
+            { id: 'events', name: 'events', description: 'ignored', category: 'schema' },
+            'en',
+            copy,
+        ),
+        {
+            name: 'Preview events',
+            description: copy.exampleReadRows,
+        },
+    );
+    assert.deepEqual(
+        exampleText(
+            {
+                id: 'clickhouse-server-version',
+                name: 'Server version',
+                description: 'Read the version',
+                category: 'clickhouse',
+            },
+            'zh',
+            copy,
+        ),
+        {
+            name: 'ClickHouse 版本',
+            description: '查看此连接所使用的 ClickHouse 版本。',
+        },
+    );
+    assert.deepEqual(
+        exampleText(
+            {
+                id: 'unknown-example',
+                name: 'Unknown example',
+                description: 'No translation',
+                category: 'basics',
+            },
+            'zh',
+            copy,
+        ),
+        {
+            name: 'Unknown example',
+            description: 'No translation',
+        },
+    );
 });

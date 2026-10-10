@@ -34,11 +34,7 @@
       var(--help-experimental) 34%,
       var(--help-border)
     );
-    --help-experimental-text: color-mix(
-      in srgb,
-      var(--help-experimental) 62%,
-      var(--text)
-    );
+    --help-experimental-text: color-mix(in srgb, var(--help-experimental) 62%, var(--text));
     --help-radius-control: var(--radius-control);
     --help-radius-card: var(--radius-panel);
     --help-control-height: 36px;
@@ -433,11 +429,7 @@
     padding: 5px 9px;
     border: 1px solid var(--help-experimental-border);
     border-radius: var(--radius-label);
-    background: color-mix(
-      in srgb,
-      var(--help-experimental) 12%,
-      var(--panel-raised)
-    );
+    background: color-mix(in srgb, var(--help-experimental) 12%, var(--panel-raised));
     color: var(--help-experimental-text);
     font-size: var(--help-text-meta);
     font-weight: 850;
@@ -452,29 +444,13 @@
   }
 
   .workspace-help-tour-experimental .workspace-help-feature-card {
-    border-color: color-mix(
-      in srgb,
-      var(--help-experimental) 20%,
-      var(--help-border)
-    );
-    background: color-mix(
-      in srgb,
-      var(--help-experimental) 4%,
-      var(--help-surface)
-    );
+    border-color: color-mix(in srgb, var(--help-experimental) 20%, var(--help-border));
+    background: color-mix(in srgb, var(--help-experimental) 4%, var(--help-surface));
   }
 
   .workspace-help-tour-experimental .workspace-help-feature-icon {
-    border-color: color-mix(
-      in srgb,
-      var(--help-experimental) 35%,
-      var(--help-border)
-    );
-    background: color-mix(
-      in srgb,
-      var(--help-experimental) 10%,
-      var(--panel-raised)
-    );
+    border-color: color-mix(in srgb, var(--help-experimental) 35%, var(--help-border));
+    background: color-mix(in srgb, var(--help-experimental) 10%, var(--panel-raised));
     color: var(--help-experimental-text);
   }
 
@@ -857,15 +833,8 @@
     border: 1px solid var(--help-border);
     border-radius: var(--radius-panel);
     background-image:
-      linear-gradient(
-        color-mix(in srgb, var(--accent) 4%, transparent) 1px,
-        transparent 1px
-      ),
-      linear-gradient(
-        90deg,
-        color-mix(in srgb, var(--accent) 4%, transparent) 1px,
-        transparent 1px
-      );
+      linear-gradient(color-mix(in srgb, var(--accent) 4%, transparent) 1px, transparent 1px),
+      linear-gradient(90deg, color-mix(in srgb, var(--accent) 4%, transparent) 1px, transparent 1px);
     background-size: 18px 18px;
   }
   .workspace-help-monitoring-sample-chart > div:first-child,
@@ -917,9 +886,7 @@
     white-space: nowrap;
   }
   .workspace-help-monitoring-sample-families span,
-  .workspace-help-monitoring-sample-replicas
-    > div
-    > span:not(.workspace-help-replica-dot) {
+  .workspace-help-monitoring-sample-replicas > div > span:not(.workspace-help-replica-dot) {
     color: var(--muted);
     font-size: 9px;
     white-space: nowrap;
@@ -988,15 +955,8 @@
         color-mix(in srgb, var(--accent) 9%, transparent),
         transparent 24%
       ),
-      linear-gradient(
-        color-mix(in srgb, var(--text) 4%, transparent) 1px,
-        transparent 1px
-      ),
-      linear-gradient(
-        90deg,
-        color-mix(in srgb, var(--text) 4%, transparent) 1px,
-        transparent 1px
-      ),
+      linear-gradient(color-mix(in srgb, var(--text) 4%, transparent) 1px, transparent 1px),
+      linear-gradient(90deg, color-mix(in srgb, var(--text) 4%, transparent) 1px, transparent 1px),
       color-mix(in srgb, var(--page) 78%, var(--panel));
     background-size:
       auto,
@@ -1008,8 +968,7 @@
   .workspace-help-geo-preview::before {
     position: absolute;
     inset: 13% 6%;
-    border: 1px solid
-      color-mix(in srgb, var(--help-border-strong) 70%, transparent);
+    border: 1px solid color-mix(in srgb, var(--help-border-strong) 70%, transparent);
     border-radius: 50%;
     background:
       linear-gradient(
@@ -1036,8 +995,7 @@
     top: 0;
     width: var(--geo-demo-size);
     height: var(--geo-demo-size);
-    border: 2px solid
-      color-mix(in srgb, var(--panel-raised) 84%, hsl(var(--geo-hue) 90% 70%));
+    border: 2px solid color-mix(in srgb, var(--panel-raised) 84%, hsl(var(--geo-hue) 90% 70%));
     border-radius: 50%;
     background: hsl(var(--geo-hue) 92% 58%);
     box-shadow: var(--status-ring);
@@ -1055,8 +1013,7 @@
     min-width: 72px;
     gap: 2px;
     padding: 5px 7px;
-    border: 1px solid
-      color-mix(in srgb, hsl(var(--geo-hue) 92% 60%) 52%, var(--help-border));
+    border: 1px solid color-mix(in srgb, hsl(var(--geo-hue) 92% 60%) 52%, var(--help-border));
     border-radius: var(--radius-popover);
     background: color-mix(in srgb, var(--panel-raised) 94%, transparent);
     color: var(--text);
@@ -1822,8 +1779,7 @@
 
 /* Light theme */
 
-:root[data-theme="click-light"]
-  :is(.workspace-help-panel, .workspace-help-header) {
+:root[data-theme="click-light"] :is(.workspace-help-panel, .workspace-help-header) {
   background: var(--panel-raised);
   border-color: var(--line);
 }

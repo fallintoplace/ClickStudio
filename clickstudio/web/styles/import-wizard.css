@@ -18,11 +18,7 @@
 }
 .import-kind-button.is-query.is-selected {
   border-color: color-mix(in srgb, var(--import-kind-accent) 64%, var(--line));
-  background: color-mix(
-    in srgb,
-    var(--import-kind-accent) 11%,
-    var(--panel-raised)
-  );
+  background: color-mix(in srgb, var(--import-kind-accent) 11%, var(--panel-raised));
 }
 .import-kind-button.is-query.is-selected::before {
   background: var(--import-kind-accent);
@@ -542,11 +538,7 @@
   scrollbar-color: var(--scrollbar-thumb) transparent;
   --import-cyan: #66e7f2;
   --import-status-ring: 0 0 0 var(--status-ring-width)
-    color-mix(
-      in srgb,
-      var(--import-cyan) var(--status-ring-opacity),
-      transparent
-    );
+    color-mix(in srgb, var(--import-cyan) var(--status-ring-opacity), transparent);
   --import-blue: #72aaff;
   --import-violet: #b18bff;
   --import-action-start: #66e7f2;
@@ -708,26 +700,13 @@
 .import-kind-icon {
   display: grid;
   place-items: center;
-  border: 1px solid
-    color-mix(
-      in srgb,
-      var(--import-kind-accent, var(--accent)) 35%,
-      var(--line)
-    );
+  border: 1px solid color-mix(in srgb, var(--import-kind-accent, var(--accent)) 35%, var(--line));
   color: var(--import-kind-accent, var(--accent));
   width: 28px;
   height: 28px;
   border-radius: var(--radius-panel);
-  border-color: color-mix(
-    in srgb,
-    var(--import-kind-accent, var(--import-cyan)) 42%,
-    var(--line)
-  );
-  background: color-mix(
-    in srgb,
-    var(--import-kind-accent, var(--import-cyan)) 9%,
-    var(--panel)
-  );
+  border-color: color-mix(in srgb, var(--import-kind-accent, var(--import-cyan)) 42%, var(--line));
+  background: color-mix(in srgb, var(--import-kind-accent, var(--import-cyan)) 9%, var(--panel));
 }
 .import-kind-icon svg {
   width: 15px;
@@ -865,8 +844,7 @@
   grid-template-columns: 48px minmax(0, 1fr);
   gap: 12px 15px;
   padding: clamp(18px, 3vw, 30px);
-  border: 1px dashed
-    color-mix(in srgb, var(--import-cyan) 40%, var(--line-bright));
+  border: 1px dashed color-mix(in srgb, var(--import-cyan) 40%, var(--line-bright));
   border-radius: var(--radius-panel);
   background: linear-gradient(
     125deg,
@@ -881,11 +859,7 @@
   content: "";
   opacity: 0.8;
   width: 2px;
-  background: linear-gradient(
-    var(--import-cyan),
-    var(--import-blue),
-    var(--import-violet)
-  );
+  background: linear-gradient(var(--import-cyan), var(--import-blue), var(--import-violet));
 }
 .import-file-picker:hover {
   transform: none;
@@ -897,12 +871,7 @@
   display: grid;
   grid-row: span 2;
   place-items: center;
-  border: 1px solid
-    color-mix(
-      in srgb,
-      var(--import-file-accent, var(--accent)) 38%,
-      var(--line)
-    );
+  border: 1px solid color-mix(in srgb, var(--import-file-accent, var(--accent)) 38%, var(--line));
   width: 48px;
   height: 48px;
   border-color: color-mix(in srgb, var(--import-cyan) 45%, var(--line));
@@ -931,11 +900,7 @@
   transition:
     filter 0.15s ease,
     transform 0.15s ease;
-  background: linear-gradient(
-    100deg,
-    var(--import-action-start),
-    var(--import-action-end)
-  );
+  background: linear-gradient(100deg, var(--import-action-start), var(--import-action-end));
   color: var(--import-action-ink);
   font-weight: 750;
 }
@@ -1626,11 +1591,7 @@
   font-size: 10px;
 }
 .import-wizard-footer > div > button:last-child:not(:disabled) {
-  background: linear-gradient(
-    100deg,
-    var(--import-action-start),
-    var(--import-action-end)
-  );
+  background: linear-gradient(100deg, var(--import-action-start), var(--import-action-end));
   color: var(--import-action-ink);
   box-shadow: var(--shadow-inset);
 }
@@ -1943,11 +1904,7 @@
 }
 
 :root[data-theme="click-light"]
-  :is(
-    .import-wizard-header,
-    .import-setup-source,
-    .import-preview-table > div:first-child
-  ) {
+  :is(.import-wizard-header, .import-setup-source, .import-preview-table > div:first-child) {
   border-color: var(--line);
   background: var(--panel-raised);
 }
@@ -1957,25 +1914,17 @@
 }
 
 :root[data-theme="click-light"]
-  :is(
-    .import-file-picker,
-    .import-file-picker:hover,
-    .import-kind-button.is-selected
-  ) {
+  :is(.import-file-picker, .import-file-picker:hover, .import-kind-button.is-selected) {
   border-color: var(--control-border);
   background: var(--panel-raised);
 }
 
-:root[data-theme="click-light"]
-  .import-step-item.is-current
-  .import-step-number {
+:root[data-theme="click-light"] .import-step-item.is-current .import-step-number {
   background: var(--accent-action);
   color: var(--accent-ink);
 }
 
-:root[data-theme="click-light"]
-  .import-file-picker-query
-  .import-file-input::file-selector-button {
+:root[data-theme="click-light"] .import-file-picker-query .import-file-input::file-selector-button {
   background: var(--violet);
   color: var(--panel);
 }

@@ -49,20 +49,30 @@ export function useWorkspaceDocumentSave({
         metric: draft.metric,
         dependencies: draft.dependencies,
     });
-    const sameSaveRequest = (left: Draft, right: Draft) => JSON.stringify(savePayload(left)) === JSON.stringify(savePayload(right));
+    const sameSaveRequest = (left: Draft, right: Draft) =>
+        JSON.stringify(savePayload(left)) === JSON.stringify(savePayload(right));
     const saveDraft = (requestedDraft?: Draft): Promise<void> => {
-        const currentActive = workspaceRef.current.tabs.find(draft => draft.id === workspaceRef.current.activeId) ?? active;
+        const currentActive =
+            workspaceRef.current.tabs.find(draft => draft.id === workspaceRef.current.activeId) ??
+            active;
         const requested = requestedDraft ?? currentActive;
         const resolveDraft = () => {
             const current = workspaceRef.current.tabs.find(draft => draft.id === requested.id);
             return current
-                ? { ...current, ...(requested.name !== current.name ? { name: requested.name } : {}) }
+                ? {
+                      ...current,
+                      ...(requested.name !== current.name ? { name: requested.name } : {}),
+                  }
                 : requested;
         };
         const target = resolveDraft();
         const inFlight = inFlightSaveDraftsRef.current.get(target.id);
         const queued = queuedSaveDraftsRef.current.get(target.id);
-        if ((inFlight && sameSaveRequest(target, inFlight)) || (queued && sameSaveRequest(target, queued))) return Promise.resolve();
+        if (
+            (inFlight && sameSaveRequest(target, inFlight)) ||
+            (queued && sameSaveRequest(target, queued))
+        )
+            return Promise.resolve();
         if (busy || saveRunningRef.current) {
             queuedSaveDraftsRef.current.set(target.id, target);
             return Promise.resolve();
@@ -76,19 +86,28 @@ export function useWorkspaceDocumentSave({
             if (!payload.name) throw new Error('Enter a query name before saving.');
             setSavingDraftIds(current => ({ ...current, [draft.id]: true }));
             try {
-                const saved = await api<QueryDocument>(draft.serverId ? `/documents/${encodeURIComponent(draft.serverId)}` : '/documents', {
-                    method: draft.serverId ? 'PUT' : 'POST',
-                    body: payload,
-                });
+                const saved = await api<QueryDocument>(
+                    draft.serverId
+                        ? `/documents/${encodeURIComponent(draft.serverId)}`
+                        : '/documents',
+                    {
+                        method: draft.serverId ? 'PUT' : 'POST',
+                        body: payload,
+                    },
+                );
                 updateDraft(draft.id, current => ({
                     ...current,
                     ...(current.name.trim() === draft.name ? { name: saved.name } : {}),
                     serverId: saved.id,
                     baseRevision: saved.revision,
                 }));
-                setDocuments(current => [saved, ...current.filter(document => document.id !== saved.id)]);
+                setDocuments(current => [
+                    saved,
+                    ...current.filter(document => document.id !== saved.id),
+                ]);
                 setNotice(`Saved ${saved.name} · revision ${saved.revision}`);
-                if (draft.serverId && inspectorRef.current === 'revisions') void loadDocumentRevisions(saved.id);
+                if (draft.serverId && inspectorRef.current === 'revisions')
+                    void loadDocumentRevisions(saved.id);
             } finally {
                 setSavingDraftIds(current => ({ ...current, [draft.id]: false }));
             }
@@ -109,7 +128,14 @@ export function useWorkspaceDocumentSave({
 
     useEffect(() => {
         const saveOnShortcut = (event: KeyboardEvent) => {
-            if (event.defaultPrevented || !(event.metaKey || event.ctrlKey) || event.shiftKey || event.altKey || event.key.toLowerCase() !== 's') return;
+            if (
+                event.defaultPrevented ||
+                !(event.metaKey || event.ctrlKey) ||
+                event.shiftKey ||
+                event.altKey ||
+                event.key.toLowerCase() !== 's'
+            )
+                return;
             event.preventDefault();
             void saveDraftRef.current();
         };

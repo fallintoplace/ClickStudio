@@ -1,6 +1,19 @@
-import type { RunKind, RunStatus, RunResultState, ScriptStatus, ResultCompleteness, RunEventType } from './run-types.js';
+import type {
+    RunKind,
+    RunStatus,
+    RunResultState,
+    ScriptStatus,
+    ResultCompleteness,
+    RunEventType,
+} from './run-types.js';
 import type { ChartKind } from './chart-types.js';
-import type { AssistantAction, FindingSeverity, EvaluationStatus, QualityCheckId, ProposalDecision } from './assistant-types.js';
+import type {
+    AssistantAction,
+    FindingSeverity,
+    EvaluationStatus,
+    QualityCheckId,
+    ProposalDecision,
+} from './assistant-types.js';
 import type { MonitorCondition } from './monitor-types.js';
 import type { QueryLogSource } from './workload.js';
 import type { FlamegraphSource } from './flamegraph.js';
@@ -9,9 +22,15 @@ export type { ChartKind } from './chart-types.js';
 export type { AssistantAction, EvaluationStatus } from './assistant-types.js';
 
 /** Values remain lossless JSON: Int64/UInt64 and Decimal arrive as strings. */
-export type Json = null | boolean | number | string | Json[] | {
-    [key: string]: Json;
-};
+export type Json =
+    | null
+    | boolean
+    | number
+    | string
+    | Json[]
+    | {
+          [key: string]: Json;
+      };
 export type Row = Json[];
 export interface Column {
     name: string;
@@ -25,10 +44,18 @@ export interface Limits {
     threads: number;
 }
 export const DEFAULT_LIMITS: Readonly<Limits> = Object.freeze({
-    rows: 5000, bytes: 2000000, seconds: 30, memory: 536870912, threads: 4,
+    rows: 5000,
+    bytes: 2000000,
+    seconds: 30,
+    memory: 536870912,
+    threads: 4,
 });
 export const HARD_LIMITS: Readonly<Limits> = Object.freeze({
-    rows: 20000, bytes: 5000000, seconds: 120, memory: 1073741824, threads: 8,
+    rows: 20000,
+    bytes: 5000000,
+    seconds: 120,
+    memory: 1073741824,
+    threads: 8,
 });
 export type Capability = {
     available: boolean;
@@ -49,7 +76,9 @@ export interface Manifest {
     queryTree?: Capability;
     /** Trace symbolization form used for profiler samples. */
     traceLogSource?: FlamegraphSource;
-    /** Running EXPLAIN PIPELINE as a query is separate from loading structured pipeline evidence. */
+    /**
+     * Running EXPLAIN PIPELINE as a query is separate from loading structured pipeline evidence.
+     */
     explainPipeline?: Capability;
     pipeline: Capability;
     queryLog: Capability;
@@ -225,7 +254,8 @@ export interface ProfileInsight {
     title: string;
     description: string;
 }
-export type ProfilePipelineNodeKind = 'read' | 'filter' | 'aggregate' | 'sort' | 'resize' | 'join' | 'transform' | 'output' | 'stage';
+export type ProfilePipelineNodeKind =
+    'read' | 'filter' | 'aggregate' | 'sort' | 'resize' | 'join' | 'transform' | 'output' | 'stage';
 export interface ProfilePipelineNode {
     id: string;
     label: string;
@@ -471,7 +501,12 @@ export interface AssistantEvaluationReport {
     safetyPassRate: number | null;
     semanticPassRate: number | null;
     averageScore: number | null;
-    latest: Array<Pick<Proposal, 'id' | 'action' | 'decision' | 'createdAt'> & { status: EvaluationStatus | 'unknown'; score: number | null }>;
+    latest: Array<
+        Pick<Proposal, 'id' | 'action' | 'decision' | 'createdAt'> & {
+            status: EvaluationStatus | 'unknown';
+            score: number | null;
+        }
+    >;
     benchmark: {
         total: number;
         passed: number;

@@ -1,34 +1,81 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { checkpoint, closeDraft, draftFromDocument, MAX_CLOSED_TABS, MAX_TABS, newDraft, recover, reopenDraft } from '../../.workspace-build/web/workspace-state.js';
+import {
+    checkpoint,
+    closeDraft,
+    draftFromDocument,
+    MAX_CLOSED_TABS,
+    MAX_TABS,
+    newDraft,
+    recover,
+    reopenDraft,
+} from '../../.workspace-build/web/workspace-state.js';
 
 const workspace = (...tabs) => ({ version: 1, tabs, activeId: tabs[0].id });
 const read = value => ({ getItem: () => JSON.stringify(value) });
 
 test('Existing version-1 drafts preserve SQL, parameters, evidence and saved revision', () => {
-    const draft = { ...newDraft('Exact.sql', 'SELECT {n:UInt64}'), serverId: 'document-1', baseRevision: 7,
-        parameters: { n: '18446744073709551615' }, activeRunId: 'run-1', runIds: ['run-1'],
-        chart: { kind: 'bar', x: 0, ys: [1], title: 'Counts' }, from: 2, to: 4,
-        dependencies: ['metric-1'], parentDocumentId: 'parent-1', parentRunId: 'parent-run-1' };
+    const draft = {
+        ...newDraft('Exact.sql', 'SELECT {n:UInt64}'),
+        serverId: 'document-1',
+        baseRevision: 7,
+        parameters: { n: '18446744073709551615' },
+        activeRunId: 'run-1',
+        runIds: ['run-1'],
+        chart: { kind: 'bar', x: 0, ys: [1], title: 'Counts' },
+        from: 2,
+        to: 4,
+        dependencies: ['metric-1'],
+        parentDocumentId: 'parent-1',
+        parentRunId: 'parent-run-1',
+    };
     const result = recover('key', read(workspace(draft))).tabs[0];
     for (const [key, value] of Object.entries(draft)) assert.deepEqual(result[key], value, key);
 });
 
 test('A deleted table marker survives recovery only with valid source and run identity', () => {
     const source = { database: 'analytics', table: 'events', runId: 'run-1' };
-    const draft = { ...newDraft('Preview events.sql', 'SELECT * FROM `analytics`.`events`'), activeRunId: 'run-1', invalidatedSource: source };
+    const draft = {
+        ...newDraft('Preview events.sql', 'SELECT * FROM `analytics`.`events`'),
+        activeRunId: 'run-1',
+        invalidatedSource: source,
+    };
     assert.deepEqual(recover('key', read(workspace(draft))).tabs[0].invalidatedSource, source);
 
-    const malformed = recover('key', read(workspace({ ...draft, invalidatedSource: { ...source, runId: '../bad' } }))).tabs[0];
+    const malformed = recover(
+        'key',
+        read(workspace({ ...draft, invalidatedSource: { ...source, runId: '../bad' } })),
+    ).tabs[0];
     assert.equal(malformed.invalidatedSource, undefined);
 });
 
 test('Opening a saved metric preserves its revision, run, parent and dependency semantics', () => {
-    const metric = { definition: 'sum(amount)', grain: 'day', dimensions: ['region'], timezone: 'UTC', filters: 'paid', nullTreatment: 'exclude', sourceColumns: ['orders.amount'] };
-    const document = { id: 'metric-document', owner: 'owner', name: 'Daily revenue', connectionId: 'demo', sql: 'SELECT sum(amount) FROM orders', revision: 4,
-        createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-02T00:00:00.000Z', parameters: { currency: 'EUR' },
-        chart: { kind: 'line', x: 0, ys: [1], title: 'Revenue by day' }, runId: 'metric-run', parentDocumentId: 'parent-document',
-        dependencies: ['source-document'], kind: 'metric', metric };
+    const metric = {
+        definition: 'sum(amount)',
+        grain: 'day',
+        dimensions: ['region'],
+        timezone: 'UTC',
+        filters: 'paid',
+        nullTreatment: 'exclude',
+        sourceColumns: ['orders.amount'],
+    };
+    const document = {
+        id: 'metric-document',
+        owner: 'owner',
+        name: 'Daily revenue',
+        connectionId: 'demo',
+        sql: 'SELECT sum(amount) FROM orders',
+        revision: 4,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-02T00:00:00.000Z',
+        parameters: { currency: 'EUR' },
+        chart: { kind: 'line', x: 0, ys: [1], title: 'Revenue by day' },
+        runId: 'metric-run',
+        parentDocumentId: 'parent-document',
+        dependencies: ['source-document'],
+        kind: 'metric',
+        metric,
+    };
     const draft = draftFromDocument(document);
     assert.notEqual(draft.id, document.id);
     assert.equal(draft.serverId, document.id);
@@ -44,10 +91,24 @@ test('Opening a saved metric preserves its revision, run, parent and dependency 
 });
 
 test('Malformed optional metadata cannot crash a restored SQL draft', () => {
-    const state = recover('key', read(workspace({ id: 'valid', name: 'Keep.sql', sql: 'SELECT 42',
-        chart: { kind: 'unknown', x: -4, ys: 'bad', title: null }, parameters: [], dependencies: null,
-        checkpoints: [null, false, { sql: 'SELECT 7', from: 100, to: -1 }], runIds: 4,
-        from: 1000, to: -10, kind: 'dashboard' })));
+    const state = recover(
+        'key',
+        read(
+            workspace({
+                id: 'valid',
+                name: 'Keep.sql',
+                sql: 'SELECT 42',
+                chart: { kind: 'unknown', x: -4, ys: 'bad', title: null },
+                parameters: [],
+                dependencies: null,
+                checkpoints: [null, false, { sql: 'SELECT 7', from: 100, to: -1 }],
+                runIds: 4,
+                from: 1000,
+                to: -10,
+                kind: 'dashboard',
+            }),
+        ),
+    );
     const draft = state.tabs[0];
     assert.equal(draft.sql, 'SELECT 42');
     assert.deepEqual(draft.chart, { kind: 'table', x: 0, ys: [], title: 'Query result' });
@@ -65,7 +126,13 @@ test('Scatter and heatmap chart settings survive workspace recovery', () => {
     const charts = [
         { kind: 'scatter', x: 0, ys: [1], title: 'Fare by distance' },
         { kind: 'heatmap', x: 1, groupBy: 0, ys: [2], title: 'Trips by weekday and hour' },
-        { kind: 'heatmap', x: 499, groupBy: 498, ys: [497], title: 'Largest supported axis indexes' },
+        {
+            kind: 'heatmap',
+            x: 499,
+            groupBy: 498,
+            ys: [497],
+            title: 'Largest supported axis indexes',
+        },
     ];
     for (const chart of charts) {
         const draft = { ...newDraft('Chart.sql', 'SELECT 1'), chart };
@@ -75,7 +142,10 @@ test('Scatter and heatmap chart settings survive workspace recovery', () => {
 
 test('Invalid heatmap group-by metadata is discarded without losing the rest of the chart', () => {
     for (const groupBy of [-1, 1.5, Number.MAX_SAFE_INTEGER + 1, 500, '1']) {
-        const draft = { ...newDraft('Chart.sql', 'SELECT 1'), chart: { kind: 'heatmap', x: 0, groupBy, ys: [2], title: 'Recoverable' } };
+        const draft = {
+            ...newDraft('Chart.sql', 'SELECT 1'),
+            chart: { kind: 'heatmap', x: 0, groupBy, ys: [2], title: 'Recoverable' },
+        };
         const recovered = recover('key', read(workspace(draft))).tabs[0].chart;
         assert.deepEqual(recovered, { kind: 'heatmap', x: 0, ys: [2], title: 'Recoverable' });
     }
@@ -83,7 +153,10 @@ test('Invalid heatmap group-by metadata is discarded without losing the rest of 
 
 test('One invalid tab does not reset valid sibling drafts', () => {
     const good = newDraft('Keep.sql', 'SELECT 123');
-    const state = recover('key', read({ version: 1, tabs: [null, good, { sql: 123 }], activeId: good.id }));
+    const state = recover(
+        'key',
+        read({ version: 1, tabs: [null, good, { sql: 123 }], activeId: good.id }),
+    );
     assert.equal(state.tabs.length, 1);
     assert.equal(state.tabs[0].sql, 'SELECT 123');
     assert.match(state.recoveryWarning, /could not be recovered/);
@@ -94,13 +167,19 @@ test('Duplicate tab IDs are repaired without dropping either SQL draft', () => {
     const second = { ...first, name: 'B.sql', sql: 'SELECT 2' };
     const state = recover('key', read(workspace(first, second)));
     assert.equal(new Set(state.tabs.map(t => t.id)).size, 2);
-    assert.deepEqual(state.tabs.map(t => t.sql), ['SELECT 1', 'SELECT 2']);
+    assert.deepEqual(
+        state.tabs.map(t => t.sql),
+        ['SELECT 1', 'SELECT 2'],
+    );
     assert.equal(state.activeId, first.id);
 });
 
 test('Missing active tab selects a valid existing draft', () => {
     const draft = newDraft();
-    assert.equal(recover('key', read({ ...workspace(draft), activeId: 'missing' })).activeId, draft.id);
+    assert.equal(
+        recover('key', read({ ...workspace(draft), activeId: 'missing' })).activeId,
+        draft.id,
+    );
 });
 
 for (const value of [null, [], 1, { version: 2, tabs: [] }, { version: 1, tabs: [] }]) {
@@ -112,7 +191,14 @@ for (const value of [null, [], 1, { version: 2, tabs: [] }, { version: 1, tabs: 
 }
 
 test('Invalid JSON and unavailable browser storage do not prevent startup', () => {
-    for (const storage of [{ getItem: () => '{bad' }, { getItem() { throw new Error('denied'); } }])
+    for (const storage of [
+        { getItem: () => '{bad' },
+        {
+            getItem() {
+                throw new Error('denied');
+            },
+        },
+    ])
         assert.equal(recover('key', storage).tabs.length, 1);
 });
 
@@ -127,20 +213,43 @@ test('Parameters remain exact strings and own properties, including reserved-loo
 
 test('Restored checkpoints and both tab queues respect their documented limits', () => {
     const draft = newDraft();
-    const points = Array.from({ length: 40 }, () => ({ id: 'point', at: '', reason: 'test', sql: 'SELECT 1', from: 0, to: 0 }));
-    const state = recover('key', read({ ...workspace({ ...draft, checkpoints: points }),
-        tabs: Array.from({ length: 40 }, () => ({ ...draft, checkpoints: points })),
-        closedTabs: Array.from({ length: 20 }, () => draft) }));
+    const points = Array.from({ length: 40 }, () => ({
+        id: 'point',
+        at: '',
+        reason: 'test',
+        sql: 'SELECT 1',
+        from: 0,
+        to: 0,
+    }));
+    const state = recover(
+        'key',
+        read({
+            ...workspace({ ...draft, checkpoints: points }),
+            tabs: Array.from({ length: 40 }, () => ({ ...draft, checkpoints: points })),
+            closedTabs: Array.from({ length: 20 }, () => draft),
+        }),
+    );
     assert.equal(state.tabs.length, MAX_TABS);
     assert.equal(state.closedTabs.length, MAX_CLOSED_TABS);
     assert.equal(state.tabs[0].checkpoints.length, 30);
-    assert.equal(new Set([...state.tabs, ...state.closedTabs].map(t => t.id)).size, MAX_TABS + MAX_CLOSED_TABS);
+    assert.equal(
+        new Set([...state.tabs, ...state.closedTabs].map(t => t.id)).size,
+        MAX_TABS + MAX_CLOSED_TABS,
+    );
 });
 
 test('Metric metadata is preserved and malformed arrays are made safe', () => {
-    const metric = { definition: 'Orders', grain: 'day', dimensions: ['region', null], timezone: 'UTC',
-        filters: 'paid', nullTreatment: 'exclude', sourceColumns: ['orders.id'] };
-    const draft = recover('key', read(workspace({ ...newDraft(), kind: 'metric', metric }))).tabs[0];
+    const metric = {
+        definition: 'Orders',
+        grain: 'day',
+        dimensions: ['region', null],
+        timezone: 'UTC',
+        filters: 'paid',
+        nullTreatment: 'exclude',
+        sourceColumns: ['orders.id'],
+    };
+    const draft = recover('key', read(workspace({ ...newDraft(), kind: 'metric', metric })))
+        .tabs[0];
     assert.deepEqual(draft.metric, { ...metric, dimensions: ['region'] });
     assert.equal(draft.kind, 'metric');
 });
@@ -170,8 +279,15 @@ test('Closing the last tab keeps a usable editor and a recoverable closed draft'
 });
 
 test('Close/reopen preserves unsaved parameters, selection, checkpoints and run IDs', () => {
-    const draft = { ...checkpoint(newDraft('Work.sql', 'SELECT 3'), 'Before change'), from: 2, to: 4,
-        activeRunId: 'run-1', runIds: ['run-1'], scriptId: 'script-1', parameters: { n: '3' } };
+    const draft = {
+        ...checkpoint(newDraft('Work.sql', 'SELECT 3'), 'Before change'),
+        from: 2,
+        to: 4,
+        activeRunId: 'run-1',
+        runIds: ['run-1'],
+        scriptId: 'script-1',
+        parameters: { n: '3' },
+    };
     const other = newDraft();
     const restored = reopenDraft(closeDraft(workspace(draft, other), draft.id));
     assert.equal(restored.tabs.at(-1), draft);
@@ -221,9 +337,16 @@ test('Reopening a duplicated local ID allocates a distinct ID without changing s
 });
 
 test('Valid closed drafts survive when every open tab is malformed', () => {
-    const draft = { ...newDraft('Still recoverable.sql', 'SELECT {n:UInt64}'),
-        parameters: { n: '9007199254740993' }, serverId: 'saved-document', baseRevision: 3 };
-    const recovered = recover('key', read({ version: 1, tabs: [null, { sql: 42 }], closedTabs: [draft] }));
+    const draft = {
+        ...newDraft('Still recoverable.sql', 'SELECT {n:UInt64}'),
+        parameters: { n: '9007199254740993' },
+        serverId: 'saved-document',
+        baseRevision: 3,
+    };
+    const recovered = recover(
+        'key',
+        read({ version: 1, tabs: [null, { sql: 42 }], closedTabs: [draft] }),
+    );
     assert.equal(recovered.tabs.length, 1);
     assert.equal(recovered.closedTabs.length, 1);
     assert.equal(reopenDraft(recovered).tabs.at(-1).sql, draft.sql);
@@ -249,7 +372,13 @@ test('Closed history can be recovered even when the open-tab list is missing', (
 
 test('Malformed closed siblings are reported without losing valid closed drafts', () => {
     const draft = newDraft('Closed.sql', 'SELECT 8');
-    const recovered = recover('key', read({ ...workspace(newDraft()), closedTabs: [null, draft, { sql: 8 }] }));
-    assert.deepEqual(recovered.closedTabs.map(d => d.sql), [draft.sql]);
+    const recovered = recover(
+        'key',
+        read({ ...workspace(newDraft()), closedTabs: [null, draft, { sql: 8 }] }),
+    );
+    assert.deepEqual(
+        recovered.closedTabs.map(d => d.sql),
+        [draft.sql],
+    );
     assert.match(recovered.recoveryWarning, /could not be recovered/);
 });

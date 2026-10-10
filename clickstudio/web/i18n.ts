@@ -39,13 +39,17 @@ export function resolveLocale(...candidates: readonly (string | null | undefined
     return 'en';
 }
 
-export const themeOptions = (copy: Copy): readonly SelectOption<Theme>[] => THEMES.map(value => ({
-    value, label: value === 'click-dark' ? copy.app.darkTheme : copy.app.lightTheme,
-}));
+export const themeOptions = (copy: Copy): readonly SelectOption<Theme>[] =>
+    THEMES.map(value => ({
+        value,
+        label: value === 'click-dark' ? copy.app.darkTheme : copy.app.lightTheme,
+    }));
 
-export const experienceOptions = (copy: Copy): readonly SelectOption<ExperienceLevel>[] => EXPERIENCE_LEVELS.map(value => ({
-    value, label: copy.app[value],
-}));
+export const experienceOptions = (copy: Copy): readonly SelectOption<ExperienceLevel>[] =>
+    EXPERIENCE_LEVELS.map(value => ({
+        value,
+        label: copy.app[value],
+    }));
 
 function mergeSection<T extends object>(englishSection: T, translated: object): T {
     const result = { ...englishSection };
@@ -65,7 +69,16 @@ export function getCopy(locale: Locale): Copy {
         app: { ...mergeSection(english.app, translated), ...chrome.app },
         auth: { ...mergeSection(english.auth, translated), ...chrome.auth },
         imports: mergeSection(english.imports, importTranslations[locale] ?? {}),
-        common: { ...mergeSection(english.common, translated), ...exampleCommonTranslations[locale], ...workspaceCommonTranslations[locale], ...referenceTranslations[locale], ...referenceCatalogTranslations[locale], ...objectExplorerTranslations[locale], ...explainCommonTranslations[locale], ...emptyWorkspaceTranslations[locale] },
+        common: {
+            ...mergeSection(english.common, translated),
+            ...exampleCommonTranslations[locale],
+            ...workspaceCommonTranslations[locale],
+            ...referenceTranslations[locale],
+            ...referenceCatalogTranslations[locale],
+            ...objectExplorerTranslations[locale],
+            ...explainCommonTranslations[locale],
+            ...emptyWorkspaceTranslations[locale],
+        },
         chart: mergeSection(english.chart, translated),
     };
 }

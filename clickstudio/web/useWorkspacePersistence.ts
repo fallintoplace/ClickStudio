@@ -8,13 +8,25 @@ export function useWorkspacePersistence(key: string, state: WorkspaceState): str
     const [error, setError] = useState('');
     useLayoutEffect(() => {
         let mounted = true;
-        const current = createWorkspaceWriter(key, (k, value) => localStorage.setItem(k, value),
-            message => { if (mounted) setError(message); });
+        const current = createWorkspaceWriter(
+            key,
+            (k, value) => localStorage.setItem(k, value),
+            message => {
+                if (mounted) setError(message);
+            },
+        );
         writer.current = current;
-        const flush = () => { current.flush(); };
-        const visibility = () => { if (document.visibilityState === 'hidden') flush(); };
+        const flush = () => {
+            current.flush();
+        };
+        const visibility = () => {
+            if (document.visibilityState === 'hidden') flush();
+        };
         const unload = (event: BeforeUnloadEvent) => {
-            if (!current.flush()) { event.preventDefault(); event.returnValue = ''; }
+            if (!current.flush()) {
+                event.preventDefault();
+                event.returnValue = '';
+            }
         };
         window.addEventListener('pagehide', flush);
         window.addEventListener('beforeunload', unload);
@@ -28,6 +40,8 @@ export function useWorkspacePersistence(key: string, state: WorkspaceState): str
             document.removeEventListener('visibilitychange', visibility);
         };
     }, [key]);
-    useLayoutEffect(() => { writer.current?.schedule(state); }, [state, key]);
+    useLayoutEffect(() => {
+        writer.current?.schedule(state);
+    }, [state, key]);
     return error;
 }

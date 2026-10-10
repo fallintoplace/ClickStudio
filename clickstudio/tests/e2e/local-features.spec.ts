@@ -10,8 +10,22 @@ const cloudSchema: Schema = {
     databases: ['default'],
     tables: [{ database: 'default', name: 'events', engine: 'MergeTree' }],
     columns: [
-        { database: 'default', table: 'events', name: 'day', type: 'Date', defaultKind: '', comment: '' },
-        { database: 'default', table: 'events', name: 'events', type: 'UInt64', defaultKind: '', comment: '' },
+        {
+            database: 'default',
+            table: 'events',
+            name: 'day',
+            type: 'Date',
+            defaultKind: '',
+            comment: '',
+        },
+        {
+            database: 'default',
+            table: 'events',
+            name: 'events',
+            type: 'UInt64',
+            defaultKind: '',
+            comment: '',
+        },
     ],
     warnings: [],
     truncated: false,
@@ -41,16 +55,23 @@ const cloudConnectionTest: CloudConnectionTest = {
 function countRuns(page: Page) {
     let count = 0;
     page.on('request', request => {
-        if (request.method() === 'POST' && ['/api/runs', '/api/scripts'].includes(new URL(request.url()).pathname)) count++;
+        if (
+            request.method() === 'POST' &&
+            ['/api/runs', '/api/scripts'].includes(new URL(request.url()).pathname)
+        )
+            count++;
     });
     return () => count;
 }
 async function resultPage(page: Page, transform: (result: Result) => Result) {
-    await page.route(url => url.pathname.endsWith('/result'), async route => {
-        const response = await route.fetch();
-        const result = await response.json() as Result;
-        await route.fulfill({ response, json: { ...result, ...transform(result) } });
-    });
+    await page.route(
+        url => url.pathname.endsWith('/result'),
+        async route => {
+            const response = await route.fetch();
+            const result = (await response.json()) as Result;
+            await route.fulfill({ response, json: { ...result, ...transform(result) } });
+        },
+    );
 }
 async function run(page: Page) {
     await page.getByTestId('run-button').click();
@@ -66,10 +87,16 @@ async function downloadedText(download: Download): Promise<string> {
     return Buffer.concat(chunks).toString('utf8');
 }
 
-test('Duplicate result-column names keep their values in the correct positions', async ({ page }) => {
+test('Duplicate result-column names keep their values in the correct positions', async ({
+    page,
+}) => {
     const runs = countRuns(page);
-    await resultPage(page, result => ({ ...result,
-        columns: [{ name: 'same', type: 'String' }, { name: 'same', type: 'UInt64' }],
+    await resultPage(page, result => ({
+        ...result,
+        columns: [
+            { name: 'same', type: 'String' },
+            { name: 'same', type: 'UInt64' },
+        ],
         rows: [['text', '9007199254740993']],
     }));
     await trust(page);
@@ -102,15 +129,21 @@ test('Result export downloads the complete retained CSV from the server', async 
     expect(runs()).toBe(1);
 });
 
-test('Local Cloud connection restores after refresh and exports retained rows from the browser workspace', async ({ page }) => {
+test('Local Cloud connection restores after refresh and exports retained rows from the browser workspace', async ({
+    page,
+}) => {
     const cloudActions: string[] = [];
     const cloudSessionMethods: string[] = [];
     const serverExportRequests: string[] = [];
-    let savedCloudSession: { profile: { host: string; database: string; username: string }; tested: CloudConnectionTest } | null = null;
+    let savedCloudSession: {
+        profile: { host: string; database: string; username: string };
+        tested: CloudConnectionTest;
+    } | null = null;
     await page.route('**/api/connections', async route => {
         const response = await route.fetch();
-        const connections = await response.json() as { id: string }[];
-        if (!connections.some(connection => connection.id === PLAYGROUND_CONNECTION.id)) connections.push(PLAYGROUND_CONNECTION);
+        const connections = (await response.json()) as { id: string }[];
+        if (!connections.some(connection => connection.id === PLAYGROUND_CONNECTION.id))
+            connections.push(PLAYGROUND_CONNECTION);
         await route.fulfill({ response, json: connections });
     });
     await page.route('**/api/cloud/session', async route => {
@@ -121,7 +154,9 @@ test('Local Cloud connection restores after refresh and exports retained rows fr
             return;
         }
         if (method === 'POST') {
-            const { credentials } = route.request().postDataJSON() as { credentials: { host: string; database: string; username: string } };
+            const { credentials } = route.request().postDataJSON() as {
+                credentials: { host: string; database: string; username: string };
+            };
             savedCloudSession = { profile: credentials, tested: cloudConnectionTest };
             await route.fulfill({ json: cloudConnectionTest });
             return;
@@ -141,27 +176,46 @@ test('Local Cloud connection restores after refresh and exports retained rows fr
             return;
         }
         if (body.action === 'run') {
-            await route.fulfill({ json: {
-                queryId: body.queryId ?? 'clickstudio-run-test',
-                columns: [{ name: 'day', type: 'Date' }, { name: 'events', type: 'UInt64' }],
-                rows: [['2026-01-01', '10'], ['2026-01-02', '20']],
-                elapsedMs: 8,
-                bytes: 32,
-                truncated: false,
-            } });
+            await route.fulfill({
+                json: {
+                    queryId: body.queryId ?? 'clickstudio-run-test',
+                    columns: [
+                        { name: 'day', type: 'Date' },
+                        { name: 'events', type: 'UInt64' },
+                    ],
+                    rows: [
+                        ['2026-01-01', '10'],
+                        ['2026-01-02', '20'],
+                    ],
+                    elapsedMs: 8,
+                    bytes: 32,
+                    truncated: false,
+                },
+            });
             return;
         }
-        await route.fulfill({ status: 409, json: { error: { code: 'UNEXPECTED_ACTION', message: 'Unexpected Cloud action in this export test.' } } });
+        await route.fulfill({
+            status: 409,
+            json: {
+                error: {
+                    code: 'UNEXPECTED_ACTION',
+                    message: 'Unexpected Cloud action in this export test.',
+                },
+            },
+        });
     });
     page.on('request', request => {
         const url = new URL(request.url());
-        if (url.pathname.startsWith('/api/runs/') && url.pathname.endsWith('/export')) serverExportRequests.push(url.pathname);
+        if (url.pathname.startsWith('/api/runs/') && url.pathname.endsWith('/export'))
+            serverExportRequests.push(url.pathname);
     });
 
     await page.goto('/');
     await page.getByRole('button', { name: 'Connect Cloud' }).click();
     const connectionDialog = page.getByRole('dialog', { name: 'Connect to your service' });
-    await connectionDialog.getByLabel('HTTPS host').fill('service.region.provider.clickhouse.cloud:8443');
+    await connectionDialog
+        .getByLabel('HTTPS host')
+        .fill('service.region.provider.clickhouse.cloud:8443');
     await connectionDialog.getByLabel('Database').fill('default');
     await connectionDialog.getByLabel('Username').fill('demo');
     await connectionDialog.getByLabel('Password').fill('demo-password');
@@ -192,14 +246,22 @@ test('Local Cloud connection restores after refresh and exports retained rows fr
     expect(firstConnect).toBeGreaterThanOrEqual(0);
     expect(cloudSessionMethods.slice(firstConnect + 1)).toContain('GET');
     const restoredResults = await run(page);
-    await expect(restoredResults.getByRole('table', { name: 'Retained query rows' })).toContainText('2026-01-02');
+    await expect(restoredResults.getByRole('table', { name: 'Retained query rows' })).toContainText(
+        '2026-01-02',
+    );
     expect(cloudActions.filter(action => action === 'run')).toHaveLength(2);
 });
 
-test('Wide retained results remain horizontally scrollable and keyboard accessible', async ({ page }) => {
+test('Wide retained results remain horizontally scrollable and keyboard accessible', async ({
+    page,
+}) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await resultPage(page, result => ({ ...result,
-        columns: Array.from({ length: 10 }, (_, index) => ({ name: `column_${index + 1}`, type: 'String' })),
+    await resultPage(page, result => ({
+        ...result,
+        columns: Array.from({ length: 10 }, (_, index) => ({
+            name: `column_${index + 1}`,
+            type: 'String',
+        })),
         rows: [Array.from({ length: 10 }, (_, index) => `value ${index + 1}`)],
     }));
     await trust(page);
@@ -215,13 +277,21 @@ test('Wide retained results remain horizontally scrollable and keyboard accessib
     await expect.poll(() => scroll.evaluate(element => element.scrollLeft)).toBeGreaterThan(0);
 });
 
-for (const theme of ['light', 'dark']) test(`Retained results stay within a 390px ${theme} viewport`, async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/');
-    await page.getByRole('radiogroup', { name: 'Theme' }).getByRole('radio', { name: theme === 'dark' ? 'Dark theme' : 'Light theme' }).click();
-    await trust(page);
-    const results = await run(page);
-    await expect(results.getByRole('table', { name: 'Retained query rows' })).toBeVisible();
-    const overflow = await page.evaluate(() => Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - innerWidth);
-    expect(overflow).toBeLessThanOrEqual(1);
-});
+for (const theme of ['light', 'dark'])
+    test(`Retained results stay within a 390px ${theme} viewport`, async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.goto('/');
+        await page
+            .getByRole('radiogroup', { name: 'Theme' })
+            .getByRole('radio', { name: theme === 'dark' ? 'Dark theme' : 'Light theme' })
+            .click();
+        await trust(page);
+        const results = await run(page);
+        await expect(results.getByRole('table', { name: 'Retained query rows' })).toBeVisible();
+        const overflow = await page.evaluate(
+            () =>
+                Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) -
+                innerWidth,
+        );
+        expect(overflow).toBeLessThanOrEqual(1);
+    });

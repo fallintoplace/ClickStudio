@@ -1,13 +1,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createWorkspaceWriter, STORAGE_ERROR } from '../../.workspace-build/web/workspace-persistence.js';
+import {
+    createWorkspaceWriter,
+    STORAGE_ERROR,
+} from '../../.workspace-build/web/workspace-persistence.js';
 import { newDraft, recover } from '../../.workspace-build/web/workspace-state.js';
 
-const state = sql => { const draft = newDraft('Work.sql', sql); return { version: 1, tabs: [draft], activeId: draft.id }; };
+const state = sql => {
+    const draft = newDraft('Work.sql', sql);
+    return { version: 1, tabs: [draft], activeId: draft.id };
+};
 function setup(t, write) {
     t.mock.timers.enable({ apis: ['setTimeout'] });
-    const writes = [], errors = [];
-    const writer = createWorkspaceWriter('demo', write ?? ((key, value) => writes.push([key, JSON.parse(value)])), message => errors.push(message));
+    const writes = [],
+        errors = [];
+    const writer = createWorkspaceWriter(
+        'demo',
+        write ?? ((key, value) => writes.push([key, JSON.parse(value)])),
+        message => errors.push(message),
+    );
     t.after(() => writer.dispose());
     return { writer, writes, errors };
 }
@@ -53,7 +64,10 @@ test('Switching connections does not write either draft under the other key', t 
     second.schedule(state('SELECT second'));
     second.dispose();
     assert.equal(recover('first', { getItem: key => store.get(key) }).tabs[0].sql, 'SELECT first');
-    assert.equal(recover('second', { getItem: key => store.get(key) }).tabs[0].sql, 'SELECT second');
+    assert.equal(
+        recover('second', { getItem: key => store.get(key) }).tabs[0].sql,
+        'SELECT second',
+    );
     t.mock.timers.tick(1000);
     assert.equal(store.size, 2);
 });
@@ -61,7 +75,10 @@ test('Switching connections does not write either draft under the other key', t 
 test('A failed write is reported and stays available for retry', t => {
     let fail = true;
     const writes = [];
-    const { writer, errors } = setup(t, (key, value) => { if (fail) throw new Error('quota'); writes.push(value); });
+    const { writer, errors } = setup(t, (key, value) => {
+        if (fail) throw new Error('quota');
+        writes.push(value);
+    });
     writer.schedule(state('SELECT important'));
     assert.equal(writer.flush(), false);
     assert.equal(errors.at(-1), STORAGE_ERROR);
@@ -74,7 +91,10 @@ test('A failed write is reported and stays available for retry', t => {
 test('New edits replace an older pending failed write', t => {
     let fail = true;
     let persisted;
-    const { writer } = setup(t, (_, value) => { if (fail) throw new Error('quota'); persisted = value; });
+    const { writer } = setup(t, (_, value) => {
+        if (fail) throw new Error('quota');
+        persisted = value;
+    });
     writer.schedule(state('SELECT old'));
     writer.flush();
     writer.schedule(state('SELECT latest'));
@@ -86,21 +106,27 @@ test('New edits replace an older pending failed write', t => {
 test('Duplicate snapshots are not written twice', t => {
     const { writer, writes } = setup(t);
     const draft = state('SELECT 1');
-    writer.schedule(draft); writer.flush();
-    writer.schedule(structuredClone(draft)); writer.flush();
+    writer.schedule(draft);
+    writer.flush();
+    writer.schedule(structuredClone(draft));
+    writer.flush();
     assert.equal(writes.length, 1);
 });
 
 test('A disposed writer ignores later schedules and leaves no timer behind', t => {
     const { writer, writes } = setup(t);
-    writer.schedule(state('SELECT initial')); writer.dispose();
-    writer.schedule(state('SELECT ignored')); t.mock.timers.tick(1000);
+    writer.schedule(state('SELECT initial'));
+    writer.dispose();
+    writer.schedule(state('SELECT ignored'));
+    t.mock.timers.tick(1000);
     assert.equal(writes.length, 1);
     assert.equal(writes[0][1].tabs[0].sql, 'SELECT initial');
 });
 
 test('Disposal accurately reports storage failure instead of claiming a save', t => {
-    const { writer, errors } = setup(t, () => { throw new Error('denied'); });
+    const { writer, errors } = setup(t, () => {
+        throw new Error('denied');
+    });
     writer.schedule(state('SELECT 1'));
     assert.equal(writer.dispose(), false);
     assert.equal(errors.at(-1), STORAGE_ERROR);
@@ -111,8 +137,10 @@ test('Strict-mode style setup, cleanup and setup preserves each committed snapsh
     const values = [];
     const write = (_, value) => values.push(JSON.parse(value).tabs[0].sql);
     const first = createWorkspaceWriter('same', write, () => {});
-    first.schedule(state('SELECT initial')); first.dispose();
+    first.schedule(state('SELECT initial'));
+    first.dispose();
     const second = createWorkspaceWriter('same', write, () => {});
-    second.schedule(state('SELECT edited')); second.dispose();
+    second.schedule(state('SELECT edited'));
+    second.dispose();
     assert.deepEqual(values, ['SELECT initial', 'SELECT edited']);
 });

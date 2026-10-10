@@ -41,14 +41,28 @@ test('query tree parser keeps nested comma types intact', () => {
     ]);
     const column = tree.root?.children[0]?.children[0];
     assert.equal(column?.summary, 'payload · Tuple(String, Array(UInt64))');
-    assert.equal(column?.properties.find(item => item.name === 'result_type')?.value, 'Tuple(String, Array(UInt64))');
+    assert.equal(
+        column?.properties.find(item => item.name === 'result_type')?.value,
+        'Tuple(String, Array(UInt64))',
+    );
 });
 
 test('query tree parser bounds oversized analyzer output', () => {
-    const tree = parseQueryTree([
-        'QUERY id: 0',
-        ...Array.from({ length: 20 }, (_, index) => '  COLUMN id: ' + (index + 1) + ', column_name: c' + index + ', result_type: UInt64'),
-    ], { maxNodes: 5 });
+    const tree = parseQueryTree(
+        [
+            'QUERY id: 0',
+            ...Array.from(
+                { length: 20 },
+                (_, index) =>
+                    '  COLUMN id: ' +
+                    (index + 1) +
+                    ', column_name: c' +
+                    index +
+                    ', result_type: UInt64',
+            ),
+        ],
+        { maxNodes: 5 },
+    );
     assert.equal(tree.nodeCount, 5);
     assert.equal(tree.truncated, true);
     assert.equal(tree.root?.children.length, 4);

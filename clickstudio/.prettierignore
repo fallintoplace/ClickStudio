@@ -1,3 +1,10 @@
 node_modules/
 dist/
 tests/fixtures/
+.core-build/
+.workspace-build/
+vendor/
+web/vendor/
+playwright-report/
+test-results/
+.vercel/

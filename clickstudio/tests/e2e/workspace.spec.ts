@@ -1,5 +1,12 @@
 import { test, expect, type Page } from '@playwright/test';
-import { currentQueryId, openBlankSql, runButton, runIdentity, trust, trustCurrentConnection } from './helpers.js';
+import {
+    currentQueryId,
+    openBlankSql,
+    runButton,
+    runIdentity,
+    trust,
+    trustCurrentConnection,
+} from './helpers.js';
 
 function countRunRequests(page: Page) {
     let count = 0;
@@ -9,9 +16,15 @@ function countRunRequests(page: Page) {
     return () => count;
 }
 
-test('Execution IDs are available from copyable details instead of the footer', async ({ page }) => {
+test('Execution IDs are available from copyable details instead of the footer', async ({
+    page,
+}) => {
     await trust(page);
-    const response = page.waitForResponse(request => request.request().method() === 'POST' && new URL(request.url()).pathname === '/api/runs');
+    const response = page.waitForResponse(
+        request =>
+            request.request().method() === 'POST' &&
+            new URL(request.url()).pathname === '/api/runs',
+    );
     await runButton(page).click();
     const run = runIdentity(await (await response).json());
 
@@ -26,7 +39,11 @@ test('Execution IDs are available from copyable details instead of the footer', 
 async function switchConnection(page: Page, name: string) {
     const picker = page.locator('.connection-trigger');
     await picker.click();
-    await page.getByRole('dialog', { name: 'Connection details', exact: true }).getByRole('button').filter({ hasText: name }).click();
+    await page
+        .getByRole('dialog', { name: 'Connection details', exact: true })
+        .getByRole('button')
+        .filter({ hasText: name })
+        .click();
     await expect(picker).toContainText(name);
 }
 
@@ -40,10 +57,13 @@ test('Run, chart, save and reload preserve the same execution evidence', async (
     const queryId = await currentQueryId(page);
     await results.getByRole('tab', { name: 'Chart', exact: true }).click();
     await expect(results.locator('svg[role="img"]')).toBeVisible();
-    const saveResponse = page.waitForResponse(response =>
-        response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/documents');
+    const saveResponse = page.waitForResponse(
+        response =>
+            response.request().method() === 'POST' &&
+            new URL(response.url()).pathname === '/api/documents',
+    );
     await page.getByTestId('save-query').click();
-    const saved = await (await saveResponse).json() as { revision: number };
+    const saved = (await (await saveResponse).json()) as { revision: number };
     expect(saved.revision).toBe(1);
     await page.reload();
     const recovered = page.getByRole('region', { name: 'Query results' });
@@ -53,7 +73,7 @@ test('Run, chart, save and reload preserve the same execution evidence', async (
     expect(runs()).toBe(1);
 });
 
-test('Switching connections never reuses another connection\'s result', async ({ page }) => {
+test("Switching connections never reuses another connection's result", async ({ page }) => {
     await trust(page);
     await page.getByTestId('run-button').click();
     await expect(page.locator('.execution-bar')).toHaveAttribute('data-run-status', 'succeeded');
@@ -61,13 +81,19 @@ test('Switching connections never reuses another connection\'s result', async ({
     await trustCurrentConnection(page);
     await expect(page.getByRole('region', { name: 'Query results' })).toHaveCount(0);
     await switchConnection(page, 'Sample data');
-    await expect(page.getByRole('region', { name: 'Query results' }).getByRole('cell', { name: '2026-01-01', exact: true })).toBeVisible();
+    await expect(
+        page
+            .getByRole('region', { name: 'Query results' })
+            .getByRole('cell', { name: '2026-01-01', exact: true }),
+    ).toBeVisible();
 });
 
 test('Closing and reopening a result tab does not execute SQL again', async ({ page }) => {
     const runs = countRunRequests(page);
     await trust(page);
-    await page.getByRole('textbox', { name: 'SQL document name', exact: true }).fill('Recoverable.sql');
+    await page
+        .getByRole('textbox', { name: 'SQL document name', exact: true })
+        .fill('Recoverable.sql');
     const editor = page.locator('.cm-content');
     await editor.click();
     await page.keyboard.press('ControlOrMeta+a');
@@ -101,12 +127,15 @@ test('Closing and reopening a result tab does not execute SQL again', async ({ p
     expect(placement.menuRight).toBeLessThanOrEqual(placement.triggerRight + 1);
     expect(placement.menuLeft).toBeLessThan(placement.triggerLeft);
     await restoreMenu.getByRole('menuitem', { name: /Recoverable\.sql/ }).click();
-    await expect(page.getByRole('textbox', { name: 'SQL document name', exact: true })).toHaveValue('Recoverable.sql');
-    await expect(page.getByRole('textbox', { name: 'value:UInt64', exact: true })).toHaveValue('9007199254740993');
+    await expect(page.getByRole('textbox', { name: 'SQL document name', exact: true })).toHaveValue(
+        'Recoverable.sql',
+    );
+    await expect(page.getByRole('textbox', { name: 'value:UInt64', exact: true })).toHaveValue(
+        '9007199254740993',
+    );
     await expect(page.locator('.execution-bar')).toHaveAttribute('data-query-id', queryId);
     expect(runs()).toBe(1);
 });
-
 
 test('overflowing SQL tabs keep controls visible and expose scroll buttons', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -163,7 +192,9 @@ test('overflowing SQL tabs keep controls visible and expose scroll buttons', asy
     expect(layout.activeRight).toBeLessThanOrEqual(layout.containerRight + 1);
 
     await scrollLeft.click();
-    await expect.poll(() => tabList.evaluate(node => node.scrollLeft)).toBeLessThan(layout.scrollLeft);
+    await expect
+        .poll(() => tabList.evaluate(node => node.scrollLeft))
+        .toBeLessThan(layout.scrollLeft);
     await expect(scrollRight).toBeEnabled();
     await expect(newSql).toBeVisible();
 });

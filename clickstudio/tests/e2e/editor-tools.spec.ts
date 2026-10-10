@@ -2,7 +2,11 @@ import { test, expect, type Page } from '@playwright/test';
 import { trust } from './helpers.js';
 
 function readSql(page: Page) {
-    return page.locator('.cm-content').evaluate(editor => Array.from(editor.querySelectorAll('.cm-line')).map(line => line.textContent ?? '').join('\n'));
+    return page.locator('.cm-content').evaluate(editor =>
+        Array.from(editor.querySelectorAll('.cm-line'))
+            .map(line => line.textContent ?? '')
+            .join('\n'),
+    );
 }
 
 async function replaceSql(page: Page, sql: string) {
@@ -16,7 +20,9 @@ async function replaceSql(page: Page, sql: string) {
 test('statement navigation stays keyboard-accessible without executing SQL', async ({ page }) => {
     await trust(page);
     let runs = 0;
-    page.on('request', request => { if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/runs') runs++; });
+    page.on('request', request => {
+        if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/runs') runs++;
+    });
     const sql = "SELECT 'a;b';\nSELECT 2;\nSELECT 3;";
     await replaceSql(page, sql);
     await expect(page.getByTestId('sql-editor-tools')).toHaveCount(0);

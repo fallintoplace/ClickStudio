@@ -48,7 +48,7 @@ const DEFAULT_SKIP_KEYS = ['value'] as const;
 
 export function asNativeAstObject(value: unknown): NativeAstObject | undefined {
     return typeof value === 'object' && value !== null && !Array.isArray(value)
-        ? value as NativeAstObject
+        ? (value as NativeAstObject)
         : undefined;
 }
 
@@ -63,11 +63,15 @@ export function nativeAstChildren(value: unknown): unknown[] {
 }
 
 function positiveInteger(value: number | undefined, fallback: number): number {
-    return Number.isFinite(value) && value !== undefined ? Math.max(1, Math.floor(value)) : fallback;
+    return Number.isFinite(value) && value !== undefined
+        ? Math.max(1, Math.floor(value))
+        : fallback;
 }
 
 function nonNegativeInteger(value: number | undefined, fallback: number): number {
-    return Number.isFinite(value) && value !== undefined ? Math.max(0, Math.floor(value)) : fallback;
+    return Number.isFinite(value) && value !== undefined
+        ? Math.max(0, Math.floor(value))
+        : fallback;
 }
 
 /**
@@ -91,19 +95,16 @@ export function walkNativeAst(
         if (Array.isArray(value)) {
             if (seen.has(value)) continue;
             seen.add(value);
-            for (let index = value.length - 1; index >= 0; index--)
-                stack.push(value[index]);
+            for (let index = value.length - 1; index >= 0; index--) stack.push(value[index]);
             continue;
         }
         const node = asNativeAstObject(value);
         if (!node) continue;
         if (seen.has(node)) continue;
         seen.add(node);
-        if (visited >= maxNodes)
-            return { visited, truncated: true };
+        if (visited >= maxNodes) return { visited, truncated: true };
         visited++;
-        if (visit(node) === false)
-            return { visited, truncated: false };
+        if (visit(node) === false) return { visited, truncated: false };
         const entries = Object.entries(node);
         for (let index = entries.length - 1; index >= 0; index--) {
             const [key, child] = entries[index]!;
@@ -136,8 +137,7 @@ function propertyText(value: unknown, maxLength: number): string {
     if (value === undefined) return 'undefined';
     try {
         return short(JSON.stringify(value), maxLength);
-    }
-    catch {
+    } catch {
         return short(String(value), maxLength);
     }
 }
@@ -146,16 +146,17 @@ function nodeSummary(node: NativeAstObject, maxLength: number): string | undefin
     const parts = node.name_parts;
     if (Array.isArray(parts)) {
         const names = parts.filter((part): part is string => typeof part === 'string');
-        if (names.length === parts.length && names.length)
-            return short(names.join('.'), maxLength);
+        if (names.length === parts.length && names.length) return short(names.join('.'), maxLength);
     }
-    if (typeof node.name === 'string' && node.name.length)
-        return short(node.name, maxLength);
+    if (typeof node.name === 'string' && node.name.length) return short(node.name, maxLength);
     const type = nativeAstType(node);
     if (type === 'Literal') {
         const literal = asNativeAstObject(node.value);
         if (literal && typeof literal.field_type === 'string') {
-            const value = propertyText(literal.value, Math.max(24, maxLength - literal.field_type.length - 3));
+            const value = propertyText(
+                literal.value,
+                Math.max(24, maxLength - literal.field_type.length - 3),
+            );
             return short(`${literal.field_type} · ${value}`, maxLength);
         }
         return short(propertyText(node.value, maxLength), maxLength);
@@ -173,7 +174,10 @@ function nodeSummary(node: NativeAstObject, maxLength: number): string | undefin
 
 type ChildCandidate = { node: NativeAstObject; path: string; field: string };
 
-function childCandidates(node: NativeAstObject, path: string): { children: ChildCandidate[]; propertyEntries: Array<[string, unknown]> } {
+function childCandidates(
+    node: NativeAstObject,
+    path: string,
+): { children: ChildCandidate[]; propertyEntries: Array<[string, unknown]> } {
     const children: ChildCandidate[] = [];
     const propertyEntries: Array<[string, unknown]> = [];
     for (const [key, value] of Object.entries(node)) {
@@ -188,7 +192,11 @@ function childCandidates(node: NativeAstObject, path: string): { children: Child
             for (let index = 0; index < value.length; index++) {
                 const item = astObject(value[index]);
                 if (item)
-                    typedItems.push({ node: item, path: `${pathKey(path, key)}[${index}]`, field: `${key}[${index}]` });
+                    typedItems.push({
+                        node: item,
+                        path: `${pathKey(path, key)}[${index}]`,
+                        field: `${key}[${index}]`,
+                    });
             }
             if (typedItems.length) {
                 children.push(...typedItems);
@@ -201,19 +209,26 @@ function childCandidates(node: NativeAstObject, path: string): { children: Child
 }
 
 /** Build a bounded UI-friendly tree containing only real ClickHouse AST nodes. */
-export function buildNativeAstTree(root: unknown, options: NativeAstTreeOptions = {}): NativeAstTree {
+export function buildNativeAstTree(
+    root: unknown,
+    options: NativeAstTreeOptions = {},
+): NativeAstTree {
     const maxNodes = positiveInteger(options.maxNodes, DEFAULT_TREE_LIMIT);
     const maxDepth = nonNegativeInteger(options.maxDepth, DEFAULT_TREE_DEPTH);
     const maxPropertyLength = positiveInteger(options.maxPropertyLength, DEFAULT_PROPERTY_LENGTH);
     const rootNode = astObject(root);
-    if (!rootNode)
-        return { nodeCount: 0, truncated: false };
+    if (!rootNode) return { nodeCount: 0, truncated: false };
 
     const seen = new WeakSet<object>();
     let nodeCount = 0;
     let truncated = false;
 
-    const build = (node: NativeAstObject, path: string, field: string, depth: number): NativeAstTreeNode | undefined => {
+    const build = (
+        node: NativeAstObject,
+        path: string,
+        field: string,
+        depth: number,
+    ): NativeAstTreeNode | undefined => {
         if (nodeCount >= maxNodes) {
             truncated = true;
             return undefined;
@@ -225,15 +240,16 @@ export function buildNativeAstTree(root: unknown, options: NativeAstTreeOptions 
         seen.add(node);
         nodeCount++;
         const { children: candidates, propertyEntries } = childCandidates(node, path);
-        const properties = propertyEntries.slice(0, MAX_VISIBLE_PROPERTIES).map(([name, value]) => ({
-            name,
-            value: propertyText(value, maxPropertyLength),
-        }));
+        const properties = propertyEntries
+            .slice(0, MAX_VISIBLE_PROPERTIES)
+            .map(([name, value]) => ({
+                name,
+                value: propertyText(value, maxPropertyLength),
+            }));
         const builtChildren: NativeAstTreeNode[] = [];
         if (depth >= maxDepth) {
             if (candidates.length) truncated = true;
-        }
-        else {
+        } else {
             for (const candidate of candidates) {
                 const built = build(candidate.node, candidate.path, candidate.field, depth + 1);
                 if (!built) break;

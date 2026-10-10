@@ -21,13 +21,19 @@ test('Experimental mode uses the Standard right inspector layout', async ({ page
     await expect(inspector.getByRole('button', { name: 'Objects', exact: true })).toBeVisible();
     await expect(inspector.getByRole('button', { name: 'Reference', exact: true })).toBeVisible();
     await expect(inspector.getByRole('button', { name: 'AI', exact: true })).toBeVisible();
-    await expect(inspector.getByRole('button', { name: 'Close inspector', exact: true })).toBeVisible();
+    await expect(
+        inspector.getByRole('button', { name: 'Close inspector', exact: true }),
+    ).toBeVisible();
 
     for (const width of [1280, 1120, 851]) {
         await page.setViewportSize({ width, height: 900 });
         const railBounds = await rail.evaluate(element => element.getBoundingClientRect().toJSON());
-        const workspaceBounds = await workspace.evaluate(element => element.getBoundingClientRect().toJSON());
-        const inspectorBounds = await inspector.evaluate(element => element.getBoundingClientRect().toJSON());
+        const workspaceBounds = await workspace.evaluate(element =>
+            element.getBoundingClientRect().toJSON(),
+        );
+        const inspectorBounds = await inspector.evaluate(element =>
+            element.getBoundingClientRect().toJSON(),
+        );
         expect(railBounds.right).toBeLessThanOrEqual(workspaceBounds.left + 1);
         expect(workspaceBounds.right).toBeLessThanOrEqual(inspectorBounds.left + 1);
         expect(inspectorBounds.width).toBeGreaterThanOrEqual(320);
@@ -48,7 +54,10 @@ test('Experimental mode uses the Standard right inspector layout', async ({ page
 
     await inspector.getByRole('button', { name: 'Close inspector', exact: true }).click();
     await expect(inspector).toHaveCount(0);
-    await expect(rail.getByRole('button', { name: 'AI', exact: true })).toHaveAttribute('aria-pressed', 'false');
+    await expect(rail.getByRole('button', { name: 'AI', exact: true })).toHaveAttribute(
+        'aria-pressed',
+        'false',
+    );
     await rail.getByRole('button', { name: 'AI', exact: true }).click();
     await expect(inspector).toBeVisible();
     await expect(inspector.getByRole('heading', { name: 'AI', exact: true })).toBeVisible();
@@ -60,23 +69,35 @@ test('Experimental mode uses the Standard right inspector layout', async ({ page
     await expect(page.getByRole('button', { name: 'Run', exact: true })).toBeVisible();
 });
 
-test('One Run button and the explain actions stay visible in Experimental mode', async ({ page }) => {
+test('One Run button and the explain actions stay visible in Experimental mode', async ({
+    page,
+}) => {
     await trust(page);
     const actions = page.getByRole('group', { name: 'Run actions', exact: true });
-    const run = page.locator('.editor-heading-actions').getByRole('button', { name: 'Run', exact: true });
+    const run = page
+        .locator('.editor-heading-actions')
+        .getByRole('button', { name: 'Run', exact: true });
     await expect(page.getByRole('button', { name: 'Run', exact: true })).toHaveCount(1);
     await expect(run).toBeVisible();
     await expect(actions.getByRole('button', { name: 'Run script', exact: true })).toHaveCount(0);
-    await expect(actions.getByRole('button', { name: 'EXPLAIN INDEXES', exact: true })).toBeVisible();
+    await expect(
+        actions.getByRole('button', { name: 'EXPLAIN INDEXES', exact: true }),
+    ).toBeVisible();
     await expect(actions.getByRole('button', { name: 'EXPLAIN PLAN', exact: true })).toBeVisible();
-    await expect(actions.getByRole('button', { name: 'EXPLAIN PIPELINE', exact: true })).toBeVisible();
-    await expect(actions.getByRole('button', { name: 'EXPLAIN ANALYZE', exact: true })).toBeVisible();
+    await expect(
+        actions.getByRole('button', { name: 'EXPLAIN PIPELINE', exact: true }),
+    ).toBeVisible();
+    await expect(
+        actions.getByRole('button', { name: 'EXPLAIN ANALYZE', exact: true }),
+    ).toBeVisible();
     await expect(run).toBeEnabled();
     await run.focus();
     await expect(run).toBeFocused();
 });
 
-test('EXPLAIN INDEXES opens an interactive index graph and keeps the raw result available', async ({ page }) => {
+test('EXPLAIN INDEXES opens an interactive index graph and keeps the raw result available', async ({
+    page,
+}) => {
     await trust(page);
     await page.getByTestId('run-action-explain').click();
 
@@ -88,7 +109,9 @@ test('EXPLAIN INDEXES opens an interactive index graph and keeps the raw result 
     const bloomIndex = graph.locator('[data-node-id]').filter({ hasText: 'tenant_bloom' });
     await expect(bloomIndex).toBeVisible();
     await bloomIndex.click();
-    const inspection = page.locator('.pipeline-node-inspector[aria-label="Selected index details"]');
+    const inspection = page.locator(
+        '.pipeline-node-inspector[aria-label="Selected index details"]',
+    );
     await expect(inspection).toContainText('tenant_bloom');
     await expect(inspection).toContainText('Granules');
     await expect(inspection).toContainText('4 / 12');
@@ -96,19 +119,26 @@ test('EXPLAIN INDEXES opens an interactive index graph and keeps the raw result 
     const controls = page.getByRole('group', { name: 'Graph view controls', exact: true });
     await controls.getByRole('button', { name: 'Zoom in', exact: true }).click();
     const zoomBeforeEditorFocus = await controls.getByLabel('Zoom level').innerText();
-    const selectedId = await graph.locator('[data-node-id][aria-pressed="true"]').getAttribute('data-node-id');
+    const selectedId = await graph
+        .locator('[data-node-id][aria-pressed="true"]')
+        .getAttribute('data-node-id');
     const editor = page.locator('.cm-content');
     await editor.click();
     await page.keyboard.press('ControlOrMeta+a');
     await expect(editor).toBeFocused();
-    await expect(graph.locator('[data-node-id][aria-pressed="true"]')).toHaveAttribute('data-node-id', selectedId!);
+    await expect(graph.locator('[data-node-id][aria-pressed="true"]')).toHaveAttribute(
+        'data-node-id',
+        selectedId!,
+    );
     await expect(controls.getByLabel('Zoom level')).toHaveText(zoomBeforeEditorFocus);
 
     await page.getByRole('tab', { name: 'Results', exact: true }).click();
     await expect(page.getByRole('table', { name: 'Retained query rows' })).toBeVisible();
 });
 
-test('EXPLAIN PLAN opens a graph with a tree view and keeps the raw result available', async ({ page }) => {
+test('EXPLAIN PLAN opens a graph with a tree view and keeps the raw result available', async ({
+    page,
+}) => {
     await trust(page);
     await page.getByTestId('run-action-explain-plan').click();
 
@@ -116,9 +146,16 @@ test('EXPLAIN PLAN opens a graph with a tree view and keeps the raw result avail
     await expect(plan).toContainText('Expression');
     await expect(plan).toContainText('ReadFromFixture');
     await expect(plan).toContainText('Fixture only; the SQL was not evaluated.');
-    await expect(plan.locator('.explain-plan-heading')).not.toContainText('no runtime measurements');
-    await expect(plan.getByRole('button', { name: 'Graph', exact: true })).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.getByRole('region', { name: 'Logical query plan', exact: true })).toHaveCount(1);
+    await expect(plan.locator('.explain-plan-heading')).not.toContainText(
+        'no runtime measurements',
+    );
+    await expect(plan.getByRole('button', { name: 'Graph', exact: true })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+    );
+    await expect(page.getByRole('region', { name: 'Logical query plan', exact: true })).toHaveCount(
+        1,
+    );
     const graph = plan.getByRole('region', { name: 'Logical query plan · Graph', exact: true });
     await expect(graph).toBeVisible();
     const graphNodes = graph.locator('[data-node-id]');
@@ -143,22 +180,31 @@ test('EXPLAIN PLAN opens a graph with a tree view and keeps the raw result avail
     await editor.click();
     await page.keyboard.press('ControlOrMeta+a');
     await expect(editor).toBeFocused();
-    await expect(graph.locator('[data-node-id][aria-pressed="true"]')).toHaveAttribute('data-node-id', selectedNodeId!);
+    await expect(graph.locator('[data-node-id][aria-pressed="true"]')).toHaveAttribute(
+        'data-node-id',
+        selectedNodeId!,
+    );
     await expect(controls.getByLabel('Zoom level')).toHaveText(zoomBeforeEditorFocus);
 
     await expect(plan.locator('.explain-plan-heading-actions > strong')).toBeVisible();
-    const headingHeight = await plan.locator('.explain-plan-heading').evaluate(element => element.getBoundingClientRect().height);
+    const headingHeight = await plan
+        .locator('.explain-plan-heading')
+        .evaluate(element => element.getBoundingClientRect().height);
     expect(headingHeight).toBeLessThan(56);
     await plan.getByRole('button', { name: 'Tree', exact: true }).click();
     await expect(plan.locator('.explain-plan-tree')).toBeVisible();
     await plan.getByRole('button', { name: 'Graph', exact: true }).click();
-    await expect(plan.getByRole('region', { name: 'Logical query plan · Graph', exact: true })).toBeVisible();
+    await expect(
+        plan.getByRole('region', { name: 'Logical query plan · Graph', exact: true }),
+    ).toBeVisible();
 
     await page.getByRole('tab', { name: 'Results', exact: true }).click();
     await expect(page.getByRole('table', { name: 'Retained query rows' })).toBeVisible();
 });
 
-test('EXPLAIN ANALYZE opens a measured runtime graph and retains the raw result', async ({ page }) => {
+test('EXPLAIN ANALYZE opens a measured runtime graph and retains the raw result', async ({
+    page,
+}) => {
     await trust(page);
     await page.getByTestId('run-action-explain-analyze').click();
 
@@ -195,7 +241,12 @@ test('EXPLAIN PIPELINE opens an interactive ClickHouse operator graph', async ({
         if (!selectedNode) return false;
         const viewport = element.getBoundingClientRect();
         const node = selectedNode.getBoundingClientRect();
-        return node.right > viewport.left && node.left < viewport.right && node.bottom > viewport.top && node.top < viewport.bottom;
+        return (
+            node.right > viewport.left &&
+            node.left < viewport.right &&
+            node.bottom > viewport.top &&
+            node.top < viewport.bottom
+        );
     });
     expect(selectedIsInGraphViewport).toBe(true);
     const filter = graph.locator('[data-node-id]').filter({ hasText: 'FilterTransform' });
@@ -204,25 +255,37 @@ test('EXPLAIN PIPELINE opens an interactive ClickHouse operator graph', async ({
     await expect(page.locator('.pipeline-node-inspector')).toContainText('FilterTransform');
     await expect(page.locator('.pipeline-node-inspector')).toContainText('planned');
 
-    const graphMetrics = await graph.evaluate(element => ({ clientHeight: element.clientHeight, scrollHeight: element.scrollHeight }));
+    const graphMetrics = await graph.evaluate(element => ({
+        clientHeight: element.clientHeight,
+        scrollHeight: element.scrollHeight,
+    }));
     expect(graphMetrics.scrollHeight).toBeGreaterThan(graphMetrics.clientHeight);
     const lastNode = graph.locator('[data-node-id]').last();
-    await graph.evaluate(element => { element.scrollTop = element.scrollHeight; });
+    await graph.evaluate(element => {
+        element.scrollTop = element.scrollHeight;
+    });
     await expect(lastNode).toBeInViewport();
 
     const svg = graph.locator('svg');
     const initialWidth = Number(await svg.getAttribute('width'));
     await controls.getByRole('button', { name: 'Zoom in', exact: true }).click();
-    await expect.poll(async () => Number(await svg.getAttribute('width'))).toBeGreaterThan(initialWidth);
+    await expect
+        .poll(async () => Number(await svg.getAttribute('width')))
+        .toBeGreaterThan(initialWidth);
     await controls.getByRole('button', { name: 'Focus node', exact: true }).click();
     await expect(controls.getByLabel('Zoom level')).toHaveText('100%');
     await controls.getByRole('button', { name: 'Fit graph', exact: true }).click();
     await expect(controls.getByLabel('Zoom level')).not.toHaveText('100%');
 
     const resultsContent = page.locator('#query-results-content');
-    const resultsMetrics = await resultsContent.evaluate(element => ({ clientHeight: element.clientHeight, scrollHeight: element.scrollHeight }));
+    const resultsMetrics = await resultsContent.evaluate(element => ({
+        clientHeight: element.clientHeight,
+        scrollHeight: element.scrollHeight,
+    }));
     expect(resultsMetrics.scrollHeight).toBeGreaterThan(resultsMetrics.clientHeight);
-    await resultsContent.evaluate(element => { element.scrollTop = element.scrollHeight; });
+    await resultsContent.evaluate(element => {
+        element.scrollTop = element.scrollHeight;
+    });
     await expect(page.locator('.pipeline-node-inspector')).toBeInViewport();
 
     const zoomBeforeEditorFocus = await controls.getByLabel('Zoom level').innerText();
@@ -246,7 +309,9 @@ test('Experimental panels stay reachable through the workspace rail and More', a
     await expect(page.locator('.cm-content')).toContainText('SELECT');
 });
 
-test('Mobile expert navigation opens the browser drawer and keeps its tabs usable', async ({ page }) => {
+test('Mobile expert navigation opens the browser drawer and keeps its tabs usable', async ({
+    page,
+}) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await trust(page);
 

@@ -114,29 +114,18 @@
   border-radius: var(--help-radius-card);
   background: color-mix(in srgb, var(--help-surface) 88%, var(--panel));
 }
-.workspace-help-storage
-  .parts-explorer-dialog.is-embedded
-  .parts-explorer-header {
+.workspace-help-storage .parts-explorer-dialog.is-embedded .parts-explorer-header {
   align-items: center;
   gap: 10px;
 }
-.workspace-help-storage
-  .parts-explorer-dialog.is-embedded
-  .parts-explorer-header
-  .eyebrow {
+.workspace-help-storage .parts-explorer-dialog.is-embedded .parts-explorer-header .eyebrow {
   display: none;
 }
-.workspace-help-storage
-  .parts-explorer-dialog.is-embedded
-  .parts-explorer-header
-  h2 {
+.workspace-help-storage .parts-explorer-dialog.is-embedded .parts-explorer-header h2 {
   margin: 0 0 3px;
   font-size: 16px;
 }
-.workspace-help-storage
-  .parts-explorer-dialog.is-embedded
-  .parts-explorer-header
-  p {
+.workspace-help-storage .parts-explorer-dialog.is-embedded .parts-explorer-header p {
   color: var(--muted);
   font-size: var(--help-text-meta);
   line-height: 1.4;
@@ -215,9 +204,7 @@
 .workspace-help-storage .parts-graph-viewport::before {
   opacity: 0.28;
 }
-.workspace-help-storage
-  .parts-explorer-dialog.is-embedded
-  .parts-graph-viewport.is-map {
+.workspace-help-storage .parts-explorer-dialog.is-embedded .parts-graph-viewport.is-map {
   min-height: 180px;
   max-height: min(430px, 48vh);
   flex: 0 1 auto;
@@ -402,9 +389,7 @@
   .workspace-help-storage .parts-graph-meta > span:last-child {
     text-align: left;
   }
-  .workspace-help-storage
-    .parts-explorer-dialog.is-embedded
-    .parts-graph-viewport.is-map {
+  .workspace-help-storage .parts-explorer-dialog.is-embedded .parts-graph-viewport.is-map {
     max-height: min(340px, 46vh);
   }
 }

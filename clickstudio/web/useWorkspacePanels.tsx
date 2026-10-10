@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, type CSSProperties, type Dispatch, type SetStateAction } from 'react';
+import {
+    useEffect,
+    useRef,
+    useState,
+    type CSSProperties,
+    type Dispatch,
+    type SetStateAction,
+} from 'react';
 import {
     WORKSPACE_LAYOUT_STORAGE_KEY,
     clampPanelSplitRatio,
@@ -28,14 +35,20 @@ export function useWorkspacePanels({
 }) {
     const [panelLayout, setPanelLayout] = useState(() => {
         let stored: string | null = null;
-        try { stored = window.localStorage.getItem(WORKSPACE_LAYOUT_STORAGE_KEY); } catch {}
+        try {
+            stored = window.localStorage.getItem(WORKSPACE_LAYOUT_STORAGE_KEY);
+        } catch {}
         return recoverWorkspacePanelLayout(stored, panelViewport());
     });
-    const [temporaryReveals, setTemporaryReveals] = useState<Partial<Record<WorkspacePanelId, string>>>({});
+    const [temporaryReveals, setTemporaryReveals] = useState<
+        Partial<Record<WorkspacePanelId, string>>
+    >({});
     const workspaceContentRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        try { window.localStorage.setItem(WORKSPACE_LAYOUT_STORAGE_KEY, JSON.stringify(panelLayout)); } catch {}
+        try {
+            window.localStorage.setItem(WORKSPACE_LAYOUT_STORAGE_KEY, JSON.stringify(panelLayout));
+        } catch {}
     }, [panelLayout]);
 
     useEffect(() => {
@@ -53,18 +66,22 @@ export function useWorkspacePanels({
     }, [activeDraftId]);
 
     useEffect(() => {
-        const normalize = () => setPanelLayout(current => normalizeWorkspacePanelLayout(current, panelViewport()));
+        const normalize = () =>
+            setPanelLayout(current => normalizeWorkspacePanelLayout(current, panelViewport()));
         window.addEventListener('resize', normalize);
         return () => window.removeEventListener('resize', normalize);
     }, []);
 
     const queryCollapsed = panelLayout.query.collapsed && temporaryReveals.query !== activeDraftId;
-    const resultsCollapsed = panelLayout.results.collapsed && temporaryReveals.results !== activeDraftId;
+    const resultsCollapsed =
+        panelLayout.results.collapsed && temporaryReveals.results !== activeDraftId;
     const revealPanelTemporarily = (panel: WorkspacePanelId, draftId = activeDraftId) => {
         setTemporaryReveals(current => ({ ...current, [panel]: draftId }));
     };
     const clearTemporaryPanelReveal = (panel: WorkspacePanelId) => {
-        setTemporaryReveals(current => current[panel] === undefined ? current : { ...current, [panel]: undefined });
+        setTemporaryReveals(current =>
+            current[panel] === undefined ? current : { ...current, [panel]: undefined },
+        );
     };
     const setPanelCollapsed = (panel: WorkspacePanelId, next: SetStateAction<boolean>) => {
         const current = panel === 'query' ? queryCollapsed : resultsCollapsed;
@@ -72,12 +89,15 @@ export function useWorkspacePanels({
         setPanelLayout(layout => ({ ...layout, [panel]: { ...layout[panel], collapsed } }));
         clearTemporaryPanelReveal(panel);
     };
-    const setQueryCollapsed: Dispatch<SetStateAction<boolean>> = next => setPanelCollapsed('query', next);
-    const setResultsCollapsed: Dispatch<SetStateAction<boolean>> = next => setPanelCollapsed('results', next);
-    const canSplitPanels = Boolean(hasOutput
-        && !queryCollapsed && !resultsCollapsed && !compactViewport);
+    const setQueryCollapsed: Dispatch<SetStateAction<boolean>> = next =>
+        setPanelCollapsed('query', next);
+    const setResultsCollapsed: Dispatch<SetStateAction<boolean>> = next =>
+        setPanelCollapsed('results', next);
+    const canSplitPanels = Boolean(
+        hasOutput && !queryCollapsed && !resultsCollapsed && !compactViewport,
+    );
     const workspaceLayoutStyle = canSplitPanels
-        ? { '--query-panel-basis': `${panelLayout.splitRatio * 100}%` } as CSSProperties
+        ? ({ '--query-panel-basis': `${panelLayout.splitRatio * 100}%` } as CSSProperties)
         : undefined;
     const startPanelSplit = (event: PanelPointerStartEvent) => {
         const content = workspaceContentRef.current;

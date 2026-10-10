@@ -254,13 +254,7 @@
 }
 /* Light theme */
 
-:root[data-theme="click-light"]
-  .native-comparison-table
-  tbody
-  td:nth-child(2):not([title]),
-:root[data-theme="click-light"]
-  .native-comparison-table
-  tbody
-  td:nth-child(3):not([title]) {
+:root[data-theme="click-light"] .native-comparison-table tbody td:nth-child(2):not([title]),
+:root[data-theme="click-light"] .native-comparison-table tbody td:nth-child(3):not([title]) {
   color: var(--muted);
 }

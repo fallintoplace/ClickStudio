@@ -686,11 +686,7 @@
     fill: color-mix(in srgb, var(--accent) 19%, var(--panel-raised));
   }
   .flamegraph-node.depth-3 rect {
-    fill: color-mix(
-      in srgb,
-      var(--cyan, var(--accent)) 17%,
-      var(--panel-raised)
-    );
+    fill: color-mix(in srgb, var(--cyan, var(--accent)) 17%, var(--panel-raised));
   }
   .flamegraph-node.depth-4 rect,
   .flamegraph-node.depth-5 rect {
