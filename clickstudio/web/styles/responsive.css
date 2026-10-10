@@ -37,7 +37,6 @@
     .beginner-workspace-content { grid-template-rows: minmax(330px, 1.2fr) minmax(160px, .8fr); }
     .editor-heading { min-height: 46px; padding: 6px 12px; }
     .editor-frame { min-height: 96px; }
-    .editor-footer { padding-top: 5px; padding-bottom: 5px; }
     .results-header { min-height: 47px; padding-top: 5px; padding-bottom: 5px; }
     .empty-workspace { gap: 7px; padding: 10px; }
     .empty-graphic { display: grid; width: 42px; height: 42px; margin-bottom: 0; }
@@ -95,7 +94,6 @@
     .editor-heading { min-height: 47px; padding: 6px 9px; }
     .editor-mode-label { gap: 6px; font-size: 8px; }
     .editor-control-rail { gap: 7px; padding: 8px; }
-    .editor-footer { font-size: 7px; }
     .execution-bar { min-height: 40px; flex-wrap: wrap; gap: 7px 12px; padding: 6px 10px; }
     .help-button { min-height: 27px; }
     .execution-telemetry { justify-content: flex-start; }

@@ -149,6 +149,4 @@
     .parameter-field input, .field-input, .field-textarea { width: 100%; min-height: 31px; padding: 7px 9px; border: 1px solid var(--line); border-radius: var(--radius-compact); outline: none; background: var(--page-raised); color: var(--text); font-size: 10px; transition: .18s ease; }
     .parameter-field input:focus, .field-input:focus, .field-textarea:focus { border-color: var(--active-border); box-shadow: var(--focus-ring); }
     .parameter-count { padding-bottom: 8px; color: var(--green); font-size: 9px; white-space: nowrap; }
-    .editor-footer { display: flex; flex: none; align-items: center; justify-content: flex-end; gap: 10px; padding: 7px 13px; border-top: 1px solid var(--line); color: var(--muted); font-size: 8px; }
-    .footer-dot { padding: 0 5px; color: var(--line-bright); }
 }
