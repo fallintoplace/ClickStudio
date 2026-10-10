@@ -42,7 +42,7 @@ test('example category labels use localized and custom labels', () => {
     for (const [category, expected] of labels) {
         assert.equal(categoryLabel(category, copy, 'en'), expected, category);
     }
-    assert.equal(categoryLabel('featured', copy, 'de'), 'Highlights');
+    assert.equal(categoryLabel('featured', copy, 'zh'), '精选');
     assert.equal(categoryLabel('openSource', copy, 'zh'), '开源');
 });
 
@@ -72,11 +72,11 @@ test('schema examples use table copy while other examples preserve or localize t
         name: 'Preview events',
         description: copy.exampleReadRows,
     });
-    assert.deepEqual(exampleText({ id: 'clickhouse-server-version', name: 'Server version', description: 'Read the version', category: 'clickhouse' }, 'ru', copy), {
-        name: 'Версия ClickHouse',
-        description: 'Узнать версию ClickHouse для этого подключения.',
+    assert.deepEqual(exampleText({ id: 'clickhouse-server-version', name: 'Server version', description: 'Read the version', category: 'clickhouse' }, 'zh', copy), {
+        name: 'ClickHouse 版本',
+        description: '查看此连接所使用的 ClickHouse 版本。',
     });
-    assert.deepEqual(exampleText({ id: 'unknown-example', name: 'Unknown example', description: 'No translation', category: 'basics' }, 'de', copy), {
+    assert.deepEqual(exampleText({ id: 'unknown-example', name: 'Unknown example', description: 'No translation', category: 'basics' }, 'zh', copy), {
         name: 'Unknown example',
         description: 'No translation',
     });

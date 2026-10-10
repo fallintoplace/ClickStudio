@@ -1,6 +1,6 @@
 import type { english } from './i18n-english.js';
 
-export const allLocales = ['en', 'de', 'es', 'nl', 'zh', 'ru'] as const;
+export const allLocales = ['en', 'zh'] as const;
 export type Locale = (typeof allLocales)[number];
 
 type WidenStrings<T> = T extends string

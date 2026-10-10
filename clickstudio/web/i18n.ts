@@ -26,17 +26,6 @@ export const themeAppearance: Record<Theme, { dark: boolean; chromeColor: string
     'click-light': { dark: false, chromeColor: '#ffffff' },
 };
 
-const localeLabels: Record<Locale, string> = {
-    en: 'English',
-    de: 'Deutsch',
-    es: 'Español',
-    nl: 'Nederlands',
-    zh: '中文',
-    ru: 'Русский',
-};
-
-export const localeOptions = supportedLocales.map(value => ({ value, label: localeLabels[value] })) satisfies readonly SelectOption<Locale>[];
-
 export function resolveLocale(...candidates: readonly (string | null | undefined)[]): Locale {
     for (const candidate of candidates) {
         const normalized = candidate?.trim().toLowerCase().replaceAll('_', '-');

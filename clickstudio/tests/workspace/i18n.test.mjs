@@ -1,15 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-const { allLocales, getCopy, localeOptions, resolveLocale, supportedLocales, themeOptions } =
+const { allLocales, getCopy, resolveLocale, supportedLocales, themeOptions } =
     await import('../../.workspace-build/web/i18n.js');
 
 const nonEnglishLocales = supportedLocales.filter(locale => locale !== 'en');
 
-test('Supported locales and selector options stay synchronized', () => {
+test('Locale dictionaries match the supported application locales', () => {
     assert.deepEqual(supportedLocales, ['en', 'zh']);
-    assert.deepEqual(localeOptions.map(option => option.value), supportedLocales);
-    assert.equal(new Set(localeOptions.map(option => option.value)).size, supportedLocales.length);
+    assert.deepEqual(allLocales, supportedLocales);
 });
 
 test('Browser locale resolution accepts regional tags and safe fallbacks', () => {
@@ -18,7 +17,17 @@ test('Browser locale resolution accepts regional tags and safe fallbacks', () =>
     assert.equal(resolveLocale('fr-FR', 'es-MX'), 'en');
     assert.equal(resolveLocale('ru'), 'en');
     assert.equal(resolveLocale('', null, undefined, 'pt-BR'), 'en');
+    assert.equal(resolveLocale('  ZH-hant-TW  '), 'zh');
+    assert.equal(resolveLocale('en-GB', 'zh'), 'en');
 });
+
+for (const locale of ['de', 'es', 'nl', 'ru']) {
+    test(`Retired stored locale ${locale} falls back to the browser locale`, () => {
+        assert.equal(resolveLocale(locale, 'zh-CN', 'en-US'), 'zh');
+        assert.equal(resolveLocale(`${locale}_${locale.toUpperCase()}`, 'en-US'), 'en');
+        assert.equal(resolveLocale(locale), 'en');
+    });
+}
 
 test('Authentication and theme chrome is localized for every selectable locale', () => {
     const english = getCopy('en');
