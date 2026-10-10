@@ -800,8 +800,6 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         onInsert: (value: string) => editor.current?.insert(value),
         onOpenSqlDraft: openSqlDraft,
         onTableDeleted: table => setWorkspace(current => workspaceAfterTableDeleted(current, table)),
-        onOpenImport: () => setImportOpen(true),
-        onOpenExport: () => setExportOpen(true),
         onOpenRun: openRun,
         onOpenDocument: openDocument,
         onLoadProfile: () => void perform(loadProfile, 'save'),
@@ -903,12 +901,10 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
             <aside className="icon-rail" aria-label="Workspace tools">
                 <span className="rail-separator"/>
                 {PRIMARY_INSPECTOR_NAVIGATION.map(item => <RailButton key={item.id} icon={item.icon} label={copy.common[item.copyKey]} active={inspector === item.id && drawerOpen} accent={item.id === 'assistant'} testId={experience === 'expert' && item.id === 'assistant' ? 'open-ai' : undefined} onClick={() => showInspector(item.id)}/>)}
-                {experience === 'beginner' && <>
-                    <span className="rail-spacer"/>
-                    <span className="rail-separator"/>
-                    <RailButton icon="importFile" label={copy.common.import} onClick={() => setImportOpen(true)}/>
-                    <RailButton icon="exportFile" label={copy.common.export} onClick={() => setExportOpen(true)}/>
-                </>}
+                <span className="rail-spacer"/>
+                <span className="rail-separator"/>
+                <RailButton icon="importFile" label={copy.common.import} onClick={() => setImportOpen(true)}/>
+                <RailButton icon="exportFile" label={copy.common.export} onClick={() => setExportOpen(true)}/>
                 {experience === 'expert' && <div className="expert-rail-secondary">
                     <span className="rail-separator"/>
                     {EXPERT_BROWSE_NAVIGATION.map(item => <RailButton key={item.id} icon={item.icon} label={item.copyKey ? copy.common[item.copyKey] : inspectorLabel(item.id)} active={inspector === item.id && drawerOpen} onClick={() => showInspector(item.id)}/>)}
