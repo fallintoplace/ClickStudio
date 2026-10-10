@@ -80,17 +80,6 @@
     color: var(--text);
     box-shadow: var(--active-inset);
   }
-  .suggested-dot {
-    display: inline-block;
-    width: 5px;
-    height: 5px;
-    margin-left: 5px;
-    border-radius: 50%;
-    background: var(--accent);
-    vertical-align: 2px;
-    box-shadow: var(--status-ring);
-    color: var(--accent);
-  }
   .result-grid-wrap {
     display: flex;
     min-height: 0;
