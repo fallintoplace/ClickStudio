@@ -68,7 +68,7 @@ export function ScriptResults({ script, runs, activeRunId, onSelectRun, onSelect
         const details = run?.error ? `${run.error.code}: ${run.error.message}` : statement.error ? `${statement.error.code}: ${statement.error.message}` : run ? `${statementOutcome(run)} · ${Math.round(run.elapsedMs)} ms` : statement.status === 'pending' ? 'Waiting to run' : statement.status === 'running' ? 'Running' : statement.status === 'skipped' ? 'Skipped' : 'Not executed';
         return { statement, index, details };
     });
-    return <section className="script-results" aria-label="Script statement results">
+    return <section className={cx('script-results', script.status !== 'running' && 'is-settled')} aria-label="Script statement results">
         <div className="script-results-heading"><div className="script-results-summary"><span className="eyebrow">SCRIPT EXECUTION</span><strong>{script.statements.length} statements <i>·</i> {script.status}</strong></div>{script.status === 'running' && (script.cancelled
             ? <span className="script-cancel-status" role="status">{cancelAfterCurrentStatement ? 'Stopping after this query…' : 'Cancelling script…'}</span>
             : <Button variant="danger" className="toolbar-small" onClick={onCancel} disabled={cancelDisabled}>{cancelAfterCurrentStatement ? 'Stop after current statement' : 'Cancel script'}</Button>)}</div>

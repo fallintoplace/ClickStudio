@@ -120,9 +120,15 @@
     .script-statement:disabled { cursor: default; opacity: .72; }
     .script-statement-index { display: grid; width: 22px; height: 22px; place-items: center; border-radius: var(--radius-label); background: var(--panel-raised); color: var(--muted); font-family: var(--font-mono); font-size: 8px; }
     .script-statement-copy { display: grid; min-width: 0; gap: 1px; }
-    .script-statement-copy strong { color: var(--text); font-size: 9px; }
+    .script-statement-copy strong { overflow: hidden; color: var(--text); font-size: 9px; line-height: 12px; text-overflow: ellipsis; white-space: nowrap; }
     .script-statement-copy code { overflow: hidden; color: var(--muted); font-family: var(--font-mono); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
-    .script-statement-copy small { overflow: hidden; color: var(--muted); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+    .script-statement-copy small { overflow: hidden; color: var(--muted); font-size: 8px; line-height: 11px; text-overflow: ellipsis; white-space: nowrap; }
+    .script-statement-copy strong, .script-statement-copy small { max-height: 12px; opacity: 1; transition: max-height .16s ease, opacity .16s ease; }
+    .script-results.is-settled { gap: 4px; max-height: min(78px, 16vh); padding-block: 4px; }
+    .script-results.is-settled .script-statement-list { gap: 4px; padding-block: 0 1px; }
+    .script-results.is-settled .script-statement { flex: 0 0 168px; min-width: 168px; max-width: 168px; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 5px; padding: 3px 5px; }
+    .script-results.is-settled .script-statement-index { width: 18px; height: 18px; }
+    .script-results.is-settled .script-statement-copy strong, .script-results.is-settled .script-statement-copy small { max-height: 0; opacity: 0; }
     .script-status { padding: 3px 5px; border-radius: var(--radius-label); background: color-mix(in srgb, var(--muted) 9%, transparent); color: var(--muted); font-size: 7px; font-weight: 750; letter-spacing: .03em; text-transform: uppercase; }
     .script-status.status-succeeded { background: color-mix(in srgb, var(--green) 10%, transparent); color: var(--green); }
     .script-status.status-truncated, .script-status.status-running, .script-status.status-queued { background: color-mix(in srgb, var(--amber) 11%, transparent); color: var(--amber); }
