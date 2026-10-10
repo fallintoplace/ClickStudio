@@ -4,6 +4,7 @@ import type { Result } from '../../shared/types';
 import type { Draft } from '../workspace-state';
 import type { Copy, Locale } from '../i18n';
 import { ScrollEdgeFrame } from './ScrollEdgeShadows';
+import { ChartToolbar } from './ChartToolbar';
 import { categoryAxisLayout, chartText, formatCount, seriesColor } from './chart-helpers';
 
 export function RowCountChart({ result, chart, suggestion, onChart, copy, locale }: {
@@ -60,9 +61,11 @@ export function RowCountChart({ result, chart, suggestion, onChart, copy, locale
     const noTimeValues = timeAxis && !series.length;
     const dimensionName = result.columns[xIndex]?.name ?? '';
     const groupName = groupByIndex === undefined ? '' : result.columns[groupByIndex]?.name ?? '';
-    const title = timeAxis
+    const generatedTitle = timeAxis ? groupByIndex === undefined ? 'Rows over time' : `Rows over time by ${groupName}` : `Rows by ${dimensionName}`;
+    const customTitle = chart.title.trim() && !['Query result', generatedTitle, suggestion.config.title].includes(chart.title) ? chart.title : undefined;
+    const title = customTitle ?? (timeAxis
         ? groupByIndex === undefined ? copy.rowsOverTime : chartText(copy.rowsOverTimeBy, { dimension: groupName })
-        : chartText(copy.rowsBy, { dimension: dimensionName });
+        : chartText(copy.rowsBy, { dimension: dimensionName }));
     const timeUnit = countData?.unit === 'minute' ? copy.minutes
         : countData?.unit === 'hour' ? copy.hours
             : countData?.unit === 'day' ? copy.days
@@ -95,15 +98,7 @@ export function RowCountChart({ result, chart, suggestion, onChart, copy, locale
     </svg>;
 
     return <ScrollEdgeFrame<HTMLDivElement> className="chart-workspace-frame">{ref => <div ref={ref} className="chart-workspace animate-enter">
-        <div className="chart-title-row">
-            <div>
-                <span className="eyebrow">{copy.visualExploration}</span>
-                <h3>{title}</h3>
-                <p>{timeAxis
-                    ? chartText(copy.timeCountDescription, { unit: timeUnit || copy.days })
-                    : chartText(copy.categoryCountDescription, { dimension: dimensionName })}</p>
-            </div>
-            <div className="chart-controls">
+        <ChartToolbar title={title} description={timeAxis ? chartText(copy.timeCountDescription, { unit: timeUnit || copy.days }) : chartText(copy.categoryCountDescription, { dimension: dimensionName })} copy={copy}>
                 <label>{copy.xAxis}<select aria-label={copy.xAxis} value={xIndex} onChange={event => {
                     const nextX = Number(event.target.value);
                     const nextTime = temporalType(result.columns[nextX]?.type ?? '');
@@ -113,15 +108,14 @@ export function RowCountChart({ result, chart, suggestion, onChart, copy, locale
                     const nextTitle = nextTime
                         ? nextGroupBy === undefined ? 'Rows over time' : `Rows over time by ${result.columns[nextGroupBy]?.name}`
                         : `Rows by ${result.columns[nextX]?.name}`;
-                    onChart({ ...chart, kind: nextTime ? 'line' : 'bar', x: nextX, groupBy: nextGroupBy, ys: [], title: nextTitle });
+                    onChart({ ...chart, kind: nextTime ? 'line' : 'bar', x: nextX, groupBy: nextGroupBy, ys: [], title: customTitle ?? nextTitle });
                 }}>{dimensions.map(index => <option key={index} value={index}>{result.columns[index]?.name}</option>)}</select></label>
                 {timeAxis && breakdowns.length > 0 && <label>{copy.breakdownBy}<select aria-label={copy.breakdownBy} value={groupByIndex ?? ''} onChange={event => {
                     const nextGroupBy = event.target.value === '' ? undefined : Number(event.target.value);
-                    onChart({ ...chart, kind: 'line', x: xIndex, groupBy: nextGroupBy, ys: [], title: nextGroupBy === undefined ? 'Rows over time' : `Rows over time by ${result.columns[nextGroupBy]?.name}` });
+                    onChart({ ...chart, kind: 'line', x: xIndex, groupBy: nextGroupBy, ys: [], title: customTitle ?? (nextGroupBy === undefined ? 'Rows over time' : `Rows over time by ${result.columns[nextGroupBy]?.name}`) });
                 }}><option value="">{copy.allRows}</option>{breakdowns.map(index => <option key={index} value={index}>{result.columns[index]?.name}</option>)}</select></label>}
                 <span className="chart-row-count-type"><span className="chart-legend-dot"/>{copy.rowsLabel}</span>
-            </div>
-        </div>
+        </ChartToolbar>
         {!hasRows
             ? <div className="chart-empty">{copy.noRetainedRows}</div>
             : noTimeValues

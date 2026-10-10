@@ -4,25 +4,27 @@
     min-height: 0;
     flex: 1;
     overflow: auto;
+  }
+  .insights-view {
     padding: 17px 18px;
   }
-  .insights-heading,
-  .chart-title-row {
+  .chart-workspace {
+    padding: 0 10px 8px;
+  }
+  .insights-heading {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
     gap: 20px;
   }
-  .insights-heading h3,
-  .chart-title-row h3 {
+  .insights-heading h3 {
     margin: 5px 0 4px;
     font-family: var(--font-display);
     font-size: 17px;
     font-weight: 650;
     letter-spacing: -0.03em;
   }
-  .insights-heading p,
-  .chart-title-row p {
+  .insights-heading p {
     margin: 0;
     color: var(--muted);
     font-size: 9px;
@@ -1284,9 +1286,6 @@
     font-size: 9px;
     line-height: 1.6;
   }
-  .chart-title-row {
-    flex-wrap: wrap;
-  }
   .chart-controls {
     display: flex;
     flex-wrap: wrap;
@@ -1308,6 +1307,128 @@
     background: var(--panel-raised);
     color: var(--text-soft);
     font-size: 9px;
+  }
+  .chart-toolbar {
+    display: flex;
+    min-height: 40px;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .chart-toolbar h3 {
+    max-width: min(200px, 100%);
+    overflow: hidden;
+    margin: 0;
+    color: var(--text-soft);
+    font-size: 11px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .chart-toolbar .chart-controls {
+    display: contents;
+  }
+  .chart-toolbar .chart-controls > .chart-popover-control:last-child {
+    margin-left: auto;
+  }
+  .chart-toolbar .chart-controls label {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+  }
+  .chart-toolbar .chart-controls select {
+    height: 28px;
+    min-width: 80px;
+    max-width: 160px;
+    padding: 3px 6px;
+    font-size: 10px;
+  }
+  .chart-popover-control {
+    display: inline-flex;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .chart-popover-trigger {
+    min-width: 0;
+    max-width: 100%;
+    min-height: 28px;
+    gap: 6px;
+    padding: 0 7px;
+    font-size: 10px;
+  }
+  .chart-popover-trigger svg {
+    width: 14px;
+    height: 14px;
+    flex: none;
+  }
+  .chart-popover-trigger.is-icon-only {
+    width: 28px;
+    padding: 0;
+  }
+  .chart-popover-trigger:has(+ .chart-popover:popover-open) {
+    border-color: var(--active-border);
+    background: var(--active-surface);
+  }
+  .chart-measure-summary {
+    max-width: 140px;
+    overflow: hidden;
+    color: var(--text);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .chart-popover {
+    position: fixed;
+    width: min(320px, calc(100vw - 16px));
+    max-height: min(360px, calc(100dvh - 16px));
+    overflow: auto;
+    margin: 0;
+    padding: 10px;
+    border: 1px solid var(--line-bright);
+    border-radius: var(--radius-panel);
+    outline: none;
+    background: var(--panel-raised);
+    box-shadow: var(--shadow-popover);
+    color: var(--text-soft);
+    font-size: 11px;
+    inset: auto;
+  }
+  .chart-popover-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .chart-popover-heading .button-base {
+    width: 24px;
+    min-height: 24px;
+    padding: 0;
+  }
+  .chart-popover-heading svg {
+    width: 14px;
+    height: 14px;
+  }
+  .chart-popover p {
+    margin: 0;
+    font-size: 10px;
+    line-height: 1.5;
+  }
+  .chart-setup-fields {
+    display: grid;
+    gap: 6px;
+  }
+  .chart-toolbar .chart-setup-fields label {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .chart-toolbar .chart-setup-fields select {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
   }
   .market-chart {
     display: grid;
@@ -1485,34 +1606,34 @@
     font-size: 9px;
   }
   .chart-measures {
-    display: flex;
-    max-width: 280px;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 5px 9px;
+    display: grid;
+    gap: 4px;
     min-width: 0;
     margin: 0;
-    padding: 5px 7px;
-    border: 1px solid var(--line);
-    border-radius: var(--radius-panel);
+    padding: 0;
+    border: 0;
   }
   .chart-measures legend {
-    padding: 0 3px;
-    color: var(--muted);
-    font-size: 8px;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
   }
-  .chart-measures label {
+  .chart-toolbar .chart-measures label {
     display: inline-flex;
     min-width: 0;
     grid-auto-flow: column;
     align-items: center;
     gap: 4px;
     color: var(--text-soft);
-    font-size: 8px;
+    font-size: 11px;
+    overflow-wrap: anywhere;
   }
   .chart-measures input {
-    width: 11px;
-    height: 11px;
+    width: 13px;
+    height: 13px;
+    flex: none;
     margin: 0;
     accent-color: var(--accent);
   }
@@ -1522,6 +1643,10 @@
     flex: none;
     border-radius: 2px;
     background: var(--series-color);
+  }
+  .chart-measures + p {
+    margin-top: 8px;
+    color: var(--muted);
   }
   .chart-canvas {
     position: relative;
@@ -2214,12 +2339,7 @@
     min-width: 0;
     max-width: unset;
   }
-  .chart-measures {
-    flex: 1 0 100%;
-    max-width: none;
-  }
-  .chart-measures label {
-    flex: 0 0 auto;
-    min-width: 0;
+  .chart-toolbar .chart-controls > label {
+    flex: 0 1 auto;
   }
 }

@@ -41,6 +41,24 @@ for (const theme of ['Light', 'Dark']) {
                     await page.setViewportSize(viewport);
                     await expectReferenceStyles(page, info, `responsive-${viewport.width}`);
                 }
+                await page.setViewportSize({ width: 1440, height: 1000 });
+                const results = page.getByRole('region', { name: 'Query results', exact: true });
+                await results.getByRole('tab', { name: 'Chart', exact: true }).click();
+                await expect(results.locator('.chart-toolbar')).toBeVisible();
+                await expectReferenceStyles(page, info, 'compact-chart');
+                await results.getByRole('button', { name: 'Measures', exact: true }).click();
+                await expect(results.getByRole('dialog', { name: 'Measures', exact: true })).toBeVisible();
+                await expectReferenceStyles(page, info, 'chart-measures');
+                await page.keyboard.press('Escape');
+                await results.getByRole('button', { name: 'Chart details', exact: true }).click();
+                await expect(results.getByRole('dialog', { name: 'Chart details', exact: true })).toBeVisible();
+                await expectReferenceStyles(page, info, 'chart-details');
+                await page.keyboard.press('Escape');
+                await page.setViewportSize({ width: 390, height: 844 });
+                await expectReferenceStyles(page, info, 'compact-chart-mobile');
+                await results.getByRole('button', { name: 'Measures', exact: true }).click();
+                await expect(results.getByRole('dialog', { name: 'Measures', exact: true })).toBeVisible();
+                await expectReferenceStyles(page, info, 'chart-measures-mobile');
             });
         }
 

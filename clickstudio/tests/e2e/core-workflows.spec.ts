@@ -1357,6 +1357,7 @@ test('Charts keep NULL missing and plot nullable negative values from zero', asy
     const results = await runQuery(page);
     await results.getByRole('tab', { name: 'Chart', exact: true }).click();
     await expect(results.locator('.chart-canvas svg[role="img"]')).toBeVisible();
+    await results.getByRole('button', { name: 'Measures', exact: true }).click();
     const measure = results.getByRole('group', { name: 'Measures' }).getByLabel('value');
     await expect(measure).toBeChecked();
     await expect(results.locator('.chart-footer')).toContainText('3 retained rows across 1 measure');
