@@ -164,7 +164,7 @@ export function ChartView({ result, loading, chart, onChart, copy, locale }: { r
                 const segments = splitChartSegments(series.points);
                 return <g key={series.columnIndex} style={{ '--series-color': series.color } as CSSProperties}>
                     {segments.filter(points => points.length > 1).map((points, index) => <polygon key={`area-${index}`} points={`${x(points[0]!.index)},${zeroY} ${points.map(point => `${x(point.index)},${y(point.value!)}`).join(' ')} ${x(points.at(-1)!.index)},${zeroY}`} className="chart-area-fill"/>)}
-                    {segments.map((points, index) => <polyline key={`line-${index}`} points={points.map(point => `${x(point.index)},${y(point.value!)}`).join(' ')} className="chart-line"/>)}
+                    {segments.map((points, index) => <polyline key={`line-${index}`} points={points.map(point => `${x(point.index)},${y(point.value!)}`).join(' ')} pathLength={1} className="chart-line"/>)}
                     {series.points.filter(point => point.value !== null).map(point => <circle key={point.index} cx={x(point.index)} cy={y(point.value!)} r="3.5" className="chart-point"/>)}
                 </g>;
             }) : plotSeries.flatMap((series, seriesIndex) => series.points.flatMap(point => {

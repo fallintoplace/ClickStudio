@@ -86,7 +86,7 @@ export function RowCountChart({ result, chart, suggestion, onChart, copy, locale
         <line x1={plotLeft} x2={plotRight} y1={plotBottom} y2={plotBottom} className="chart-zero-line"/>
         {timeAxis
             ? series.map((item, seriesIndex) => <g key={item.key} style={{ '--series-color': seriesColor(seriesIndex) } as CSSProperties}>
-                {item.points.length > 1 && <polyline points={item.points.map(point => `${xTime(point.timestamp)},${y(point.count)}`).join(' ')} className="chart-line"/>}
+                {item.points.length > 1 && <polyline points={item.points.map(point => `${xTime(point.timestamp)},${y(point.count)}`).join(' ')} pathLength={1} className="chart-line"/>}
                 {item.points.map(point => <circle key={`${item.key}-${point.timestamp}`} cx={xTime(point.timestamp)} cy={y(point.count)} r="3.5" className="chart-point"><title>{chartText(copy.timePointTooltip, { bucket: point.label, series: item.label, count: formatCount(point.count, locale) })}</title></circle>)}
             </g>)
             : bars.map((group, index) => {

@@ -1724,7 +1724,7 @@
     stroke-linejoin: round;
     stroke-width: 3;
     filter: none;
-    stroke-dasharray: 1400;
+    stroke-dasharray: 1;
     animation: drawLine 1.1s ease both;
   }
   .chart-area-fill {
