@@ -577,20 +577,6 @@
     font-weight: 800;
     box-shadow: var(--active-inset);
   }
-  .connection-readonly {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    color: var(--muted);
-    font-size: 9px;
-    font-weight: 690;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-  .connection-readonly svg {
-    width: 13px;
-    height: 13px;
-  }
   .workspace-root {
     position: relative;
     display: flex;

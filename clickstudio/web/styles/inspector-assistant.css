@@ -11,17 +11,17 @@
   }
   .inspector-header {
     display: flex;
-    min-height: 66px;
+    min-height: 44px;
     flex: none;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    padding: 11px 16px;
+    padding: 6px 16px;
     border-bottom: 1px solid var(--line);
     background: var(--panel-header);
   }
   .inspector-header h2 {
-    margin: 3px 0 0;
+    margin: 0;
     font-family: var(--font-display);
     font-size: 15px;
     font-weight: 680;
@@ -2624,32 +2624,6 @@
     color: var(--amber);
     font-size: 8px;
     text-transform: uppercase;
-  }
-  .inspector-footer {
-    display: grid;
-    flex: none;
-    gap: 8px;
-    padding: 9px 11px;
-    border-top: 1px solid var(--line);
-    color: var(--muted);
-    font-size: 8px;
-  }
-  .inspector-footer-meta {
-    display: flex;
-    min-width: 0;
-    align-items: center;
-    justify-content: space-between;
-    gap: 7px;
-  }
-  .inspector-footer-meta > span:last-child {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .inspector-footer-meta i {
-    color: var(--line-bright);
-    font-style: normal;
   }
   .execution-bar {
     position: relative;

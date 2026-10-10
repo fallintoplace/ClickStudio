@@ -94,7 +94,7 @@ test('File import previews, maps, and reports a successful insert without typed 
         .locator('.import-column-map thead th')
         .evaluateAll(headers => headers.map(header => header.getBoundingClientRect().width));
     expect(mappingColumnWidths[1]).toBeGreaterThan(mappingColumnWidths[0]!);
-    expect(mappingColumnWidths[2]).toBeLessThan(mappingColumnWidths[0]!);
+    expect(mappingColumnWidths[2]).toBeGreaterThan(mappingColumnWidths[0]!);
     await expect(dialog.getByLabel('Map day to destination')).toHaveValue('day');
     await dialog.getByRole('button', { name: 'Review import', exact: true }).click();
     const review = dialog.getByRole('region', { name: 'Review import', exact: true });
@@ -115,6 +115,85 @@ test('File import previews, maps, and reports a successful insert without typed 
         fields: { day: 'day', events: 'events' },
     });
     expect(commitBody).toEqual({});
+});
+
+test('Import mapping shows nullable types and keeps long nested types compact on wide and narrow screens', async ({
+    page,
+}, info) => {
+    const types = [
+        'Nullable(UInt64)',
+        'Nullable(Float64)',
+        "Array(Tuple(String, Nullable(Decimal(38, 9)), Map(String, DateTime64(9, 'Europe/Warsaw'))))",
+    ];
+    const columns = ['number', 'square', 'details'];
+    await mockWritableWorkspace(page, ['demo.events'], {
+        ...schema,
+        columns: columns.map((name, index) => ({
+            ...schema.columns[0]!,
+            name,
+            type: types[index]!,
+        })),
+    });
+    await page.route('**/api/imports/preview', route =>
+        route.fulfill({
+            status: 201,
+            json: {
+                id: 'input-types',
+                name: 'numbers.json',
+                format: 'json',
+                columns,
+                rows: [{ number: 1, square: 1.5, details: [] }],
+                rowCount: 1,
+            },
+        }),
+    );
+    await page.getByRole('button', { name: 'Import', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Import data', exact: true });
+    await dialog.getByLabel('Choose a CSV, JSON, or NDJSON file').setInputFiles({
+        name: 'numbers.json',
+        mimeType: 'application/json',
+        buffer: Buffer.from('[{"number":1,"square":1.5,"details":[]}]'),
+    });
+    await dialog.getByRole('button', { name: 'Read file and continue', exact: true }).click();
+    await chooseExistingTable(dialog);
+
+    for (const width of [1440, 1280, 900, 390]) {
+        await page.setViewportSize({ width, height: 900 });
+        const labels = dialog.locator('.import-column-type');
+        await expect(labels).toHaveText(types);
+        for (const [index, type] of types.entries()) {
+            const label = labels.nth(index);
+            await expect(label).toHaveAttribute('title', type);
+            if (index === types.length - 1) continue;
+            const textFits = await label.evaluate(element => {
+                const bounds = element.getBoundingClientRect();
+                const range = document.createRange();
+                range.selectNodeContents(element);
+                return [...range.getClientRects()].every(
+                    rect =>
+                        rect.left >= bounds.left &&
+                        rect.right <= bounds.right &&
+                        rect.top >= bounds.top &&
+                        rect.bottom <= bounds.bottom,
+                );
+            });
+            expect(textFits, `${type} is fully visible at ${width}px`).toBe(true);
+        }
+        const nestedType = labels.last();
+        expect(
+            await nestedType.evaluate(element => element.scrollWidth - element.clientWidth),
+        ).toBeGreaterThan(0);
+        const rowHeights = await dialog
+            .locator('.import-column-map tbody tr')
+            .evaluateAll(rows => rows.map(row => row.getBoundingClientRect().height));
+        expect(rowHeights[2]).toBeLessThanOrEqual(rowHeights[0]! + 1);
+        await dialog.locator('.import-column-map').evaluate(element => {
+            element.scrollLeft = element.scrollWidth;
+        });
+        await labels.last().scrollIntoViewIfNeeded();
+        await expect(labels.last()).toBeInViewport();
+        await page.screenshot({ path: info.outputPath(`import-types-${width}.png`) });
+    }
 });
 
 test('Import review explains sparse source values and unmapped default columns', async ({
@@ -635,9 +714,55 @@ test('Import setup opens at the top and keeps actions visible on short and narro
             dialog.getByRole('button', { name: 'Choose a destination', exact: true }),
         ).toBeInViewport();
         expect(await main.evaluate(element => element.scrollWidth - element.clientWidth)).toBe(0);
+        expect(
+            await dialog
+                .locator('.import-preview-table > div:last-child')
+                .evaluate(element => element.scrollWidth - element.clientWidth),
+        ).toBe(0);
         await main.evaluate(element => {
             element.scrollTop = element.scrollHeight;
         });
         await expect(dialog.locator('.import-preview-table tbody tr').last()).toBeInViewport();
     }
+
+    const wideColumns = [
+        'customer_identifier',
+        'order_timestamp',
+        'product_description',
+        'payment_reference',
+        'shipping_destination',
+        'fulfillment_status',
+    ];
+    await page.route('**/api/imports/preview', route =>
+        route.fulfill({
+            status: 201,
+            json: {
+                id: 'input-wide',
+                name: 'wide.csv',
+                format: 'csv',
+                columns: wideColumns,
+                rows: [Object.fromEntries(wideColumns.map(column => [column, 'sample']))],
+                rowCount: 1,
+            },
+        }),
+    );
+    await dialog.getByRole('button', { name: 'Change file', exact: true }).click();
+    await dialog.getByLabel('Choose a CSV, JSON, or NDJSON file').setInputFiles({
+        name: 'wide.csv',
+        mimeType: 'text/csv',
+        buffer: Buffer.from(
+            `${wideColumns.join(',')}\nsample,sample,sample,sample,sample,sample\n`,
+        ),
+    });
+    await dialog.getByRole('button', { name: 'Read file and continue', exact: true }).click();
+    const sample = dialog.locator('.import-preview-table > div:last-child');
+    expect(
+        await sample.evaluate(element => element.scrollWidth - element.clientWidth),
+    ).toBeGreaterThan(0);
+    expect(await main.evaluate(element => element.scrollWidth - element.clientWidth)).toBe(0);
+    await sample.evaluate(element => {
+        element.scrollLeft = element.scrollWidth;
+    });
+    await sample.locator('thead th').last().scrollIntoViewIfNeeded();
+    await expect(sample.locator('thead th').last()).toBeInViewport();
 });

@@ -30,7 +30,7 @@ export function ImportPreviewTable({
                 </span>
             </div>
             <div className="max-h-64 overflow-auto">
-                <table className="w-full min-w-[440px] border-collapse text-left text-[10px]">
+                <table className="w-full border-collapse text-left text-[10px]">
                     <thead className="sticky top-0 bg-[var(--panel-raised)] text-[var(--muted)]">
                         <tr>
                             {columns.map(column => (

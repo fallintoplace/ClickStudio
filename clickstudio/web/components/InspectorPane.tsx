@@ -252,10 +252,7 @@ export function InspectorPane({
     return (
         <aside className={cx('inspector-pane', docked && 'is-docked-inspector')}>
             <header className="inspector-header">
-                <div>
-                    <span className="eyebrow">{copy.workspaceInspector}</span>
-                    <h2>{title}</h2>
-                </div>
+                <h2>{title}</h2>
                 {closeButton}
             </header>
             {(!expert || docked) && (
@@ -509,17 +506,6 @@ export function InspectorPane({
                     />
                 )}
             </div>
-            <footer className="inspector-footer">
-                <div className="inspector-footer-meta">
-                    <span className="connection-readonly">
-                        <Icon name={connection.readonly ? 'lock' : 'database'} />{' '}
-                        {connection.readonly ? copy.readOnly : 'Read/write'}
-                    </span>
-                    <span title={`${connection.name} · ${connection.database}`}>
-                        {connection.name} <i>·</i> {connection.database}
-                    </span>
-                </div>
-            </footer>
         </aside>
     );
 }
