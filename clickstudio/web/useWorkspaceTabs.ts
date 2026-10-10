@@ -52,12 +52,18 @@ export function useWorkspaceTabs(workspace: WorkspaceState, setWorkspace: Dispat
 
     useEffect(() => {
         const scroller = tabScrollerRef.current;
+        let observedWidth = scroller?.clientWidth;
         const handleResize = () => {
             updateTabScrollState();
             revealActiveTab();
         };
         const observer = scroller && typeof ResizeObserver !== 'undefined'
-            ? new ResizeObserver(handleResize)
+            ? new ResizeObserver(() => {
+                updateTabScrollState();
+                const width = scroller.clientWidth;
+                if (observedWidth !== undefined && width !== observedWidth) revealActiveTab();
+                observedWidth = width;
+            })
             : undefined;
         if (scroller) observer?.observe(scroller);
         window.addEventListener('resize', handleResize);

@@ -232,17 +232,15 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
     const helpPanelOpenerRef = useRef<HTMLButtonElement | null>(null);
     const openHelpPanel = useCallback((section: HelpPanelSection, opener: HTMLButtonElement) => {
         helpPanelOpenerRef.current = opener;
+        if (section === 'examples') revealActiveTab();
         setHelpPanelSection(section);
         setHelpPanelOpen(true);
-    }, []);
+    }, [revealActiveTab]);
     const closeHelpPanel = useCallback((restoreFocus = true) => {
         setHelpPanelOpen(false);
         if (restoreFocus) window.requestAnimationFrame(() => helpPanelOpenerRef.current?.focus());
     }, []);
-    const openExamples = useCallback((opener: HTMLButtonElement) => {
-        revealActiveTab();
-        openHelpPanel('examples', opener);
-    }, [openHelpPanel, revealActiveTab]);
+    const openExamples = useCallback((opener: HTMLButtonElement) => openHelpPanel('examples', opener), [openHelpPanel]);
     const openHelp = useCallback((opener: HTMLButtonElement) => openHelpPanel('tour', opener), [openHelpPanel]);
     const [busy, setBusy] = useState<BusyAction>('');
     const [cancelling, setCancelling] = useState(false);

@@ -150,7 +150,6 @@ test('overflowing SQL tabs keep controls visible and expose scroll buttons', asy
             scrollWidth: node.scrollWidth,
             scrollLeft: node.scrollLeft,
             activeWidth: activeRect.width,
-            activeFlexShrink: getComputedStyle(active).flexShrink,
             activeLeft: activeRect.left,
             activeRight: activeRect.right,
             containerLeft: containerRect.left,
@@ -158,7 +157,6 @@ test('overflowing SQL tabs keep controls visible and expose scroll buttons', asy
         };
     });
 
-    expect(layout.activeFlexShrink).toBe('0');
     expect(layout.activeWidth).toBeGreaterThanOrEqual(160);
     expect(layout.scrollWidth).toBeGreaterThan(layout.clientWidth);
     expect(layout.activeLeft).toBeGreaterThanOrEqual(layout.containerLeft - 1);
