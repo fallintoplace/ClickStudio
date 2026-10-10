@@ -1,3 +1,4 @@
+import { ASSISTANT_ACTIONS, EVALUATION_STATUSES, QUALITY_CHECK_IDS, PROPOSAL_DECISIONS, FINDING_SEVERITIES, type FindingSeverity } from './assistant-types.js';
 import type {
     AssistantAction,
     AssistantSource,
@@ -9,19 +10,6 @@ import type {
     ProposalQualityCheck,
 } from './types.js';
 
-const assistantActions = {
-    ask: true,
-    generate: true,
-    explain: true,
-    repair: true,
-    result: true,
-    performance: true,
-    review: true,
-} satisfies Record<AssistantAction, true>;
-const evaluationStatuses = { pass: true, warn: true, fail: true } satisfies Record<EvaluationStatus, true>;
-const qualityCheckIds = { contract: true, safety: true, grounding: true, semantic: true } satisfies Record<ProposalQualityCheck['id'], true>;
-const proposalDecisions = { pending: true, accepted: true, rejected: true } satisfies Record<Proposal['decision'], true>;
-
 function isRecord(value: unknown): value is Record<string, unknown> {
     return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
@@ -31,19 +19,19 @@ function isStringArray(value: unknown): value is string[] {
 }
 
 function isAssistantAction(value: unknown): value is AssistantAction {
-    return typeof value === 'string' && Object.hasOwn(assistantActions, value);
+    return typeof value === 'string' && ASSISTANT_ACTIONS.some(action => action === value);
 }
 
 function isEvaluationStatus(value: unknown): value is EvaluationStatus {
-    return typeof value === 'string' && Object.hasOwn(evaluationStatuses, value);
+    return typeof value === 'string' && EVALUATION_STATUSES.some(status => status === value);
 }
 
 function isQualityCheckId(value: unknown): value is ProposalQualityCheck['id'] {
-    return typeof value === 'string' && Object.hasOwn(qualityCheckIds, value);
+    return typeof value === 'string' && QUALITY_CHECK_IDS.some(id => id === value);
 }
 
 function isProposalDecision(value: unknown): value is Proposal['decision'] {
-    return typeof value === 'string' && Object.hasOwn(proposalDecisions, value);
+    return typeof value === 'string' && PROPOSAL_DECISIONS.some(decision => decision === value);
 }
 
 function parseSources(value: unknown): AssistantSource[] | undefined {
@@ -63,12 +51,16 @@ function parseSources(value: unknown): AssistantSource[] | undefined {
     return sources;
 }
 
+function isFindingSeverity(value: unknown): value is FindingSeverity {
+    return FINDING_SEVERITIES.some(severity => severity === value);
+}
+
 function parseFindings(value: unknown): ProposalContent['findings'] | undefined {
     if (!Array.isArray(value)) return undefined;
     const findings: ProposalContent['findings'] = [];
     for (const finding of value) {
         if (!isRecord(finding) ||
-            (finding.severity !== 'high' && finding.severity !== 'medium' && finding.severity !== 'low') ||
+            !isFindingSeverity(finding.severity) ||
             typeof finding.message !== 'string' || typeof finding.evidence !== 'string') return undefined;
         findings.push({ severity: finding.severity, message: finding.message, evidence: finding.evidence });
     }

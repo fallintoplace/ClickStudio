@@ -25,6 +25,20 @@ async function start(token?: string, voice?: VoiceService, parserWasm?: () => Pr
     return { ...service, call, origin: config.origin, stop: async () => { await service.close(); server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); } };
 }
 const owner = { id: 'local-owner', role: 'owner' } as const;
+test('Proposal decisions reject stored-only states and unknown values before lookup', async t => {
+    const app = await start();
+    t.after(() => app.stop());
+    for (const decision of ['pending', 'constructor', 'toString', '__proto__', '', null, 1]) {
+        const response = await app.call('/assistant/proposals/missing/decision', { decision, connectionId: 'demo', currentSql: '' });
+        assert.equal(response.status, 400);
+        assert.equal((await response.json() as { error: { code: string } }).error.code, 'DECISION');
+    }
+    for (const decision of ['accepted', 'rejected']) {
+        const response = await app.call('/assistant/proposals/missing/decision', { decision, connectionId: 'demo', currentSql: '' });
+        assert.equal(response.status, 404);
+        assert.equal((await response.json() as { error: { code: string } }).error.code, 'NOT_FOUND');
+    }
+});
 class NoQueryLogDemoDriver extends DemoDriver {
     evidenceCalls = 0;
     override connection(principal: Parameters<DemoDriver['connection']>[0], id: string) {

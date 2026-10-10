@@ -1,3 +1,4 @@
+import type { ProposalDecisionAction } from '../shared/assistant-types';
 import { createPortal } from 'react-dom';
 import { parameterNames } from '../shared/sql';
 import { sqlReferencesQualifiedTable } from '../shared/table-deletion';
@@ -183,7 +184,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         onRetryParser: () => editor.current?.retryNativeParser(),
         onAskAI: (currentSchema?: Schema, serverVersion?: string, database?: string) => void requestAssistantSql(currentSchema, serverVersion, database, includeRun ? signal => loadAssistantRunContext(run, snapshot, signal) : undefined),
         onCancelAssistantRequest: cancelAssistantRequest,
-        onDecideProposal: (turnId: string, decision: 'accepted' | 'rejected') => void decideAssistantProposal(turnId, decision),
+        onDecideProposal: (turnId: string, decision: ProposalDecisionAction) => void decideAssistantProposal(turnId, decision),
         onRunQuery: sql => void execute('query', sql),
         runDisabled: sql => {
             if (!trusted || busy) return true;

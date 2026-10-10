@@ -1,6 +1,7 @@
-import type { ClickHouseDocumentationSummary, ReferenceCategory } from './types.js';
+import type { ClickHouseDocumentationSummary } from './types.js';
 
-export const REFERENCE_CATEGORIES = ['all', 'functions', 'types', 'engines', 'settings', 'system', 'formats', 'sql'] as const satisfies readonly ReferenceCategory[];
+export const REFERENCE_CATEGORIES = ['all', 'functions', 'types', 'engines', 'settings', 'system', 'formats', 'sql'] as const;
+export type ReferenceCategory = typeof REFERENCE_CATEGORIES[number];
 
 export const REFERENCE_TYPES_BY_CATEGORY: Readonly<Record<Exclude<ReferenceCategory, 'all'>, readonly string[]>> = {
     functions: ['Function', 'Aggregate Function', 'Table Function', 'Aggregate Function Combinator'],

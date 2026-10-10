@@ -1,5 +1,7 @@
-export type WorkspacePanelId = 'query' | 'results';
-export type WorkspacePanelMode = 'docked' | 'floating' | 'maximized';
+export const WORKSPACE_PANEL_IDS = ['query', 'results'] as const;
+export type WorkspacePanelId = typeof WORKSPACE_PANEL_IDS[number];
+export const WORKSPACE_PANEL_MODES = ['docked', 'floating', 'maximized'] as const;
+export type WorkspacePanelMode = typeof WORKSPACE_PANEL_MODES[number];
 
 export type ViewportSize = { width: number; height: number };
 export type PanelGeometry = { x: number; y: number; width: number; height: number };

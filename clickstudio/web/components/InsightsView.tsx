@@ -1,6 +1,6 @@
 import { RunComparisonLauncher, type RunComparisonProps } from './RunComparison';
 import type { Capability, ProfilePipeline, QueryProfile, Run } from '../../shared/types';
-import type { FlamegraphSnapshot, FlamegraphTraceType } from '../../shared/flamegraph';
+import { FLAMEGRAPH_TRACE_TYPES, type FlamegraphSnapshot, type FlamegraphTraceType } from '../../shared/flamegraph';
 import { PipelineGraph } from './PipelineGraph';
 import { FlamegraphView } from './FlamegraphView';
 import { Button, formatBytes, Icon, terminal } from './ui';
@@ -25,7 +25,7 @@ export function InsightsView({ comparison, run, profile, pipeline, pipelineAvail
     const measuredStages = plan?.nodes.filter(node => node.status === 'measured').length ?? 0;
     const plannedStages = plan?.nodes.filter(node => node.status === 'planned').length ?? 0;
     const estimatedStages = plan?.nodes.filter(node => node.status === 'estimated').length ?? 0;
-    const traceTypes = (['CPU', 'Real'] as const).filter(type => flamegraph?.series[type]);
+    const traceTypes = FLAMEGRAPH_TRACE_TYPES.filter(type => flamegraph?.series[type]);
     const selectedTraceType = flamegraph?.series[traceType] ? traceType : traceTypes[0];
     const totalSamples = flamegraph ? flamegraph.samples.CPU + flamegraph.samples.Real : 0;
     const flamegraphAvailable = flamegraphCapability?.available === true;

@@ -1,3 +1,4 @@
+import type { ProposalDecisionAction } from '../shared/assistant-types';
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { parseAssistantProposal } from '../shared/assistant-proposal';
 import type { AssistantConversationMessage, Result, Schema } from '../shared/types';
@@ -338,7 +339,7 @@ export function useWorkspaceAssistant({
         }
     };
 
-    const decideAssistantProposal = async (turnId: string, decision: 'accepted' | 'rejected') => {
+    const decideAssistantProposal = async (turnId: string, decision: ProposalDecisionAction) => {
         const turn = activeChat.turns.find(item => item.id === turnId || item.proposal?.id === turnId);
         const proposal = turn?.proposal;
         if (!turn || !proposal || proposal.decision !== 'pending' || (decision === 'accepted' && proposal.baseSql !== active.sql)) return;

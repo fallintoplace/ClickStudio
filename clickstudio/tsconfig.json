@@ -7,5 +7,5 @@
     "esModuleInterop": true, "resolveJsonModule": true,
     "types": ["vite/client"], "noEmit": true
   },
-  "include": ["web", "shared"]
+  "include": ["web", "shared", "tests/types"]
 }

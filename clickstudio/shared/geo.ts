@@ -2,7 +2,8 @@ import type { Column, Json, Row } from './types.js';
 import { baseType, chartNumber, displayValue, numericType } from './results.js';
 
 export const MAX_GEO_RENDER_FEATURES = 2000;
-export type NativeGeoType = 'Point' | 'Ring' | 'LineString' | 'MultiLineString' | 'Polygon' | 'MultiPolygon' | 'Geometry';
+export const NATIVE_GEO_TYPES = ['Point', 'Ring', 'LineString', 'MultiLineString', 'Polygon', 'MultiPolygon', 'Geometry'] as const;
+export type NativeGeoType = typeof NATIVE_GEO_TYPES[number];
 export type GeoPosition = [number, number];
 export type GeoGeometry =
     | { type: 'Point'; coordinates: GeoPosition }
@@ -34,7 +35,7 @@ export interface PreparedGeoFeatures {
     sampled: boolean;
 }
 
-const GEO_TYPES = new Set<NativeGeoType>(['Point', 'Ring', 'LineString', 'MultiLineString', 'Polygon', 'MultiPolygon', 'Geometry']);
+const GEO_TYPES = new Set<NativeGeoType>(NATIVE_GEO_TYPES);
 const MAX_GEO_LITERAL_LENGTH = 1_000_000;
 const MAX_GEO_LITERAL_VALUES = 200_000;
 const MAX_GEO_LITERAL_DEPTH = 8;

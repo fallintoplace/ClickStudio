@@ -1,3 +1,7 @@
+import { NATIVE_EXPLORER_KINDS } from '../shared/native-explorers.js';
+import { ASSISTANT_ACTIONS, PROPOSAL_DECISION_ACTIONS } from '../shared/assistant-types.js';
+import { MONITOR_CONDITIONS } from '../shared/monitor-types.js';
+import { CLOUD_ACTIONS } from '../shared/cloud-requests.js';
 import { MAX_SQL_CHARS, DEFAULT_RESULT_PAGE_ROWS } from '../shared/query-limits.js';
 import { IMPORT_FORMATS, MAX_IMPORT_SOURCE_CHARS, MAX_IMPORT_COLUMNS, MAX_IMPORT_COLUMN_NAME_CHARS, IMPORT_PREVIEW_ROWS } from '../shared/import-limits.js';
 import { CLICKHOUSE_CLOUD_CONNECTION_ID } from '../shared/cloud-policy.js';
@@ -8,7 +12,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { Readable } from 'node:stream';
 import cloudApi from '../api/cloud.js';
-import type { AssistantAction, AuditEvent, ClickHouseDocumentationEntry, ClickHouseDocumentationSummary, Principal, Result, Run, Schema } from '../shared/types.js';
+import type { AuditEvent, ClickHouseDocumentationEntry, ClickHouseDocumentationSummary, Principal, Result, Run, Schema } from '../shared/types.js';
 import type { QueryDriver } from '../core/runs.js';
 import { RunService, terminal } from '../core/runs.js';
 import { ArtifactService } from '../core/artifacts.js';
@@ -38,8 +42,6 @@ import { telemetry, recordRun } from './telemetry.js';
 import { registerMcpRoutes } from './mcp.js';
 type Driver = QueryDriver & ImportDriver & Pick<ClickHouseDriver, 'connection' | 'connections' | 'test' | 'targets' | 'database' | 'createTable' | 'dropTable' | 'profileEvidence' | 'profilePipeline' | 'profileFlamegraph' | 'workload' | 'replication' | 'queryTree' | 'tableParts' | 'nativeExplorer' | 'searchDocumentation' | 'documentationEntry' | 'close'>;
 const MAX_WASM_PARSER_BYTES = 64 * 1024 * 1024;
-const ASSISTANT_ACTIONS = ['ask', 'generate', 'explain', 'repair', 'result', 'performance', 'review'] as const satisfies readonly AssistantAction[];
-const MONITOR_CONDITIONS = ['changed', 'nonempty', 'failure'] as const;
 let parserWasmCache: Promise<Uint8Array> | undefined;
 
 function registerAssistantSqlRoute(app: Express, dependencies: {
@@ -267,7 +269,7 @@ function registerCloudApi(app: Express, config: Config, cloudSessions: CloudConn
             const request = new globalThis.Request(cloudUrl(req), {
                 method: 'POST',
                 headers,
-                body: JSON.stringify({ action: 'test', credentials }),
+                body: JSON.stringify({ action: CLOUD_ACTIONS.test, credentials }),
             });
             const response = await cloudApiClient.fetch(request);
             if (!response.ok) {
@@ -378,7 +380,7 @@ export function createApp(config: Config, overrides: {
     app.post('/api/connections/:id/native-explorer', async (req, res) => {
         const connectionId = id(req), value = body(req);
         requireThat(authorized(principal(res), connectionId), 403, 'WORKSPACE_UNTRUSTED', 'Trust this connection before inspecting native metadata');
-        const kind = choice(value.kind, ['lineage', 'merges', 'mutations'] as const, 400, 'INVALID_REQUEST', 'Unknown native explorer kind');
+        const kind = choice(value.kind, NATIVE_EXPLORER_KINDS, 400, 'INVALID_REQUEST', 'Unknown native explorer kind');
         const database = text(value.database, 'database', 128);
         const request = kind === 'lineage' ? { kind, database } : { kind, database, table: text(value.table, 'table', 128) };
         const controller = new AbortController();
@@ -616,7 +618,7 @@ export function createApp(config: Config, overrides: {
     registerAssistantSqlRoute(app, { config, driver, runs, ai, store, authorized: (p, c) => assistantConnectionAuthorized(authorized, p, c), secretFree });
     app.post('/api/assistant/proposals', async (req, res) => { const v = body(req); res.json(await ai.propose(principal(res), identifier(v.contextId, 'contextId'), v.consent === true)); });
     app.get('/api/assistant/proposals/:id', (req, res) => res.json(ai.get(principal(res), id(req))));
-    app.post('/api/assistant/proposals/:id/decision', (req, res) => { const v = body(req); requireThat(v.decision === 'accepted' || v.decision === 'rejected', 400, 'DECISION', 'Unknown proposal decision'); res.json(ai.decide(principal(res), id(req), v.decision, identifier(v.connectionId, 'connectionId'), text(v.currentSql, 'current SQL', MAX_SQL_CHARS, true))); });
+    app.post('/api/assistant/proposals/:id/decision', (req, res) => { const v = body(req); const decision = choice(v.decision, PROPOSAL_DECISION_ACTIONS, 400, 'DECISION', 'Unknown proposal decision'); res.json(ai.decide(principal(res), id(req), decision, identifier(v.connectionId, 'connectionId'), text(v.currentSql, 'current SQL', MAX_SQL_CHARS, true))); });
     app.delete('/api/assistant/proposals/:id', (req, res) => { ai.remove(principal(res), id(req)); res.json({ ok: true }); });
     app.get('/api/imports', (req, res) => {
         const p = principal(res), connectionId = typeof req.query.connectionId === 'string' ? text(req.query.connectionId, 'connectionId', 128) : undefined;

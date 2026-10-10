@@ -1,5 +1,6 @@
 import { DEFAULT_LIMITS, type Connection, type QueryDocument, type Result, type Run, type Schema, type SchemaColumn } from '../shared/types.js';
 import { DEMO_EXPLAIN_ANALYZE } from '../shared/demo-fixtures.js';
+import { CHART_KINDS } from '../shared/chart-types.js';
 import { DEMO_PREVIEW_STARTERS, demoIndexAnalysis } from './demo-preview-data.js';
 
 export const owner = 'preview-user';
@@ -234,9 +235,10 @@ export function chartConfig(value: unknown): QueryDocument['chart'] {
             },
         };
     }
-    if ((chart.kind === 'table' || chart.kind === 'number' || chart.kind === 'line' || chart.kind === 'bar' || chart.kind === 'scatter' || chart.kind === 'heatmap') &&
+    const kind = CHART_KINDS.find(kind => kind === chart.kind);
+    if (kind && kind !== 'candlestick' &&
         chartIndex(chart.x) && Array.isArray(chart.ys) && chart.ys.every(chartIndex) && typeof chart.title === 'string')
-        return { kind: chart.kind, x: chart.x, ...(chartIndex(chart.groupBy) ? { groupBy: chart.groupBy } : {}), ys: chart.ys.filter(chartIndex), title: chart.title };
+        return { kind, x: chart.x, ...(chartIndex(chart.groupBy) ? { groupBy: chart.groupBy } : {}), ys: chart.ys.filter(chartIndex), title: chart.title };
     return { kind: 'table', x: 0, ys: [], title: 'Query result' };
 }
 

@@ -119,3 +119,34 @@ test('Assistant proposal parsing rejects non-object values', () => {
     for (const value of [null, [], 'proposal', 1])
         assert.equal(parseAssistantProposal(value), undefined);
 });
+
+test('Assistant proposal parsing preserves all existing string domains', () => {
+    for (const action of ['ask', 'generate', 'explain', 'repair', 'result', 'performance', 'review'])
+        assert.equal(parseAssistantProposal(validProposal({ action })).action, action);
+    for (const decision of ['pending', 'accepted', 'rejected'])
+        assert.equal(parseAssistantProposal(validProposal({ decision })).decision, decision);
+    for (const severity of ['high', 'medium', 'low'])
+        assert.equal(parseAssistantProposal(validProposal({ findings: [{ severity, message: 'Finding', evidence: 'SQL' }] })).findings[0].severity, severity);
+    for (const status of ['pass', 'warn', 'fail']) {
+        for (const id of ['contract', 'safety', 'grounding', 'semantic']) {
+            const quality = { evaluatorVersion: 'v1', evaluatedAt: 'now', status, score: 80, checks: [{ id, status, message: 'Check' }] };
+            assert.deepEqual(parseAssistantProposal(validProposal({ quality })).quality, quality);
+        }
+    }
+});
+
+test('Assistant proposal parsing rejects prototype names and non-string domain values', () => {
+    for (const value of ['constructor', 'toString', '__proto__', '', null, 1, {}, []]) {
+        const quality = { evaluatorVersion: 'v1', evaluatedAt: 'now', status: 'pass', score: 80, checks: [{ id: 'safety', status: 'pass', message: 'Check' }] };
+        const proposals = [
+            validProposal({ action: value }),
+            validProposal({ decision: value }),
+            validProposal({ findings: [{ severity: value, message: 'Finding', evidence: 'SQL' }] }),
+            validProposal({ quality: { ...quality, status: value } }),
+            validProposal({ quality: { ...quality, checks: [{ ...quality.checks[0], id: value }] } }),
+            validProposal({ quality: { ...quality, checks: [{ ...quality.checks[0], status: value }] } }),
+        ];
+        for (const proposal of proposals)
+            assert.equal(parseAssistantProposal(proposal), undefined);
+    }
+});

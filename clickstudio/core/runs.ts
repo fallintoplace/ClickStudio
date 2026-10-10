@@ -1,3 +1,4 @@
+import { isTerminalRunStatus } from '../shared/run-types.js';
 import { MAX_SCRIPT_STATEMENTS, MAX_RESULT_PAGE_ROWS, DEFAULT_RESULT_PAGE_ROWS } from '../shared/query-limits.js';
 import { randomUUID } from 'node:crypto';
 import type { Column, Connection, Limits, Principal, Progress, Result, ResultPage, Row, Run, RunEvent, RunRequest, Script } from '../shared/types.js';
@@ -29,12 +30,11 @@ interface Receipt {
     kind: 'run' | 'script';
     at: string;
 }
-const terminalStates = new Set(['succeeded', 'truncated', 'failed', 'cancelled', 'timed_out', 'interrupted']);
 export const DEFAULT_SCRIPT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 export const DEFAULT_RECEIPT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 export const DEFAULT_RUN_HISTORY_LIMIT = 10_000;
 export const DEFAULT_RECEIPT_LIMIT = 100_000;
-export function terminal(run: Pick<Run, 'status'>) { return terminalStates.has(run.status); }
+export function terminal(run: Pick<Run, 'status'>) { return isTerminalRunStatus(run.status); }
 export class RunService {
     private readonly listeners = new Map<string, Set<(event: RunEvent) => void>>();
     private readonly controllers = new Map<string, AbortController>();

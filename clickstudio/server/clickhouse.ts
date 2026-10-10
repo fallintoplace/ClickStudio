@@ -1,3 +1,4 @@
+import type { ImportJobStatus } from '../shared/import-status.js';
 import { loadNativeExplorer, type NativeExplorerRequest } from '../shared/native-explorers.js';
 import { createClient, type ClickHouseClient } from '@clickhouse/client';
 import { randomUUID } from 'node:crypto';
@@ -5,7 +6,7 @@ import type { ClickHouseDocumentationEntry, ClickHouseDocumentationSummary, Conn
 import { mergeTreePartsQuery, parseMergeTreeParts, type MergeTreePartsSnapshot } from '../shared/parts.js';
 import { flamegraphQuery, parseFlamegraphRows, type FlamegraphSource } from '../shared/flamegraph.js';
 import { parseReplicationSnapshot, replicationQueueQuery, replicationReplicasQuery, type ReplicationCapabilities } from '../shared/replication.js';
-import { parseWorkloadSnapshot, workloadFamiliesQuery, workloadPointsQuery, type QueryLogSource, type WorkloadWindow } from '../shared/workload.js';
+import { isQueryLogSource, parseWorkloadSnapshot, workloadFamiliesQuery, workloadPointsQuery, type QueryLogSource, type WorkloadWindow } from '../shared/workload.js';
 import { collectSchemaMetadataWarnings, enrichSchemaTables, type OptionalSchemaMetadataWarning, type SchemaTableMetadata, type SchemaTableSkipIndex } from '../shared/schema.js';
 import { buildReferenceEntryQuery, buildReferenceSearchQuery, isMissingDocumentationSourceColumn } from '../shared/reference.js';
 import { AppError, requireThat } from '../core/errors.js';
@@ -353,14 +354,14 @@ export class ClickHouseDriver implements QueryDriver, ImportDriver, CreateTableD
     }
     private queryLogTable(id: string) {
         const source = this.manifests.get(id)?.queryLogSource;
-        requireThat(source === 'user_query_log' || source === 'query_log', 409, 'CAPABILITY_UNAVAILABLE', 'Test the connection; query-log visibility is required');
+        requireThat(isQueryLogSource(source), 409, 'CAPABILITY_UNAVAILABLE', 'Test the connection; query-log visibility is required');
         return `system.${source}`;
     }
     async workload(id: string, minutes: WorkloadWindow) {
         const manifest = this.manifests.get(id);
         requireThat(manifest?.queryLog.available, 409, 'CAPABILITY_UNAVAILABLE', manifest?.queryLog.reason ?? 'Query-log visibility is required for workload analysis');
         const source = manifest.queryLogSource;
-        requireThat(source === 'user_query_log' || source === 'query_log', 409, 'CAPABILITY_UNAVAILABLE', 'Test the connection; query-log visibility is required');
+        requireThat(isQueryLogSource(source), 409, 'CAPABILITY_UNAVAILABLE', 'Test the connection; query-log visibility is required');
         const parameters = { minutes: String(minutes), username: this.profile(id).username };
         const [families, points] = await Promise.all([
             this.rows<Record<string, unknown>>(id, workloadFamiliesQuery(source), parameters),
@@ -459,7 +460,7 @@ export class ClickHouseDriver implements QueryDriver, ImportDriver, CreateTableD
             throw this.safeError(error);
         }
     }
-    async inspectInsert(id: string, queryId: string): Promise<'running' | 'succeeded' | 'unknown'> {
+    async inspectInsert(id: string, queryId: string): Promise<ImportJobStatus> {
         const source = this.manifests.get(id)?.queryLogSource;
         const [active, events] = await Promise.all([
             this.rows<{ query_id: string }>(id, 'SELECT query_id FROM system.processes WHERE query_id = {id:String} LIMIT 1', { id: queryId }).catch(() => []),

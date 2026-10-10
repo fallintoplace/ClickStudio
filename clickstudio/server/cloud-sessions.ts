@@ -1,10 +1,11 @@
+import type { CloudCredentials } from '../shared/cloud-requests.js';
 import { createHash, randomBytes } from 'node:crypto';
 import { requireThat } from '../core/errors.js';
 
 export const CLOUD_SESSION_COOKIE = 'clickstudio_cloud_session';
 export const CLOUD_SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 
-export type CloudCredentials = { host: string; database: string; username: string; password: string };
+export type { CloudCredentials } from '../shared/cloud-requests.js';
 export type CloudProfile = Pick<CloudCredentials, 'host' | 'database' | 'username'>;
 export type CloudSessionSnapshot = { profile: CloudProfile; tested: Record<string, unknown> };
 

@@ -1,3 +1,4 @@
+import type { ExperienceLevel } from '../appearance-types';
 import type { QueryDocument } from '../../shared/types';
 import { draftSaveStatus } from '../../shared/workspace-view';
 import type { Draft, WorkspaceState } from '../workspace-state';
@@ -12,7 +13,7 @@ type TabScrollState = {
 
 type WorkspaceDocumentTabsProps = {
     workspace: WorkspaceState;
-    experience: 'beginner' | 'expert';
+    experience: ExperienceLevel;
     activeId: string;
     connectionId: string;
     documents: QueryDocument[];

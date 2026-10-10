@@ -1,3 +1,4 @@
+import { THEMES, ACCENT_CHOICES, EXPERIENCE_LEVELS, PARSER_MODES, type AccentChoice, type ParserMode } from './appearance-types';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, message, post } from './api';
 import { Button, cx, Icon } from './components/ui';
@@ -10,9 +11,6 @@ import clickhouseLogomarkDark from './assets/clickhouse-logomark-dark.svg';
 import clickhouseLogomarkLight from './assets/clickhouse-logomark-light.svg';
 import type { Connected, Session } from './workspace-types';
 import { resolveConnectionSelection } from '../shared/connection-selection';
-
-type ParserMode = 'wasm' | 'basic';
-type AccentChoice = 'cyan' | 'clickhouse-yellow';
 
 const connectionLabel = (connection: Connected, demo: boolean) => demo && connection.dataSource === 'fixture' ? connection.id === 'demo' ? 'Sample data' : 'Another sample' : connection.name;
 const storedPreference = (key: string): string | null => {
@@ -46,10 +44,10 @@ function cloudProfileDefaults(connection?: Connected): SavedCloudConnectionProfi
 
 function App() {
     const [locale] = useState<Locale>(() => resolveLocale(storedPreference('clickstudio:locale'), ...browserLocales()));
-    const [theme, setTheme] = useState<Theme>(() => pref('clickstudio:theme', ['click-dark', 'click-light'] as const, 'click-dark'));
-    const [accent, setAccent] = useState<AccentChoice>(() => pref('clickstudio:accent', ['cyan', 'clickhouse-yellow'] as const, 'cyan'));
-    const [experience, setExperience] = useState<ExperienceLevel>(() => pref('clickstudio:experience', ['beginner', 'expert'] as const, 'beginner'));
-    const [parserMode, setParserMode] = useState<ParserMode>(() => pref('clickstudio:parser-mode', ['wasm', 'basic'] as const, 'wasm'));
+    const [theme, setTheme] = useState<Theme>(() => pref('clickstudio:theme', THEMES, 'click-dark'));
+    const [accent, setAccent] = useState<AccentChoice>(() => pref('clickstudio:accent', ACCENT_CHOICES, 'cyan'));
+    const [experience, setExperience] = useState<ExperienceLevel>(() => pref('clickstudio:experience', EXPERIENCE_LEVELS, 'beginner'));
+    const [parserMode, setParserMode] = useState<ParserMode>(() => pref('clickstudio:parser-mode', PARSER_MODES, 'wasm'));
     const [session, setSession] = useState<Session>();
     const [connections, setConnections] = useState<Connected[]>([]);
     const [connectionId, setConnectionId] = useState(() => new URLSearchParams(location.search).get('connection') ?? '');
@@ -227,7 +225,8 @@ function App() {
                     <div className="experience-switch parser-switch">
                         <span className="mode-caption">{copy.common.parserMode}</span>
                         <RadioGroup className="navbar-mode-control" value={parserMode} onValueChange={value => {
-                            if (value === 'wasm' || value === 'basic') setParserMode(value);
+                            const mode = PARSER_MODES.find(mode => mode === value);
+                            if (mode) setParserMode(mode);
                         }} aria-label={copy.common.parserMode} inline orientation="horizontal" dir="end">
                             <RadioGroup.Item value="wasm" className={`navbar-mode-option parser-mode-option is-wasm ${parserMode === 'wasm' ? 'is-active' : ''}`} label="WASM"/>
                             <RadioGroup.Item value="basic" className={`navbar-mode-option parser-mode-option is-basic ${parserMode === 'basic' ? 'is-active' : ''}`} label="CodeMirror"/>

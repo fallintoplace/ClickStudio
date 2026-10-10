@@ -2,7 +2,13 @@ import { buildMaterializedViewLineage, LINEAGE_TABLE_LIMIT, type LineageSnapshot
 import { metadataText, type MetadataReader } from './native-metadata.js';
 import { ACTIVITY_LIMIT, activityScopeNote, parseMergeActivity, parseMutationActivity, type MergeSnapshot, type MutationSnapshot } from './storage-activity.js';
 
-export type NativeExplorerRequest = { kind: 'lineage'; database: string } | { kind: 'merges' | 'mutations'; database: string; table: string };
+export const NATIVE_EXPLORER_KINDS = ['lineage', 'merges', 'mutations'] as const;
+export type NativeExplorerKind = typeof NATIVE_EXPLORER_KINDS[number];
+export type NativeExplorerRequest = { kind: Extract<NativeExplorerKind, 'lineage'>; database: string } | { kind: Exclude<NativeExplorerKind, 'lineage'>; database: string; table: string };
+
+export function isNativeExplorerKind(value: unknown): value is NativeExplorerKind {
+    return NATIVE_EXPLORER_KINDS.some(kind => kind === value);
+}
 export type NativeExplorerSnapshot = LineageSnapshot | MergeSnapshot | MutationSnapshot;
 
 export function mergeActivityQuery(): string {

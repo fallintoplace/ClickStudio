@@ -1,14 +1,8 @@
+import { CHART_KINDS } from '../../shared/chart-types';
 import type { Draft } from '../workspace-state';
 import type { Copy, Locale } from '../i18n';
 
-export const chartKindOptions = [
-    { value: 'number' },
-    { value: 'line' },
-    { value: 'bar' },
-    { value: 'scatter' },
-    { value: 'heatmap' },
-    { value: 'candlestick' },
-] as const satisfies readonly { value: Draft['chart']['kind'] }[];
+export const chartKindOptions = CHART_KINDS.filter(kind => kind !== 'table').map(value => ({ value }));
 
 const chartColors = ['var(--accent)', 'var(--green)', 'var(--amber)', 'var(--red)', 'var(--violet)'] as const;
 export const seriesColor = (index: number) => chartColors[index % chartColors.length]!;

@@ -1,3 +1,4 @@
+import type { ImportJobStatus } from '../shared/import-status.js';
 import { IMPORT_FILE_SIZE_LABEL, IMPORT_ROW_LIMIT_LABEL, MAX_IMPORT_FILE_BYTES, MAX_IMPORT_ROWS, MAX_IMPORT_COLUMNS, MAX_IMPORT_COLUMN_NAME_CHARS, type ImportFormat } from '../shared/import-limits.js';
 import { randomUUID } from 'node:crypto';
 import type { Json, Principal, Schema, SchemaColumn } from '../shared/types.js';
@@ -118,7 +119,7 @@ export interface ImportJob {
     deduplicationToken?: string;
     rows: number;
     createdAt: string;
-    status: 'running' | 'succeeded' | 'unknown';
+    status: ImportJobStatus;
     error?: string;
     reconciliationRequired?: boolean;
     reviewedAt?: string;
@@ -127,7 +128,7 @@ export interface ImportDriver {
     schema(connectionId: string): Promise<Schema>;
     allowed(connectionId: string, table: string): boolean;
     insert(connectionId: string, table: string, rows: Record<string, Json>[], queryId: string, deduplicationToken?: string): Promise<void>;
-    inspectInsert(connectionId: string, queryId: string): Promise<'running' | 'succeeded' | 'unknown'>;
+    inspectInsert(connectionId: string, queryId: string): Promise<ImportJobStatus>;
 }
 interface Mapping {
     id: string;

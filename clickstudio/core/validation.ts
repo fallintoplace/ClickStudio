@@ -1,10 +1,9 @@
+import { RUN_KINDS } from '../shared/run-types.js';
 import { MAX_SQL_CHARS } from '../shared/query-limits.js';
 import { DEFAULT_LIMITS, HARD_LIMITS, type Limits, type RunRequest, type Json } from '../shared/types.js';
 import { AppError, requireThat } from './errors.js';
 
-type RunKind = NonNullable<RunRequest['kind']>;
 const LIMIT_KEYS = ['rows', 'bytes', 'seconds', 'memory', 'threads'] satisfies readonly (keyof Limits)[];
-const RUN_KINDS = ['query', 'explain', 'plan', 'pipeline', 'analyze'] as const satisfies readonly RunKind[];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return value !== null && typeof value === 'object' && !Array.isArray(value);

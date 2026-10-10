@@ -1,3 +1,4 @@
+import type { ImportJobStatus } from '../../shared/import-status';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import type { SchemaColumn, SchemaTable } from '../../shared/types';
 import { api, message, post, RequestError } from '../api';
@@ -13,7 +14,7 @@ type Props = {
 
 type Preview = { id: string; rowCount: number };
 type Mapping = { id: string; table: string; rowCount: number; fields: Record<string, string>; deduplicationToken?: string | null };
-type ImportJob = { id: string; table: string; rows: number; status: 'running' | 'succeeded' | 'unknown'; error?: string; reconciliationRequired?: boolean; reviewedAt?: string; queryId?: string; deduplicationToken?: string; connectionId?: string };
+type ImportJob = { id: string; table: string; rows: number; status: ImportJobStatus; error?: string; reconciliationRequired?: boolean; reviewedAt?: string; queryId?: string; deduplicationToken?: string; connectionId?: string };
 type Step = 'edit' | 'review' | 'status';
 function optionalColumn(column: SchemaColumn) {
     return Boolean(column.defaultKind) || /^Nullable\(/.test(column.type);

@@ -1,3 +1,5 @@
+import { CLOUD_ACTIONS, type CloudCredentials, type CloudRequest } from '../shared/cloud-requests.js';
+import type { ImportJobStatus } from '../shared/import-status.js';
 import type { ImportFormat } from '../shared/import-limits.js';
 import { CLICKHOUSE_CLOUD_CONNECTION_ID, CLOUD_QUERY_LIMITS } from '../shared/cloud-policy.js';
 import { DEFAULT_LIMITS, type Capability, type ClickHouseDocumentationEntry, type ClickHouseDocumentationSummary, type Column, type Connection, type Row, type Schema, type SchemaColumn } from '../shared/types.js';
@@ -11,10 +13,10 @@ import type { MergeTreePartsSnapshot } from '../shared/parts.js';
 
 export { CLICKHOUSE_CLOUD_CONNECTION_ID } from '../shared/cloud-policy.js';
 
-export type CloudCredentials = { host: string; database: string; username: string; password: string };
+export type { CloudCredentials } from '../shared/cloud-requests.js';
 export type SavedCloudConnectionProfile = Pick<CloudCredentials, 'host' | 'database' | 'username'>;
 export type CloudQueryResult = { queryId: string; columns: Column[]; rows: Row[]; elapsedMs: number; bytes: number; truncated: boolean; writtenRows?: number };
-export type CloudImportJob = { id: string; connectionId: string; table: string; queryId: string; deduplicationToken?: string; rows: number; createdAt: string; status: 'running' | 'succeeded' | 'unknown'; error?: string; reviewedAt?: string; reconciliationRequired?: boolean; tableCreated?: boolean; tableExists?: boolean };
+export type CloudImportJob = { id: string; connectionId: string; table: string; queryId: string; deduplicationToken?: string; rows: number; createdAt: string; status: ImportJobStatus; error?: string; reviewedAt?: string; reconciliationRequired?: boolean; tableCreated?: boolean; tableExists?: boolean };
 export type CloudImportInput = {
     file: File;
     format: ImportFormat;
@@ -53,7 +55,7 @@ export class CloudRequestError extends Error {
     }
 }
 
-async function requestCloud<T>(body: Record<string, unknown>, signal?: AbortSignal): Promise<T> {
+async function requestCloud<T>(body: CloudRequest, signal?: AbortSignal): Promise<T> {
     const requestBody = activeCloud?.localSession
         ? Object.fromEntries(Object.entries(body).filter(([key]) => key !== 'credentials'))
         : body;
@@ -179,7 +181,7 @@ function makeConnection(credentials: SavedCloudConnectionProfile, tested: CloudC
 export async function connectClickHouseCloud(credentials: CloudCredentials, persistInLocalServer = false) {
     const tested = persistInLocalServer
         ? await localCloudSession<CloudConnectionTest>('POST', { credentials })
-        : await requestCloud<CloudConnectionTest>({ action: 'test', credentials });
+        : await requestCloud<CloudConnectionTest>({ action: CLOUD_ACTIONS.test, credentials });
     const connection = makeConnection(credentials, tested);
     activeCloud = persistInLocalServer
         ? { connection, localSession: true }
@@ -206,40 +208,40 @@ export async function disconnectClickHouseCloud() {
 
 export async function runClickHouseCloudSql(sql: string, sessionId?: string, options: { queryId?: string; parameters?: Record<string, string> } = {}): Promise<CloudQueryResult> {
     if (!activeCloud) throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before running SQL.', 401);
-    return await requestCloud<CloudQueryResult>({ action: 'run', credentials: activeCloud.credentials, sql, ...(sessionId ? { sessionId } : {}), ...options });
+    return await requestCloud<CloudQueryResult>({ action: CLOUD_ACTIONS.run, credentials: activeCloud.credentials, sql, ...(sessionId ? { sessionId } : {}), ...options });
 }
 
 export async function loadClickHouseCloudSchema(offsets: { databaseOffset?: number; tableOffset?: number; columnOffset?: number } = {}): Promise<Schema> {
     if (!activeCloud) throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before loading its schema.', 401);
-    return await requestCloud<Schema>({ action: 'schema', credentials: activeCloud.credentials, ...offsets });
+    return await requestCloud<Schema>({ action: CLOUD_ACTIONS.schema, credentials: activeCloud.credentials, ...offsets });
 }
 
 export async function loadClickHouseCloudQueryTree(sql: string, parameters: Record<string, string>, signal?: AbortSignal): Promise<string[]> {
     if (!activeCloud) throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before analyzing SQL.', 401);
-    return await requestCloud<string[]>({ action: 'query-tree', credentials: activeCloud.credentials, sql, parameters }, signal);
+    return await requestCloud<string[]>({ action: CLOUD_ACTIONS.queryTree, credentials: activeCloud.credentials, sql, parameters }, signal);
 }
 
 export async function loadClickHouseCloudProgress(queryId: string, signal?: AbortSignal) {
     if (!activeCloud) throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud to load query progress.', 401);
-    const response = await requestCloud<{ progress?: { readRows: string; readBytes: string; elapsedMs: number; memory?: string } }>({ action: 'progress', credentials: activeCloud.credentials, queryId }, signal);
+    const response = await requestCloud<{ progress?: { readRows: string; readBytes: string; elapsedMs: number; memory?: string } }>({ action: CLOUD_ACTIONS.progress, credentials: activeCloud.credentials, queryId }, signal);
     return response.progress;
 }
 
 export async function cancelClickHouseCloudQuery(queryId: string, signal?: AbortSignal) {
     if (!activeCloud) throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before stopping SQL.', 401);
-    return await requestCloud<{ cancelled: boolean; queryId: string }>({ action: 'cancel', credentials: activeCloud.credentials, queryId }, signal);
+    return await requestCloud<{ cancelled: boolean; queryId: string }>({ action: CLOUD_ACTIONS.cancel, credentials: activeCloud.credentials, queryId }, signal);
 }
 
 export async function loadClickHouseCloudProfileEvidence(queryId: string, signal?: AbortSignal) {
     if (!activeCloud) throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before loading query history.', 401);
     const source = activeCloud.connection.manifest?.queryLogSource;
     if (!source) throw new CloudRequestError('QUERY_LOG_UNAVAILABLE', 'Test the connection to check query-log access.', 409);
-    return await requestCloud<Record<string, unknown>[]>({ action: 'profile', credentials: activeCloud.credentials, queryId, source }, signal);
+    return await requestCloud<Record<string, unknown>[]>({ action: CLOUD_ACTIONS.profile, credentials: activeCloud.credentials, queryId, source }, signal);
 }
 
 export async function loadClickHouseCloudPipeline(sql: string, parameters: Record<string, string>, signal?: AbortSignal) {
     if (!activeCloud) throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before loading pipeline details.', 401);
-    return await requestCloud<string[]>({ action: 'pipeline', credentials: activeCloud.credentials, sql, parameters }, signal);
+    return await requestCloud<string[]>({ action: CLOUD_ACTIONS.pipeline, credentials: activeCloud.credentials, sql, parameters }, signal);
 }
 
 export async function loadClickHouseCloudFlamegraph(queryId: string, createdAt: string, finishedAt: string | undefined, signal?: AbortSignal): Promise<FlamegraphSnapshot> {
@@ -250,47 +252,47 @@ export async function loadClickHouseCloudFlamegraph(queryId: string, createdAt: 
         const date = new Date(value);
         return Number.isFinite(date.getTime()) ? date.toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
     };
-    return await requestCloud<FlamegraphSnapshot>({ action: 'flamegraph', credentials: activeCloud.credentials, queryId, startDate: asDate(createdAt), endDate: asDate(finishedAt ?? createdAt), source }, signal);
+    return await requestCloud<FlamegraphSnapshot>({ action: CLOUD_ACTIONS.flamegraph, credentials: activeCloud.credentials, queryId, startDate: asDate(createdAt), endDate: asDate(finishedAt ?? createdAt), source }, signal);
 }
 
 export async function searchClickHouseCloudDocumentation(query: string, category: string, signal?: AbortSignal) {
     if (!activeCloud) throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before searching reference docs.', 401);
-    return await requestCloud<ClickHouseDocumentationSummary[]>({ action: 'documentation-search', credentials: activeCloud.credentials, query, category }, signal);
+    return await requestCloud<ClickHouseDocumentationSummary[]>({ action: CLOUD_ACTIONS.documentationSearch, credentials: activeCloud.credentials, query, category }, signal);
 }
 
 export async function loadClickHouseCloudDocumentationEntry(name: string, type: string, signal?: AbortSignal) {
     if (!activeCloud) throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before opening reference docs.', 401);
-    return await requestCloud<ClickHouseDocumentationEntry | undefined>({ action: 'documentation-entry', credentials: activeCloud.credentials, name, type, serverVersion: activeCloud.connection.manifest?.serverVersion }, signal);
+    return await requestCloud<ClickHouseDocumentationEntry | undefined>({ action: CLOUD_ACTIONS.documentationEntry, credentials: activeCloud.credentials, name, type, serverVersion: activeCloud.connection.manifest?.serverVersion }, signal);
 }
 
 export async function loadClickHouseCloudNativeExplorer(request: NativeExplorerRequest, signal: AbortSignal): Promise<NativeExplorerSnapshot> {
     if (!activeCloud) throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before inspecting metadata.', 401);
-    return await requestCloud<NativeExplorerSnapshot>({ action: 'native-explorer', credentials: activeCloud.credentials, ...request }, signal);
+    return await requestCloud<NativeExplorerSnapshot>({ action: CLOUD_ACTIONS.nativeExplorer, credentials: activeCloud.credentials, ...request }, signal);
 }
 
 export async function loadClickHouseCloudTableParts(database: string, table: string, signal: AbortSignal): Promise<MergeTreePartsSnapshot> {
     if (!activeCloud) throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before inspecting storage.', 401);
-    return await requestCloud<MergeTreePartsSnapshot>({ action: 'table-parts', credentials: activeCloud.credentials, database, table }, signal);
+    return await requestCloud<MergeTreePartsSnapshot>({ action: CLOUD_ACTIONS.tableParts, credentials: activeCloud.credentials, database, table }, signal);
 }
 
 export async function createClickHouseCloudTable(input: { database: string; name: string; columns: CreateTableColumn[]; orderBy: string }) {
     if (!activeCloud) throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before creating a table.', 401);
     return await requestCloud<{ database: string; table: string; columns: CreateTableColumn[]; orderBy: string; queryId: string }>({
-        action: 'create-table', credentials: activeCloud.credentials, ...input,
+        action: CLOUD_ACTIONS.createTable, credentials: activeCloud.credentials, ...input,
     });
 }
 
 export async function dropClickHouseCloudTable(database: string, table: string, confirmation: string) {
     if (!activeCloud) throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before deleting a table.', 401);
     return await requestCloud<{ database: string; table: string; queryId: string }>({
-        action: 'drop-table', credentials: activeCloud.credentials, database, table, confirmation,
+        action: CLOUD_ACTIONS.dropTable, credentials: activeCloud.credentials, database, table, confirmation,
     });
 }
 
 export async function importClickHouseCloudFile(input: CloudImportInput): Promise<CloudImportJob> {
     if (!activeCloud) throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before importing data.', 401);
     const form = new FormData();
-    form.set('action', 'import-commit');
+    form.set('action', CLOUD_ACTIONS.importCommit);
     if (activeCloud.credentials) form.set('credentials', JSON.stringify(activeCloud.credentials));
     form.set('file', input.file, input.file.name);
     form.set('format', input.format);
@@ -324,17 +326,17 @@ export async function insertClickHouseCloudRow(input: {
 
 export async function checkClickHouseCloudImport(queryId: string, table: string, rows: number, deduplicationToken?: string): Promise<CloudImportJob> {
     if (!activeCloud) throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before checking import status.', 401);
-    return await requestCloud<CloudImportJob>({ action: 'import-status', credentials: activeCloud.credentials, queryId, table, rows, ...(deduplicationToken ? { deduplicationToken } : {}) });
+    return await requestCloud<CloudImportJob>({ action: CLOUD_ACTIONS.importStatus, credentials: activeCloud.credentials, queryId, table, rows, ...(deduplicationToken ? { deduplicationToken } : {}) });
 }
 
 export async function loadClickHouseCloudWorkload(minutes: WorkloadWindow, signal: AbortSignal): Promise<WorkloadSnapshot> {
     if (!activeCloud) throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before loading workload history.', 401);
     const source = activeCloud.connection.manifest?.queryLogSource;
     if (!source) throw new CloudRequestError('QUERY_LOG_UNAVAILABLE', 'Test the connection to check query-log access.', 409);
-    return await requestCloud<WorkloadSnapshot>({ action: 'workload', credentials: activeCloud.credentials, minutes, source }, signal);
+    return await requestCloud<WorkloadSnapshot>({ action: CLOUD_ACTIONS.workload, credentials: activeCloud.credentials, minutes, source }, signal);
 }
 
 export async function loadClickHouseCloudReplication(signal: AbortSignal): Promise<ReplicationSnapshot> {
     if (!activeCloud) throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before loading replication status.', 401);
-    return await requestCloud<ReplicationSnapshot>({ action: 'replication', credentials: activeCloud.credentials }, signal);
+    return await requestCloud<ReplicationSnapshot>({ action: CLOUD_ACTIONS.replication, credentials: activeCloud.credentials }, signal);
 }

@@ -1,3 +1,5 @@
+import type { ExperienceLevel } from '../appearance-types';
+import type { ProposalDecisionAction } from '../../shared/assistant-types';
 import { MAX_SCRIPT_STATEMENTS } from '../../shared/query-limits';
 import { useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { diffLines } from 'diff';
@@ -11,7 +13,7 @@ import { ScrollEdgeFrame } from './ScrollEdgeShadows';
 import { Button, cx, Icon } from './ui';
 
 export type AssistantWorkflowProps = {
-    mode: 'beginner' | 'expert';
+    mode: ExperienceLevel;
     sql: string;
     question: string;
     onQuestionChange: (question: string) => void;
@@ -38,7 +40,7 @@ export type AssistantWorkflowProps = {
     schemaLoading: boolean;
     schemaStatus: string;
     onRefreshSchema: () => void;
-    onDecideProposal: (turnId: string, decision: 'accepted' | 'rejected') => void;
+    onDecideProposal: (turnId: string, decision: ProposalDecisionAction) => void;
     onRunQuery: (sql: string) => void;
     runDisabled: (sql: string) => boolean;
 };

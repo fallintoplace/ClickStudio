@@ -1,3 +1,4 @@
+import { CHART_KINDS } from '../shared/chart-types.js';
 import { MAX_SQL_CHARS } from '../shared/query-limits.js';
 import type { ChartConfig, QueryDocument } from '../shared/types.js';
 import type { SaveableDraft } from '../shared/workspace-view.js';
@@ -67,8 +68,7 @@ const position = (value: unknown, length: number) => typeof value === 'number' &
 const index = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 const chartIndex = (value: unknown): value is number => index(value) && value <= 499;
 const revision = (value: unknown) => index(value) && value > 0 ? value : undefined;
-const chartKinds = ['table', 'number', 'line', 'bar', 'scatter', 'heatmap', 'candlestick'] as const satisfies readonly ChartConfig['kind'][];
-const isChartKind = (value: unknown): value is ChartConfig['kind'] => chartKinds.some(kind => kind === value);
+const isChartKind = (value: unknown): value is ChartConfig['kind'] => CHART_KINDS.some(kind => kind === value);
 function recoveredCandlestick(value: unknown): ChartConfig['candlestick'] {
     if (!record(value)) return undefined;
     return {

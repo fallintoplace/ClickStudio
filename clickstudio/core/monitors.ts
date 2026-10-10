@@ -1,3 +1,4 @@
+import { MONITOR_CONDITIONS } from '../shared/monitor-types.js';
 import { randomUUID } from 'node:crypto';
 import type { Monitor, Notice, Principal } from '../shared/types.js';
 import { requireThat } from './errors.js';
@@ -15,7 +16,7 @@ export class MonitorService {
         const pub = this.artifacts.published(p, publishedId);
         requireThat(pub.source === 'live-run', 409, 'MONITOR_SOURCE', 'Imported evidence is not an executable published revision');
         integer(intervalSeconds, 'intervalSeconds', 60, 31536000);
-        requireThat(['changed', 'nonempty', 'failure'].includes(condition), 400, 'MONITOR_CONDITION', 'Invalid monitor condition');
+        requireThat(MONITOR_CONDITIONS.includes(condition), 400, 'MONITOR_CONDITION', 'Invalid monitor condition');
         requireThat(this.list(p).length < 20, 429, 'MONITOR_CAPACITY', 'At most 20 monitors are supported');
         const monitor: Monitor = { id: randomUUID(), owner: p.id, publishedId, intervalSeconds, condition, paused: false,
             createdAt: new Date().toISOString(), nextAt: new Date(Date.now() + intervalSeconds * 1000).toISOString() };

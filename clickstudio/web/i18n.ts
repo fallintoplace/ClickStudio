@@ -1,3 +1,4 @@
+import { THEMES, EXPERIENCE_LEVELS, type Theme, type ExperienceLevel } from './appearance-types.js';
 import type { Copy, Locale } from './i18n-types.js';
 import type { SelectOption } from './workspace-types.js';
 import { english } from './i18n-english.js';
@@ -18,8 +19,7 @@ export { allLocales } from './i18n-types.js';
 export type { Copy, Locale } from './i18n-types.js';
 
 export const supportedLocales = ['en', 'zh'] as const satisfies readonly Locale[];
-export type Theme = 'click-dark' | 'click-light';
-export type ExperienceLevel = 'beginner' | 'expert';
+export type { Theme, ExperienceLevel } from './appearance-types.js';
 
 export const themeAppearance: Record<Theme, { dark: boolean; chromeColor: string }> = {
     'click-dark': { dark: true, chromeColor: '#151515' },
@@ -39,15 +39,13 @@ export function resolveLocale(...candidates: readonly (string | null | undefined
     return 'en';
 }
 
-export const themeOptions = (copy: Copy) => [
-    { value: 'click-dark', label: copy.app.darkTheme },
-    { value: 'click-light', label: copy.app.lightTheme },
-] as const satisfies readonly SelectOption<Theme>[];
+export const themeOptions = (copy: Copy): readonly SelectOption<Theme>[] => THEMES.map(value => ({
+    value, label: value === 'click-dark' ? copy.app.darkTheme : copy.app.lightTheme,
+}));
 
-export const experienceOptions = (copy: Copy) => [
-    { value: 'beginner', label: copy.app.beginner },
-    { value: 'expert', label: copy.app.expert },
-] as const satisfies readonly SelectOption<ExperienceLevel>[];
+export const experienceOptions = (copy: Copy): readonly SelectOption<ExperienceLevel>[] => EXPERIENCE_LEVELS.map(value => ({
+    value, label: copy.app[value],
+}));
 
 function mergeSection<T extends object>(englishSection: T, translated: object): T {
     const result = { ...englishSection };

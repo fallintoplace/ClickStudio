@@ -1,9 +1,10 @@
+import { isTerminalRunStatus } from '../../shared/run-types';
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import type { Run } from '../../shared/types';
 import type { Inspector } from '../workspace-types';
 import type { Copy } from '../i18n';
 
-export const terminal = (run?: Run) => Boolean(run && ['succeeded', 'truncated', 'failed', 'cancelled', 'timed_out', 'interrupted'].includes(run.status));
+export const terminal = (run?: Run) => Boolean(run && isTerminalRunStatus(run.status));
 
 export function cx(...values: Array<string | false | undefined>) { return values.filter(Boolean).join(' '); }
 

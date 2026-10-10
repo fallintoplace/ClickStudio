@@ -1,3 +1,13 @@
+import type { RunKind, RunStatus, RunResultState, ScriptStatus, ResultCompleteness, RunEventType } from './run-types.js';
+import type { ChartKind } from './chart-types.js';
+import type { AssistantAction, FindingSeverity, EvaluationStatus, QualityCheckId, ProposalDecision } from './assistant-types.js';
+import type { MonitorCondition } from './monitor-types.js';
+import type { QueryLogSource } from './workload.js';
+import type { FlamegraphSource } from './flamegraph.js';
+export type { RunKind, RunStatus } from './run-types.js';
+export type { ChartKind } from './chart-types.js';
+export type { AssistantAction, EvaluationStatus } from './assistant-types.js';
+
 /** Values remain lossless JSON: Int64/UInt64 and Decimal arrive as strings. */
 export type Json = null | boolean | number | string | Json[] | {
     [key: string]: Json;
@@ -24,7 +34,7 @@ export type Capability = {
     available: boolean;
     reason?: string;
 };
-export type RunKind = 'query' | 'explain' | 'plan' | 'pipeline' | 'analyze';
+
 export interface Manifest {
     version: 1;
     serverVersion: string;
@@ -38,12 +48,12 @@ export interface Manifest {
     /** Server-side semantic tree produced by EXPLAIN QUERY TREE. */
     queryTree?: Capability;
     /** Trace symbolization form used for profiler samples. */
-    traceLogSource?: 'symbolized' | 'addresses';
+    traceLogSource?: FlamegraphSource;
     /** Running EXPLAIN PIPELINE as a query is separate from loading structured pipeline evidence. */
     explainPipeline?: Capability;
     pipeline: Capability;
     queryLog: Capability;
-    queryLogSource?: 'user_query_log' | 'query_log';
+    queryLogSource?: QueryLogSource;
     traceLog?: Capability;
     replication?: Capability;
     documentation: Capability;
@@ -125,7 +135,7 @@ export interface Schema {
         columns?: number;
     };
 }
-export type ReferenceCategory = 'all' | 'functions' | 'types' | 'engines' | 'settings' | 'system' | 'formats' | 'sql';
+export type { ReferenceCategory } from './reference.js';
 export interface ClickHouseDocumentationSummary {
     name: string;
     type: string;
@@ -153,7 +163,7 @@ export interface RunRequest {
     sourceFrom?: number;
     sourceTo?: number;
 }
-export type RunStatus = 'queued' | 'running' | 'succeeded' | 'truncated' | 'failed' | 'cancelled' | 'timed_out' | 'interrupted';
+
 export interface Progress {
     readRows: string;
     readBytes: string;
@@ -189,7 +199,7 @@ export interface Run {
     error?: ApiError;
     sequence: number;
     resultExpiresAt?: string;
-    resultState: 'pending' | 'reopenable' | 'expired' | 'unavailable';
+    resultState: RunResultState;
     requestedBy: string;
     executedAs: string;
     permissionSnapshot: {
@@ -275,7 +285,7 @@ export interface Result {
     queryId: string;
     columns: Column[];
     rows: Row[];
-    completeness: 'complete' | 'truncated';
+    completeness: ResultCompleteness;
     createdAt: string;
     expiresAt: string;
 }
@@ -287,7 +297,7 @@ export interface ResultPage extends Omit<Result, 'rows'> {
 }
 export interface RunEvent {
     sequence: number;
-    type: 'state' | 'progress';
+    type: RunEventType;
     run: Run;
 }
 export interface Script {
@@ -296,7 +306,7 @@ export interface Script {
     connectionId: string;
     sql: string;
     createdAt: string;
-    status: 'running' | 'succeeded' | 'partial' | 'failed' | 'cancelled' | 'interrupted';
+    status: ScriptStatus;
     stopOnError: boolean;
     cancelled: boolean;
     statements: {
@@ -308,7 +318,7 @@ export interface Script {
         error?: ApiError;
     }[];
 }
-export type ChartKind = 'table' | 'number' | 'line' | 'bar' | 'scatter' | 'heatmap' | 'candlestick';
+
 export interface CandlestickConfig {
     open?: number;
     high?: number;
@@ -392,7 +402,7 @@ export interface AuditEvent {
     outcome: 'allowed' | 'denied' | 'failed';
     ruleId?: string;
 }
-export type AssistantAction = 'ask' | 'generate' | 'explain' | 'repair' | 'result' | 'performance' | 'review';
+
 export interface AssistantConversationMessage {
     role: 'user' | 'assistant';
     content: string;
@@ -416,14 +426,14 @@ export interface ProposalContent {
     clarification: string | null;
     sources?: AssistantSource[];
     findings: {
-        severity: 'high' | 'medium' | 'low';
+        severity: FindingSeverity;
         message: string;
         evidence: string;
     }[];
 }
-export type EvaluationStatus = 'pass' | 'warn' | 'fail';
+
 export interface ProposalQualityCheck {
-    id: 'contract' | 'safety' | 'grounding' | 'semantic';
+    id: QualityCheckId;
     status: EvaluationStatus;
     message: string;
 }
@@ -445,7 +455,7 @@ export interface Proposal extends ProposalContent {
     model: string;
     promptVersion: string;
     contextSummary: string[];
-    decision: 'pending' | 'accepted' | 'rejected';
+    decision: ProposalDecision;
     quality?: ProposalQuality;
     decidedAt?: string;
 }
@@ -479,7 +489,7 @@ export interface Monitor {
     nextAt: string;
     lastRunId?: string;
     lastHash?: string;
-    condition: 'changed' | 'nonempty' | 'failure';
+    condition: MonitorCondition;
 }
 export interface Notice {
     id: string;
@@ -487,6 +497,6 @@ export interface Notice {
     monitorId: string;
     runId: string;
     createdAt: string;
-    reason: 'changed' | 'nonempty' | 'failure';
+    reason: MonitorCondition;
     read: boolean;
 }

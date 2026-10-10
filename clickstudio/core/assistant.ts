@@ -1,3 +1,4 @@
+import { FINDING_SEVERITIES, type ProposalDecisionAction } from '../shared/assistant-types.js';
 import { randomUUID } from 'node:crypto';
 import type { AssistantAction, AssistantConversationMessage, AssistantEvaluationReport, ClickHouseDocumentationEntry, Principal, Proposal, ProposalContent, Result, Schema } from '../shared/types.js';
 import { AppError, requireThat } from './errors.js';
@@ -93,7 +94,6 @@ interface AssistantContextData {
         rows: Result['rows'];
     };
 }
-const FINDING_SEVERITIES = ['high', 'medium', 'low'] as const satisfies readonly ProposalContent['findings'][number]['severity'][];
 const credentialPattern = /\b(?:password|api[_-]?key|access[_-]?token|secret)\s*[:=]\s*['"][^'"]+['"]|\b(?:sk-[A-Za-z0-9_-]{16,})|https?:\/\/[^\s/@]+:[^\s/@]+@/i;
 export function validateAssistantConversation(value: unknown): AssistantConversationMessage[] {
     if (value === undefined) return [];
@@ -359,7 +359,7 @@ export class AssistantService {
     evaluation(p: Principal): AssistantEvaluationReport {
         return buildEvaluationReport(this.store.list<Proposal>('proposals').filter(proposal => proposal.owner === p.id));
     }
-    decide(p: Principal, id: string, decision: 'accepted' | 'rejected', connectionId: string, currentSql: string): Proposal {
+    decide(p: Principal, id: string, decision: ProposalDecisionAction, connectionId: string, currentSql: string): Proposal {
         canWrite(p);
         const proposal = this.get(p, id);
         requireThat(proposal.connectionId === connectionId, 409, 'CONNECTION_MISMATCH', 'The proposal targets another connection');

@@ -2,8 +2,13 @@ export const MAX_FLAMEGRAPH_STACKS = 250;
 export const MAX_FLAMEGRAPH_DEPTH = 32;
 export const MAX_FLAMEGRAPH_NODES = 4000;
 
-export type FlamegraphTraceType = 'CPU' | 'Real';
-export type FlamegraphSource = 'symbolized' | 'addresses';
+export const FLAMEGRAPH_TRACE_TYPES = ['CPU', 'Real'] as const;
+export type FlamegraphTraceType = typeof FLAMEGRAPH_TRACE_TYPES[number];
+export const FLAMEGRAPH_SOURCES = ['symbolized', 'addresses'] as const;
+export type FlamegraphSource = typeof FLAMEGRAPH_SOURCES[number];
+export function isFlamegraphSource(value: unknown): value is FlamegraphSource {
+    return FLAMEGRAPH_SOURCES.some(source => source === value);
+}
 
 export interface FlamegraphFrame {
     id: string;
@@ -46,7 +51,7 @@ const sampleCount = (value: unknown) => {
     const count = Number(value);
     return Number.isSafeInteger(count) && count > 0 ? count : 0;
 };
-const typeValue = (value: unknown): FlamegraphTraceType | undefined => value === 'CPU' || value === 'Real' ? value : undefined;
+const typeValue = (value: unknown) => FLAMEGRAPH_TRACE_TYPES.find(type => type === value);
 const stringArray = (value: unknown) => Array.isArray(value) ? value : [];
 
 export function flamegraphQuery(source: FlamegraphSource) {
@@ -64,7 +69,7 @@ export function flamegraphQuery(source: FlamegraphSource) {
     FROM system.trace_log
     WHERE query_id = {queryId:String}
         AND event_date >= toDate({startDate:Date}) - 1 AND event_date <= toDate({endDate:Date}) + 1
-        AND trace_type IN ('CPU', 'Real')
+        AND trace_type IN (${FLAMEGRAPH_TRACE_TYPES.map(type => `'${type}'`).join(', ')})
     GROUP BY ${grouping}
     ORDER BY samples DESC
     LIMIT ${MAX_FLAMEGRAPH_STACKS + 1}`;
@@ -112,7 +117,7 @@ export function parseFlamegraphRows(queryId: string, rows: readonly Row[]): Flam
         }
     }
     const series: FlamegraphSnapshot['series'] = {};
-    for (const type of ['CPU', 'Real'] as const) {
+    for (const type of FLAMEGRAPH_TRACE_TYPES) {
         if (!roots[type].children.size) continue;
         series[type] = { type, root: freezeFrame(roots[type]), samples: samples[type] };
     }

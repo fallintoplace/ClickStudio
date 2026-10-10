@@ -1,3 +1,4 @@
+import { FINDING_SEVERITIES } from '../shared/assistant-types.js';
 import OpenAI from 'openai';
 import { APIConnectionTimeoutError, APIError } from 'openai';
 import { ASSISTANT_REQUEST_TIMEOUT_MS, ASSISTANT_TIMEOUT_MESSAGE, MAX_ASSISTANT_PROPOSAL_TABLES, isAssistantTimeoutSignal, validateProposal, type AssistantDriver, type PreparedContext } from '../core/assistant.js';
@@ -9,7 +10,7 @@ const strings = { type: 'array', items: { type: 'string' } };
 const schema = { type: 'object', additionalProperties: false, required: ['sql', 'alternatives', 'summary', 'assumptions', 'tables', 'caveats', 'clarification', 'findings'], properties: {
         sql: { type: ['string', 'null'] }, alternatives: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['title', 'summary', 'sql'], properties: { title: { type: 'string' }, summary: { type: 'string' }, sql: { type: 'string' } } } },
         summary: { type: 'string' }, assumptions: strings, tables: { ...strings, maxItems: MAX_ASSISTANT_PROPOSAL_TABLES }, caveats: strings, clarification: { type: ['string', 'null'] },
-        findings: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['severity', 'message', 'evidence'], properties: { severity: { type: 'string', enum: ['high', 'medium', 'low'] }, message: { type: 'string' }, evidence: { type: 'string' } } } },
+        findings: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['severity', 'message', 'evidence'], properties: { severity: { type: 'string', enum: FINDING_SEVERITIES }, message: { type: 'string' }, evidence: { type: 'string' } } } },
     } };
 
 function maxInputTokens(): number {

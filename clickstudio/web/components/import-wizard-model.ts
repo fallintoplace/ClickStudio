@@ -1,15 +1,16 @@
+import type { ImportJobStatus } from '../../shared/import-status';
 import type { ImportFormat } from '../../shared/import-limits';
 import type { Json, Schema, SchemaColumn } from '../../shared/types';
 import { api } from '../api';
 
 export type { ImportFormat } from '../../shared/import-limits';
-export type Step = 'file' | 'mapping' | 'review' | 'status';
 export const importSteps = [
     { id: 'file', label: 'File' },
     { id: 'mapping', label: 'Set up' },
     { id: 'review', label: 'Review' },
     { id: 'status', label: 'Import' },
-] as const satisfies readonly { id: Step; label: string }[];
+] as const;
+export type Step = typeof importSteps[number]['id'];
 
 export type ImportPreview = {
     id: string;
@@ -38,7 +39,7 @@ export type ImportJob = {
     deduplicationToken?: string;
     rows: number;
     createdAt?: string;
-    status: 'running' | 'succeeded' | 'unknown';
+    status: ImportJobStatus;
     error?: string;
     reconciliationRequired?: boolean;
     tableCreated?: boolean;

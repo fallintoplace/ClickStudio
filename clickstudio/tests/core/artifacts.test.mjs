@@ -12,8 +12,10 @@ async function ready() {
 test('Optimistic revisions cannot silently overwrite concurrent edits', async () => { const f = await ready(); f.a.save(owner, { ...f.doc, baseRevision: 1, sql: 'SELECT 3' }, f.doc.id); assert.throws(() => f.a.save(owner, { ...f.doc, baseRevision: 1, sql: 'SELECT 4' }, f.doc.id), { code: 'REVISION_CONFLICT' }); });
 test('Legacy chart types normalize to table and unknown types are rejected', async () => {
     const f = await ready();
-    const saved = f.a.save(owner, { name: 'legacy.sql', connectionId: 'local', sql: 'SELECT 1', chart: { kind: 'pie', x: 0, ys: [0], title: 'Legacy' } });
-    assert.equal(saved.chart.kind, 'table');
+    for (const kind of ['pie', 'area', 'stacked']) {
+        const saved = f.a.save(owner, { name: 'legacy.sql', connectionId: 'local', sql: 'SELECT 1', chart: { kind, x: 0, ys: [0], title: 'Legacy' } });
+        assert.equal(saved.chart.kind, 'table');
+    }
     assert.throws(() => f.a.save(owner, { name: 'invalid.sql', connectionId: 'local', sql: 'SELECT 1', chart: { kind: 'unknown', x: 0, ys: [0], title: 'Invalid' } }), { code: 'CHART_CONFIG' });
     const stored = f.store.get('documents', f.doc.id);
     stored.chart.kind = 'area';
@@ -21,6 +23,16 @@ test('Legacy chart types normalize to table and unknown types are rejected', asy
     assert.equal(f.a.get(owner, stored.id).chart.kind, 'table');
     assert.equal(f.a.list(owner).find(document => document.id === stored.id).chart.kind, 'table');
     assert.equal(f.a.revisions(owner, stored.id)[0].chart.kind, 'table');
+});
+test('All supported chart kinds survive saving and reading a document', async t => {
+    const f = await ready();
+    t.after(() => f.runs.close());
+    for (const kind of ['table', 'number', 'line', 'bar', 'scatter', 'heatmap', 'candlestick']) {
+        const document = f.a.save(owner, { name: `${kind}.sql`, connectionId: 'local', sql: 'SELECT 1', chart: { kind, x: 0, ys: [], title: 'Chart', ...(kind === 'candlestick' ? { candlestick: {} } : {}) } });
+        assert.equal(document.chart.kind, kind);
+        assert.equal(f.a.get(owner, document.id).chart.kind, kind);
+        assert.equal(f.a.get(owner, document.id, 1).chart.kind, kind);
+    }
 });
 test('Scatter and heatmap chart settings survive document saves and revision reads', async () => {
     const f = await ready();

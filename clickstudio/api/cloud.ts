@@ -1,3 +1,5 @@
+import { CLOUD_ACTIONS, type CloudCredentials } from '../shared/cloud-requests.js';
+import type { ImportJobStatus } from '../shared/import-status.js';
 import { MAX_SQL_CHARS } from '../shared/query-limits.js';
 import { IMPORT_FORMATS, IMPORT_FILE_SIZE_LABEL, MAX_IMPORT_FILE_BYTES, MAX_IMPORT_ROWS, MAX_IMPORT_COLUMNS, type ImportFormat } from '../shared/import-limits.js';
 import { CLICKHOUSE_CLOUD_CONNECTION_ID, CLOUD_QUERY_LIMITS, MAX_CLOUD_INSPECTOR_RESULT_ROWS, MAX_CLOUD_REFERENCE_RESULT_ROWS, CLOUD_SCHEMA_DATABASE_PAGE_ROWS, CLOUD_SCHEMA_TABLE_PAGE_ROWS, CLOUD_SCHEMA_COLUMN_PAGE_ROWS, CLOUD_REQUEST_TIMEOUT_MS, CLOUD_QUERY_TIMEOUT_MS, MAX_CLOUD_IMPORT_REQUEST_BYTES } from '../shared/cloud-policy.js';
@@ -11,17 +13,16 @@ import { ImportMappingError, mapImportRows } from '../core/import-mapping.js';
 import type { Capability, ClickHouseDocumentationEntry, ClickHouseDocumentationSummary, Column, Json, Row, Schema, SchemaColumn, SchemaTable } from '../shared/types.js';
 import { EXPLORATION_FORMAT_ERROR, hasTopLevelOutputFormat, lexSql, quoteIdentifier, quoteStringLiteral, splitSql } from '../shared/sql.js';
 import { buildReferenceEntryQuery, buildReferenceSearchQuery, isMissingDocumentationSourceColumn, isReferenceCategory } from '../shared/reference.js';
-import { flamegraphQuery, parseFlamegraphRows, type FlamegraphSource } from '../shared/flamegraph.js';
+import { isFlamegraphSource, flamegraphQuery, parseFlamegraphRows, type FlamegraphSource } from '../shared/flamegraph.js';
 import { CREATE_TABLE_COLUMN_TYPES, isValidTableDatabase, type CreateTableColumn, type CreateTableColumnType } from '../shared/table-creation.js';
 import { createTableSql } from '../core/table-creation.js';
 import { canDropTableTarget, dropTableSql, isSystemDatabaseName, isViewEngine, tableDeletionConfirmation } from '../shared/table-deletion.js';
 import { cloudImportQueryLogOutcome } from '../shared/cloud-import-status.js';
 import { parseReplicationSnapshot, replicationQueueQuery, replicationReplicasQuery, type ReplicationCapabilities } from '../shared/replication.js';
-import { parseWorkloadSnapshot, WORKLOAD_WINDOWS, workloadFamiliesQuery, workloadPointsQuery, type QueryLogSource, type WorkloadWindow } from '../shared/workload.js';
-import { loadNativeExplorer, type NativeExplorerRequest, type NativeExplorerSnapshot } from '../shared/native-explorers.js';
+import { QUERY_LOG_SOURCES, isQueryLogSource, parseWorkloadSnapshot, WORKLOAD_WINDOWS, workloadFamiliesQuery, workloadPointsQuery, type QueryLogSource, type WorkloadWindow } from '../shared/workload.js';
+import { isNativeExplorerKind, loadNativeExplorer, type NativeExplorerRequest, type NativeExplorerSnapshot } from '../shared/native-explorers.js';
 import { mergeTreePartsQuery, parseMergeTreeParts, type MergeTreePartsSnapshot } from '../shared/parts.js';
 
-type CloudCredentials = { host: string; database: string; username: string; password: string };
 const clickhouseSettings = {
     max_execution_time: CLOUD_QUERY_LIMITS.seconds,
     max_result_rows: String(CLOUD_QUERY_LIMITS.rows),
@@ -38,7 +39,7 @@ const clickhouseRunSettings = {
     output_format_json_quote_decimals: 1 as const,
 };
 
-type CloudImportJob = { id: string; connectionId: typeof CLICKHOUSE_CLOUD_CONNECTION_ID; table: string; queryId: string; deduplicationToken?: string; rows: number; createdAt: string; status: 'running' | 'succeeded' | 'unknown'; error?: string; reviewedAt?: string; reconciliationRequired?: boolean; tableCreated?: boolean; tableExists?: boolean };
+type CloudImportJob = { id: string; connectionId: typeof CLICKHOUSE_CLOUD_CONNECTION_ID; table: string; queryId: string; deduplicationToken?: string; rows: number; createdAt: string; status: ImportJobStatus; error?: string; reviewedAt?: string; reconciliationRequired?: boolean; tableCreated?: boolean; tableExists?: boolean };
 
 function isSameOrigin(request: Request) {
     const origin = request.headers.get('origin');
@@ -578,7 +579,7 @@ async function inspectCloudImport(credentials: CloudCredentials, url: string, qu
         } catch { }
         const insertEntries: { query_id: string; type: string; event_time: string }[] = [];
         const createEntries: { query_id: string; type: string; event_time: string }[] = [];
-        for (const source of ['user_query_log', 'query_log'] as const) {
+        for (const source of QUERY_LOG_SOURCES) {
             try {
                 const entries = await queryRows<{ query_id: string; type: string; event_time: string }>(client,
                     `SELECT query_id, type, event_time FROM system.${source} WHERE query_id IN ({queryId:String}, {createQueryId:String}) ORDER BY event_time DESC LIMIT 20`, { queryId, createQueryId }, 8_000, 6);
@@ -735,7 +736,7 @@ async function postCloudImport(request: Request): Promise<Response> {
     const validated = validateCredentials(credentialInput);
     if (validated instanceof Response) return validated;
     const { credentials, url } = validated;
-    if (form.get('action') !== 'import-commit') return fail('CLOUD_ACTION', 'Choose the Cloud import action.');
+    if (form.get('action') !== CLOUD_ACTIONS.importCommit) return fail('CLOUD_ACTION', 'Choose the Cloud import action.');
     try {
         return json(await commitCloudImport(form, credentials, url));
     } catch (error) {
@@ -772,9 +773,9 @@ async function post(request: Request): Promise<Response> {
 
     const { credentials, url } = validated;
     try {
-        if (body.action === 'test')
+        if (body.action === CLOUD_ACTIONS.test)
             return json(await testConnection(credentials, url));
-        if (body.action === 'schema') {
+        if (body.action === CLOUD_ACTIONS.schema) {
             const offset = (key: 'databaseOffset' | 'tableOffset' | 'columnOffset') => {
                 const value = body[key] === undefined ? 0 : Number(body[key]);
                 if (!Number.isSafeInteger(value) || value < 0 || value > 100_000_000) throw new AppError(400, 'SCHEMA_OFFSET', 'The schema page is invalid.');
@@ -782,56 +783,56 @@ async function post(request: Request): Promise<Response> {
             };
             return json(await readSchema(credentials, url, { databases: offset('databaseOffset'), tables: offset('tableOffset'), columns: offset('columnOffset') }));
         }
-        if (body.action === 'query-tree') {
+        if (body.action === CLOUD_ACTIONS.queryTree) {
             if (typeof body.sql !== 'string' || !body.sql.trim() || body.sql.length > MAX_SQL_CHARS || splitSql(body.sql).length !== 1)
                 return fail('QUERY_TREE_SQL', 'Enter one SQL statement to inspect.');
             if (!isExplainableReadQuery(body.sql.trim()))
                 return fail('QUERY_TREE_SQL', 'Query-tree inspection accepts one read query, such as SELECT or WITH.');
             return json(await cloudQueryTree(credentials, url, body.sql.trim(), queryParameters(body.parameters)));
         }
-        if (body.action === 'progress') {
+        if (body.action === CLOUD_ACTIONS.progress) {
             if (!validRunQueryId(body.queryId)) return fail('RUN_QUERY_ID', 'The running query id is invalid.');
             return json({ progress: await readCloudProgress(credentials, url, body.queryId) });
         }
-        if (body.action === 'cancel') {
+        if (body.action === CLOUD_ACTIONS.cancel) {
             if (!validRunQueryId(body.queryId)) return fail('RUN_QUERY_ID', 'The running query id is invalid.');
             return json(await cancelCloudQuery(credentials, url, body.queryId));
         }
-        if (body.action === 'profile') {
+        if (body.action === CLOUD_ACTIONS.profile) {
             if (!validRunQueryId(body.queryId)) return fail('RUN_QUERY_ID', 'The query id is invalid.');
-            if (body.source !== 'user_query_log' && body.source !== 'query_log') return fail('QUERY_LOG_UNAVAILABLE', 'Test the connection to check query-log access.', 409);
+            if (!isQueryLogSource(body.source)) return fail('QUERY_LOG_UNAVAILABLE', 'Test the connection to check query-log access.', 409);
             return json(await cloudQueryLogEvidence(credentials, url, body.queryId, body.source));
         }
-        if (body.action === 'pipeline') {
+        if (body.action === CLOUD_ACTIONS.pipeline) {
             if (typeof body.sql !== 'string' || !body.sql.trim() || body.sql.length > MAX_SQL_CHARS || splitSql(body.sql).length !== 1)
                 return fail('PIPELINE_SQL', 'Enter one SQL statement to inspect.');
             if (!isExplainableReadQuery(body.sql.trim()))
                 return fail('PIPELINE_SQL', 'Pipeline inspection accepts one read query, such as SELECT or WITH.');
             return json(await cloudPipelineEvidence(credentials, url, body.sql.trim(), queryParameters(body.parameters)));
         }
-        if (body.action === 'flamegraph') {
+        if (body.action === CLOUD_ACTIONS.flamegraph) {
             if (!validRunQueryId(body.queryId)) return fail('RUN_QUERY_ID', 'The query id is invalid.');
-            if (body.source !== 'symbolized' && body.source !== 'addresses') return fail('TRACE_UNAVAILABLE', 'Test the connection to check trace-log access.', 409);
+            if (!isFlamegraphSource(body.source)) return fail('TRACE_UNAVAILABLE', 'Test the connection to check trace-log access.', 409);
             const date = (value: unknown) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`)) ? value : undefined;
             const startDate = date(body.startDate), endDate = date(body.endDate);
             if (!startDate || !endDate) return fail('TRACE_DATE', 'The query time range is invalid.');
             return json(await cloudFlamegraph(credentials, url, body.queryId, startDate, endDate, body.source));
         }
-        if (body.action === 'documentation-search') {
+        if (body.action === CLOUD_ACTIONS.documentationSearch) {
             const query = typeof body.query === 'string' ? body.query.slice(0, 128) : '';
             const category = typeof body.category === 'string' ? body.category : 'all';
             return json(await cloudReferenceSearch(credentials, url, query, category));
         }
-        if (body.action === 'documentation-entry') {
+        if (body.action === CLOUD_ACTIONS.documentationEntry) {
             if (typeof body.name !== 'string' || body.name.length > 128 || typeof body.type !== 'string' || body.type.length > 80)
                 return fail('DOCUMENTATION_ENTRY', 'Choose a valid ClickHouse reference entry.');
             const version = typeof body.serverVersion === 'string' ? body.serverVersion.slice(0, 80) : 'unknown';
             return json(await cloudReferenceEntry(credentials, url, body.name, body.type, version));
         }
-        if (body.action === 'native-explorer') {
+        if (body.action === CLOUD_ACTIONS.nativeExplorer) {
             if (typeof body.database !== 'string' || !body.database.trim() || body.database.length > 128 || isSystemDatabaseName(body.database))
                 return fail('NATIVE_EXPLORER_DATABASE', 'Choose a valid non-system database to inspect.');
-            if (body.kind !== 'lineage' && body.kind !== 'merges' && body.kind !== 'mutations')
+            if (!isNativeExplorerKind(body.kind))
                 return fail('NATIVE_EXPLORER_KIND', 'Choose a supported metadata view.');
             let request: NativeExplorerRequest;
             if (body.kind === 'lineage') request = { kind: 'lineage', database: body.database };
@@ -842,14 +843,14 @@ async function post(request: Request): Promise<Response> {
             }
             return json(await readNativeExplorer(credentials, url, request));
         }
-        if (body.action === 'table-parts') {
+        if (body.action === CLOUD_ACTIONS.tableParts) {
             if (typeof body.database !== 'string' || !body.database.trim() || body.database.length > 128 || isSystemDatabaseName(body.database))
                 return fail('TABLE_PARTS_DATABASE', 'Choose a valid non-system database to inspect.');
             if (typeof body.table !== 'string' || !body.table.trim() || body.table.length > 128)
                 return fail('TABLE_PARTS_TABLE', 'Choose a valid table to inspect.');
             return json(await readTableParts(credentials, url, body.database, body.table));
         }
-        if (body.action === 'run') {
+        if (body.action === CLOUD_ACTIONS.run) {
             if (typeof body.sql !== 'string') return fail('SQL_REQUIRED', 'Enter SQL to run.');
             const sessionId = body.sessionId;
             if (sessionId !== undefined && (typeof sessionId !== 'string' || !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(sessionId)))
@@ -857,19 +858,19 @@ async function post(request: Request): Promise<Response> {
             if (body.queryId !== undefined && !validRunQueryId(body.queryId)) return fail('RUN_QUERY_ID', 'The query id is invalid.');
             return json(await runSql(credentials, url, body.sql, sessionId, body.queryId as string | undefined, queryParameters(body.parameters)));
         }
-        if (body.action === 'workload') {
+        if (body.action === CLOUD_ACTIONS.workload) {
             if (!isWorkloadWindow(body.minutes)) return fail('WORKLOAD_WINDOW', 'Choose a supported workload time window.');
-            const source = body.source === 'user_query_log' || body.source === 'query_log' ? body.source : undefined;
+            const source = isQueryLogSource(body.source) ? body.source : undefined;
             if (!source) return fail('QUERY_LOG_UNAVAILABLE', 'Test the connection to check query-log access.', 409);
             return json(await readWorkload(credentials, url, body.minutes, source));
         }
-        if (body.action === 'replication')
+        if (body.action === CLOUD_ACTIONS.replication)
             return json(await readReplication(credentials, url));
-        if (body.action === 'create-table')
+        if (body.action === CLOUD_ACTIONS.createTable)
             return json(await createCloudTable(credentials, url, body));
-        if (body.action === 'drop-table')
+        if (body.action === CLOUD_ACTIONS.dropTable)
             return json(await dropCloudTable(credentials, url, body));
-        if (body.action === 'import-status') {
+        if (body.action === CLOUD_ACTIONS.importStatus) {
             const targetTable = typeof body.table === 'string' ? body.table : '';
             if (!validImportQueryId(body.queryId) || !parseImportTarget(targetTable) ||
                 typeof body.rows !== 'number' || !Number.isSafeInteger(body.rows) || body.rows < 1 || body.rows > MAX_IMPORT_ROWS ||

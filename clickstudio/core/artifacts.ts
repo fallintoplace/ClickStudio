@@ -1,3 +1,4 @@
+import { CHART_KINDS } from '../shared/chart-types.js';
 import { MAX_SQL_CHARS } from '../shared/query-limits.js';
 import { randomUUID, randomBytes } from 'node:crypto';
 import type { ChartConfig, Comment, MetricContract, Principal, Published, QueryDocument } from '../shared/types.js';
@@ -15,7 +16,6 @@ interface Share {
     expiresAt: string;
 }
 const DOCUMENT_KINDS = ['query', 'snippet', 'metric'] as const satisfies readonly QueryDocument['kind'][];
-const CHART_KINDS = ['table', 'number', 'line', 'bar', 'scatter', 'heatmap', 'candlestick'] as const satisfies readonly ChartConfig['kind'][];
 const LEGACY_CHART_KINDS = ['area', 'stacked', 'pie'] as const;
 function isStringArray(value: unknown): value is string[] {
     return Array.isArray(value) && value.every(item => typeof item === 'string');

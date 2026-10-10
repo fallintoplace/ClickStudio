@@ -1,3 +1,4 @@
+import type { ProposalDecisionAction } from '../../shared/assistant-types';
 import { RunComparisonLauncher } from './RunComparison';
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { ProfilePipeline, QueryDocument, QueryProfile, Run, Schema, SchemaTable } from '../../shared/types';
@@ -79,7 +80,7 @@ export type InspectorPaneProps = {
     onRetryParser: () => void;
     onAskAI: (schema?: Schema, serverVersion?: string, database?: string) => void;
     onCancelAssistantRequest: () => void;
-    onDecideProposal: (turnId: string, decision: 'accepted' | 'rejected') => void;
+    onDecideProposal: (turnId: string, decision: ProposalDecisionAction) => void;
     onRunQuery: (sql: string) => void;
     runDisabled: (sql: string) => boolean;
     expert?: boolean;

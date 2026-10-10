@@ -1,8 +1,5 @@
+import { RUN_KINDS, RUN_STATUSES, RUN_RESULT_STATES, RESULT_COMPLETENESS, RUN_EVENT_TYPES, type RunEventType } from './run-types.js';
 import type { ApiError, Column, Json, Limits, Progress, Result, Run, RunEvent, RunStatus } from './types.js';
-
-const runStatuses = [
-    'queued', 'running', 'succeeded', 'truncated', 'failed', 'cancelled', 'timed_out', 'interrupted',
-] as const satisfies readonly RunStatus[];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -64,7 +61,7 @@ function isApiError(value: unknown): value is ApiError {
 }
 
 function isRunStatus(value: unknown): value is RunStatus {
-    return typeof value === 'string' && runStatuses.some(status => status === value);
+    return typeof value === 'string' && RUN_STATUSES.some(status => status === value);
 }
 
 export function isRun(value: unknown): value is Run {
@@ -100,7 +97,7 @@ export function isRun(value: unknown): value is Run {
         && (value.error === undefined || isApiError(value.error))
         && isSafeInteger(value.sequence)
         && isOptionalString(value.resultExpiresAt)
-        && (value.resultState === 'pending' || value.resultState === 'reopenable' || value.resultState === 'expired' || value.resultState === 'unavailable')
+        && RUN_RESULT_STATES.some(state => state === value.resultState)
         && typeof value.requestedBy === 'string'
         && typeof value.executedAs === 'string'
         && isRecord(value.permissionSnapshot)
@@ -112,7 +109,7 @@ export function isRun(value: unknown): value is Run {
 }
 
 function isRunKind(value: unknown): value is Run['kind'] {
-    return value === 'query' || value === 'explain' || value === 'plan' || value === 'pipeline' || value === 'analyze';
+    return RUN_KINDS.some(kind => kind === value);
 }
 
 export function isResult(value: unknown): value is Result {
@@ -123,15 +120,19 @@ export function isResult(value: unknown): value is Result {
         && value.columns.every(isColumn)
         && Array.isArray(value.rows)
         && value.rows.every(row => Array.isArray(row) && row.every(isJson))
-        && (value.completeness === 'complete' || value.completeness === 'truncated')
+        && RESULT_COMPLETENESS.some(completeness => completeness === value.completeness)
         && typeof value.createdAt === 'string'
         && typeof value.expiresAt === 'string';
+}
+
+function isRunEventType(value: unknown): value is RunEventType {
+    return RUN_EVENT_TYPES.some(type => type === value);
 }
 
 export function parseRunEvent(value: unknown): RunEvent {
     if (!isRecord(value)
         || !isSafeInteger(value.sequence)
-        || (value.type !== 'state' && value.type !== 'progress')
+        || !isRunEventType(value.type)
         || !isRun(value.run))
         throw new Error('Invalid run event');
     return { sequence: value.sequence, type: value.type, run: value.run };

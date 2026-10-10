@@ -1,3 +1,4 @@
+import type { ExperienceLevel } from './appearance-types';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 export type DetachedWorkspaceWindow = Readonly<{
@@ -20,7 +21,7 @@ function copyWorkspaceStyles(source: Document, target: Document) {
     }
 }
 
-function prepareWorkspaceWindow(child: Window, title: string, experience: 'beginner' | 'expert', rootClassName: string, label: string): HTMLDivElement {
+function prepareWorkspaceWindow(child: Window, title: string, experience: ExperienceLevel, rootClassName: string, label: string): HTMLDivElement {
     const source = document;
     const target = child.document;
     const html = target.documentElement;
@@ -52,7 +53,7 @@ function useDetachedWorkspaceWindow(windowName: string, rootClassName: string, l
     const [detached, setDetached] = useState<DetachedWorkspaceWindow | null>(null);
     const detachedWindow = useRef<Window | null>(null);
 
-    const open = useCallback((title: string, experience: 'beginner' | 'expert') => {
+    const open = useCallback((title: string, experience: ExperienceLevel) => {
         const current = detachedWindow.current;
         if (current && !current.closed) {
             current.focus();
