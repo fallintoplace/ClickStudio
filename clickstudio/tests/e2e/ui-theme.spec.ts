@@ -17,12 +17,12 @@ const themes = [
     {
         value: 'click-light',
         dark: false,
-        surface: '#edf4f6',
-        panel: '#fcfeff',
-        accent: '#08758d',
-        action: '#08758d',
-        yellowAccent: '#6b6c00',
-        yellowAction: '#f5e36a',
+        surface: '#f3f4f6',
+        panel: '#ffffff',
+        accent: '#006c83',
+        action: '#006c83',
+        yellowAccent: '#6b5d00',
+        yellowAction: '#f4df50',
         chrome: '#ffffff',
         logoColor: '#161616',
     },
@@ -104,7 +104,7 @@ for (const mode of ['Standard', 'Experimental']) test(`${mode} keeps light yello
     await accentOption(page, 'clickhouse-yellow').click();
     const run = runButton(page);
     await expect(run).toHaveCSS('background-image', 'none');
-    await expect(run).toHaveCSS('background-color', 'rgb(245, 227, 106)');
+    await expect(run).toHaveCSS('background-color', 'rgb(244, 223, 80)');
     for (const state of ['normal', 'hover', 'focus']) {
         if (state === 'hover') await run.hover();
         if (state === 'focus') {
@@ -141,7 +141,7 @@ for (const mode of ['Standard', 'Experimental']) test(`${mode} keeps light yello
     await accentOption(page, 'clickhouse-yellow').click();
     await page.reload();
     await expect(run).toHaveCSS('background-image', 'none');
-    await expect(run).toHaveCSS('background-color', 'rgb(245, 227, 106)');
+    await expect(run).toHaveCSS('background-color', 'rgb(244, 223, 80)');
 });
 
 test('an unknown saved theme falls back to ClickDark', async ({ page }) => {

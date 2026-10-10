@@ -59,7 +59,7 @@
 
     /* Unified ClickHouse object explorer */
     .object-explorer-section { --explorer-signal: var(--signal-accent); --explorer-database: var(--explorer-signal); --explorer-table: #79baff; --explorer-view: #c39aff; --explorer-column: #69dfbd; --explorer-dictionary: #ffbf68; --explorer-projection: #f28dca; --explorer-index: #ff8d80; --explorer-tree-surface: #1c3442; --explorer-tree-border: var(--line); position: relative; isolation: isolate; display: flex; height: 100%; min-height: 0; flex-direction: column; gap: 8px; overflow: hidden; padding: 10px; background: var(--panel); }
-    :root[data-theme="click-light"] .object-explorer-section { --explorer-table: #286da8; --explorer-view: #72459e; --explorer-column: #19785d; --explorer-dictionary: #9b5700; --explorer-projection: #a43875; --explorer-index: #a84238; --explorer-tree-surface: #e8f2f7; --explorer-tree-border: var(--line); }
+    :root[data-theme="click-light"] .object-explorer-section { --explorer-table: #286da8; --explorer-view: #72459e; --explorer-column: #19785d; --explorer-dictionary: #9b5700; --explorer-projection: #a43875; --explorer-index: #a84238; --explorer-tree-surface: var(--panel); --explorer-tree-border: var(--line); }
     .object-explorer-action-bar { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: 6px; }
     .object-explorer-action-bar .toolbar-small { min-width: 0; flex: 0 0 auto; justify-content: center; gap: 6px; }
     .object-explorer-action-bar .object-create-table-action { flex: 1 1 auto; }

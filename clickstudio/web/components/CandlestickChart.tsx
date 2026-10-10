@@ -111,11 +111,11 @@ export function CandlestickChart({ result, config, x, copy, locale }: Props) {
             : fullDomain;
         const visible = candles.filter(candle => candle.time >= +domain[0] && candle.time <= +domain[1]);
         const plotted = visible.length ? visible : candles;
-        const upColor = getComputedStyle(svgElement).getPropertyValue('--green').trim() || '#1d9a6c';
-        const downColor = getComputedStyle(svgElement).getPropertyValue('--red').trim() || '#e45757';
-        const bidAskColor = getComputedStyle(svgElement).getPropertyValue('--accent').trim();
-        const gridColor = getComputedStyle(svgElement).getPropertyValue('--line-bright').trim() || '#343a38';
-        const textColor = getComputedStyle(svgElement).getPropertyValue('--muted').trim() || '#909a95';
+        const upColor = 'var(--green)';
+        const downColor = 'var(--red)';
+        const bidAskColor = 'var(--accent)';
+        const gridColor = 'var(--line-bright)';
+        const textColor = 'var(--muted)';
         const mono = getComputedStyle(svgElement).getPropertyValue('--font-mono').trim() || 'monospace';
         const xScale = scaleUtc().domain(domain).range([LEFT, RIGHT]);
         const low = Math.min(...plotted.map(candle => candle.low), ...plotted.flatMap(candle => candle.bid === undefined ? [] : [candle.bid]));
@@ -170,7 +170,7 @@ export function CandlestickChart({ result, config, x, copy, locale }: Props) {
             spreadAxis.selectAll('.tick line').attr('stroke', gridColor).attr('stroke-dasharray', '3 5').attr('opacity', .55);
             spreadAxis.selectAll('.tick text').attr('fill', textColor).attr('font-family', mono).attr('font-size', 9).attr('dx', -7);
             const spreadLine = line<Candle>().defined(candle => candle.spread !== undefined).x(candle => xScale(new Date(candle.time)).valueOf()).y(candle => spreadScale(candle.spread!)).curve(curveMonotoneX);
-            root.append('path').datum(plotted).attr('class', 'market-spread-line').attr('d', spreadLine).attr('fill', 'none').attr('stroke', getComputedStyle(svgElement).getPropertyValue('--amber').trim() || '#d99416').attr('stroke-width', 1.8);
+            root.append('path').datum(plotted).attr('class', 'market-spread-line').attr('d', spreadLine).attr('fill', 'none').attr('stroke', 'var(--amber)').attr('stroke-width', 1.8);
         } else root.append('text').attr('class', 'market-pane-empty').attr('x', LEFT).attr('y', SPREAD_TOP + 34).text(copy.spreadUnavailable);
 
         const overview = scaleUtc().domain(fullDomain).range([LEFT, RIGHT]);
