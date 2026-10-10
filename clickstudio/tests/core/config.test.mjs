@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { loadConfig, publicProfile, redactor } from '../../.core-build/server/config.js';
-import { insertChildFilter } from '../../.core-build/shared/sql.js';
 test('Local startup binds loopback by default', () => assert.equal(loadConfig({}).host, '127.0.0.1'));
 test('Local startup includes the public ClickHouse Playground with bounded read-only defaults', () => {
     const config = loadConfig({}), playground = config.profiles.find(profile => profile.publicPlayground);
@@ -48,8 +47,6 @@ test('The ClickHouse identity can write without target allowlist configuration',
     const writer = loadConfig({ CLICKHOUSE_WRITER_USER: 'writer', CLICKHOUSE_WRITER_PASSWORD: 'writer-pass' }).profiles[0].writer;
     assert.deepEqual(writer, { username: 'writer', password: 'writer-pass' });
 });
-test('Null child filters use IS NULL semantics rather than a printable value', () => { const child = insertChildFilter('SELECT NULL AS value', 'value', null); assert.ok(child.sql.includes('isNull(`value`)')); assert.deepEqual(child.parameters, {}); });
-test('Child filters do not overwrite an existing query parameter', () => { const child = insertChildFilter('SELECT {wb_filter:String} AS value', 'value', 'next'); assert.deepEqual(child.parameters, { wb_filter_child: 'next' }); assert.ok(child.sql.includes('{wb_filter_child:String}')); });
 test('Demo publications remain labeled fixtures outside the workspace', async () => {
     const { DemoDriver } = await import('../../.core-build/server/demo.js');
     const { MemoryStore } = await import('../../.core-build/core/store.js');

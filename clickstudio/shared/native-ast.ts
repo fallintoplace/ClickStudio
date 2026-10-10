@@ -114,32 +114,6 @@ export function walkNativeAst(
     return { visited, truncated: false };
 }
 
-export function findNativeAst(
-    root: unknown,
-    predicate: (node: NativeAstObject) => boolean,
-    options?: NativeAstWalkOptions,
-): NativeAstObject | undefined {
-    let found: NativeAstObject | undefined;
-    walkNativeAst(root, node => {
-        if (!predicate(node)) return;
-        found = node;
-        return false;
-    }, options);
-    return found;
-}
-
-export function findAllNativeAst(
-    root: unknown,
-    predicate: (node: NativeAstObject) => boolean,
-    options?: NativeAstWalkOptions,
-): NativeAstObject[] {
-    const found: NativeAstObject[] = [];
-    walkNativeAst(root, node => {
-        if (predicate(node)) found.push(node);
-    }, options);
-    return found;
-}
-
 function astObject(value: unknown): NativeAstObject | undefined {
     const node = asNativeAstObject(value);
     return node && nativeAstType(node) ? node : undefined;

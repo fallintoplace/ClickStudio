@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { activeStatementIndex, appendQuerySeparator, classifySqlOperation, CLICKHOUSE_SNIPPETS, completionTarget, matchingNames, statementOutline, tableAliases } from '../../.core-build/shared/editor-tools.js';
+import { activeStatementIndex, appendQuerySeparator, CLICKHOUSE_SNIPPETS, completionTarget, matchingNames, statementOutline, tableAliases } from '../../.core-build/shared/editor-tools.js';
 import { selectedStatement, splitSql } from '../../.core-build/shared/sql.js';
 
 for (const [name, sql, count] of [
@@ -57,7 +57,10 @@ for (const [name, sql, operation] of [
     ['unknown operation', 'SYSTEM FLUSH LOGS', 'unknown'],
     ['empty statement', '', 'unknown'],
 ]) test(`operation preview classifies ${name}`, () => {
-    assert.equal(classifySqlOperation(sql), operation);
+    const outline = statementOutline(sql);
+    assert.equal(outline.error, undefined);
+    assert.equal(outline.statements.length, sql ? 1 : 0);
+    assert.equal(outline.statements[0]?.operation ?? 'unknown', operation);
 });
 
 test('script preview keeps order and labels an UPDATE followed by DELETE', () => {

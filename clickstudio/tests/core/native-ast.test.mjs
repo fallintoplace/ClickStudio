@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-const { buildNativeAstTree, findAllNativeAst, findNativeAst, walkNativeAst } =
+const { buildNativeAstTree, walkNativeAst } =
     await import('../../.core-build/shared/native-ast.js');
 
 const ast = {
@@ -38,11 +38,6 @@ test('native AST walker keeps preorder, skips literal payloads, and respects its
 
     const capped = walkNativeAst(ast, () => undefined, { maxNodes: 3 });
     assert.deepEqual(capped, { visited: 3, truncated: true });
-});
-
-test('native AST find helpers reuse the bounded traversal', () => {
-    assert.equal(findNativeAst(ast, node => node.type === 'Function')?.name, 'uniqExact');
-    assert.deepEqual(findAllNativeAst(ast, node => node.type === 'ExpressionList').map(node => node.type), ['ExpressionList', 'ExpressionList', 'ExpressionList']);
 });
 
 test('native AST tree keeps ClickHouse fields, stable paths, summaries, and truncation', () => {

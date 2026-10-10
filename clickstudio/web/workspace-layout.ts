@@ -1,6 +1,5 @@
 export type WorkspacePanelId = 'query' | 'results';
 export type WorkspacePanelMode = 'docked' | 'floating' | 'maximized';
-export type PanelResizeEdge = 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw';
 
 export type ViewportSize = { width: number; height: number };
 export type PanelGeometry = { x: number; y: number; width: number; height: number };
@@ -60,25 +59,6 @@ export function defaultPanelGeometry(panel: WorkspacePanelId, viewport: Viewport
     const x = panel === 'query' ? PANEL_MARGIN + 24 : limits.width - width - PANEL_MARGIN - 24;
     const y = panel === 'query' ? PANEL_MARGIN + 56 : limits.height - height - PANEL_MARGIN - 48;
     return normalizePanelGeometry({ x, y, width, height }, viewport);
-}
-
-export function movePanelGeometry(geometry: PanelGeometry, dx: number, dy: number, viewport: ViewportSize): PanelGeometry {
-    return normalizePanelGeometry({ ...geometry, x: geometry.x + dx, y: geometry.y + dy }, viewport);
-}
-
-export function resizePanelGeometry(geometry: PanelGeometry, edge: PanelResizeEdge, dx: number, dy: number, viewport: ViewportSize): PanelGeometry {
-    const limits = geometryLimits(viewport);
-    let left = geometry.x;
-    let top = geometry.y;
-    let right = geometry.x + geometry.width;
-    let bottom = geometry.y + geometry.height;
-
-    if (edge.includes('w')) left = clamp(left + dx, PANEL_MARGIN, right - limits.minWidth);
-    if (edge.includes('e')) right = clamp(right + dx, left + limits.minWidth, limits.width - PANEL_MARGIN);
-    if (edge.includes('n')) top = clamp(top + dy, PANEL_MARGIN, bottom - limits.minHeight);
-    if (edge.includes('s')) bottom = clamp(bottom + dy, top + limits.minHeight, limits.height - PANEL_MARGIN);
-
-    return normalizePanelGeometry({ x: left, y: top, width: right - left, height: bottom - top }, viewport);
 }
 
 export function clampPanelSplitRatio(value: number): number {

@@ -43,10 +43,6 @@ function classifyTokens(tokens: readonly Token[]): SqlOperation {
     return 'unknown';
 }
 
-export function classifySqlOperation(sql: string): SqlOperation {
-    return classifyTokens(lexSql(sql));
-}
-
 /** Uses the execution boundary lexer, so quoted semicolons never create fake queries. */
 export function statementOutline(text: string): StatementOutline {
     try {

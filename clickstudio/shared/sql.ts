@@ -264,16 +264,3 @@ export function parameterNames(sql: string): SqlParameter[] {
     }
     return [...out].map(([name, type]) => ({ name, type }));
 }
-/** Only substitutes lexer-recognized placeholders in explicit snippet expansion. */
-export function insertChildFilter(sql: string, column: string, value: string | null, parameter = 'wb_filter') {
-    const statements = splitSql(sql);
-    if (statements.length !== 1)
-        throw new Error('Child filtering requires one statement');
-    const parent = statements[0]!.sql;
-    const used = new Set(parameterNames(parent).map(p => p.name));
-    while (used.has(parameter))
-        parameter += '_child';
-    const predicate = value === null ? `isNull(${quoteIdentifier(column)})` : `toString(${quoteIdentifier(column)}) = {${parameter}:String}`;
-    const parameters: Record<string, string> = value === null ? {} : { [parameter]: value };
-    return { sql: `SELECT *\nFROM (\n${parent}\n) AS parent_result\nWHERE ${predicate}`, parameters };
-}

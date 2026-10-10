@@ -1,21 +1,5 @@
-import { HARD_LIMITS, type CandlestickConfig, type ChartConfig, type Limits, type MetricContract, type QueryDocument, type Run, type RunStatus } from './types.js';
+import type { CandlestickConfig, ChartConfig, MetricContract, QueryDocument } from './types.js';
 import { sameParameters } from './evidence.js';
-
-/** Match the server's numeric bounds. Connection limits are defaults, not ceilings. */
-export function executionLimitIssue(value: string, field: 'rows' | 'seconds'): string | undefined {
-    const number = Number(value);
-    if (!value.trim() || !Number.isSafeInteger(number) || number < 1 || number > HARD_LIMITS[field]) {
-        const label = field === 'rows' ? 'Maximum returned rows' : 'Deadline';
-        return `${label} must be a whole number from 1 to ${HARD_LIMITS[field].toLocaleString('en-US')}.`;
-    }
-    return undefined;
-}
-
-export function executionLimits(rows: string, seconds: string): Pick<Limits, 'rows' | 'seconds'> {
-    const issue = executionLimitIssue(rows, 'rows') ?? executionLimitIssue(seconds, 'seconds');
-    if (issue) throw new Error(issue);
-    return { rows: Number(rows), seconds: Number(seconds) };
-}
 
 type EditableDocument = Pick<QueryDocument, 'name' | 'sql' | 'parameters' | 'chart' | 'kind' | 'metric' | 'dependencies' | 'parentDocumentId'>;
 export type SaveableDraft = EditableDocument & { serverId?: string; baseRevision?: number; activeRunId?: string };
@@ -66,14 +50,6 @@ export function draftSaveStatus(draft: SaveableDraft, connectionId: string, save
         : { state: 'changed', label: `Unsaved changes since r${saved.revision}`, detail: 'The draft differs from its saved revision. Save a revision to keep these changes on the server.' };
 }
 
-export const HISTORY_STATUSES: ReadonlyArray<{ value: RunStatus | 'all'; label: string }> = [
-    { value: 'all', label: 'All statuses' }, { value: 'queued', label: 'Queued' }, { value: 'running', label: 'Running' },
-    { value: 'succeeded', label: 'Succeeded' }, { value: 'truncated', label: 'Truncated' }, { value: 'failed', label: 'Failed' },
-    { value: 'cancelled', label: 'Cancelled' }, { value: 'timed_out', label: 'Timed out' }, { value: 'interrupted', label: 'Interrupted' },
-];
-type HistoryRun = Pick<Run, 'id' | 'queryId' | 'connectionId' | 'documentId' | 'sql' | 'status' | 'createdAt'>;
-export interface HistoryScope { connectionId: string; documentId?: string; runIds: readonly string[]; allFiles: boolean }
-
 /** Remember script statement runs in the existing draft history without duplicating IDs. */
 export function rememberRunIds(current: string[], incoming: readonly string[]): string[] {
     const seen = new Set(current), added: string[] = [];
@@ -81,25 +57,4 @@ export function rememberRunIds(current: string[], incoming: readonly string[]): 
         if (!seen.has(id)) { seen.add(id); added.push(id); }
     }
     return added.length ? [...current, ...added] : current;
-}
-
-/** Saving a previously unnamed draft must not hide its earlier runs. Never mix connections. */
-export function scopedHistory<T extends HistoryRun>(runs: readonly T[], scope: HistoryScope): T[] {
-    const localIds = new Set(scope.runIds);
-    return runs.filter(run => run.connectionId === scope.connectionId && (scope.allFiles || localIds.has(run.id) ||
-        Boolean(scope.documentId && run.documentId === scope.documentId)));
-}
-
-/** Search the complete loaded history before applying the rendering limit. */
-export function searchHistory<T extends HistoryRun>(runs: readonly T[], search: string, status: RunStatus | 'all'): T[] {
-    const terms = search.trim().toLowerCase().split(/\s+/).filter(Boolean);
-    return runs.filter(run => {
-        if (status !== 'all' && run.status !== status) return false;
-        if (!terms.length) return true;
-        const text = `${run.sql}\n${run.queryId}`.toLowerCase();
-        return terms.every(term => text.includes(term));
-    }).sort((left, right) => {
-        const date = (value: string) => { const timestamp = Date.parse(value); return Number.isFinite(timestamp) ? timestamp : -Infinity; };
-        return (date(right.createdAt) - date(left.createdAt)) || left.id.localeCompare(right.id);
-    });
 }

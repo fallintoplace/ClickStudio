@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { splitSql, selectedStatement, parameterNames, quoteIdentifier, insertChildFilter, formatSql, hasSqlComments, hasTopLevelOutputFormat } from '../../.core-build/shared/sql.js';
+import { splitSql, selectedStatement, parameterNames, quoteIdentifier, formatSql, hasSqlComments, hasTopLevelOutputFormat } from '../../.core-build/shared/sql.js';
 import { guardSql } from '../../.core-build/core/guards.js';
 import { limits, runRequest, validateJson } from '../../.core-build/core/validation.js';
 const cases = [
@@ -51,7 +51,6 @@ test('Cluster names in data, comments, and column identifiers remain valid', () 
     for (const sql of ["SELECT 'cluster() clusterAllReplicas()'", 'SELECT 1 /* cluster() */', 'SELECT cluster, clusterAllReplicas FROM events', 'SELECT `cluster` FROM events'])
         assert.doesNotThrow(() => guardSql(sql));
 });
-test('Child filter is bound, not interpolated', () => { const f = insertChildFilter('SELECT x FROM t', 'x', "x' OR 1=1"); assert.ok(!f.sql.includes("OR 1=1")); assert.equal(f.parameters.wb_filter, "x' OR 1=1"); });
 test('SQL comment detection ignores comment markers inside quoted values', () => {
     assert.equal(hasSqlComments("SELECT '-- text', '/* text */', '# text'"), false);
     assert.equal(hasSqlComments('SELECT 1 -- note'), true);
