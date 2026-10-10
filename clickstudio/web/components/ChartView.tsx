@@ -1,5 +1,5 @@
 import type { ChartKind } from '../../shared/chart-types';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, RefCallback } from 'react';
 import {
     type HeatmapPreparation,
     chartNumber,
@@ -20,6 +20,7 @@ import { CandlestickChart } from './CandlestickChart';
 import { ChartPopover, ChartToolbar } from './ChartToolbar';
 import { RowCountChart } from './RowCountChart';
 import { ScrollEdgeFrame } from './ScrollEdgeShadows';
+import { useChartPlotWidth } from './useChartPlotWidth';
 import {
     categoryAxisLayout,
     chartKindOptions,
@@ -45,6 +46,7 @@ export function ChartView({
     copy: Copy;
     locale: Locale;
 }) {
+    const { width: categoryViewportWidth, onViewport: onCategoryViewport } = useChartPlotWidth();
     const chartCopy = copy.chart;
     if (loading || !result)
         return (
@@ -267,7 +269,10 @@ export function ChartView({
         })),
     }));
     const categoryLayout = categoricalAxis
-        ? categoryAxisLayout(plotSeries[0]?.points.map(point => point.label) ?? [])
+        ? categoryAxisLayout(
+              plotSeries[0]?.points.map(point => point.label) ?? [],
+              Math.max(652, categoryViewportWidth),
+          )
         : undefined;
     const values = plotSeries.flatMap(series =>
         series.points.flatMap(point => (point.value === null ? [] : [point.value])),
@@ -415,6 +420,7 @@ export function ChartView({
         compactNumber,
         values,
         categoricalAxis,
+        onCategoryViewport,
         chartYTicks,
         renderChartSvg,
         scatterSummary,
@@ -449,6 +455,7 @@ function renderChartWorkspace({
     compactNumber,
     values,
     categoricalAxis,
+    onCategoryViewport,
     chartYTicks,
     renderChartSvg,
     scatterSummary,
@@ -480,6 +487,7 @@ function renderChartWorkspace({
     compactNumber: Intl.NumberFormat;
     values: number[];
     categoricalAxis: boolean;
+    onCategoryViewport: RefCallback<HTMLDivElement>;
     chartYTicks: { value: number; position: number }[];
     renderChartSvg: ReturnType<typeof createChartSvgRenderer>;
     scatterSummary: string;
@@ -574,7 +582,10 @@ function renderChartWorkspace({
                                 </svg>
                             )}
                             {categoricalAxis ? (
-                                <ScrollEdgeFrame<HTMLDivElement> className="chart-category-scroll-frame">
+                                <ScrollEdgeFrame<HTMLDivElement>
+                                    className="chart-category-scroll-frame"
+                                    onViewport={onCategoryViewport}
+                                >
                                     {ref => (
                                         <div
                                             ref={ref}

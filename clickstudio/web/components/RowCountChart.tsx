@@ -14,6 +14,7 @@ import type { Copy, Locale } from '../i18n';
 import { ScrollEdgeFrame } from './ScrollEdgeShadows';
 import { ChartToolbar } from './ChartToolbar';
 import { categoryAxisLayout, chartText, formatCount, seriesColor } from './chart-helpers';
+import { useChartPlotWidth } from './useChartPlotWidth';
 
 export function RowCountChart({
     result,
@@ -30,6 +31,7 @@ export function RowCountChart({
     copy: Copy['chart'];
     locale: Locale;
 }) {
+    const { width: categoryViewportWidth, onViewport: onCategoryViewport } = useChartPlotWidth();
     const dimensions = result.columns.flatMap((column, index) =>
         numericType(column.type) ? [] : [index],
     );
@@ -61,7 +63,10 @@ export function RowCountChart({
     const bars = categoryData ?? [];
     const categoryLayout = timeAxis
         ? undefined
-        : categoryAxisLayout(bars.map(group => group.label));
+        : categoryAxisLayout(
+              bars.map(group => group.label),
+              Math.max(652, categoryViewportWidth),
+          );
     const plotLeft = timeAxis ? 80 : 0,
         plotRight = categoryLayout?.width ?? 732,
         plotWidth = plotRight - plotLeft;
@@ -290,7 +295,10 @@ export function RowCountChart({
                             {timeAxis ? (
                                 renderChartSvg(false)
                             ) : (
-                                <ScrollEdgeFrame<HTMLDivElement> className="chart-category-scroll-frame">
+                                <ScrollEdgeFrame<HTMLDivElement>
+                                    className="chart-category-scroll-frame"
+                                    onViewport={onCategoryViewport}
+                                >
                                     {ref => (
                                         <div
                                             ref={ref}
