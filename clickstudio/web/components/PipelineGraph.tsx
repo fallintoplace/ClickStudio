@@ -10,6 +10,7 @@ import {
 } from 'react';
 import type { ReactNode } from 'react';
 import type { ProfilePipeline, ProfilePipelineNode } from '../../shared/types';
+import { Icon } from './ui';
 import {
     autoFocusGraphKinds,
     centerGraphNode,
@@ -257,16 +258,7 @@ export function PipelineGraph({
                     title={copy?.pipelineFocusNode ?? 'Focus node'}
                     onClick={focusSelectedNode}
                 >
-                    <svg
-                        aria-hidden="true"
-                        viewBox="0 0 16 16"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                    >
-                        <circle cx="8" cy="8" r="4.25" />
-                        <path d="M8 1.5v2.2m0 8.6v2.2M1.5 8h2.2m8.6 0h2.2" />
-                    </svg>
+                    <Icon name="focus" />
                     <span>{copy?.pipelineFocusNode ?? 'Focus node'}</span>
                 </button>
                 <button
@@ -276,15 +268,7 @@ export function PipelineGraph({
                     title={copy?.pipelineFit ?? 'Fit graph'}
                     onClick={fitGraph}
                 >
-                    <svg
-                        aria-hidden="true"
-                        viewBox="0 0 16 16"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                    >
-                        <path d="M6 2H2v4m0-4 4 4m4-4h4v4m0-4-4 4M2 10v4h4m-4 0 4-4m8 4h-4m4 0v-4m0 4-4-4" />
-                    </svg>
+                    <Icon name="fit" />
                     <span>{copy?.pipelineFit ?? 'Fit graph'}</span>
                 </button>
             </div>

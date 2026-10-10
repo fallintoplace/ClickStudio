@@ -3,6 +3,7 @@ import type { ExplainPlan, ExplainPlanNode, ExplainPlanProperty } from '../../sh
 import type { Json, ProfilePipeline, ProfilePipelineNode } from '../../shared/types';
 import { PipelineGraph } from './PipelineGraph';
 import { ScrollEdgeFrame } from './ScrollEdgeShadows';
+import { Icon } from './ui';
 import type { Copy } from '../i18n';
 
 const MAX_PROPERTY_TEXT = 12_000;
@@ -183,18 +184,7 @@ export function ExplainPlanView({
                                     aria-pressed={view === 'graph'}
                                     onClick={() => setView('graph')}
                                 >
-                                    <svg
-                                        aria-hidden="true"
-                                        viewBox="0 0 16 16"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="1.4"
-                                    >
-                                        <circle cx="3" cy="8" r="1.6" />
-                                        <circle cx="13" cy="3" r="1.6" />
-                                        <circle cx="13" cy="13" r="1.6" />
-                                        <path d="m4.5 7 7-3m-7 5 7 3" />
-                                    </svg>
+                                    <Icon name="graph" />
                                     {copy.planGraphView}
                                 </button>
                                 <button
@@ -202,19 +192,7 @@ export function ExplainPlanView({
                                     aria-pressed={view === 'tree'}
                                     onClick={() => setView('tree')}
                                 >
-                                    <svg
-                                        aria-hidden="true"
-                                        viewBox="0 0 16 16"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="1.4"
-                                    >
-                                        <path d="M3 3v10m0-8h5m-5 6h5m0-6v6m0-5h5m-5 4h5" />
-                                        <circle cx="3" cy="3" r="1.2" />
-                                        <circle cx="3" cy="13" r="1.2" />
-                                        <circle cx="13" cy="5" r="1.2" />
-                                        <circle cx="13" cy="11" r="1.2" />
-                                    </svg>
+                                    <Icon name="tree" />
                                     {copy.planTreeView}
                                 </button>
                             </div>
