@@ -84,7 +84,7 @@ test('Reopening and saving a metric keeps its saved contract and dependency', as
     await trust(page);
     const browser = page.getByRole('navigation', { name: 'Workspace browser', exact: true });
     await browser.getByRole('button', { name: 'More workspace panels', exact: true }).click();
-    await page.getByRole('menuitem', { name: 'Queries', exact: true }).click();
+    await page.getByRole('menuitem', { name: 'Saved queries', exact: true }).click();
     await page.getByRole('button', { name: /Daily revenue/ }).click();
     await expect(page.locator('.cm-content')).toContainText(savedDocument.sql);
     await expect(page.locator('.execution-bar')).toHaveAttribute('data-query-id', savedRun.queryId);

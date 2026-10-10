@@ -16,7 +16,7 @@ export const translations: Record<Exclude<Locale, 'en'>, LocalizedCopy> = {
         cancel: '取消',
         save: '保存',
         schema: '架构',
-        history: '运行记录',
+        history: '查询历史',
         assistant: 'AI',
         results: '结果',
         chart: '图表',

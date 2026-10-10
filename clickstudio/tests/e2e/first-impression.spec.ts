@@ -58,10 +58,65 @@ test('Experimental mode uses the Standard right inspector layout', async ({ page
     await expect(inspector.getByRole('heading', { name: 'AI', exact: true })).toBeVisible();
 
     await inspector.getByRole('button', { name: 'More workspace panels', exact: true }).click();
-    await page.getByRole('menuitem', { name: 'Queries', exact: true }).click();
-    await expect(inspector.getByRole('heading', { name: 'Queries', exact: true })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: 'Query history', exact: true })).toBeVisible();
+    await expect(
+        page.getByRole('menuitem', { name: 'Version history', exact: true }),
+    ).toBeVisible();
+    await page.getByRole('menuitem', { name: 'Saved queries', exact: true }).click();
+    await expect(
+        inspector.getByRole('heading', { name: 'Saved queries', exact: true }),
+    ).toBeVisible();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Run', exact: true })).toBeVisible();
+});
+
+test('Standard More keeps query history and saved queries before and after execution', async ({
+    page,
+}) => {
+    await page.addInitScript(() => localStorage.setItem('clickstudio:experience', 'beginner'));
+    await trust(page);
+    await page.locator('.icon-rail').getByRole('button', { name: 'Objects', exact: true }).click();
+    const inspector = page.locator('.inspector-pane.is-docked-inspector');
+    const more = inspector.getByRole('button', { name: 'More workspace panels', exact: true });
+    const menu = page.getByRole('menu', { name: 'More workspace panels', exact: true });
+
+    await more.click();
+    await expect(menu.getByRole('menuitem')).toHaveText(['Query history', 'Saved queries']);
+    await menu.getByRole('menuitem', { name: 'Query history', exact: true }).click();
+    await expect(
+        inspector.getByRole('heading', { name: 'Query history', exact: true }),
+    ).toBeVisible();
+
+    await page.getByTestId('run-button').click();
+    await expect(
+        page.getByRole('table', { name: 'Retained query rows', exact: true }),
+    ).toBeVisible();
+    const saved = page.waitForResponse(
+        response =>
+            response.request().method() === 'POST' &&
+            new URL(response.url()).pathname === '/api/documents',
+    );
+    await page.getByTestId('save-query').click();
+    expect((await saved).ok()).toBe(true);
+
+    await more.click();
+    await expect(menu.getByRole('menuitem')).toHaveText(['Query history', 'Saved queries']);
+    await menu.getByRole('menuitem', { name: 'Saved queries', exact: true }).click();
+    await expect(
+        inspector.getByRole('heading', { name: 'Saved queries', exact: true }),
+    ).toBeVisible();
+    await expect(inspector.locator('.document-card')).not.toHaveCount(0);
+
+    await page.getByText('Experimental', { exact: true }).click();
+    await more.click();
+    await menu.getByRole('menuitem', { name: 'Version history', exact: true }).click();
+    await expect(inspector.locator('.revision-list')).toBeVisible();
+    await page.getByText('Standard', { exact: true }).click();
+    await expect(
+        inspector.getByRole('heading', { name: 'Saved queries', exact: true }),
+    ).toBeVisible();
+    await more.click();
+    await expect(menu.getByRole('menuitem')).toHaveText(['Query history', 'Saved queries']);
 });
 
 test('One Run button and the explain actions stay visible in Experimental mode', async ({
@@ -295,8 +350,8 @@ test('EXPLAIN PIPELINE opens an interactive ClickHouse operator graph', async ({
 test('Experimental panels stay reachable through the workspace rail and More', async ({ page }) => {
     await trust(page);
     await page.getByRole('button', { name: 'More workspace panels', exact: true }).click();
-    await page.getByRole('menuitem', { name: 'Runs', exact: true }).click();
-    await expect(page.locator('.inspector-header h2')).toHaveText('Run history');
+    await page.getByRole('menuitem', { name: 'Query history', exact: true }).click();
+    await expect(page.locator('.inspector-header h2')).toHaveText('Query history');
 
     await page.locator('.icon-rail').getByRole('button', { name: 'AI', exact: true }).click();
     await expect(page.locator('.inspector-header h2')).toHaveText('AI');

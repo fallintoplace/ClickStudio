@@ -436,8 +436,8 @@ export function inspectorLabel(value: Inspector): string {
     return {
         schema: 'Schema explorer',
         reference: 'Reference',
-        history: 'Run history',
-        documents: 'Documents',
+        history: 'Query history',
+        documents: 'Saved queries',
         revisions: 'Version history',
         details: 'Run details',
         profile: 'Query profile',

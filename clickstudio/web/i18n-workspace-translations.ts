@@ -164,7 +164,7 @@ export const workspaceCommonTranslations: Record<
         browse: '浏览',
         readOnly: '只读',
         tables: '表',
-        queries: '查询',
+        queries: '已保存的查询',
         more: '更多',
         query: '查询',
         format: '格式化',

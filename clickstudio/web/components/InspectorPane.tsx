@@ -205,11 +205,13 @@ export function InspectorPane({
             ? copy.objects
             : inspector === 'reference'
               ? copy.reference
-              : inspector === 'documents'
-                ? copy.queries
-                : inspector === 'assistant'
-                  ? copy.assistant
-                  : inspectorLabel(inspector);
+              : inspector === 'history'
+                ? copy.history
+                : inspector === 'documents'
+                  ? copy.queries
+                  : inspector === 'assistant'
+                    ? copy.assistant
+                    : inspectorLabel(inspector);
     const assistantServerVersion =
         connection.dataSource === 'fixture'
             ? undefined
@@ -313,7 +315,7 @@ export function InspectorPane({
                 {inspector === 'history' && (
                     <section className="inspector-section">
                         <div className="schema-heading">
-                            <span>RECENT RUNS</span>
+                            <span>{copy.history.toUpperCase()}</span>
                             <RunComparisonLauncher
                                 connectionId={connectionId}
                                 trusted={trusted}
@@ -367,7 +369,7 @@ export function InspectorPane({
                 {inspector === 'documents' && (
                     <section className="inspector-section">
                         <div className="schema-heading">
-                            <span>SAVED DOCUMENTS</span>
+                            <span>{copy.queries.toUpperCase()}</span>
                             <Button
                                 variant="ghost"
                                 className="toolbar-small"

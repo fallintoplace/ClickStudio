@@ -35,7 +35,7 @@ export const INSPECTOR_NAVIGATION: readonly InspectorNavigationDestination[] = [
         copyKey: 'queries',
         railSection: 'browse',
     },
-    { group: 'more', id: 'revisions', icon: 'history' },
+    { group: 'more', id: 'revisions', icon: 'history', expertOnly: true },
     {
         group: 'more',
         id: 'details',
