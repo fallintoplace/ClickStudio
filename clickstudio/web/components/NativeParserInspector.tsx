@@ -12,6 +12,38 @@ type Props = {
 const MAX_AST_PREVIEW_LENGTH = 100_000;
 
 export function NativeParserInspector({ enabled, status, snapshot, onRetry }: Props) {
+    const getParserTone = () => {
+        if (!enabled) {
+            return '';
+        }
+
+        switch (status) {
+            case 'ready':
+                return 'is-trusted';
+
+            case 'unavailable':
+                return 'is-warning';
+
+            default:
+                return 'is-running';
+        }
+    };
+    const getParserStatusLabel = () => {
+        if (enabled) {
+            switch (status) {
+                case 'ready':
+                    return 'Ready · local WebAssembly';
+
+                case 'loading':
+                    return 'Loading parser…';
+
+                default:
+                    return 'Unavailable';
+            }
+        }
+
+        return 'WASM parser off';
+    };
     return (
         <section
             className="inspector-section parser-inspector"
@@ -23,31 +55,12 @@ export function NativeParserInspector({ enabled, status, snapshot, onRetry }: Pr
                     `parser-status-${enabled ? status : 'disabled'}`,
                 )}
             >
-                <span
-                    className={cx(
-                        'status-light',
-                        !enabled
-                            ? ''
-                            : status === 'ready'
-                              ? 'is-trusted'
-                              : status === 'unavailable'
-                                ? 'is-warning'
-                                : 'is-running',
-                    )}
-                />
+                <span className={cx('status-light', getParserTone())} />
                 <div>
                     <strong>
                         {enabled ? 'ClickHouse native parser' : 'CodeMirror SQL highlighting'}
                     </strong>
-                    <small>
-                        {enabled
-                            ? status === 'ready'
-                                ? 'Ready · local WebAssembly'
-                                : status === 'loading'
-                                  ? 'Loading parser…'
-                                  : 'Unavailable'
-                            : 'WASM parser off'}
-                    </small>
+                    <small>{getParserStatusLabel()}</small>
                 </div>
                 {enabled && snapshot && (
                     <span className="parser-duration">{snapshot.elapsedMs.toFixed(1)} ms</span>

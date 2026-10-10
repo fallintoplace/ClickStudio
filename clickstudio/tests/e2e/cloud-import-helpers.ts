@@ -74,12 +74,15 @@ export async function mockCloudEndpoint(
                 body.match(
                     /name="file"; filename="[^\"]+"\r\nContent-Type: [^\r\n]+\r\n\r\n([\s\S]*?)\r\n--/,
                 )?.[1] ?? '';
-            const rows =
-                format === 'json'
-                    ? (JSON.parse(fileContents) as unknown[]).length
-                    : format === 'ndjson'
-                      ? fileContents.split(/\r?\n/).filter(Boolean).length
-                      : Math.max(0, fileContents.trim().split(/\r?\n/).length - 1);
+            let rows: number;
+
+            if (format === 'json') {
+                rows = (JSON.parse(fileContents) as unknown[]).length;
+            } else if (format === 'ndjson') {
+                rows = fileContents.split(/\r?\n/).filter(Boolean).length;
+            } else {
+                rows = Math.max(0, fileContents.trim().split(/\r?\n/).length - 1);
+            }
             const id = queryId.replace('clickstudio-import-', '');
             const createValue = body.match(/name="createTable"\r\n\r\n([^\r\n]+)/)?.[1];
             const createTable = createValue

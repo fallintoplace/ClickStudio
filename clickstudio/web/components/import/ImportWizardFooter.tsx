@@ -73,24 +73,95 @@ export function ImportWizardFooter({
     importAnotherFile: () => void;
     closeWizard: ReturnType<typeof useImportWizardController>['closeWizard'];
 }) {
+    const getStepHint = () => {
+        if (importKind === 'query') {
+            return 'SQL opens as a draft and does not run automatically';
+        }
+
+        if (browserDemoImport) {
+            return 'Browser demo · nothing is written to ClickHouse';
+        }
+
+        if (browserCloudImport) {
+            return `CSV, JSON, or NDJSON · up to ${IMPORT_FILE_SIZE_LABEL} and ${IMPORT_ROW_LIMIT_LABEL} rows`;
+        }
+
+        switch (step) {
+            case 'file':
+                return `CSV, JSON, or NDJSON · up to ${IMPORT_FILE_SIZE_LABEL} and ${IMPORT_ROW_LIMIT_LABEL} rows`;
+
+            case 'mapping':
+                if (target) {
+                    return `${formatImportColumnCount(Object.keys(selectedFields).length)} mapped · review before writing`;
+                }
+
+                return 'Choose a table and match its columns';
+
+            case 'review':
+                return 'Review the destination and row count before writing';
+
+            default:
+                return 'Import status is checked with ClickHouse';
+        }
+    };
+    const getReviewActionLabel = () => {
+        if (busy === 'mapping') {
+            return 'Checking mapping…';
+        }
+
+        if (liveMappingIssue) {
+            return 'Fix column mapping';
+        }
+
+        if (!target) {
+            if (browserCloudImport && selectedDestinationChoice === 'existing') {
+                return 'Choose a table';
+            }
+
+            return 'Choose a destination';
+        }
+
+        if (createTableAlreadyExists) {
+            return 'Choose another table name';
+        }
+
+        if (!destinationNames.length && destinationColumns.length > 0) {
+            return 'Map a column first';
+        }
+
+        if (duplicateDestinations) {
+            return 'Fix duplicate columns';
+        }
+
+        if (!destinationColumns.length) {
+            return 'No writable columns';
+        }
+
+        return 'Review import';
+    };
+    const getCommitActionLabel = () => {
+        if (busy === 'commit') {
+            if (browserDemoImport) {
+                return 'Saving…';
+            }
+
+            return 'Starting…';
+        }
+
+        if (creatingTable) {
+            return 'Create table and import';
+        }
+
+        if (browserDemoImport) {
+            return 'Save demo rows';
+        }
+
+        return 'Import rows';
+    };
     return (
         <footer className="import-wizard-footer flex flex-wrap items-center justify-between gap-3 border-t border-[var(--line)] bg-[var(--page)] px-5 py-3 sm:px-7">
             <span className="import-wizard-footer-note text-[10px] text-[var(--muted)]">
-                {importKind === 'query'
-                    ? 'SQL opens as a draft and does not run automatically'
-                    : browserDemoImport
-                      ? 'Browser demo · nothing is written to ClickHouse'
-                      : browserCloudImport
-                        ? `CSV, JSON, or NDJSON · up to ${IMPORT_FILE_SIZE_LABEL} and ${IMPORT_ROW_LIMIT_LABEL} rows`
-                        : step === 'file'
-                          ? `CSV, JSON, or NDJSON · up to ${IMPORT_FILE_SIZE_LABEL} and ${IMPORT_ROW_LIMIT_LABEL} rows`
-                          : step === 'mapping'
-                            ? target
-                                ? `${formatImportColumnCount(Object.keys(selectedFields).length)} mapped · review before writing`
-                                : 'Choose a table and match its columns'
-                            : step === 'review'
-                              ? 'Review the destination and row count before writing'
-                              : 'Import status is checked with ClickHouse'}
+                {getStepHint()}
             </span>
             <div className="flex items-center gap-2">
                 {importKind === 'query' && (
@@ -149,25 +220,7 @@ export function ImportWizardFooter({
                                 }
                                 className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
                             >
-                                {busy === 'mapping'
-                                    ? 'Checking mapping…'
-                                    : liveMappingIssue
-                                      ? 'Fix column mapping'
-                                      : !target
-                                        ? browserCloudImport &&
-                                          selectedDestinationChoice === 'existing'
-                                            ? 'Choose a table'
-                                            : 'Choose a destination'
-                                        : createTableAlreadyExists
-                                          ? 'Choose another table name'
-                                          : !destinationNames.length &&
-                                              destinationColumns.length > 0
-                                            ? 'Map a column first'
-                                            : duplicateDestinations
-                                              ? 'Fix duplicate columns'
-                                              : !destinationColumns.length
-                                                ? 'No writable columns'
-                                                : 'Review import'}
+                                {getReviewActionLabel()}
                             </button>
                         )}
                         {recoveryState === 'ready' && !importUnavailable && step === 'review' && (
@@ -177,15 +230,7 @@ export function ImportWizardFooter({
                                 disabled={Boolean(busy)}
                                 className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
                             >
-                                {busy === 'commit'
-                                    ? browserDemoImport
-                                        ? 'Saving…'
-                                        : 'Starting…'
-                                    : creatingTable
-                                      ? 'Create table and import'
-                                      : browserDemoImport
-                                        ? 'Save demo rows'
-                                        : 'Import rows'}
+                                {getCommitActionLabel()}
                             </button>
                         )}
                         {recoveryState === 'ready' &&

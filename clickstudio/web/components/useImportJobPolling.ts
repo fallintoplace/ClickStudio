@@ -39,19 +39,22 @@ export function useImportJobPolling({
             if (polling) return;
             polling = true;
             try {
-                const next =
-                    cloudImport && job.queryId
-                        ? await checkClickHouseCloudImport(
-                              job.queryId,
-                              job.table,
-                              job.rows,
-                              job.deduplicationToken,
-                          )
-                        : job.reconciliationRequired
-                          ? await post<ImportJob>(
-                                `/imports/${encodeURIComponent(job.id)}/reconcile`,
-                            )
-                          : await api<ImportJob>(`/imports/${encodeURIComponent(job.id)}`);
+                let next;
+
+                if (cloudImport && job.queryId) {
+                    next = await checkClickHouseCloudImport(
+                        job.queryId,
+                        job.table,
+                        job.rows,
+                        job.deduplicationToken,
+                    );
+                } else if (job.reconciliationRequired) {
+                    next = await post<ImportJob>(
+                        `/imports/${encodeURIComponent(job.id)}/reconcile`,
+                    );
+                } else {
+                    next = await api<ImportJob>(`/imports/${encodeURIComponent(job.id)}`);
+                }
                 if (!current) return;
                 setJob(next);
                 setRecoverableJobs(items =>

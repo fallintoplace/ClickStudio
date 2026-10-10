@@ -40,12 +40,19 @@ export function formatPlaygroundMetadataWarning(
 ): string | undefined {
     const unique = [...new Set(unavailable)];
     if (!unique.length) return undefined;
-    const list =
-        unique.length === 1
-            ? unique[0]
-            : unique.length === 2
-              ? `${unique[0]} or ${unique[1]}`
-              : `${unique.slice(0, -1).join(', ')}, or ${unique.at(-1)}`;
+    let list: string | undefined;
+
+    switch (unique.length) {
+        case 1:
+            list = unique[0];
+            break;
+        case 2:
+            list = `${unique[0]} or ${unique[1]}`;
+            break;
+        default:
+            list = `${unique.slice(0, -1).join(', ')}, or ${unique.at(-1)}`;
+            break;
+    }
     return `The public Playground account cannot read ${list} metadata.`;
 }
 

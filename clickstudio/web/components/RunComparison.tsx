@@ -24,11 +24,15 @@ export interface RunComparisonProps {
     queryLogAvailable?: boolean;
 }
 function metricValue(value: string | undefined, unit: ComparisonMetric['unit']) {
-    return unit === 'bytes'
-        ? nativeBytes(value)
-        : value === undefined
-          ? 'Unavailable'
-          : `${nativeCount(value)}${unit === 'ms' ? ' ms' : ''}`;
+    if (unit === 'bytes') {
+        return nativeBytes(value);
+    }
+
+    if (value === undefined) {
+        return 'Unavailable';
+    }
+
+    return `${nativeCount(value)}${unit === 'ms' ? ' ms' : ''}`;
 }
 function runOptionLabel(run: Run) {
     const query = run.sql.replace(/\s+/g, ' ').trim();

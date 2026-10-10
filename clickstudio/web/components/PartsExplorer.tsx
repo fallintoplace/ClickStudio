@@ -74,7 +74,16 @@ function metricText(part: MergeTreePart, metric: PartsMetric) {
 function compareBlockNumber(left: string, right: string) {
     const a = BigInt(left),
         b = BigInt(right);
-    return a < b ? -1 : a > b ? 1 : 0;
+
+    if (a < b) {
+        return -1;
+    }
+
+    if (a > b) {
+        return 1;
+    }
+
+    return 0;
 }
 
 function makeTree(
@@ -275,12 +284,19 @@ export function PartsExplorer({
 
     const current = state?.key === requestKey ? state : undefined;
     const partitions = new Set(filteredParts.map(part => part.partition)).size;
-    const activeMetricLabel =
-        metric === 'compressedBytes'
-            ? copy.partsMetricSize
-            : metric === 'rows'
-              ? copy.partsMetricRows
-              : copy.partsMetricMarks;
+    let activeMetricLabel: string;
+
+    switch (metric) {
+        case 'compressedBytes':
+            activeMetricLabel = copy.partsMetricSize;
+            break;
+        case 'rows':
+            activeMetricLabel = copy.partsMetricRows;
+            break;
+        default:
+            activeMetricLabel = copy.partsMetricMarks;
+            break;
+    }
     const selectedPartition = zoomedPartition?.replace(/^partition:/, '');
     const partitionParts = selectedPartition
         ? filteredParts.filter(part => part.partition === selectedPartition)
@@ -297,18 +313,32 @@ export function PartsExplorer({
             handleCell(id, part);
         }
     };
-    const selectedTotal =
-        partState === 'all'
-            ? snapshot?.totalParts
-            : partState === 'active'
-              ? snapshot?.activeParts
-              : snapshot?.inactiveParts;
-    const selectedStateLabel =
-        partState === 'all'
-            ? copy.partsStateAll
-            : partState === 'active'
-              ? copy.partsStateActive
-              : copy.partsStateInactive;
+    let selectedTotal: string | undefined;
+
+    switch (partState) {
+        case 'all':
+            selectedTotal = snapshot?.totalParts;
+            break;
+        case 'active':
+            selectedTotal = snapshot?.activeParts;
+            break;
+        default:
+            selectedTotal = snapshot?.inactiveParts;
+            break;
+    }
+    let selectedStateLabel: string;
+
+    switch (partState) {
+        case 'all':
+            selectedStateLabel = copy.partsStateAll;
+            break;
+        case 'active':
+            selectedStateLabel = copy.partsStateActive;
+            break;
+        default:
+            selectedStateLabel = copy.partsStateInactive;
+            break;
+    }
     const stateIsTruncated =
         snapshot &&
         selectedTotal !== undefined &&
@@ -448,6 +478,17 @@ function renderPartsDialog({
     partitionParts: MergeTreePart[];
     connection: Pick<Connection, 'id' | 'dataSource'>;
 }) {
+    const getPartsSummary = () => {
+        if (snapshot) {
+            return `${exactCount(snapshot.activeParts)} ${copy.partsStateActive.toLowerCase()} · ${exactCount(snapshot.inactiveParts)} ${copy.partsStateInactive.toLowerCase()} · ${partitions} ${copy.partsPartitions}`;
+        }
+
+        if (current?.loading) {
+            return copy.partsLoading;
+        }
+
+        return '';
+    };
     return (
         <section
             className={`parts-explorer-dialog${embedded ? ' is-embedded' : ''}`}
@@ -476,73 +517,104 @@ function renderPartsDialog({
             </header>
             <div className="parts-explorer-toolbar">
                 <div className="parts-view-control" role="group" aria-label={copy.partsStateFilter}>
-                    {(['all', 'active', 'inactive'] as const).map(value => (
-                        <button
-                            key={value}
-                            type="button"
-                            aria-pressed={partState === value}
-                            onClick={() => {
-                                setPartState(value);
-                                setSelectedPart(undefined);
-                                setZoomedPartition(undefined);
-                            }}
-                        >
-                            {value === 'all'
-                                ? copy.partsStateAll
-                                : value === 'active'
-                                  ? copy.partsStateActive
-                                  : copy.partsStateInactive}
-                            {value === 'active' && snapshot
-                                ? ` ${exactCount(snapshot.activeParts)}`
-                                : value === 'inactive' && snapshot
-                                  ? ` ${exactCount(snapshot.inactiveParts)}`
-                                  : ''}
-                        </button>
-                    ))}
+                    {(['all', 'active', 'inactive'] as const).map(value => {
+                        const getStateLabel = () => {
+                            switch (value) {
+                                case 'all':
+                                    return copy.partsStateAll;
+
+                                case 'active':
+                                    return copy.partsStateActive;
+
+                                default:
+                                    return copy.partsStateInactive;
+                            }
+                        };
+                        const getStateCount = () => {
+                            if (value === 'active' && snapshot) {
+                                return ` ${exactCount(snapshot.activeParts)}`;
+                            }
+
+                            if (value === 'inactive' && snapshot) {
+                                return ` ${exactCount(snapshot.inactiveParts)}`;
+                            }
+
+                            return '';
+                        };
+                        return (
+                            <button
+                                key={value}
+                                type="button"
+                                aria-pressed={partState === value}
+                                onClick={() => {
+                                    setPartState(value);
+                                    setSelectedPart(undefined);
+                                    setZoomedPartition(undefined);
+                                }}
+                            >
+                                {getStateLabel()}
+                                {getStateCount()}
+                            </button>
+                        );
+                    })}
                 </div>
                 <div
                     className="parts-view-control"
                     role="group"
                     aria-label={copy.partsExplorerTitle}
                 >
-                    {(['compressedBytes', 'rows', 'marks'] as const).map(value => (
-                        <button
-                            key={value}
-                            type="button"
-                            aria-pressed={metric === value}
-                            onClick={() => setMetric(value)}
-                        >
-                            {value === 'compressedBytes'
-                                ? copy.partsMetricSize
-                                : value === 'rows'
-                                  ? copy.partsMetricRows
-                                  : copy.partsMetricMarks}
-                        </button>
-                    ))}
+                    {(['compressedBytes', 'rows', 'marks'] as const).map(value => {
+                        const getMetricLabel = () => {
+                            switch (value) {
+                                case 'compressedBytes':
+                                    return copy.partsMetricSize;
+
+                                case 'rows':
+                                    return copy.partsMetricRows;
+
+                                default:
+                                    return copy.partsMetricMarks;
+                            }
+                        };
+                        return (
+                            <button
+                                key={value}
+                                type="button"
+                                aria-pressed={metric === value}
+                                onClick={() => setMetric(value)}
+                            >
+                                {getMetricLabel()}
+                            </button>
+                        );
+                    })}
                 </div>
                 <div className="parts-view-control" role="group" aria-label={copy.partsMap}>
-                    {(['map', 'treemap', 'galaxy'] as const).map(value => (
-                        <button
-                            key={value}
-                            type="button"
-                            aria-pressed={layoutMode === value}
-                            onClick={() => setLayoutMode(value)}
-                        >
-                            {value === 'map'
-                                ? copy.partsMap
-                                : value === 'treemap'
-                                  ? copy.partsTreemap
-                                  : copy.partsGalaxy}
-                        </button>
-                    ))}
+                    {(['map', 'treemap', 'galaxy'] as const).map(value => {
+                        const getViewLabel = () => {
+                            switch (value) {
+                                case 'map':
+                                    return copy.partsMap;
+
+                                case 'treemap':
+                                    return copy.partsTreemap;
+
+                                default:
+                                    return copy.partsGalaxy;
+                            }
+                        };
+                        return (
+                            <button
+                                key={value}
+                                type="button"
+                                aria-pressed={layoutMode === value}
+                                onClick={() => setLayoutMode(value)}
+                            >
+                                {getViewLabel()}
+                            </button>
+                        );
+                    })}
                 </div>
-                <span className="parts-count-summary">
-                    {snapshot
-                        ? `${exactCount(snapshot.activeParts)} ${copy.partsStateActive.toLowerCase()} · ${exactCount(snapshot.inactiveParts)} ${copy.partsStateInactive.toLowerCase()} · ${partitions} ${copy.partsPartitions}`
-                        : current?.loading
-                          ? copy.partsLoading
-                          : ''}
-                </span>
+                <span className="parts-count-summary">{getPartsSummary()}</span>
             </div>
             {current?.loading && (
                 <div className="parts-state" role="status">
@@ -639,9 +711,9 @@ function renderPartInspector({
     selectedPartition: string | undefined;
     partitionParts: MergeTreePart[];
 }) {
-    return (
-        <div className="parts-inspector" aria-live="polite">
-            {selectedPart ? (
+    const renderSelectionDetails = () => {
+        if (selectedPart) {
+            return (
                 <>
                     <div className="parts-inspector-heading">
                         <span className="eyebrow">
@@ -694,7 +766,11 @@ function renderPartInspector({
                         </span>
                     </div>
                 </>
-            ) : selectedPartition && partitionParts.length > 0 ? (
+            );
+        }
+
+        if (selectedPartition && partitionParts.length > 0) {
+            return (
                 <>
                     <div className="parts-inspector-heading">
                         <span className="eyebrow">{copy.partsPartitions.toUpperCase()}</span>
@@ -729,9 +805,14 @@ function renderPartInspector({
                         </span>
                     </div>
                 </>
-            ) : (
-                <p>{copy.partsSelectForDetails}</p>
-            )}
+            );
+        }
+
+        return <p>{copy.partsSelectForDetails}</p>;
+    };
+    return (
+        <div className="parts-inspector" aria-live="polite">
+            {renderSelectionDetails()}
         </div>
     );
 }

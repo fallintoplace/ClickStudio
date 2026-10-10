@@ -382,13 +382,23 @@ export function Button({
 }
 
 export function Status({ run, copy }: { run?: Run; copy?: Copy['common'] }) {
-    const kind = terminal(run)
-        ? run?.status === 'succeeded'
-            ? 'is-trusted'
-            : run?.status === 'truncated'
-              ? 'is-warning'
-              : 'is-error'
-        : 'is-running';
+    let kind: 'is-running' | 'is-trusted' | 'is-warning' | 'is-error';
+
+    if (terminal(run)) {
+        switch (run?.status) {
+            case 'succeeded':
+                kind = 'is-trusted';
+                break;
+            case 'truncated':
+                kind = 'is-warning';
+                break;
+            default:
+                kind = 'is-error';
+                break;
+        }
+    } else {
+        kind = 'is-running';
+    }
     const statusCopy: Partial<Record<NonNullable<Run>['status'], keyof Copy['common']>> = {
         queued: 'statusQueued',
         running: 'statusRunning',

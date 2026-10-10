@@ -53,23 +53,22 @@ function isPartsSnapshot(value: unknown): value is MergeTreePartsSnapshot {
     );
 }
 
+function valueType(value: unknown): string {
+    if (value === null) return 'null';
+    if (Array.isArray(value)) return 'array';
+    return typeof value;
+}
+
 function responseShape(value: unknown) {
-    if (!isRecord(value))
-        return `received ${value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value}`;
+    if (!isRecord(value)) return `received ${valueType(value)}`;
     const fields = Object.entries(value)
         .slice(0, 12)
-        .map(
-            ([key, field]) =>
-                `${key}:${field === null ? 'null' : Array.isArray(field) ? 'array' : typeof field}`,
-        );
+        .map(([key, field]) => `${key}:${valueType(field)}`);
     const firstPart = Array.isArray(value.parts) ? value.parts[0] : undefined;
     const partFields = isRecord(firstPart)
         ? Object.entries(firstPart)
               .slice(0, 12)
-              .map(
-                  ([key, field]) =>
-                      `${key}:${field === null ? 'null' : Array.isArray(field) ? 'array' : typeof field}`,
-              )
+              .map(([key, field]) => `${key}:${valueType(field)}`)
         : [];
     return `received fields: ${fields.join(', ') || '(none)'}${partFields.length ? `; first part fields: ${partFields.join(', ')}` : ''}`;
 }

@@ -126,11 +126,15 @@ function parseCompactRows(body: string) {
 function parsePlaygroundError(body: string, status?: number) {
     const trimmed = body.trim();
     const match = trimmed.match(/^(?:Code:\s*(\d+)\.\s*)?(?:DB::Exception:\s*)?([\s\S]*)$/);
-    const code = match?.[1]
-        ? `CLICKHOUSE_${match[1]}`
-        : status
-          ? `PLAYGROUND_HTTP_${status}`
-          : 'PLAYGROUND_QUERY_ERROR';
+    let code: string;
+
+    if (match?.[1]) {
+        code = `CLICKHOUSE_${match[1]}`;
+    } else if (status) {
+        code = `PLAYGROUND_HTTP_${status}`;
+    } else {
+        code = 'PLAYGROUND_QUERY_ERROR';
+    }
     const message = (match?.[2] ?? trimmed)
         .replace(/\s+\(version [^)]+\)\s*$/, '')
         .trim()

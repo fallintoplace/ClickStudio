@@ -45,15 +45,37 @@ export function ImportReviewStep({
     generateId: ReturnType<typeof useImportWizardController>['generateId'];
     hasCreateIdColumn: boolean;
 }) {
+    const getReviewHeading = () => {
+        if (browserDemoImport) {
+            return 'Ready to save in browser demo';
+        }
+
+        if (creatingTable) {
+            return 'Ready to create and import';
+        }
+
+        return 'Ready to insert';
+    };
+    const getWriteDescription = () => {
+        if (browserDemoImport) {
+            return 'This adds rows to the Vercel interview sandbox in this browser. It does not write to ClickHouse.';
+        }
+
+        if (browserCloudImport) {
+            if (creatingTable) {
+                return 'This creates a MergeTree table in the connected database, then inserts the file rows.';
+            }
+
+            return 'This writes to the selected Cloud table. ClickHouse checks your account permissions and destination types.';
+        }
+
+        return 'This writes data to the selected ClickHouse table. The mapping and destination schema were checked by the server.';
+    };
     return (
         <section aria-label="Review import" className="import-review-step space-y-4">
             <div className="import-ready-card rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-4 sm:p-5">
                 <span className="import-ready-eyebrow text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--muted)]">
-                    {browserDemoImport
-                        ? 'Ready to save in browser demo'
-                        : creatingTable
-                          ? 'Ready to create and import'
-                          : 'Ready to insert'}
+                    {getReviewHeading()}
                 </span>
                 <h3 className="import-ready-title mt-1 text-base font-semibold">
                     Ready to import into{' '}
@@ -62,13 +84,7 @@ export function ImportReviewStep({
                     </code>
                 </h3>
                 <p className="mt-2 text-xs leading-relaxed text-[var(--text-soft)]">
-                    {browserDemoImport
-                        ? 'This adds rows to the Vercel interview sandbox in this browser. It does not write to ClickHouse.'
-                        : browserCloudImport
-                          ? creatingTable
-                              ? 'This creates a MergeTree table in the connected database, then inserts the file rows.'
-                              : 'This writes to the selected Cloud table. ClickHouse checks your account permissions and destination types.'
-                          : 'This writes data to the selected ClickHouse table. The mapping and destination schema were checked by the server.'}
+                    {getWriteDescription()}
                 </p>
                 <dl className="import-review-metrics" aria-label="Import summary">
                     <div>

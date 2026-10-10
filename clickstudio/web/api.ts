@@ -104,9 +104,13 @@ export function download(name: string, value: unknown, type = 'application/json'
     setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 export function message(error: unknown) {
-    return error instanceof RequestError
-        ? `${error.detail.code}: ${error.message}`
-        : error instanceof Error
-          ? error.message
-          : String(error);
+    if (error instanceof RequestError) {
+        return `${error.detail.code}: ${error.message}`;
+    }
+
+    if (error instanceof Error) {
+        return error.message;
+    }
+
+    return String(error);
 }

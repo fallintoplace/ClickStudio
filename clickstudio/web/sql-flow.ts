@@ -88,11 +88,15 @@ function tableSources(
         const alias = typeof node.alias === 'string' ? node.alias : undefined;
         const isCte = parts.length === 1 && cteNames.has(cleanIdentifier(parts[0]!));
         const label = isCte ? `CTE · ${parts[0]}` : name;
-        const detail = isCte
-            ? `Common table expression reference${alias ? ` · alias ${alias}` : ''}`
-            : alias
-              ? `Table source · alias ${alias}`
-              : 'Table source';
+        let detail: string;
+
+        if (isCte) {
+            detail = `Common table expression reference${alias ? ` · alias ${alias}` : ''}`;
+        } else if (alias) {
+            detail = `Table source · alias ${alias}`;
+        } else {
+            detail = 'Table source';
+        }
         const tokenRange = findIdentifierRange(tokens, parts, from);
         const key = `${cleanIdentifier(name)}\u0000${cleanIdentifier(alias ?? '')}`;
         if (seen.has(key)) return;
@@ -625,6 +629,17 @@ function aggregatePipeline(
         mode === 'native AST'
             ? 'Built from the ClickHouse parser AST. This shows logical SQL structure; it is not the server’s physical EXPLAIN PIPELINE.'
             : 'The native AST is unavailable, so this is a best-effort keyword estimate. It is not the server’s physical EXPLAIN PIPELINE.';
+    const getTruncationSuffix = () => {
+        if (capped) {
+            return ` The graph is bounded to ${MAX_FLOW_NODES} nodes.`;
+        }
+
+        if (branchesTruncated) {
+            return ` The graph is bounded to ${MAX_BRANCHES} UNION branches.`;
+        }
+
+        return '';
+    };
     return {
         pipeline: {
             available: nodes.length > 0,
@@ -632,7 +647,7 @@ function aggregatePipeline(
             nodes,
             edges,
             truncated: capped || branchesTruncated,
-            notice: `${notice}${capped ? ` The graph is bounded to ${MAX_FLOW_NODES} nodes.` : branchesTruncated ? ` The graph is bounded to ${MAX_BRANCHES} UNION branches.` : ''}`,
+            notice: `${notice}${getTruncationSuffix()}`,
         },
         sourceRanges,
         mode,

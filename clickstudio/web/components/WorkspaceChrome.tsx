@@ -139,19 +139,30 @@ export function ScriptResults({
     const byId = new Map(runs.map(run => [run.id, run]));
     const statements = script.statements.map((statement, index) => {
         const run = statement.runId ? byId.get(statement.runId) : undefined;
-        const details = run?.error
-            ? `${run.error.code}: ${run.error.message}`
-            : statement.error
-              ? `${statement.error.code}: ${statement.error.message}`
-              : run
-                ? `${statementOutcome(run)} · ${Math.round(run.elapsedMs)} ms`
-                : statement.status === 'pending'
-                  ? 'Waiting to run'
-                  : statement.status === 'running'
-                    ? 'Running'
-                    : statement.status === 'skipped'
-                      ? 'Skipped'
-                      : 'Not executed';
+        let details: string;
+
+        if (run?.error) {
+            details = `${run.error.code}: ${run.error.message}`;
+        } else if (statement.error) {
+            details = `${statement.error.code}: ${statement.error.message}`;
+        } else if (run) {
+            details = `${statementOutcome(run)} · ${Math.round(run.elapsedMs)} ms`;
+        } else {
+            switch (statement.status) {
+                case 'pending':
+                    details = 'Waiting to run';
+                    break;
+                case 'running':
+                    details = 'Running';
+                    break;
+                case 'skipped':
+                    details = 'Skipped';
+                    break;
+                default:
+                    details = 'Not executed';
+                    break;
+            }
+        }
         return { statement, index, details };
     });
     return (
@@ -249,17 +260,68 @@ export function ExecutionBar({
     const currentRun = failedAttempt ? undefined : run;
     const progress = currentRun?.progress;
     const executionInProgress = Boolean(currentRun && (!terminal(currentRun) || scriptRunning));
-    const elapsedMs = currentRun
-        ? terminal(currentRun)
-            ? Math.round(currentRun.elapsedMs)
-            : Math.max(0, Math.round(progress?.elapsedMs ?? currentRun.elapsedMs))
-        : undefined;
+    let elapsedMs: number | undefined;
+
+    if (currentRun) {
+        if (terminal(currentRun)) {
+            elapsedMs = Math.round(currentRun.elapsedMs);
+        } else {
+            elapsedMs = Math.max(0, Math.round(progress?.elapsedMs ?? currentRun.elapsedMs));
+        }
+    } else {
+        elapsedMs = undefined;
+    }
 
     const hasTelemetry = Boolean(
         progress &&
         (progress.readRows !== '' || progress.readBytes !== '' || progress.memory !== undefined),
     );
 
+    const renderCurrentStatus = () => {
+        if (failedAttempt) {
+            return (
+                <span className="execution-ready-state" role="status">
+                    <span className="status-light is-error" />
+                    {copy.queryFailed}
+                </span>
+            );
+        }
+
+        if (currentRun) {
+            return <Status run={currentRun} copy={copy} />;
+        }
+
+        return (
+            <span className="execution-ready-state">
+                <span className="status-light is-trusted" />
+                {copy.statusReady}
+            </span>
+        );
+    };
+    const getEventTone = () => {
+        switch (eventState) {
+            case 'live':
+                return 'is-trusted';
+
+            case 'reconnecting':
+                return 'is-warning';
+
+            default:
+                return '';
+        }
+    };
+    const getEventLabel = () => {
+        switch (eventState) {
+            case 'live':
+                return copy.statusLiveUpdates;
+
+            case 'reconnecting':
+                return copy.statusReconnecting;
+
+            default:
+                return copy.statusComplete;
+        }
+    };
     return (
         <footer
             className={cx('execution-bar', executionInProgress && 'is-running')}
@@ -267,20 +329,7 @@ export function ExecutionBar({
             data-query-id={currentRun?.queryId}
         >
             <div className="execution-state">
-                {!failureInToolbar &&
-                    (failedAttempt ? (
-                        <span className="execution-ready-state" role="status">
-                            <span className="status-light is-error" />
-                            {copy.queryFailed}
-                        </span>
-                    ) : currentRun ? (
-                        <Status run={currentRun} copy={copy} />
-                    ) : (
-                        <span className="execution-ready-state">
-                            <span className="status-light is-trusted" />
-                            {copy.statusReady}
-                        </span>
-                    ))}
+                {!failureInToolbar && renderCurrentStatus()}
                 {currentRun && scriptRunning && (
                     <span className="execution-kind">{copy.runScript.toUpperCase()}</span>
                 )}
@@ -289,21 +338,8 @@ export function ExecutionBar({
                         {!failureInToolbar && <span className="execution-separator" />}
                         <strong>{elapsedMs?.toLocaleString()} ms</strong>
                         <span className="execution-link-state">
-                            <span
-                                className={cx(
-                                    'status-light',
-                                    eventState === 'live'
-                                        ? 'is-trusted'
-                                        : eventState === 'reconnecting'
-                                          ? 'is-warning'
-                                          : '',
-                                )}
-                            />
-                            {eventState === 'live'
-                                ? copy.statusLiveUpdates
-                                : eventState === 'reconnecting'
-                                  ? copy.statusReconnecting
-                                  : copy.statusComplete}
+                            <span className={cx('status-light', getEventTone())} />
+                            {getEventLabel()}
                         </span>
                     </>
                 )}

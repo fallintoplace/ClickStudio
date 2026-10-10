@@ -793,7 +793,16 @@ function measureRank(column: Schema['columns'][number]) {
         /\b(?:amount|revenue|sales|price|cost|population|quantity|count|events|trips|latency|duration|temperature|score|rating|bytes|size|distance|total|views|requests|downloads|orders|weight|height|currency|dollars?)\b/i.test(
             column.comment,
         );
-    return namedMeasure ? 3 : documentedMeasure ? 2 : 0;
+
+    if (namedMeasure) {
+        return 3;
+    }
+
+    if (documentedMeasure) {
+        return 2;
+    }
+
+    return 0;
 }
 
 function columnForTable(schema: Schema, table: Schema['tables'][number]) {
@@ -862,21 +871,35 @@ function timeSeriesExample(
     const timeName = quoteIdentifier(time.name);
     const sampled = tableIsLarge(table) && canSample(table);
     const recent = usesRecentWindow(table, time);
-    const aggregate = measure
-        ? /(?:temperature|latency|duration|score|rating|price|rate|percent|percentage|distance|weight|height)/i.test(
-              `${measure.name} ${measure.comment}`,
-          )
-            ? 'avg'
-            : 'sum'
-        : 'count';
+    let aggregate: 'avg' | 'sum' | 'count';
+
+    if (measure) {
+        if (
+            /(?:temperature|latency|duration|score|rating|price|rate|percent|percentage|distance|weight|height)/i.test(
+                `${measure.name} ${measure.comment}`,
+            )
+        ) {
+            aggregate = 'avg';
+        } else {
+            aggregate = 'sum';
+        }
+    } else {
+        aggregate = 'count';
+    }
     const measureValue = measure ? quoteIdentifier(measure.name) : undefined;
-    const value = measure
-        ? aggregate === 'sum' && sampled
-            ? `sum(${measureValue} * _sample_factor)`
-            : `${aggregate}(${measureValue})`
-        : sampled
-          ? 'sum(_sample_factor)'
-          : 'count()';
+    let value: string;
+
+    if (measure) {
+        if (aggregate === 'sum' && sampled) {
+            value = `sum(${measureValue} * _sample_factor)`;
+        } else {
+            value = `${aggregate}(${measureValue})`;
+        }
+    } else if (sampled) {
+        value = 'sum(_sample_factor)';
+    } else {
+        value = 'count()';
+    }
     const valueAlias = measure ? 'metric_value' : 'row_count';
     const sampleNote = sampled ? ' (estimated sample)' : '';
     const name = `${measure ? `Daily ${measure.name}` : 'Daily rows'} in ${table.name}${sampleNote}`;
@@ -1062,15 +1085,22 @@ export function sqlExamplesFor(
         !schema.tables.some(
             table => !['system', 'information_schema'].includes(table.database.toLowerCase()),
         );
-    const featuredExamples = featured.length
-        ? featured
-        : tableExamples.length
-          ? []
-          : noUserTables
-            ? generatedDataExamples
-            : schema
-              ? genericExamples.map((example, index) => ({ ...example, featuredOrder: index + 1 }))
-              : [];
+    let featuredExamples: SqlExample[];
+
+    if (featured.length) {
+        featuredExamples = featured;
+    } else if (tableExamples.length) {
+        featuredExamples = [];
+    } else if (noUserTables) {
+        featuredExamples = generatedDataExamples;
+    } else if (schema) {
+        featuredExamples = genericExamples.map((example, index) => ({
+            ...example,
+            featuredOrder: index + 1,
+        }));
+    } else {
+        featuredExamples = [];
+    }
     const orderedTableExamples =
         !featured.length && tableExamples.length
             ? tableExamples.map((example, index) =>

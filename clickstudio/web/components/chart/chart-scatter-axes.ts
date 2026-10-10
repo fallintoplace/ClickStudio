@@ -78,49 +78,60 @@ export function prepareScatterAxes({
         scatterMinY === scatterMaxY
             ? plotMiddle
             : plotBottom - ((value - scatterMinY) / scatterRangeY) * plotHeight;
-    const chartYTicks =
-        chartKind === 'scatter'
-            ? scatterMinY === scatterMaxY
-                ? [{ value: scatterMinY, position: plotMiddle }]
-                : [
-                      { value: scatterMaxY, position: plotTop },
-                      { value: (scatterMinY + scatterMaxY) / 2, position: plotMiddle },
-                      { value: scatterMinY, position: plotBottom },
-                  ]
-            : min === max
-              ? [{ value: min, position: plotBottom }]
-              : [
-                    { value: max, position: plotTop },
-                    { value: (min + max) / 2, position: plotMiddle },
-                    { value: min, position: plotBottom },
-                ];
-    const chartXTicks =
-        chartKind === 'scatter'
-            ? scatterMinX === scatterMaxX
-                ? [
-                      {
-                          label: compactNumber.format(scatterMinX),
-                          position: (plotLeft + plotRight) / 2,
-                      },
-                  ]
-                : [
-                      { label: compactNumber.format(scatterMinX), position: plotLeft },
-                      {
-                          label: compactNumber.format((scatterMinX + scatterMaxX) / 2),
-                          position: (plotLeft + plotRight) / 2,
-                      },
-                      { label: compactNumber.format(scatterMaxX), position: plotRight },
-                  ]
-            : categoricalAxis
-              ? (plotSeries[0]?.points.map((point, index) => ({
-                    label: point.label,
-                    position: x(index),
-                })) ?? [])
-              : [...new Set([0, Math.floor((chartRows.length - 1) / 2), chartRows.length - 1])].map(
-                    index => ({
-                        label: plotSeries[0]?.points[index]?.label ?? '',
-                        position: x(index),
-                    }),
-                );
+    let chartYTicks;
+
+    if (chartKind === 'scatter') {
+        if (scatterMinY === scatterMaxY) {
+            chartYTicks = [{ value: scatterMinY, position: plotMiddle }];
+        } else {
+            chartYTicks = [
+                { value: scatterMaxY, position: plotTop },
+                { value: (scatterMinY + scatterMaxY) / 2, position: plotMiddle },
+                { value: scatterMinY, position: plotBottom },
+            ];
+        }
+    } else if (min === max) {
+        chartYTicks = [{ value: min, position: plotBottom }];
+    } else {
+        chartYTicks = [
+            { value: max, position: plotTop },
+            { value: (min + max) / 2, position: plotMiddle },
+            { value: min, position: plotBottom },
+        ];
+    }
+    let chartXTicks;
+
+    if (chartKind === 'scatter') {
+        if (scatterMinX === scatterMaxX) {
+            chartXTicks = [
+                {
+                    label: compactNumber.format(scatterMinX),
+                    position: (plotLeft + plotRight) / 2,
+                },
+            ];
+        } else {
+            chartXTicks = [
+                { label: compactNumber.format(scatterMinX), position: plotLeft },
+                {
+                    label: compactNumber.format((scatterMinX + scatterMaxX) / 2),
+                    position: (plotLeft + plotRight) / 2,
+                },
+                { label: compactNumber.format(scatterMaxX), position: plotRight },
+            ];
+        }
+    } else if (categoricalAxis) {
+        chartXTicks =
+            plotSeries[0]?.points.map((point, index) => ({
+                label: point.label,
+                position: x(index),
+            })) ?? [];
+    } else {
+        chartXTicks = [
+            ...new Set([0, Math.floor((chartRows.length - 1) / 2), chartRows.length - 1]),
+        ].map(index => ({
+            label: plotSeries[0]?.points[index]?.label ?? '',
+            position: x(index),
+        }));
+    }
     return { chartYTicks, scatterPoints, scatterX, scatterY, chartXTicks, scatterSummary };
 }

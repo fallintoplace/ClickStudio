@@ -165,6 +165,33 @@ test('An in-flight chat turn becomes a clear cancelled message after reload', ()
     assert.match(recovered.chats[0].turns[0].error, /interrupted when the page closed/);
 });
 
+test('Restored chat errors keep interruption priority, empty text and absent properties', () => {
+    const state = createAssistantChatState();
+    const cases = [
+        { status: 'pending', error: 'Previous error' },
+        { status: 'failed', error: 'x'.repeat(4_001) },
+        { status: 'failed', error: '' },
+        { status: 'complete' },
+        { status: 'failed', error: { message: 'Invalid error' } },
+    ];
+    state.chats[0].turns = cases.map((entry, index) => ({
+        id: `turn-${index}`,
+        question: 'Explain this',
+        contextSql: 'SELECT 1',
+        includeRun: false,
+        ...entry,
+    }));
+    const turns = recoverAssistantChatState(state).chats[0].turns;
+    assert.equal(turns.length, cases.length);
+    assert.equal(turns[0].status, 'cancelled');
+    assert.match(turns[0].error, /interrupted when the page closed/);
+    assert.equal(turns[1].error, 'x'.repeat(4_000));
+    assert.equal(turns[2].error, '');
+    assert.equal(Object.hasOwn(turns[2], 'error'), true);
+    assert.equal(Object.hasOwn(turns[3], 'error'), false);
+    assert.equal(Object.hasOwn(turns[4], 'error'), false);
+});
+
 test('Malformed turns are discarded without losing the rest of a chat', () => {
     const recovered = recoverAssistantChatState({
         version: 1,

@@ -107,22 +107,29 @@ export function useWorkspaceHelpPanel(props: WorkspaceHelpPanelProps) {
     const visibleTables = tables.some(
         table => !['system', 'information_schema'].includes(table.database.toLowerCase()),
     );
-    const cloudSchemaNotice =
+    let cloudSchemaNotice;
+
+    if (
         connection.dataSource === 'clickhouse' &&
         connection.id !== PLAYGROUND_CONNECTION_ID &&
         trusted &&
         !schemaLoading
-            ? schemaError
-                ? {
-                      message: schemaLoaded
-                          ? copy.sqlExamplesSchemaRefreshFailed
-                          : copy.sqlExamplesSchemaUnavailable,
-                      error: true,
-                  }
-                : schemaLoaded && !visibleTables
-                  ? { message: copy.sqlExamplesNoTables, error: false }
-                  : undefined
-            : undefined;
+    ) {
+        if (schemaError) {
+            cloudSchemaNotice = {
+                message: schemaLoaded
+                    ? copy.sqlExamplesSchemaRefreshFailed
+                    : copy.sqlExamplesSchemaUnavailable,
+                error: true,
+            };
+        } else if (schemaLoaded && !visibleTables) {
+            cloudSchemaNotice = { message: copy.sqlExamplesNoTables, error: false };
+        } else {
+            cloudSchemaNotice = undefined;
+        }
+    } else {
+        cloudSchemaNotice = undefined;
+    }
 
     useEffect(() => {
         if (selected && selected.id !== selectedId) setSelectedId(selected.id);

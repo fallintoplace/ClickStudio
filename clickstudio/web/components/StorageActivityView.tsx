@@ -82,15 +82,22 @@ function MergeCard({ item }: { item: MergeActivity }) {
     );
 }
 function MutationCard({ item }: { item: MutationActivity }) {
+    const getMutationTone = () => {
+        if (item.done) {
+            return 'is-complete';
+        }
+
+        if (item.latestFailure) {
+            return 'is-warning';
+        }
+
+        return '';
+    };
     return (
         <article className="native-activity-card">
             <header>
                 <code>{item.id}</code>
-                <span
-                    className={`native-badge ${item.done ? 'is-complete' : item.latestFailure ? 'is-warning' : ''}`}
-                >
-                    {mutationStatus(item)}
-                </span>
+                <span className={`native-badge ${getMutationTone()}`}>{mutationStatus(item)}</span>
             </header>
             <pre className="native-sql">{item.command}</pre>
             <dl className="native-metrics">

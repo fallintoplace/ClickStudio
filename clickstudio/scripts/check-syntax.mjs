@@ -2,13 +2,17 @@ import ts from 'typescript';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 function files(path) {
-    return readdirSync(path, { withFileTypes: true }).flatMap(entry =>
-        entry.isDirectory()
-            ? files(join(path, entry.name))
-            : /\.(ts|tsx)$/.test(entry.name)
-              ? [join(path, entry.name)]
-              : [],
-    );
+    return readdirSync(path, { withFileTypes: true }).flatMap(entry => {
+        if (entry.isDirectory()) {
+            return files(join(path, entry.name));
+        }
+
+        if (/\.(ts|tsx)$/.test(entry.name)) {
+            return [join(path, entry.name)];
+        }
+
+        return [];
+    });
 }
 let failed = 0;
 const paths = [

@@ -79,21 +79,35 @@ async function loadConnectionImportSetup(
 
 function pendingImportForJob(job: ImportJob, previous?: PendingImport): PendingImport {
     const sameJob = previous?.id === job.id ? previous : undefined;
+    const getPendingQueryId = () => {
+        if (job.queryId) {
+            return { queryId: job.queryId };
+        }
+
+        if (sameJob?.queryId) {
+            return { queryId: sameJob.queryId };
+        }
+
+        return {};
+    };
+    const getPendingDeduplicationToken = () => {
+        if (job.deduplicationToken) {
+            return { deduplicationToken: job.deduplicationToken };
+        }
+
+        if (sameJob?.deduplicationToken) {
+            return { deduplicationToken: sameJob.deduplicationToken };
+        }
+
+        return {};
+    };
     return {
         id: job.id,
         table: job.table,
         rows: job.rows,
         name: sameJob?.name ?? 'Previous import',
-        ...(job.queryId
-            ? { queryId: job.queryId }
-            : sameJob?.queryId
-              ? { queryId: sameJob.queryId }
-              : {}),
-        ...(job.deduplicationToken
-            ? { deduplicationToken: job.deduplicationToken }
-            : sameJob?.deduplicationToken
-              ? { deduplicationToken: sameJob.deduplicationToken }
-              : {}),
+        ...getPendingQueryId(),
+        ...getPendingDeduplicationToken(),
         ...(sameJob?.inspectionOpened ? { inspectionOpened: true } : {}),
     };
 }
@@ -681,11 +695,15 @@ async function runCommitImport(
                         );
                         setTargets(nextTargets);
                         setSchema(nextSchema);
-                        const nextTarget = nextTargets.includes(mapping.table)
-                            ? mapping.table
-                            : creatingTable
-                              ? CREATE_CLOUD_TABLE_TARGET
-                              : '';
+                        let nextTarget: string;
+
+                        if (nextTargets.includes(mapping.table)) {
+                            nextTarget = mapping.table;
+                        } else if (creatingTable) {
+                            nextTarget = CREATE_CLOUD_TABLE_TARGET;
+                        } else {
+                            nextTarget = '';
+                        }
                         setTarget(nextTarget);
                         setLastExistingTarget(
                             nextTarget && nextTarget !== CREATE_CLOUD_TABLE_TARGET
@@ -1041,6 +1059,14 @@ async function runConfirmUnknownImport(context: ConfirmUnknownImportContext) {
     }
 }
 
+function updateRecoverableJobs(current: ImportJob[], next: ImportJob): ImportJob[] {
+    if (next.status === 'succeeded' || next.reviewedAt)
+        return current.filter(item => item.id !== next.id);
+    if (current.some(item => item.id === next.id))
+        return current.map(item => (item.id === next.id ? next : item));
+    return [next, ...current];
+}
+
 export function useImportWizardController({
     open,
     connectionId,
@@ -1235,13 +1261,7 @@ export function useImportWizardController({
 
     function rememberJob(next: ImportJob) {
         setJob(next);
-        setRecoverableJobs(current =>
-            next.status === 'succeeded' || next.reviewedAt
-                ? current.filter(item => item.id !== next.id)
-                : current.some(item => item.id === next.id)
-                  ? current.map(item => (item.id === next.id ? next : item))
-                  : [next, ...current],
-        );
+        setRecoverableJobs(current => updateRecoverableJobs(current, next));
         if (next.status === 'succeeded') reportImported(next);
         else reportDestinationNeedsInspection(next);
     }

@@ -70,12 +70,15 @@ export function FlamegraphView({ series }: { series: FlamegraphSeries }) {
                                     y = height - node.y1,
                                     rectWidth = Math.max(0, node.x1 - node.x0),
                                     rectHeight = Math.max(0, node.y1 - node.y0);
-                                const label =
-                                    rectWidth > 210
-                                        ? node.data.name
-                                        : rectWidth > 94
-                                          ? `${node.data.name.slice(0, 24)}…`
-                                          : '';
+                                let label: string;
+
+                                if (rectWidth > 210) {
+                                    label = node.data.name;
+                                } else if (rectWidth > 94) {
+                                    label = `${node.data.name.slice(0, 24)}…`;
+                                } else {
+                                    label = '';
+                                }
                                 const selectedFrame = selectedId === node.data.id;
                                 return (
                                     <g

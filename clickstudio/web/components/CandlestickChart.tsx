@@ -191,20 +191,30 @@ export function CandlestickChart({ result, config, x, copy, locale }: Props) {
                     </span>
                 </div>
                 <div className="market-range-presets" role="group" aria-label={copy.chartRange}>
-                    {(['1d', '3d', 'all'] as const).map(preset => (
-                        <button
-                            type="button"
-                            key={preset}
-                            aria-pressed={rangePreset === preset}
-                            onClick={() => setPreset(preset)}
-                        >
-                            {preset === '1d'
-                                ? copy.oneDayRange
-                                : preset === '3d'
-                                  ? copy.threeDayRange
-                                  : copy.allRange}
-                        </button>
-                    ))}
+                    {(['1d', '3d', 'all'] as const).map(preset => {
+                        const getRangeLabel = () => {
+                            switch (preset) {
+                                case '1d':
+                                    return copy.oneDayRange;
+
+                                case '3d':
+                                    return copy.threeDayRange;
+
+                                default:
+                                    return copy.allRange;
+                            }
+                        };
+                        return (
+                            <button
+                                type="button"
+                                key={preset}
+                                aria-pressed={rangePreset === preset}
+                                onClick={() => setPreset(preset)}
+                            >
+                                {getRangeLabel()}
+                            </button>
+                        );
+                    })}
                 </div>
             </div>
             <ScrollEdgeFrame<HTMLDivElement> className="market-chart-canvas-frame">
@@ -678,15 +688,18 @@ function drawCandleIndicators({
         candle.spread === undefined ? [] : [candle.spread],
     );
     const spreadExtent = extent(spreadValues) as [number, number];
-    const spreadRange =
-        spreadExtent[0] === undefined
-            ? ([0, 1] as [number, number])
-            : spreadExtent[0] === spreadExtent[1]
-              ? ([spreadExtent[0] * 0.95, spreadExtent[1] * 1.05 || spreadExtent[0] + 1] as [
-                    number,
-                    number,
-                ])
-              : spreadExtent;
+    let spreadRange;
+
+    if (spreadExtent[0] === undefined) {
+        spreadRange = [0, 1] as [number, number];
+    } else if (spreadExtent[0] === spreadExtent[1]) {
+        spreadRange = [spreadExtent[0] * 0.95, spreadExtent[1] * 1.05 || spreadExtent[0] + 1] as [
+            number,
+            number,
+        ];
+    } else {
+        spreadRange = spreadExtent;
+    }
     const spreadScale = scaleLinear()
         .domain(spreadRange)
         .nice(3)

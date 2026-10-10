@@ -106,13 +106,17 @@ export function WorkspaceQueryPanel({
         : undefined;
     const standardFormatter =
         nativeParserEnabled && nativeParserStatus === 'ready' ? 'wasm' : 'builtin';
-    const runButtonLabel = state.cancelling
-        ? 'Cancelling…'
-        : executionCanCancel
-          ? copy.common.cancel
-          : busy === 'run' || busy === 'script'
-            ? copy.common.running
-            : copy.common.run;
+    let runButtonLabel: string;
+
+    if (state.cancelling) {
+        runButtonLabel = 'Cancelling…';
+    } else if (executionCanCancel) {
+        runButtonLabel = copy.common.cancel;
+    } else if (busy === 'run' || busy === 'script') {
+        runButtonLabel = copy.common.running;
+    } else {
+        runButtonLabel = copy.common.run;
+    }
     const runSql = () => actions.onRun('query');
     const runButton = (
         <Button
@@ -143,6 +147,36 @@ export function WorkspaceQueryPanel({
             {copy.common.save}
         </Button>
     );
+    const getTrustDescription = () => {
+        if (demoMode) {
+            return 'Start the sample workspace to run this query.';
+        }
+
+        if (!connection.manifest) {
+            if (trusted) {
+                return 'Retest this connection to refresh its feature checks.';
+            }
+
+            return 'Test this connection to discover its ClickHouse features.';
+        }
+
+        return 'Trust this connection to run SQL.';
+    };
+    const getTrustActionLabel = () => {
+        if (demoMode) {
+            return 'Start exploring';
+        }
+
+        if (!connection.manifest) {
+            if (trusted) {
+                return 'Retest connection';
+            }
+
+            return 'Test connection';
+        }
+
+        return 'Trust connection';
+    };
     return (
         <section
             className={cx(
@@ -173,27 +207,13 @@ export function WorkspaceQueryPanel({
                         {experience === 'beginner' &&
                             (!trusted || (!demoMode && !connection.manifest)) && (
                                 <div className="beginner-connection-notice" role="status">
-                                    <span>
-                                        {demoMode
-                                            ? 'Start the sample workspace to run this query.'
-                                            : !connection.manifest
-                                              ? trusted
-                                                  ? 'Retest this connection to refresh its feature checks.'
-                                                  : 'Test this connection to discover its ClickHouse features.'
-                                              : 'Trust this connection to run SQL.'}
-                                    </span>
+                                    <span>{getTrustDescription()}</span>
                                     <Button
                                         variant="secondary"
                                         className="toolbar-small"
                                         onClick={() => void actions.onConnectionAction()}
                                     >
-                                        {demoMode
-                                            ? 'Start exploring'
-                                            : !connection.manifest
-                                              ? trusted
-                                                  ? 'Retest connection'
-                                                  : 'Test connection'
-                                              : 'Trust connection'}
+                                        {getTrustActionLabel()}
                                     </Button>
                                 </div>
                             )}

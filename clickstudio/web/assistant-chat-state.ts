@@ -120,6 +120,19 @@ function recoverTurn(value: unknown): AssistantChatTurn | undefined {
         value.runContext === undefined ? undefined : recoverRunContext(value.runContext);
     if (value.runContext !== undefined && !runContext) return undefined;
     const interrupted = value.status === 'pending';
+    const getRestoredError = () => {
+        if (interrupted) {
+            return {
+                error: 'This request was interrupted when the page closed. Send another message to continue.',
+            };
+        }
+
+        if (typeof value.error === 'string') {
+            return { error: value.error.slice(0, 4_000) };
+        }
+
+        return {};
+    };
     return {
         id: value.id,
         question: value.question,
@@ -129,13 +142,7 @@ function recoverTurn(value: unknown): AssistantChatTurn | undefined {
         ...(runContext ? { runContext } : {}),
         status: interrupted ? 'cancelled' : value.status,
         ...(proposal ? { proposal } : {}),
-        ...(interrupted
-            ? {
-                  error: 'This request was interrupted when the page closed. Send another message to continue.',
-              }
-            : typeof value.error === 'string'
-              ? { error: value.error.slice(0, 4_000) }
-              : {}),
+        ...getRestoredError(),
     };
 }
 

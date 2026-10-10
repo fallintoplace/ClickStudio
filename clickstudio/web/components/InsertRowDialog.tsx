@@ -434,6 +434,22 @@ function renderInsertRowDialog({
     setStep: import('react').Dispatch<import('react').SetStateAction<Step>>;
     insertRow: () => Promise<void>;
 }) {
+    const getInsertStatusMessage = (job: ImportJob) => {
+        switch (job.status) {
+            case 'succeeded':
+                if (job.reviewedAt) {
+                    return `You confirmed the row is in ${name}.`;
+                }
+
+                return `ClickHouse acknowledged an insert request containing one row for ${name}.`;
+
+            case 'running':
+                return 'ClickHouse still reports this insert as active. Wait for it to finish before sending another row.';
+
+            default:
+                return 'ClickHouse couldn’t confirm the insert. The row may already be there.';
+        }
+    };
     return (
         <dialog
             ref={dialog}
@@ -582,13 +598,7 @@ function renderInsertRowDialog({
                                 role="status"
                                 className="rounded-xl border border-[var(--line)] bg-[var(--page)] p-4 text-sm"
                             >
-                                {job.status === 'succeeded'
-                                    ? job.reviewedAt
-                                        ? `You confirmed the row is in ${name}.`
-                                        : `ClickHouse acknowledged an insert request containing one row for ${name}.`
-                                    : job.status === 'running'
-                                      ? 'ClickHouse still reports this insert as active. Wait for it to finish before sending another row.'
-                                      : 'ClickHouse couldn’t confirm the insert. The row may already be there.'}
+                                {getInsertStatusMessage(job)}
                             </p>
                             {job.status === 'unknown' && (
                                 <>

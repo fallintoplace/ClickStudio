@@ -268,11 +268,15 @@ export function ResultGrid({
         : '0';
     const retainedRange = `${rowRange} of ${page.totalRows.toLocaleString()} retained rows`;
     const pageLabel = `Page ${pageIndex + 1} of ${pageCount}`;
-    const rowCount = filter
-        ? `${visibleRows.length.toLocaleString()} of ${page.rows.length.toLocaleString()} rows${pageCount > 1 ? ' on this page' : ''}`
-        : pageCount > 1
-          ? `${rowRange} / ${page.totalRows.toLocaleString()} rows`
-          : `${page.totalRows.toLocaleString()} ${page.totalRows === 1 ? 'row' : 'rows'}`;
+    let rowCount: string;
+
+    if (filter) {
+        rowCount = `${visibleRows.length.toLocaleString()} of ${page.rows.length.toLocaleString()} rows${pageCount > 1 ? ' on this page' : ''}`;
+    } else if (pageCount > 1) {
+        rowCount = `${rowRange} / ${page.totalRows.toLocaleString()} rows`;
+    } else {
+        rowCount = `${page.totalRows.toLocaleString()} ${page.totalRows === 1 ? 'row' : 'rows'}`;
+    }
     const toolbar = (showPagination || page.completeness === 'truncated') && (
         <div className="result-table-toolbar" inert={obscured || undefined}>
             {showPagination && (
@@ -397,12 +401,16 @@ export function ResultGrid({
             )}
         </div>
     );
-    const emptyRowsMessage =
-        page.totalRows > 0
-            ? 'No retained rows are available on this page.'
-            : page.completeness === 'truncated'
-              ? 'No rows fit in the retained result. The query may still have matched rows; the result limits left none to keep.'
-              : 'This query returned zero rows.';
+    let emptyRowsMessage: string;
+
+    if (page.totalRows > 0) {
+        emptyRowsMessage = 'No retained rows are available on this page.';
+    } else if (page.completeness === 'truncated') {
+        emptyRowsMessage =
+            'No rows fit in the retained result. The query may still have matched rows; the result limits left none to keep.';
+    } else {
+        emptyRowsMessage = 'This query returned zero rows.';
+    }
     return (
         <div
             className={cx(

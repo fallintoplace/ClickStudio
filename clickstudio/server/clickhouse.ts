@@ -118,9 +118,31 @@ export class ClickHouseDriver implements QueryDriver, ImportDriver, CreateTableD
         const position = /at position (\d+)/i.exec(message)?.[1];
         const denied = /not enough privileges|access denied|authentication failed/i.test(message);
         const cap = /TOO_MANY_ROWS_OR_BYTES|LIMIT_EXCEEDED|MEMORY_LIMIT_EXCEEDED/i.test(message);
+        const getErrorStatus = () => {
+            if (denied) {
+                return 403;
+            }
+
+            if (cap) {
+                return 413;
+            }
+
+            return 502;
+        };
+        const getErrorCode = () => {
+            if (denied) {
+                return 'CLICKHOUSE_PERMISSION';
+            }
+
+            if (cap) {
+                return 'SERVER_RESOURCE_LIMIT';
+            }
+
+            return 'CLICKHOUSE_ERROR';
+        };
         return new AppError(
-            denied ? 403 : cap ? 413 : 502,
-            denied ? 'CLICKHOUSE_PERMISSION' : cap ? 'SERVER_RESOURCE_LIMIT' : 'CLICKHOUSE_ERROR',
+            getErrorStatus(),
+            getErrorCode(),
             message,
             undefined,
             position ? Math.max(0, Number(position) - 1) : undefined,
@@ -216,17 +238,25 @@ export class ClickHouseDriver implements QueryDriver, ImportDriver, CreateTableD
                 'SELECT database, table, type, create_time, num_tries, last_exception, postpone_reason, is_currently_executing FROM system.replication_queue LIMIT 0',
             ),
         ]);
-        const queryLogSource: QueryLogSource | undefined = userQueryLog.available
-            ? 'user_query_log'
-            : queryLogFallback.available
-              ? 'query_log'
-              : undefined;
+        let queryLogSource: QueryLogSource | undefined;
+
+        if (userQueryLog.available) {
+            queryLogSource = 'user_query_log';
+        } else if (queryLogFallback.available) {
+            queryLogSource = 'query_log';
+        } else {
+            queryLogSource = undefined;
+        }
         const queryLog = queryLogSource ? { available: true } : queryLogFallback;
-        const flamegraphSource: FlamegraphSource | undefined = traceLogSymbolized.available
-            ? 'symbolized'
-            : traceLogAddresses.available
-              ? 'addresses'
-              : undefined;
+        let flamegraphSource: FlamegraphSource | undefined;
+
+        if (traceLogSymbolized.available) {
+            flamegraphSource = 'symbolized';
+        } else if (traceLogAddresses.available) {
+            flamegraphSource = 'addresses';
+        } else {
+            flamegraphSource = undefined;
+        }
         if (flamegraphSource) this.flamegraphSources.set(id, flamegraphSource);
         else this.flamegraphSources.delete(id);
         const replication: ReplicationCapabilities = {

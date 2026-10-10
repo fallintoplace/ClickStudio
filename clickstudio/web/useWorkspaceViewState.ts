@@ -131,14 +131,24 @@ export function useWorkspaceViewState({
         : undefined;
     const submittedDraft = failedQueryError?.draftSql ?? runErrorContext?.draftSql;
     const submittedOffset = failedQueryError?.sourceFrom ?? runErrorContext?.sourceFrom ?? 0;
-    const failureLocation =
-        failureSql && failureRange
-            ? submittedDraft &&
-              submittedDraft.slice(submittedOffset, submittedOffset + failureSql.length) ===
-                  failureSql
-                ? sqlErrorLineColumn(submittedDraft, submittedOffset + failureRange.from)
-                : sqlErrorLineColumn(failureSql, failureRange.from)
-            : undefined;
+    let failureLocation;
+
+    if (failureSql && failureRange) {
+        if (
+            submittedDraft &&
+            submittedDraft.slice(submittedOffset, submittedOffset + failureSql.length) ===
+                failureSql
+        ) {
+            failureLocation = sqlErrorLineColumn(
+                submittedDraft,
+                submittedOffset + failureRange.from,
+            );
+        } else {
+            failureLocation = sqlErrorLineColumn(failureSql, failureRange.from);
+        }
+    } else {
+        failureLocation = undefined;
+    }
     const invalidatedSource =
         run && active.activeRunId === run.id && active.invalidatedSource?.runId === run.id
             ? active.invalidatedSource
@@ -155,35 +165,62 @@ export function useWorkspaceViewState({
         [run, active.sql, active.parameters, connection.id],
     );
     const staleResult = Boolean(invalidatedSource || resultChange);
-    const staleResultLabel = invalidatedSource
-        ? copy.common.sourceDeleted
-        : resultChange === 'query'
-          ? copy.common.queryChanged
-          : resultChange === 'parameters'
-            ? copy.common.parametersChanged
-            : resultChange === 'connection'
-              ? copy.common.connectionChanged
-              : undefined;
-    const staleResultReason = invalidatedSource
-        ? `The source table ${invalidatedSource.database}.${invalidatedSource.table} was deleted after this run.`
-        : resultChange === 'query'
-          ? copy.common.queryChangedDescription
-          : resultChange === 'parameters'
-            ? copy.common.parametersChangedDescription
-            : resultChange === 'connection'
-              ? copy.common.connectionChangedDescription
-              : undefined;
+    let staleResultLabel: string | undefined;
+
+    if (invalidatedSource) {
+        staleResultLabel = copy.common.sourceDeleted;
+    } else {
+        switch (resultChange) {
+            case 'query':
+                staleResultLabel = copy.common.queryChanged;
+                break;
+            case 'parameters':
+                staleResultLabel = copy.common.parametersChanged;
+                break;
+            case 'connection':
+                staleResultLabel = copy.common.connectionChanged;
+                break;
+            default:
+                staleResultLabel = undefined;
+                break;
+        }
+    }
+    let staleResultReason: string | undefined;
+
+    if (invalidatedSource) {
+        staleResultReason = `The source table ${invalidatedSource.database}.${invalidatedSource.table} was deleted after this run.`;
+    } else {
+        switch (resultChange) {
+            case 'query':
+                staleResultReason = copy.common.queryChangedDescription;
+                break;
+            case 'parameters':
+                staleResultReason = copy.common.parametersChangedDescription;
+                break;
+            case 'connection':
+                staleResultReason = copy.common.connectionChangedDescription;
+                break;
+            default:
+                staleResultReason = undefined;
+                break;
+        }
+    }
     const requestedResultsView =
         experience === 'beginner' && view === 'insights' ? 'results' : view;
     const sqlMapStatement = safeSelectedStatement(active.sql, active.from, active.from);
     const queryTreeCapability = connection.manifest?.queryTree ?? connection.manifest?.explain;
     const queryTreeAvailable =
         trusted && !unsupportedParameters && queryTreeCapability?.available !== false;
-    const queryTreeUnavailableReason = !trusted
-        ? copy.common.runActionTrustRequired
-        : unsupportedParameters
-          ? (connection.manifest?.parameters.reason ?? copy.common.runActionRemoveParameters)
-          : queryTreeCapability?.reason;
+    let queryTreeUnavailableReason: string | undefined;
+
+    if (!trusted) {
+        queryTreeUnavailableReason = copy.common.runActionTrustRequired;
+    } else if (unsupportedParameters) {
+        queryTreeUnavailableReason =
+            connection.manifest?.parameters.reason ?? copy.common.runActionRemoveParameters;
+    } else {
+        queryTreeUnavailableReason = queryTreeCapability?.reason;
+    }
     const sqlMapParseStatement =
         sqlMapStatement &&
         nativeParseSnapshot?.statements.find(

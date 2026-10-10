@@ -38,12 +38,17 @@ export function prepareChartView({
     selection: ReturnType<typeof prepareChartSelection>;
 }) {
     const { suggestion, numericIndexes, inferredCandle, canChooseCandlestick, candleX } = selection;
-    const chartKind =
-        chart.kind === 'table'
-            ? suggestion.config.kind === 'table'
-                ? 'bar'
-                : suggestion.config.kind
-            : chart.kind;
+    let chartKind: 'number' | 'line' | 'bar' | 'scatter' | 'heatmap' | 'candlestick';
+
+    if (chart.kind === 'table') {
+        if (suggestion.config.kind === 'table') {
+            chartKind = 'bar';
+        } else {
+            chartKind = suggestion.config.kind;
+        }
+    } else {
+        chartKind = chart.kind;
+    }
     const configuredMeasures = [
         ...new Set(chart.ys.filter(index => numericIndexes.includes(index))),
     ].slice(0, MAX_CHART_SERIES);
@@ -61,26 +66,46 @@ export function prepareChartView({
             : result.columns.findIndex(
                   (_column, index) => index !== chart.x && index !== initialMeasure,
               );
-    const allowedX = (index: number) =>
-        chartKind === 'scatter'
-            ? numericIndexes.includes(index) && index !== initialMeasure
-            : chartKind === 'heatmap'
-              ? index !== initialMeasure && index !== initialGroupBy
-              : index !== initialMeasure;
+    const allowedX = (index: number) => {
+        switch (chartKind) {
+            case 'scatter':
+                return numericIndexes.includes(index) && index !== initialMeasure;
+
+            case 'heatmap':
+                return index !== initialMeasure && index !== initialGroupBy;
+
+            default:
+                return index !== initialMeasure;
+        }
+    };
     const fallbackX = result.columns.findIndex((_column, index) => allowedX(index));
-    const xIndex =
-        validChartIndex(chart.x) && allowedX(chart.x) ? chart.x : fallbackX >= 0 ? fallbackX : 0;
-    const candidateGroupBy =
-        chartKind === 'heatmap'
-            ? chart.groupBy !== undefined &&
-              validChartIndex(chart.groupBy) &&
-              chart.groupBy !== xIndex &&
-              chart.groupBy !== initialMeasure
-                ? chart.groupBy
-                : result.columns.findIndex(
-                      (_column, index) => index !== xIndex && index !== initialMeasure,
-                  )
-            : -1;
+    let xIndex: number;
+
+    if (validChartIndex(chart.x) && allowedX(chart.x)) {
+        xIndex = chart.x;
+    } else if (fallbackX >= 0) {
+        xIndex = fallbackX;
+    } else {
+        xIndex = 0;
+    }
+    let candidateGroupBy: number;
+
+    if (chartKind === 'heatmap') {
+        if (
+            chart.groupBy !== undefined &&
+            validChartIndex(chart.groupBy) &&
+            chart.groupBy !== xIndex &&
+            chart.groupBy !== initialMeasure
+        ) {
+            candidateGroupBy = chart.groupBy;
+        } else {
+            candidateGroupBy = result.columns.findIndex(
+                (_column, index) => index !== xIndex && index !== initialMeasure,
+            );
+        }
+    } else {
+        candidateGroupBy = -1;
+    }
     const groupByIndex = candidateGroupBy >= 0 ? candidateGroupBy : undefined;
     const availableMeasures = numericIndexes.filter(
         index => index !== xIndex && index !== groupByIndex,
@@ -103,12 +128,15 @@ export function prepareChartView({
     const categoricalAxis =
         chartKind === 'bar' ||
         (chartKind === 'line' && !numericType(xType) && !temporalType(xType));
-    const chartRows =
-        chartKind === 'heatmap'
-            ? []
-            : categoricalAxis
-              ? result.rows
-              : sampleChartRows(result.rows, MAX_CHART_RENDER_POINTS);
+    let chartRows: typeof result.rows;
+
+    if (chartKind === 'heatmap') {
+        chartRows = [];
+    } else if (categoricalAxis) {
+        chartRows = result.rows;
+    } else {
+        chartRows = sampleChartRows(result.rows, MAX_CHART_RENDER_POINTS);
+    }
     const plotSeries = measureIndexes.map((columnIndex, seriesIndex) => ({
         columnIndex,
         color: seriesColor(seriesIndex),
@@ -204,14 +232,17 @@ export function prepareChartView({
             x,
         });
 
-    const suggestionReason =
-        chartKind === 'heatmap'
-            ? chartCopy.heatmapReturnedRows
-            : result.rows.length === 1
-              ? chartCopy.reasonSingleNumber
-              : temporalType(result.columns[suggestion.config.x]?.type ?? '')
-                ? chartCopy.reasonTimeMeasure
-                : chartCopy.reasonDimensionMeasure;
+    let suggestionReason: string;
+
+    if (chartKind === 'heatmap') {
+        suggestionReason = chartCopy.heatmapReturnedRows;
+    } else if (result.rows.length === 1) {
+        suggestionReason = chartCopy.reasonSingleNumber;
+    } else if (temporalType(result.columns[suggestion.config.x]?.type ?? '')) {
+        suggestionReason = chartCopy.reasonTimeMeasure;
+    } else {
+        suggestionReason = chartCopy.reasonDimensionMeasure;
+    }
     const chartTitle = chart.title && chart.title !== 'Query result' ? chart.title : undefined;
     const chartAriaLabel = chartText(chartCopy.chartComparing, {
         type: chartTypeLabel(chartKind, chartCopy).toLocaleLowerCase(locale),

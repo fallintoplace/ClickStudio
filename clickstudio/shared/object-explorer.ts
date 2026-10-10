@@ -81,6 +81,17 @@ export function relationKind(table: SchemaTable): ExplorerRelationKind {
 }
 
 function relationSearchText(table: SchemaTable): string {
+    const getTtlSearchText = () => {
+        if (table.ttlConfigured === undefined) {
+            return '';
+        }
+
+        if (table.ttlConfigured) {
+            return 'ttl configured';
+        }
+
+        return 'no ttl';
+    };
     return [
         table.database,
         table.name,
@@ -95,7 +106,7 @@ function relationSearchText(table: SchemaTable): string {
         table.uncompressedBytes,
         table.parts,
         table.activeParts,
-        table.ttlConfigured === undefined ? '' : table.ttlConfigured ? 'ttl configured' : 'no ttl',
+        getTtlSearchText(),
         table.skipIndexTypes?.join(' '),
         ...(table.projections ?? []).flatMap(projection => [
             projection.name,
@@ -133,8 +144,17 @@ function dictionarySearchText(dictionary: SchemaDictionary): string {
 
 function databaseSort(preferredDatabase: string) {
     return (left: ExplorerDatabase, right: ExplorerDatabase) => {
-        const rank = (database: string) =>
-            database === preferredDatabase ? 0 : database === 'system' ? 2 : 1;
+        const rank = (database: string) => {
+            if (database === preferredDatabase) {
+                return 0;
+            }
+
+            if (database === 'system') {
+                return 2;
+            }
+
+            return 1;
+        };
         return rank(left.name) - rank(right.name) || left.name.localeCompare(right.name);
     };
 }

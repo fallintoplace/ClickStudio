@@ -48,12 +48,15 @@ function playgroundRows<T>(
 export function isReferenceUnavailable(error: unknown) {
     if (error instanceof RequestError && error.detail.code === 'CAPABILITY_UNAVAILABLE')
         return true;
-    const value =
-        error instanceof PlaygroundError
-            ? `${error.code} ${error.message}`
-            : error instanceof Error
-              ? error.message
-              : String(error);
+    let value: string;
+
+    if (error instanceof PlaygroundError) {
+        value = `${error.code} ${error.message}`;
+    } else if (error instanceof Error) {
+        value = error.message;
+    } else {
+        value = String(error);
+    }
     return /CLICKHOUSE_(?:47|60|497|516)\b|system\.documentation.{0,80}(?:does not exist|not found|unknown table|access denied)|(?:unknown table|not enough privileges|permission denied|access denied).{0,80}system\.documentation/i.test(
         value,
     );

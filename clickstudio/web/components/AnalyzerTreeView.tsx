@@ -62,27 +62,44 @@ export function AnalyzerTreeView({
     }, [active, available, connectionId, request, requestKey, sql]);
 
     const current = state?.key === requestKey ? state : undefined;
-    return (
-        <div hidden={!active} className="analyzer-tree-view">
-            {!available ? (
+    const renderTree = () => {
+        if (!available) {
+            return (
                 <div className="pipeline-graph-empty" role="status">
                     {unavailableReason ?? copy.queryTreeUnavailable}
                 </div>
-            ) : current?.loading ? (
+            );
+        }
+
+        if (current?.loading) {
+            return (
                 <div className="pipeline-graph-empty" role="status">
                     {copy.queryTreeLoading}
                 </div>
-            ) : current?.error ? (
+            );
+        }
+
+        if (current?.error) {
+            return (
                 <div className="pipeline-graph-empty" role="alert">
                     {current.error}
                 </div>
-            ) : current?.tree?.root ? (
-                <QueryTreeGraph tree={current.tree} copy={copy} />
-            ) : (
-                <div className="pipeline-graph-empty" role="status">
-                    {copy.queryTreeNoOutput}
-                </div>
-            )}
+            );
+        }
+
+        if (current?.tree?.root) {
+            return <QueryTreeGraph tree={current.tree} copy={copy} />;
+        }
+
+        return (
+            <div className="pipeline-graph-empty" role="status">
+                {copy.queryTreeNoOutput}
+            </div>
+        );
+    };
+    return (
+        <div hidden={!active} className="analyzer-tree-view">
+            {renderTree()}
         </div>
     );
 }

@@ -342,7 +342,15 @@ export function recommendChart(
         };
     const time = columns.findIndex(c => /^Date/.test(baseType(c.type)));
     const category = columns.findIndex((_, i) => !numeric.includes(i));
-    const x = time >= 0 ? time : category >= 0 ? category : 0;
+    let x: number;
+
+    if (time >= 0) {
+        x = time;
+    } else if (category >= 0) {
+        x = category;
+    } else {
+        x = 0;
+    }
     const ys = numeric.filter(i => i !== x).slice(0, 4);
     if (!ys.length) ys.push(numeric[0]!);
     return {

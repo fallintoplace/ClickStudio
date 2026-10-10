@@ -318,21 +318,26 @@ export class DemoPreviewApi {
                 script.status !== 'running'
             )
                 continue;
-            const statements = script.statements.map(statement =>
-                statement.status === 'running'
-                    ? {
-                          ...statement,
-                          status: 'interrupted' as const,
-                          error: {
-                              code: 'SCRIPT_INTERRUPTED',
-                              message:
-                                  'The page closed before ClickHouse returned a result. This statement may have completed, so it was not retried.',
-                          },
-                      }
-                    : statement.status === 'pending'
-                      ? { ...statement, status: 'skipped' as const }
-                      : statement,
-            );
+            const statements = script.statements.map(statement => {
+                switch (statement.status) {
+                    case 'running':
+                        return {
+                            ...statement,
+                            status: 'interrupted' as const,
+                            error: {
+                                code: 'SCRIPT_INTERRUPTED',
+                                message:
+                                    'The page closed before ClickHouse returned a result. This statement may have completed, so it was not retried.',
+                            },
+                        };
+
+                    case 'pending':
+                        return { ...statement, status: 'skipped' as const };
+
+                    default:
+                        return statement;
+                }
+            });
             this.scripts.set(script.id, { ...script, status: 'interrupted', statements });
         }
     }
@@ -391,14 +396,17 @@ export class DemoPreviewApi {
                 const oldestCloudOrPlayground = results.findIndex(
                     result => this.runs.get(result.runId)?.connectionId !== 'demo',
                 );
-                const resultToExpire =
-                    playgroundResult >= 0
-                        ? playgroundResult
-                        : oldestCloudOrPlayground >= 0
-                          ? oldestCloudOrPlayground
-                          : results.length
-                            ? 0
-                            : -1;
+                let resultToExpire: number;
+
+                if (playgroundResult >= 0) {
+                    resultToExpire = playgroundResult;
+                } else if (oldestCloudOrPlayground >= 0) {
+                    resultToExpire = oldestCloudOrPlayground;
+                } else if (results.length) {
+                    resultToExpire = 0;
+                } else {
+                    resultToExpire = -1;
+                }
                 if (resultToExpire >= 0) {
                     results.splice(resultToExpire, 1);
                 } else {
@@ -593,20 +601,24 @@ export class DemoPreviewApi {
             const firstPending = script.statements.findIndex(
                 statement => statement.status === 'pending',
             );
-            const statements = script.statements.map((statement, index) =>
-                index === firstPending
-                    ? {
-                          ...statement,
-                          status: 'failed' as const,
-                          error: {
-                              code: 'CLOUD_DISCONNECTED',
-                              message: 'Reconnect to ClickHouse Cloud before running this script.',
-                          },
-                      }
-                    : statement.status === 'pending'
-                      ? { ...statement, status: 'skipped' as const }
-                      : statement,
-            );
+            const statements = script.statements.map((statement, index) => {
+                if (index === firstPending) {
+                    return {
+                        ...statement,
+                        status: 'failed' as const,
+                        error: {
+                            code: 'CLOUD_DISCONNECTED',
+                            message: 'Reconnect to ClickHouse Cloud before running this script.',
+                        },
+                    };
+                }
+
+                if (statement.status === 'pending') {
+                    return { ...statement, status: 'skipped' as const };
+                }
+
+                return statement;
+            });
             this.scripts.set(script.id, { ...script, status: 'failed', statements });
             this.persist();
             return;
@@ -728,15 +740,24 @@ export class DemoPreviewApi {
                     item => item.status === 'succeeded' || item.status === 'truncated',
                 ).length;
                 const hasPending = statements.some(item => item.status === 'pending');
+                const getInterruptedScriptStatus = () => {
+                    if (current.cancelled) {
+                        return 'cancelled';
+                    }
+
+                    if (hasPending) {
+                        return 'running';
+                    }
+
+                    if (successes) {
+                        return 'partial';
+                    }
+
+                    return 'failed';
+                };
                 this.scripts.set(scriptId, {
                     ...current,
-                    status: current.cancelled
-                        ? 'cancelled'
-                        : hasPending
-                          ? 'running'
-                          : successes
-                            ? 'partial'
-                            : 'failed',
+                    status: getInterruptedScriptStatus(),
                     statements,
                 });
                 this.persist();
@@ -755,13 +776,19 @@ export class DemoPreviewApi {
                 item.status === 'timed_out' ||
                 item.status === 'interrupted',
         );
-        const status = script.cancelled
-            ? 'cancelled'
-            : failed
-              ? successes
-                  ? 'partial'
-                  : 'failed'
-              : 'succeeded';
+        let status: 'cancelled' | 'failed' | 'succeeded' | 'partial';
+
+        if (script.cancelled) {
+            status = 'cancelled';
+        } else if (failed) {
+            if (successes) {
+                status = 'partial';
+            } else {
+                status = 'failed';
+            }
+        } else {
+            status = 'succeeded';
+        }
         const statements = script.cancelled
             ? script.statements.map(item =>
                   item.status === 'pending' ? { ...item, status: 'skipped' as const } : item,
@@ -1161,12 +1188,15 @@ export class DemoPreviewApi {
         if (pathname === '/scripts' && method === 'POST') {
             if (body.connectionId === PLAYGROUND_CONNECTION_ID)
                 throw new Error('Run one statement at a time on ClickHouse Playground.');
-            const sql =
-                typeof body.sql === 'string'
-                    ? body.sql
-                    : body.connectionId === CLICKHOUSE_CLOUD_CONNECTION_ID
-                      ? ''
-                      : DEMO_PREVIEW_SQL;
+            let sql: string;
+
+            if (typeof body.sql === 'string') {
+                sql = body.sql;
+            } else if (body.connectionId === CLICKHOUSE_CLOUD_CONNECTION_ID) {
+                sql = '';
+            } else {
+                sql = DEMO_PREVIEW_SQL;
+            }
             const id = crypto.randomUUID();
             const statements = splitSql(sql);
             if (body.connectionId === CLICKHOUSE_CLOUD_CONNECTION_ID) {

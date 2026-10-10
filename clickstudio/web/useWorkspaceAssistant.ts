@@ -385,11 +385,15 @@ export function useWorkspaceAssistant({
             const currentSchema = schema ?? (await options?.loadSchema?.());
             controller.signal.throwIfAborted();
             if (!currentSchema) throw new Error('Could not load the ClickHouse schema. Try again.');
-            const runContext = repair
-                ? { evidenceSql: repair.sql, error: repair.error }
-                : requestIncludesRun
-                  ? await loadRunContext?.(controller.signal)
-                  : undefined;
+            let runContext;
+
+            if (repair) {
+                runContext = { evidenceSql: repair.sql, error: repair.error };
+            } else if (requestIncludesRun) {
+                runContext = await loadRunContext?.(controller.signal);
+            } else {
+                runContext = undefined;
+            }
             controller.signal.throwIfAborted();
             if (requestIncludesRun && !runContext)
                 throw new Error('Could not load the selected run context. Try again.');

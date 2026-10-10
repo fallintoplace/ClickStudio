@@ -284,17 +284,21 @@ export function searchBundledReference(
             const name = displayName(entry).toLocaleLowerCase();
             const type = entry.type.toLocaleLowerCase();
             const description = entry.description.toLocaleLowerCase();
-            const score = !search
-                ? 0
-                : name === search
-                  ? 0
-                  : name.startsWith(search)
-                    ? 1
-                    : name.includes(search)
-                      ? 2
-                      : type.includes(search) || description.includes(search)
-                        ? 3
-                        : -1;
+            let score: number;
+
+            if (!search) {
+                score = 0;
+            } else if (name === search) {
+                score = 0;
+            } else if (name.startsWith(search)) {
+                score = 1;
+            } else if (name.includes(search)) {
+                score = 2;
+            } else if (type.includes(search) || description.includes(search)) {
+                score = 3;
+            } else {
+                score = -1;
+            }
             return { entry, score };
         })
         .filter(item => item.score >= 0)

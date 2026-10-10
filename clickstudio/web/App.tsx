@@ -26,12 +26,17 @@ import clickhouseLogomarkLight from './assets/clickhouse-logomark-light.svg';
 import type { Connected, Session } from './workspace-types';
 import { resolveConnectionSelection } from '../shared/connection-selection';
 
-const connectionLabel = (connection: Connected, demo: boolean) =>
-    demo && connection.dataSource === 'fixture'
-        ? connection.id === 'demo'
-            ? 'Sample data'
-            : 'Another sample'
-        : connection.name;
+const connectionLabel = (connection: Connected, demo: boolean) => {
+    if (demo && connection.dataSource === 'fixture') {
+        if (connection.id === 'demo') {
+            return 'Sample data';
+        }
+
+        return 'Another sample';
+    }
+
+    return connection.name;
+};
 const storedPreference = (key: string): string | null => {
     try {
         return localStorage.getItem(key);
@@ -43,12 +48,17 @@ const pref = <T extends string>(key: string, values: readonly T[], fallback: T):
     const value = storedPreference(key);
     return values.find(candidate => candidate === value) ?? fallback;
 };
-const browserLocales = (): readonly string[] =>
-    typeof navigator === 'undefined'
-        ? []
-        : navigator.languages.length
-          ? navigator.languages
-          : [navigator.language];
+const browserLocales = (): readonly string[] => {
+    if (typeof navigator === 'undefined') {
+        return [];
+    }
+
+    if (navigator.languages.length) {
+        return navigator.languages;
+    }
+
+    return [navigator.language];
+};
 
 function writeConnectionToUrl(id: string) {
     const url = new URL(window.location.href);
@@ -121,7 +131,18 @@ function App() {
                       item.id === CLICKHOUSE_CLOUD_CONNECTION_ID,
               )
               .sort((left, right) => {
-                  const rank = (id: string) => (id === 'playground' ? 0 : id === 'demo' ? 1 : 2);
+                  const rank = (id: string) => {
+                      switch (id) {
+                          case 'playground':
+                              return 0;
+
+                          case 'demo':
+                              return 1;
+
+                          default:
+                              return 2;
+                      }
+                  };
                   return rank(left.id) - rank(right.id);
               })
         : otherConnections;
@@ -310,15 +331,22 @@ function App() {
         );
 
     const connectionNeedsTest = Boolean(connection && !session.demo && !connection.manifest);
-    const connectionStatus = isCloudConnection
-        ? 'Connected · read/write'
-        : connection?.trusted
-          ? connectionNeedsTest
-              ? 'Retest needed'
-              : 'Read-only'
-          : connection?.manifest
-            ? 'Review needed'
-            : 'Test needed';
+    let connectionStatus:
+        'Connected · read/write' | 'Retest needed' | 'Read-only' | 'Review needed' | 'Test needed';
+
+    if (isCloudConnection) {
+        connectionStatus = 'Connected · read/write';
+    } else if (connection?.trusted) {
+        if (connectionNeedsTest) {
+            connectionStatus = 'Retest needed';
+        } else {
+            connectionStatus = 'Read-only';
+        }
+    } else if (connection?.manifest) {
+        connectionStatus = 'Review needed';
+    } else {
+        connectionStatus = 'Test needed';
+    }
 
     return (
         <div className="application" data-experience={experience}>
@@ -466,6 +494,131 @@ function renderConnectionPicker({
     hasCloudConnection: boolean;
     setCloudDialogOpen: import('react').Dispatch<import('react').SetStateAction<boolean>>;
 }) {
+    const getSourceDescription = () => {
+        if (isSampleData) {
+            return 'Sample rows are generated in this browser.';
+        }
+
+        if (isPlayground) {
+            return 'SQL runs on the public ClickHouse Playground with read-only access.';
+        }
+
+        return undefined;
+    };
+    const getSourceBadge = () => {
+        if (isSampleData) {
+            return 'SAMPLE DATA';
+        }
+
+        if (isPlayground) {
+            return 'PLAYGROUND';
+        }
+
+        if (isCloudConnection) {
+            return 'CLICKHOUSE CLOUD';
+        }
+
+        return 'LIVE CONNECTION';
+    };
+    const getConnectionLabel = () => {
+        if (connection) {
+            if (isPlayground) {
+                return 'ClickHouse';
+            }
+
+            return connectionLabel(connection, session.demo);
+        }
+
+        return 'Choose connection';
+    };
+    const getConnectionDetails = (connection: Connected) => {
+        if (isSampleData) {
+            return 'Generated sample data · SQL stays in this browser';
+        }
+
+        if (isPlayground) {
+            return `${connection.host} · public read-only access`;
+        }
+
+        if (isCloudConnection) {
+            return `${connection.host} · ${connection.database} · ${persistCloudInLocalServer ? 'local server session' : 'password held in this tab'}`;
+        }
+
+        if (session.demo) {
+            return 'Local sample data';
+        }
+
+        return `Database: ${connection.database} · Server: ${connection.host}`;
+    };
+    const getConnectionTone = (connection: Connected) => {
+        if (isSampleData) {
+            return 'is-sample';
+        }
+
+        if (isPlayground || (connection.trusted && !connectionNeedsTest)) {
+            return 'is-ready';
+        }
+
+        return 'is-review';
+    };
+    const getConnectionHelp = (connection: Connected) => {
+        if (isSampleData) {
+            return 'Sample rows are generated for the preview. SQL is not sent to a database.';
+        }
+
+        if (isPlayground) {
+            return 'Queries run against the public ClickHouse SQL Playground. Access is read only.';
+        }
+
+        if (isCloudConnection) {
+            return 'Queries pass through this site to your Cloud service over HTTPS. Your Cloud user controls which reads and writes are allowed.';
+        }
+
+        if (session.demo) {
+            return 'This demo uses sample data. Your SQL is not sent to a real database.';
+        }
+
+        if (connectionNeedsTest) {
+            if (connection.trusted) {
+                return 'Read-only access is on, but this server needs a fresh capability check.';
+            }
+
+            return 'Test this connection to discover its ClickHouse features.';
+        }
+
+        if (connection.trusted) {
+            return 'Read-only access is on. Queries can read data but cannot change it.';
+        }
+
+        return 'Connection tested. Turn on read-only access when you are ready to query.';
+    };
+    const getConnectionActionLabel = (connection: Connected) => {
+        if (connectionActionBusy) {
+            if (connectionNeedsTest) {
+                return 'Testing…';
+            }
+
+            return 'Saving…';
+        }
+
+        if (session.demo) {
+            return 'Start exploring';
+        }
+
+        if (connectionNeedsTest) {
+            if (connection.trusted) {
+                return 'Retest connection';
+            }
+
+            return 'Test connection';
+        }
+
+        if (connection.trusted) {
+            return 'Turn off read-only access';
+        }
+
+        return 'Trust connection';
+    };
     return (
         <div className="connection-wrap">
             <button
@@ -483,13 +636,7 @@ function renderConnectionPicker({
                         isPlayground && 'is-playground',
                         isCloudConnection && 'is-cloud',
                     )}
-                    title={
-                        isSampleData
-                            ? 'Sample rows are generated in this browser.'
-                            : isPlayground
-                              ? 'SQL runs on the public ClickHouse Playground with read-only access.'
-                              : undefined
-                    }
+                    title={getSourceDescription()}
                 >
                     <span
                         className={cx(
@@ -497,13 +644,7 @@ function renderConnectionPicker({
                             isSampleData || !connection?.trusted ? 'is-warning' : 'is-trusted',
                         )}
                     />
-                    {isSampleData
-                        ? 'SAMPLE DATA'
-                        : isPlayground
-                          ? 'PLAYGROUND'
-                          : isCloudConnection
-                            ? 'CLICKHOUSE CLOUD'
-                            : 'LIVE CONNECTION'}
+                    {getSourceBadge()}
                 </span>
                 {isPlayground && (
                     <span className="connection-quick-status is-ready">{copy.common.readOnly}</span>
@@ -518,13 +659,7 @@ function renderConnectionPicker({
                         {connectionStatus}
                     </span>
                 )}
-                <strong title={connection?.name}>
-                    {connection
-                        ? isPlayground
-                            ? 'ClickHouse'
-                            : connectionLabel(connection, session.demo)
-                        : 'Choose connection'}
-                </strong>
+                <strong title={connection?.name}>{getConnectionLabel()}</strong>
                 <span className="connection-database">
                     {connection?.database ?? '—'} <Icon name="chevron" />
                 </span>
@@ -546,44 +681,13 @@ function renderConnectionPicker({
                                     : 'Current connection'}
                             </span>
                             <strong>{connectionLabel(connection, session.demo)}</strong>
-                            <small>
-                                {isSampleData
-                                    ? 'Generated sample data · SQL stays in this browser'
-                                    : isPlayground
-                                      ? `${connection.host} · public read-only access`
-                                      : isCloudConnection
-                                        ? `${connection.host} · ${connection.database} · ${persistCloudInLocalServer ? 'local server session' : 'password held in this tab'}`
-                                        : session.demo
-                                          ? 'Local sample data'
-                                          : `Database: ${connection.database} · Server: ${connection.host}`}
-                            </small>
+                            <small>{getConnectionDetails(connection)}</small>
                         </div>
                         <p
-                            className={cx(
-                                'connection-menu-note',
-                                isSampleData
-                                    ? 'is-sample'
-                                    : isPlayground || (connection.trusted && !connectionNeedsTest)
-                                      ? 'is-ready'
-                                      : 'is-review',
-                            )}
+                            className={cx('connection-menu-note', getConnectionTone(connection))}
                             role="status"
                         >
-                            {isSampleData
-                                ? 'Sample rows are generated for the preview. SQL is not sent to a database.'
-                                : isPlayground
-                                  ? 'Queries run against the public ClickHouse SQL Playground. Access is read only.'
-                                  : isCloudConnection
-                                    ? 'Queries pass through this site to your Cloud service over HTTPS. Your Cloud user controls which reads and writes are allowed.'
-                                    : session.demo
-                                      ? 'This demo uses sample data. Your SQL is not sent to a real database.'
-                                      : connectionNeedsTest
-                                        ? connection.trusted
-                                            ? 'Read-only access is on, but this server needs a fresh capability check.'
-                                            : 'Test this connection to discover its ClickHouse features.'
-                                        : connection.trusted
-                                          ? 'Read-only access is on. Queries can read data but cannot change it.'
-                                          : 'Connection tested. Turn on read-only access when you are ready to query.'}
+                            {getConnectionHelp(connection)}
                         </p>
                         {!isCloudConnection &&
                             ((!session.demo && !isPlayground) || !connection.trusted) && (
@@ -595,19 +699,7 @@ function renderConnectionPicker({
                                     disabled={connectionActionBusy}
                                     onClick={() => void runConnectionAction(connectionNeedsTest)}
                                 >
-                                    {connectionActionBusy
-                                        ? connectionNeedsTest
-                                            ? 'Testing…'
-                                            : 'Saving…'
-                                        : session.demo
-                                          ? 'Start exploring'
-                                          : connectionNeedsTest
-                                            ? connection.trusted
-                                                ? 'Retest connection'
-                                                : 'Test connection'
-                                            : connection.trusted
-                                              ? 'Turn off read-only access'
-                                              : 'Trust connection'}
+                                    {getConnectionActionLabel(connection)}
                                 </Button>
                             )}
                         {sourceChoices.length > 0 && (
@@ -617,34 +709,43 @@ function renderConnectionPicker({
                                         ? 'Choose data source'
                                         : 'Switch connection'}
                                 </span>
-                                {sourceChoices.map(item => (
-                                    <button
-                                        key={item.id}
-                                        type="button"
-                                        aria-pressed={item.id === connection.id}
-                                        onClick={() => {
-                                            selectConnection(item.id);
-                                            setConnectionPicker(false);
-                                        }}
-                                    >
-                                        <span>
-                                            <strong>{connectionLabel(item, session.demo)}</strong>
-                                            <small>
-                                                {item.id === 'playground'
-                                                    ? 'Real ClickHouse · public read only'
-                                                    : item.dataSource === 'fixture'
-                                                      ? 'Generated sample rows · no database request'
-                                                      : `${item.database} · ${item.host}`}
-                                            </small>
-                                        </span>
-                                        <span
-                                            className="connection-choice-arrow"
-                                            aria-hidden="true"
+                                {sourceChoices.map(item => {
+                                    const getSourceDetails = () => {
+                                        if (item.id === 'playground') {
+                                            return 'Real ClickHouse · public read only';
+                                        }
+
+                                        if (item.dataSource === 'fixture') {
+                                            return 'Generated sample rows · no database request';
+                                        }
+
+                                        return `${item.database} · ${item.host}`;
+                                    };
+                                    return (
+                                        <button
+                                            key={item.id}
+                                            type="button"
+                                            aria-pressed={item.id === connection.id}
+                                            onClick={() => {
+                                                selectConnection(item.id);
+                                                setConnectionPicker(false);
+                                            }}
                                         >
-                                            {item.id === connection.id ? '✓' : '›'}
-                                        </span>
-                                    </button>
-                                ))}
+                                            <span>
+                                                <strong>
+                                                    {connectionLabel(item, session.demo)}
+                                                </strong>
+                                                <small>{getSourceDetails()}</small>
+                                            </span>
+                                            <span
+                                                className="connection-choice-arrow"
+                                                aria-hidden="true"
+                                            >
+                                                {item.id === connection.id ? '✓' : '›'}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
                             </div>
                         )}
                     </div>

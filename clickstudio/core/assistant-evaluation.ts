@@ -16,11 +16,15 @@ interface EvaluationContext {
 }
 
 function statusOf(checks: ProposalQualityCheck[]): ProposalQuality['status'] {
-    return checks.some(check => check.status === 'fail')
-        ? 'fail'
-        : checks.some(check => check.status === 'warn')
-          ? 'warn'
-          : 'pass';
+    if (checks.some(check => check.status === 'fail')) {
+        return 'fail';
+    }
+
+    if (checks.some(check => check.status === 'warn')) {
+        return 'warn';
+    }
+
+    return 'pass';
 }
 
 function scoreOf(checks: ProposalQualityCheck[]): number {
@@ -89,16 +93,24 @@ export function evaluateProposal(
             message:
                 'No SQL was proposed; the response needs clarification before it can be applied.',
         });
-    else
+    else {
+        const getPlaybookMessage = () => {
+            if (inspectOnly) {
+                return 'Inspect-only playbook returned no replacement SQL.';
+            }
+
+            if (flexible && sqlOptions.length === 0) {
+                return 'The request was answered without replacement SQL.';
+            }
+
+            return 'The playbook returned an applicable SQL proposal.';
+        };
         checks.push({
             id: 'contract',
             status: 'pass',
-            message: inspectOnly
-                ? 'Inspect-only playbook returned no replacement SQL.'
-                : flexible && sqlOptions.length === 0
-                  ? 'The request was answered without replacement SQL.'
-                  : 'The playbook returned an applicable SQL proposal.',
+            message: getPlaybookMessage(),
         });
+    }
 
     if (sqlOptions.length === 0) {
         checks.push({
@@ -111,14 +123,21 @@ export function evaluateProposal(
             status: 'pass',
             message: 'No table references were introduced.',
         });
+        const getClarificationMessage = () => {
+            if (content.clarification) {
+                return 'The response asks for clarification instead of guessing.';
+            }
+
+            if (flexible) {
+                return 'The request was answered without returning SQL.';
+            }
+
+            return 'No SQL was returned and no clarification was recorded.';
+        };
         checks.push({
             id: 'semantic',
             status: content.clarification || flexible ? 'pass' : 'warn',
-            message: content.clarification
-                ? 'The response asks for clarification instead of guessing.'
-                : flexible
-                  ? 'The request was answered without returning SQL.'
-                  : 'No SQL was returned and no clarification was recorded.',
+            message: getClarificationMessage(),
         });
     } else {
         checks.push({

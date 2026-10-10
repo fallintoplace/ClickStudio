@@ -105,6 +105,23 @@ export type InspectorPaneProps = {
     onClose?: () => void;
 };
 
+function panelTitle(inspector: Inspector, copy: Copy['common']): string {
+    switch (inspector) {
+        case 'schema':
+            return copy.objects;
+        case 'reference':
+            return copy.reference;
+        case 'history':
+            return copy.history;
+        case 'documents':
+            return copy.queries;
+        case 'assistant':
+            return copy.assistant;
+        default:
+            return inspectorLabel(inspector);
+    }
+}
+
 export function InspectorPane({
     comparisonProfiles,
     comparisonPipelines,
@@ -200,32 +217,27 @@ export function InspectorPane({
             <Icon name="close" />
         </Button>
     );
-    const title =
-        inspector === 'schema'
-            ? copy.objects
-            : inspector === 'reference'
-              ? copy.reference
-              : inspector === 'history'
-                ? copy.history
-                : inspector === 'documents'
-                  ? copy.queries
-                  : inspector === 'assistant'
-                    ? copy.assistant
-                    : inspectorLabel(inspector);
-    const assistantServerVersion =
-        connection.dataSource === 'fixture'
-            ? undefined
-            : connection.manifest?.serverVersion === 'ClickHouse SQL Playground'
-              ? serverVersion
-              : (serverVersion ?? connection.manifest?.serverVersion);
-    const assistantServerLabel =
-        connection.dataSource === 'fixture'
-            ? 'Sample data'
-            : assistantServerVersion
-              ? `ClickHouse ${assistantServerVersion}`
-              : serverVersionLoading
-                ? 'Detecting ClickHouse version…'
-                : 'ClickHouse version unavailable';
+    const title = panelTitle(inspector, copy);
+    let assistantServerVersion: string | undefined;
+
+    if (connection.dataSource === 'fixture') {
+        assistantServerVersion = undefined;
+    } else if (connection.manifest?.serverVersion === 'ClickHouse SQL Playground') {
+        assistantServerVersion = serverVersion;
+    } else {
+        assistantServerVersion = serverVersion ?? connection.manifest?.serverVersion;
+    }
+    let assistantServerLabel: string;
+
+    if (connection.dataSource === 'fixture') {
+        assistantServerLabel = 'Sample data';
+    } else if (assistantServerVersion) {
+        assistantServerLabel = `ClickHouse ${assistantServerVersion}`;
+    } else if (serverVersionLoading) {
+        assistantServerLabel = 'Detecting ClickHouse version…';
+    } else {
+        assistantServerLabel = 'ClickHouse version unavailable';
+    }
 
     useEffect(() => {
         setReferenceTarget(undefined);
@@ -685,16 +697,25 @@ function InspectorMoreMenu({
         );
         if (!items.length) return;
         const current = items.indexOf(document.activeElement as HTMLButtonElement);
-        const next =
-            event.key === 'ArrowDown'
-                ? (current + 1) % items.length
-                : event.key === 'ArrowUp'
-                  ? (current - 1 + items.length) % items.length
-                  : event.key === 'Home'
-                    ? 0
-                    : event.key === 'End'
-                      ? items.length - 1
-                      : undefined;
+        let next: number | undefined;
+
+        switch (event.key) {
+            case 'ArrowDown':
+                next = (current + 1) % items.length;
+                break;
+            case 'ArrowUp':
+                next = (current - 1 + items.length) % items.length;
+                break;
+            case 'Home':
+                next = 0;
+                break;
+            case 'End':
+                next = items.length - 1;
+                break;
+            default:
+                next = undefined;
+                break;
+        }
         if (next === undefined) return;
         event.preventDefault();
         items[next]?.focus();

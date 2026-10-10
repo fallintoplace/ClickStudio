@@ -190,14 +190,22 @@ export class RunService {
             request.kind === 'pipeline' ||
             request.kind === 'analyze'
         ) {
-            const capability =
-                request.kind === 'explain'
-                    ? conn.manifest?.explain
-                    : request.kind === 'plan'
-                      ? (conn.manifest?.explainPlan ?? conn.manifest?.explain)
-                      : request.kind === 'analyze'
-                        ? conn.manifest?.explainAnalyze
-                        : (conn.manifest?.explainPipeline ?? conn.manifest?.pipeline);
+            let capability;
+
+            switch (request.kind) {
+                case 'explain':
+                    capability = conn.manifest?.explain;
+                    break;
+                case 'plan':
+                    capability = conn.manifest?.explainPlan ?? conn.manifest?.explain;
+                    break;
+                case 'analyze':
+                    capability = conn.manifest?.explainAnalyze;
+                    break;
+                default:
+                    capability = conn.manifest?.explainPipeline ?? conn.manifest?.pipeline;
+                    break;
+            }
             requireThat(
                 capability?.available,
                 409,
@@ -593,12 +601,19 @@ export class RunService {
             const e = asError(error);
             run.error = e;
             run.resultState = 'unavailable';
-            run.status =
-                e.code === 'CANCELLED'
-                    ? 'cancelled'
-                    : e.code === 'DEADLINE_EXCEEDED'
-                      ? 'timed_out'
-                      : 'failed';
+            const getFailedRunStatus = () => {
+                switch (e.code) {
+                    case 'CANCELLED':
+                        return 'cancelled';
+
+                    case 'DEADLINE_EXCEEDED':
+                        return 'timed_out';
+
+                    default:
+                        return 'failed';
+                }
+            };
+            run.status = getFailedRunStatus();
             audit(this.store, principal, 'run.finish', id, 'failed', e.code);
         } finally {
             if (timeout) clearTimeout(timeout);
@@ -788,13 +803,22 @@ export class RunService {
         const successes = script.statements.filter(
             s => s.status === 'succeeded' || s.status === 'truncated',
         ).length;
-        script.status = script.cancelled
-            ? 'cancelled'
-            : failed
-              ? successes
-                  ? 'partial'
-                  : 'failed'
-              : 'succeeded';
+        const getScriptStatus = () => {
+            if (script.cancelled) {
+                return 'cancelled';
+            }
+
+            if (failed) {
+                if (successes) {
+                    return 'partial';
+                }
+
+                return 'failed';
+            }
+
+            return 'succeeded';
+        };
+        script.status = getScriptStatus();
         this.store.put('scripts', script.id, script);
     }
     async close() {

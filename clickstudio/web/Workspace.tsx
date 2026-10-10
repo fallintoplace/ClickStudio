@@ -52,12 +52,17 @@ async function loadAssistantRunContext(
 ) {
     if (!run || !terminal(run))
         throw new Error('Wait for the latest run to finish before including it.');
-    const result =
-        run.resultState === 'reopenable'
-            ? snapshot?.runId === run.id
-                ? snapshot
-                : await api<Result>(`/runs/${encodeURIComponent(run.id)}/snapshot`, { signal })
-            : undefined;
+    let result;
+
+    if (run.resultState === 'reopenable') {
+        if (snapshot?.runId === run.id) {
+            result = snapshot;
+        } else {
+            result = await api<Result>(`/runs/${encodeURIComponent(run.id)}/snapshot`, { signal });
+        }
+    } else {
+        result = undefined;
+    }
     signal.throwIfAborted();
     return { result, evidenceSql: run.sql, error: run.error?.message };
 }

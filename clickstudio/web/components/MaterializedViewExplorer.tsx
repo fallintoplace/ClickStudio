@@ -73,13 +73,16 @@ function beginnerNodeDescription(node: LineageNode, edges: LineageEdge[]) {
     if (node.kind === 'materialized-view') {
         if (node.mode === 'refreshable')
             return 'Runs its query on a schedule and writes the output to a target table.';
-        if (node.mode === 'incremental')
-            return 'When new rows arrive in a source table, ClickHouse runs this view query and writes its output to a target table.';
-        if (node.mode === 'append-incremental')
-            return 'Runs on a schedule and adds results for newly inserted rows to its target table.';
-        if (node.mode === 'unknown')
-            return 'This view transforms rows with a query. Its trigger or schedule could not be determined from the available metadata.';
-        return 'Runs a query that transforms data and writes the output to a target table.';
+        switch (node.mode) {
+            case 'incremental':
+                return 'When new rows arrive in a source table, ClickHouse runs this view query and writes its output to a target table.';
+            case 'append-incremental':
+                return 'Runs on a schedule and adds results for newly inserted rows to its target table.';
+            case 'unknown':
+                return 'This view transforms rows with a query. Its trigger or schedule could not be determined from the available metadata.';
+            default:
+                return 'Runs a query that transforms data and writes the output to a target table.';
+        }
     }
     if (node.kind === 'external')
         return 'A related object named by ClickHouse metadata, outside the objects loaded in this view.';
@@ -166,6 +169,21 @@ function NodeDetails({
         downstream = snapshot.edges.filter(edge => edge.source === node.id);
     const refresh = node.refresh;
     const role = beginnerNodeRole(node, snapshot.edges);
+    const getRefreshDescription = () => {
+        if (beginner) {
+            if (node.mode === 'incremental') {
+                return 'Runs when new rows are inserted. No schedule is needed.';
+            }
+
+            return 'No refresh status is available for this view.';
+        }
+
+        if (node.mode === 'incremental') {
+            return 'Triggered by inserted blocks; no periodic refresh schedule.';
+        }
+
+        return 'No refresh telemetry available for this object.';
+    };
     return (
         <aside
             className={`native-node-details${beginner ? ' is-beginner' : ''}`}
@@ -244,15 +262,7 @@ function NodeDetails({
                 </>
             ) : (
                 node.kind === 'materialized-view' && (
-                    <p className="native-notes">
-                        {beginner
-                            ? node.mode === 'incremental'
-                                ? 'Runs when new rows are inserted. No schedule is needed.'
-                                : 'No refresh status is available for this view.'
-                            : node.mode === 'incremental'
-                              ? 'Triggered by inserted blocks; no periodic refresh schedule.'
-                              : 'No refresh telemetry available for this object.'}
-                    </p>
+                    <p className="native-notes">{getRefreshDescription()}</p>
                 )
             )}
             <div className="native-relationships">
@@ -349,6 +359,17 @@ function LineageGraph({ snapshot, beginner }: { snapshot: LineageSnapshot; begin
     >()
         .x(point => point[0])
         .y(point => point[1]);
+    const getEmptyMessage = () => {
+        if (search) {
+            return 'No matching objects.';
+        }
+
+        if (beginner) {
+            return 'No connected views found for this database.';
+        }
+
+        return 'No materialized-view relationships were returned for this database.';
+    };
     return (
         <>
             {beginner && <LineagePrimer />}
@@ -395,13 +416,7 @@ function LineageGraph({ snapshot, beginner }: { snapshot: LineageSnapshot; begin
                 </p>
             )}
             {!graph.nodes.length ? (
-                <div className="native-empty">
-                    {search
-                        ? 'No matching objects.'
-                        : beginner
-                          ? 'No connected views found for this database.'
-                          : 'No materialized-view relationships were returned for this database.'}
-                </div>
+                <div className="native-empty">{getEmptyMessage()}</div>
             ) : (
                 <div className="native-lineage-layout">
                     <div
@@ -466,12 +481,15 @@ function LineageGraph({ snapshot, beginner }: { snapshot: LineageSnapshot; begin
                                 const role = beginnerNodeRole(node, graph.edges),
                                     hint = beginnerNodeHint(node, graph.edges);
                                 const label = beginner ? role : nodeLabel(node);
-                                const variant =
-                                    beginner && role === 'Input table'
-                                        ? 'input-table'
-                                        : beginner && role === 'Result table'
-                                          ? 'result-table'
-                                          : '';
+                                let variant: '' | 'input-table' | 'result-table';
+
+                                if (beginner && role === 'Input table') {
+                                    variant = 'input-table';
+                                } else if (beginner && role === 'Result table') {
+                                    variant = 'result-table';
+                                } else {
+                                    variant = '';
+                                }
                                 const className = `native-lineage-node ${node.kind}${beginner ? ' beginner-node' : ''} ${variant} ${node.id === selectedNode?.id ? 'is-selected' : ''}`;
                                 const ariaLabel = `${node.database}.${node.table}: ${label}`;
                                 return (
@@ -543,15 +561,22 @@ export function MaterializedViewExplorer({
         false,
     );
     const current = snapshot?.kind === 'lineage' ? snapshot : undefined;
+    const getSourceLabel = () => {
+        if (current?.source === 'fixture') {
+            return 'SAMPLE DATA';
+        }
+
+        if (embedded) {
+            return 'LIVE SERVER DATA';
+        }
+
+        return 'SERVER METADATA';
+    };
     const content = (
         <>
             <div className="native-toolbar native-lineage-meta-toolbar">
                 <span className="native-snapshot-meta">
-                    {current?.source === 'fixture'
-                        ? 'SAMPLE DATA'
-                        : embedded
-                          ? 'LIVE SERVER DATA'
-                          : 'SERVER METADATA'}
+                    {getSourceLabel()}
                     {current && ` · Updated ${nativeTime(current.observedAt)}`}
                 </span>
                 <label className="native-lineage-database">

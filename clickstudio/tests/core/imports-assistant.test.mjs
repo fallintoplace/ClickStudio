@@ -6,6 +6,7 @@ import {
     buildContext,
     MAX_ASSISTANT_CONVERSATION_MESSAGES,
     validateAssistantConversation,
+    validateImage,
     validateProposal,
 } from '../../.core-build/core/assistant.js';
 import {
@@ -649,6 +650,35 @@ test('Assistant keeps the per-image size limit without a daily total limit', () 
         code: 'IMAGE_SIZE',
     });
 });
+
+const imageSignatures = {
+    png: Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    jpeg: Buffer.from([255, 216, 255]),
+    webp: Buffer.from('RIFF\0\0\0\0WEBP', 'ascii'),
+};
+for (const [format, signature] of Object.entries(imageSignatures)) {
+    test(`Assistant checks ${format} uploads against their declared image format`, () => {
+        const image = `data:image/${format};base64,${signature.toString('base64')}`;
+        assert.equal(validateImage(image), image);
+        for (const [otherFormat, otherSignature] of Object.entries(imageSignatures)) {
+            if (otherFormat === format) continue;
+            assert.throws(
+                () =>
+                    validateImage(
+                        `data:image/${format};base64,${otherSignature.toString('base64')}`,
+                    ),
+                { code: 'IMAGE_TYPE' },
+            );
+        }
+        assert.throws(
+            () =>
+                validateImage(
+                    `data:image/${format};base64,${signature.subarray(0, -1).toString('base64')}`,
+                ),
+            { code: 'IMAGE_TYPE' },
+        );
+    });
+}
 test('Review lane cannot return applicable SQL even if model proposes it', async () => {
     const f = aiFixture(),
         c = f.ai.prepare(owner, { ...f.input, action: 'review' }),

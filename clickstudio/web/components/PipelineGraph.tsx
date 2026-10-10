@@ -172,6 +172,69 @@ export function PipelineGraph({
 
     if (!pipeline.nodes.length) return <div className="pipeline-graph-empty">{labels.empty}</div>;
 
+    const getGraphTitle = () => {
+        if (graphKind === 'index-analysis' || runtime) {
+            return terminology.graph;
+        }
+
+        if (pipeline.source === 'explain_pipeline') {
+            return 'CLICKHOUSE OPERATOR PLAN';
+        }
+
+        return 'ESTIMATED QUERY SHAPE';
+    };
+    const getGraphDescription = () => {
+        if (graphKind === 'index-analysis') {
+            return (
+                copy?.indexAnalysisDescription ??
+                'ClickHouse-reported index checks with parts and granules retained.'
+            );
+        }
+
+        if (runtime) {
+            return (
+                copy?.runtimeGraphDescription ?? 'Measured execution stages from EXPLAIN ANALYZE.'
+            );
+        }
+
+        if (pipeline.source === 'explain_pipeline') {
+            return (
+                copy?.pipelineGraphDescription ??
+                'Planned topology · runtime counters are run-level'
+            );
+        }
+
+        return 'Estimated from SQL structure';
+    };
+    const getTruncationMessage = () => {
+        switch (graphKind) {
+            case 'sql-flow':
+                return (
+                    copy?.sqlFlowTruncatedWarning ??
+                    'This query is large. The graph shows a bounded set of SQL stages.'
+                );
+
+            case 'index-analysis':
+                return copy?.planTruncated ?? 'The index output is large. Some checks are hidden.';
+
+            default:
+                return (
+                    copy?.pipelineGraphTruncated ??
+                    'This plan is large. The graph shows a bounded set of operators.'
+                );
+        }
+    };
+    const getSelectedStatus = (selected: ProfilePipelineNode) => {
+        if (graphKind === 'sql-flow') {
+            return sqlFlowNodeStatus(selected.status, copy);
+        }
+
+        if (selected.status === 'planned') {
+            return copy?.plannedStatus ?? selected.status;
+        }
+
+        return selected.status;
+    };
     return (
         <div
             className={`pipeline-graph-card grid gap-3 rounded-xl border p-3${runtime ? ' is-runtime-graph' : ''}`}
@@ -181,14 +244,7 @@ export function PipelineGraph({
             {graphKind !== 'explain-plan' && (
                 <div className="pipeline-graph-heading">
                     <div>
-                        <span className="eyebrow">
-                            {heading ??
-                                (graphKind === 'index-analysis' || runtime
-                                    ? terminology.graph
-                                    : pipeline.source === 'explain_pipeline'
-                                      ? 'CLICKHOUSE OPERATOR PLAN'
-                                      : 'ESTIMATED QUERY SHAPE')}
-                        </span>
+                        <span className="eyebrow">{heading ?? getGraphTitle()}</span>
                         <strong>
                             {(graphKind === 'index-analysis'
                                 ? pipeline.nodes.filter(node => node.kind === 'filter').length
@@ -198,31 +254,12 @@ export function PipelineGraph({
                             {connectionLabel}
                         </strong>
                     </div>
-                    <small>
-                        {subheading ??
-                            (graphKind === 'index-analysis'
-                                ? (copy?.indexAnalysisDescription ??
-                                  'ClickHouse-reported index checks with parts and granules retained.')
-                                : runtime
-                                  ? (copy?.runtimeGraphDescription ??
-                                    'Measured execution stages from EXPLAIN ANALYZE.')
-                                  : pipeline.source === 'explain_pipeline'
-                                    ? (copy?.pipelineGraphDescription ??
-                                      'Planned topology · runtime counters are run-level')
-                                    : 'Estimated from SQL structure')}
-                    </small>
+                    <small>{subheading ?? getGraphDescription()}</small>
                 </div>
             )}
             {pipeline.truncated && graphKind !== 'explain-plan' && (
                 <p className="pipeline-graph-warning" role="status">
-                    {graphKind === 'sql-flow'
-                        ? (copy?.sqlFlowTruncatedWarning ??
-                          'This query is large. The graph shows a bounded set of SQL stages.')
-                        : graphKind === 'index-analysis'
-                          ? (copy?.planTruncated ??
-                            'The index output is large. Some checks are hidden.')
-                          : (copy?.pipelineGraphTruncated ??
-                            'This plan is large. The graph shows a bounded set of operators.')}
+                    {getTruncationMessage()}
                 </p>
             )}
             <div
@@ -314,12 +351,7 @@ export function PipelineGraph({
                                     {graphKind === 'sql-flow'
                                         ? sqlFlowNodeKind(selected.kind, copy)
                                         : selected.kind}{' '}
-                                    <i>·</i>{' '}
-                                    {graphKind === 'sql-flow'
-                                        ? sqlFlowNodeStatus(selected.status, copy)
-                                        : selected.status === 'planned'
-                                          ? (copy?.plannedStatus ?? selected.status)
-                                          : selected.status}
+                                    <i>·</i> {getSelectedStatus(selected)}
                                 </small>
                                 {sqlFlowNodeDetail(
                                     selected,
@@ -574,11 +606,17 @@ function renderPipelineGraphViewport({
                                 const middle = edge.points[Math.floor(edge.points.length / 2)];
                                 const edgeId = `${edge.source}\u0000${edge.target}`;
                                 const active = focusedGraph?.edgeIds.has(edgeId) ?? false;
-                                const edgeState = focusedGraph
-                                    ? active
-                                        ? ' is-active'
-                                        : ' is-muted'
-                                    : '';
+                                let edgeState: '' | ' is-active' | ' is-muted';
+
+                                if (focusedGraph) {
+                                    if (active) {
+                                        edgeState = ' is-active';
+                                    } else {
+                                        edgeState = ' is-muted';
+                                    }
+                                } else {
+                                    edgeState = '';
+                                }
                                 const path = pathFor(edge.points);
                                 const flowStyle =
                                     runtime && edge.flow !== undefined
@@ -629,19 +667,32 @@ function renderPipelineGraphViewport({
                                     ? (copy?.plannedStatus ?? node.status)
                                     : node.status;
                             const nodeKindLabel = graphNodeKindLabel(graphKind, node, copy);
-                            const nodeStatus =
-                                graphKind === 'index-analysis'
-                                    ? node.detail
-                                    : graphKind === 'sql-flow'
-                                      ? sqlFlowNodeStatus(node.status, copy)
-                                      : status;
-                            const focusState = focusedGraph
-                                ? active
-                                    ? ' is-selected'
-                                    : related
-                                      ? ' is-related'
-                                      : ' is-muted'
-                                : '';
+                            let nodeStatus: string | undefined;
+
+                            switch (graphKind) {
+                                case 'index-analysis':
+                                    nodeStatus = node.detail;
+                                    break;
+                                case 'sql-flow':
+                                    nodeStatus = sqlFlowNodeStatus(node.status, copy);
+                                    break;
+                                default:
+                                    nodeStatus = status;
+                                    break;
+                            }
+                            let focusState: '' | ' is-muted' | ' is-selected' | ' is-related';
+
+                            if (focusedGraph) {
+                                if (active) {
+                                    focusState = ' is-selected';
+                                } else if (related) {
+                                    focusState = ' is-related';
+                                } else {
+                                    focusState = ' is-muted';
+                                }
+                            } else {
+                                focusState = '';
+                            }
                             const runtimeShare = Math.max(0, Math.min(100, node.timePercent ?? 0));
                             const runtimeStyle = runtime
                                 ? ({

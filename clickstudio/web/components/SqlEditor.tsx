@@ -228,22 +228,34 @@ function completionSource(context: CompletionContext, index: SchemaIndex): Compl
         ? (aliases.get(unquote(qualifier).toLowerCase()) ?? qualifier)
         : undefined;
     const table = tableName ? indexedTable(index, tableName) : undefined;
-    const candidates = table
-        ? (index.columnsByTable.get(tableKey(table.database, table.name)) ?? [])
-        : qualifier
-          ? []
-          : index.columns;
+    let candidates: typeof index.columns;
+
+    if (table) {
+        candidates = index.columnsByTable.get(tableKey(table.database, table.name)) ?? [];
+    } else if (qualifier) {
+        candidates = [];
+    } else {
+        candidates = index.columns;
+    }
     const columns = matchingNames(candidates, column => column.name, prefix).map(column => ({
         label: column.name,
         apply: quoteIdentifier(column.name),
         type: 'variable',
         detail: `${column.type} · ${column.database}.${column.table}`,
     }));
-    const tableCandidates = qualifier
-        ? table
-            ? []
-            : index.tables.filter(item => item.database.toLowerCase() === qualifier.toLowerCase())
-        : index.tables;
+    let tableCandidates: typeof index.tables;
+
+    if (qualifier) {
+        if (table) {
+            tableCandidates = [];
+        } else {
+            tableCandidates = index.tables.filter(
+                item => item.database.toLowerCase() === qualifier.toLowerCase(),
+            );
+        }
+    } else {
+        tableCandidates = index.tables;
+    }
     const tables = matchingNames(
         tableCandidates,
         item => (qualifier ? item.name : `${item.database}.${item.name}`),

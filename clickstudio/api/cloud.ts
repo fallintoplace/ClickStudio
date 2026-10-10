@@ -336,20 +336,28 @@ async function testConnection(credentials: CloudCredentials, url: string) {
                 .then(() => true)
                 .catch(() => false),
         ]);
-        const queryLogSource: QueryLogSource | undefined = userQueryLog
-            ? 'user_query_log'
-            : queryLogFallback
-              ? 'query_log'
-              : undefined;
+        let queryLogSource: QueryLogSource | undefined;
+
+        if (userQueryLog) {
+            queryLogSource = 'user_query_log';
+        } else if (queryLogFallback) {
+            queryLogSource = 'query_log';
+        } else {
+            queryLogSource = undefined;
+        }
         const replicationCapabilities: ReplicationCapabilities = {
             replicas,
             queue: replicationQueue,
         };
-        const traceLogSource: FlamegraphSource | undefined = symbolizedTrace
-            ? 'symbolized'
-            : addressTrace
-              ? 'addresses'
-              : undefined;
+        let traceLogSource: FlamegraphSource | undefined;
+
+        if (symbolizedTrace) {
+            traceLogSource = 'symbolized';
+        } else if (addressTrace) {
+            traceLogSource = 'addresses';
+        } else {
+            traceLogSource = undefined;
+        }
         let cancellationAvailable = false;
         try {
             await client.command({

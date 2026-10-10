@@ -461,13 +461,18 @@ export function useWorkspaceController({
                 confirmation: connection.id,
             });
             await onRefreshConnections();
-            setNotice(
-                demoMode
-                    ? 'Sample data is ready. You can explore the workspace.'
-                    : trusted
-                      ? 'Read-only access was turned off.'
-                      : 'Connection is ready for read-only queries.',
-            );
+            const getTrustNotice = () => {
+                if (demoMode) {
+                    return 'Sample data is ready. You can explore the workspace.';
+                }
+
+                if (trusted) {
+                    return 'Read-only access was turned off.';
+                }
+
+                return 'Connection is ready for read-only queries.';
+            };
+            setNotice(getTrustNotice());
         }, 'save');
     trustActionRef.current = trustConnection;
 

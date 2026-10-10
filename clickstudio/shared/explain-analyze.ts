@@ -44,16 +44,24 @@ const durationMs = (value: string): number | undefined => {
     const amount = Number(match[1]);
     if (!Number.isFinite(amount)) return undefined;
     const unit = match[2]!.toLowerCase();
-    return (
-        amount *
-        (unit === 'ns'
-            ? 0.000001
-            : unit === 'us' || unit === 'µs' || unit === 'μs'
-              ? 0.001
-              : unit === 's'
-                ? 1000
-                : 1)
-    );
+    const getUnitMultiplier = () => {
+        switch (unit) {
+            case 'ns':
+                return 0.000001;
+
+            case 'us':
+            case 'µs':
+            case 'μs':
+                return 0.001;
+
+            case 's':
+                return 1000;
+
+            default:
+                return 1;
+        }
+    };
+    return amount * getUnitMultiplier();
 };
 
 function nodeKind(label: string): ProfilePipelineNodeKind {
@@ -76,16 +84,29 @@ function metricNumber(text: string | undefined): number | undefined {
     if (!match) return undefined;
     const number = Number(match[1]);
     const suffix = (match[2] ?? '').toLowerCase();
-    const factor =
-        suffix === 'k' || suffix === 'thousand'
-            ? 1e3
-            : suffix === 'm' || suffix === 'million'
-              ? 1e6
-              : suffix === 'b' || suffix === 'billion'
-                ? 1e9
-                : suffix === 't' || suffix === 'trillion'
-                  ? 1e12
-                  : 1;
+    let factor: number;
+
+    switch (suffix) {
+        case 'k':
+        case 'thousand':
+            factor = 1e3;
+            break;
+        case 'm':
+        case 'million':
+            factor = 1e6;
+            break;
+        case 'b':
+        case 'billion':
+            factor = 1e9;
+            break;
+        case 't':
+        case 'trillion':
+            factor = 1e12;
+            break;
+        default:
+            factor = 1;
+            break;
+    }
     const value = number * factor;
     return Number.isFinite(value) ? value : undefined;
 }
@@ -163,20 +184,27 @@ function visibleText(lines: readonly string[]) {
 }
 
 export function parseExplainAnalyze(input: unknown): ExplainAnalyzeEvidence | undefined {
-    const text =
-        typeof input === 'string'
-            ? input
-            : Array.isArray(input)
-              ? input
-                    .map(value =>
-                        typeof value === 'string'
-                            ? value
-                            : Array.isArray(value)
-                              ? value.map(String).join(' ')
-                              : '',
-                    )
-                    .join('\n')
-              : '';
+    let text: string;
+
+    if (typeof input === 'string') {
+        text = input;
+    } else if (Array.isArray(input)) {
+        text = input
+            .map(value => {
+                if (typeof value === 'string') {
+                    return value;
+                }
+
+                if (Array.isArray(value)) {
+                    return value.map(String).join(' ');
+                }
+
+                return '';
+            })
+            .join('\n');
+    } else {
+        text = '';
+    }
     if (!text.trim()) return undefined;
     const boundedText = text.slice(0, MAX_OUTPUT_CHARS);
     const allLines = boundedText.split(/\r?\n/);

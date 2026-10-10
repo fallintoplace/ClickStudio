@@ -84,12 +84,15 @@ export function RowCountChart({
         categoryLayout?.positions[index] ??
         plotLeft + (length <= 1 ? 0.5 : index / (length - 1)) * plotWidth;
     const axisValueCount = timeAxis ? timeTicks.length : bars.length;
-    const labelIndexes =
-        axisValueCount <= 3
-            ? Array.from({ length: axisValueCount }, (_value, index) => index)
-            : timeAxis
-              ? [0, Math.floor((axisValueCount - 1) / 2), axisValueCount - 1]
-              : Array.from({ length: axisValueCount }, (_value, index) => index);
+    let labelIndexes;
+
+    if (axisValueCount <= 3) {
+        labelIndexes = Array.from({ length: axisValueCount }, (_value, index) => index);
+    } else if (timeAxis) {
+        labelIndexes = [0, Math.floor((axisValueCount - 1) / 2), axisValueCount - 1];
+    } else {
+        labelIndexes = Array.from({ length: axisValueCount }, (_value, index) => index);
+    }
     const axisLabels = timeAxis
         ? labelIndexes.map(index => timeTicks[index]?.label ?? '')
         : labelIndexes.map(index => categoryData?.[index]?.label ?? '');
@@ -106,40 +109,67 @@ export function RowCountChart({
     const noTimeValues = timeAxis && !series.length;
     const dimensionName = result.columns[xIndex]?.name ?? '';
     const groupName = groupByIndex === undefined ? '' : (result.columns[groupByIndex]?.name ?? '');
-    const generatedTitle = timeAxis
-        ? groupByIndex === undefined
-            ? 'Rows over time'
-            : `Rows over time by ${groupName}`
-        : `Rows by ${dimensionName}`;
+    let generatedTitle: string;
+
+    if (timeAxis) {
+        if (groupByIndex === undefined) {
+            generatedTitle = 'Rows over time';
+        } else {
+            generatedTitle = `Rows over time by ${groupName}`;
+        }
+    } else {
+        generatedTitle = `Rows by ${dimensionName}`;
+    }
     const customTitle =
         chart.title.trim() &&
         !['Query result', generatedTitle, suggestion.config.title].includes(chart.title)
             ? chart.title
             : undefined;
-    const title =
-        customTitle ??
-        (timeAxis
-            ? groupByIndex === undefined
-                ? copy.rowsOverTime
-                : chartText(copy.rowsOverTimeBy, { dimension: groupName })
-            : chartText(copy.rowsBy, { dimension: dimensionName }));
-    const timeUnit =
-        countData?.unit === 'minute'
-            ? copy.minutes
-            : countData?.unit === 'hour'
-              ? copy.hours
-              : countData?.unit === 'day'
-                ? copy.days
-                : countData?.unit === 'week'
-                  ? copy.weeks
-                  : countData?.unit === 'month'
-                    ? copy.months
-                    : '';
-    const chartAriaLabel = timeAxis
-        ? groupByIndex === undefined
-            ? copy.rowsOverTime
-            : chartText(copy.rowsOverTimeBy, { dimension: groupName })
-        : chartText(copy.rowsBy, { dimension: dimensionName });
+    const getSuggestionReason = () => {
+        if (timeAxis) {
+            if (groupByIndex === undefined) {
+                return copy.rowsOverTime;
+            }
+
+            return chartText(copy.rowsOverTimeBy, { dimension: groupName });
+        }
+
+        return chartText(copy.rowsBy, { dimension: dimensionName });
+    };
+    const title = customTitle ?? getSuggestionReason();
+    let timeUnit: string;
+
+    switch (countData?.unit) {
+        case 'minute':
+            timeUnit = copy.minutes;
+            break;
+        case 'hour':
+            timeUnit = copy.hours;
+            break;
+        case 'day':
+            timeUnit = copy.days;
+            break;
+        case 'week':
+            timeUnit = copy.weeks;
+            break;
+        case 'month':
+            timeUnit = copy.months;
+            break;
+        default:
+            timeUnit = '';
+            break;
+    }
+    let chartAriaLabel: string;
+
+    if (timeAxis) {
+        if (groupByIndex === undefined) {
+            chartAriaLabel = copy.rowsOverTime;
+        } else {
+            chartAriaLabel = chartText(copy.rowsOverTimeBy, { dimension: groupName });
+        }
+    } else {
+        chartAriaLabel = chartText(copy.rowsBy, { dimension: dimensionName });
+    }
     const renderChartSvg = createRowCountSvgRenderer({
         plotRight,
         chartAriaLabel,
@@ -165,105 +195,17 @@ export function RowCountChart({
 
     return (
         <ScrollEdgeFrame<HTMLDivElement> className="chart-workspace-frame">
-            {ref => (
-                <div ref={ref} className="chart-workspace animate-enter">
-                    <ChartToolbar
-                        title={title}
-                        description={
-                            timeAxis
-                                ? chartText(copy.timeCountDescription, {
-                                      unit: timeUnit || copy.days,
-                                  })
-                                : chartText(copy.categoryCountDescription, {
-                                      dimension: dimensionName,
-                                  })
-                        }
-                        copy={copy}
-                    >
-                        <label>
-                            {copy.xAxis}
-                            <select
-                                aria-label={copy.xAxis}
-                                value={xIndex}
-                                onChange={event => {
-                                    const nextX = Number(event.target.value);
-                                    const nextTime = temporalType(
-                                        result.columns[nextX]?.type ?? '',
-                                    );
-                                    const nextGroupBy = nextTime
-                                        ? (groupByIndex ??
-                                          dimensions.find(
-                                              index =>
-                                                  index !== nextX &&
-                                                  !temporalType(result.columns[index]?.type ?? ''),
-                                          ))
-                                        : undefined;
-                                    const nextTitle = nextTime
-                                        ? nextGroupBy === undefined
-                                            ? 'Rows over time'
-                                            : `Rows over time by ${result.columns[nextGroupBy]?.name}`
-                                        : `Rows by ${result.columns[nextX]?.name}`;
-                                    onChart({
-                                        ...chart,
-                                        kind: nextTime ? 'line' : 'bar',
-                                        x: nextX,
-                                        groupBy: nextGroupBy,
-                                        ys: [],
-                                        title: customTitle ?? nextTitle,
-                                    });
-                                }}
-                            >
-                                {dimensions.map(index => (
-                                    <option key={index} value={index}>
-                                        {result.columns[index]?.name}
-                                    </option>
-                                ))}
-                            </select>
-                        </label>
-                        {timeAxis && breakdowns.length > 0 && (
-                            <label>
-                                {copy.breakdownBy}
-                                <select
-                                    aria-label={copy.breakdownBy}
-                                    value={groupByIndex ?? ''}
-                                    onChange={event => {
-                                        const nextGroupBy =
-                                            event.target.value === ''
-                                                ? undefined
-                                                : Number(event.target.value);
-                                        onChart({
-                                            ...chart,
-                                            kind: 'line',
-                                            x: xIndex,
-                                            groupBy: nextGroupBy,
-                                            ys: [],
-                                            title:
-                                                customTitle ??
-                                                (nextGroupBy === undefined
-                                                    ? 'Rows over time'
-                                                    : `Rows over time by ${result.columns[nextGroupBy]?.name}`),
-                                        });
-                                    }}
-                                >
-                                    <option value="">{copy.allRows}</option>
-                                    {breakdowns.map(index => (
-                                        <option key={index} value={index}>
-                                            {result.columns[index]?.name}
-                                        </option>
-                                    ))}
-                                </select>
-                            </label>
-                        )}
-                        <span className="chart-row-count-type">
-                            <span className="chart-legend-dot" />
-                            {copy.rowsLabel}
-                        </span>
-                    </ChartToolbar>
-                    {!hasRows ? (
-                        <div className="chart-empty">{copy.noRetainedRows}</div>
-                    ) : noTimeValues ? (
-                        <div className="chart-empty">{copy.noValidTimeValues}</div>
-                    ) : (
+            {ref => {
+                const renderChartContent = () => {
+                    if (!hasRows) {
+                        return <div className="chart-empty">{copy.noRetainedRows}</div>;
+                    }
+
+                    if (noTimeValues) {
+                        return <div className="chart-empty">{copy.noValidTimeValues}</div>;
+                    }
+
+                    return (
                         <div
                             className={`chart-canvas${timeAxis ? '' : ' chart-canvas--categorical'}`}
                         >
@@ -311,39 +253,144 @@ export function RowCountChart({
                                 </ScrollEdgeFrame>
                             )}
                         </div>
-                    )}
-                    <div className="chart-footer">
-                        <span className="chart-legend">
-                            {(timeAxis ? series : [{ key: 'rows', label: copy.rowsLabel }]).map(
-                                (item, index) => (
-                                    <span key={item.key}>
-                                        <span
-                                            className="chart-legend-dot"
-                                            style={{
-                                                backgroundColor: seriesColor(index),
-                                                color: seriesColor(index),
-                                            }}
-                                        />
-                                        {item.label}
-                                    </span>
-                                ),
+                    );
+                };
+                return (
+                    <div ref={ref} className="chart-workspace animate-enter">
+                        <ChartToolbar
+                            title={title}
+                            description={
+                                timeAxis
+                                    ? chartText(copy.timeCountDescription, {
+                                          unit: timeUnit || copy.days,
+                                      })
+                                    : chartText(copy.categoryCountDescription, {
+                                          dimension: dimensionName,
+                                      })
+                            }
+                            copy={copy}
+                        >
+                            <label>
+                                {copy.xAxis}
+                                <select
+                                    aria-label={copy.xAxis}
+                                    value={xIndex}
+                                    onChange={event => {
+                                        const nextX = Number(event.target.value);
+                                        const nextTime = temporalType(
+                                            result.columns[nextX]?.type ?? '',
+                                        );
+                                        const nextGroupBy = nextTime
+                                            ? (groupByIndex ??
+                                              dimensions.find(
+                                                  index =>
+                                                      index !== nextX &&
+                                                      !temporalType(
+                                                          result.columns[index]?.type ?? '',
+                                                      ),
+                                              ))
+                                            : undefined;
+                                        let nextTitle: string;
+
+                                        if (nextTime) {
+                                            if (nextGroupBy === undefined) {
+                                                nextTitle = 'Rows over time';
+                                            } else {
+                                                nextTitle = `Rows over time by ${result.columns[nextGroupBy]?.name}`;
+                                            }
+                                        } else {
+                                            nextTitle = `Rows by ${result.columns[nextX]?.name}`;
+                                        }
+                                        onChart({
+                                            ...chart,
+                                            kind: nextTime ? 'line' : 'bar',
+                                            x: nextX,
+                                            groupBy: nextGroupBy,
+                                            ys: [],
+                                            title: customTitle ?? nextTitle,
+                                        });
+                                    }}
+                                >
+                                    {dimensions.map(index => (
+                                        <option key={index} value={index}>
+                                            {result.columns[index]?.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                            {timeAxis && breakdowns.length > 0 && (
+                                <label>
+                                    {copy.breakdownBy}
+                                    <select
+                                        aria-label={copy.breakdownBy}
+                                        value={groupByIndex ?? ''}
+                                        onChange={event => {
+                                            const nextGroupBy =
+                                                event.target.value === ''
+                                                    ? undefined
+                                                    : Number(event.target.value);
+                                            onChart({
+                                                ...chart,
+                                                kind: 'line',
+                                                x: xIndex,
+                                                groupBy: nextGroupBy,
+                                                ys: [],
+                                                title:
+                                                    customTitle ??
+                                                    (nextGroupBy === undefined
+                                                        ? 'Rows over time'
+                                                        : `Rows over time by ${result.columns[nextGroupBy]?.name}`),
+                                            });
+                                        }}
+                                    >
+                                        <option value="">{copy.allRows}</option>
+                                        {breakdowns.map(index => (
+                                            <option key={index} value={index}>
+                                                {result.columns[index]?.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </label>
                             )}
-                        </span>
-                        <span>
-                            {timeAxis
-                                ? `${chartText(copy.timeSummary, { buckets: formatCount(timeTicks.length, locale), unit: timeUnit, rows: formatCount(result.rows.length, locale) })}${countData?.excludedRows ? ` · ${chartText(copy.invalidDatesSkipped, { count: formatCount(countData.excludedRows, locale) })}` : ''}`
-                                : chartText(copy.categorySummary, {
-                                      categories: formatCount(bars.length, locale),
-                                      rows: formatCount(result.rows.length, locale),
-                                  })}
-                            <i>·</i>{' '}
-                            {result.completeness === 'truncated'
-                                ? copy.retainedPrefixOnly
-                                : copy.completeQueryResult}
-                        </span>
+                            <span className="chart-row-count-type">
+                                <span className="chart-legend-dot" />
+                                {copy.rowsLabel}
+                            </span>
+                        </ChartToolbar>
+                        {renderChartContent()}
+                        <div className="chart-footer">
+                            <span className="chart-legend">
+                                {(timeAxis ? series : [{ key: 'rows', label: copy.rowsLabel }]).map(
+                                    (item, index) => (
+                                        <span key={item.key}>
+                                            <span
+                                                className="chart-legend-dot"
+                                                style={{
+                                                    backgroundColor: seriesColor(index),
+                                                    color: seriesColor(index),
+                                                }}
+                                            />
+                                            {item.label}
+                                        </span>
+                                    ),
+                                )}
+                            </span>
+                            <span>
+                                {timeAxis
+                                    ? `${chartText(copy.timeSummary, { buckets: formatCount(timeTicks.length, locale), unit: timeUnit, rows: formatCount(result.rows.length, locale) })}${countData?.excludedRows ? ` · ${chartText(copy.invalidDatesSkipped, { count: formatCount(countData.excludedRows, locale) })}` : ''}`
+                                    : chartText(copy.categorySummary, {
+                                          categories: formatCount(bars.length, locale),
+                                          rows: formatCount(result.rows.length, locale),
+                                      })}
+                                <i>·</i>{' '}
+                                {result.completeness === 'truncated'
+                                    ? copy.retainedPrefixOnly
+                                    : copy.completeQueryResult}
+                            </span>
+                        </div>
                     </div>
-                </div>
-            )}
+                );
+            }}
         </ScrollEdgeFrame>
     );
 }
@@ -505,26 +552,37 @@ function createRowCountSvgRenderer({
                       );
                   })}
             <g className="chart-x-labels">
-                {axisLabels.map((label, index) => (
-                    <text
-                        key={`${label}-${index}`}
-                        x={axisLabelPositions[index]}
-                        y="218"
-                        textAnchor={
-                            categoryAxisIsScrollable
-                                ? 'middle'
-                                : axisLabels.length === 1
-                                  ? 'middle'
-                                  : index === 0
-                                    ? 'start'
-                                    : index === axisLabels.length - 1
-                                      ? 'end'
-                                      : 'middle'
+                {axisLabels.map((label, index) => {
+                    const getTickAnchor = (): 'middle' | 'start' | 'end' => {
+                        if (categoryAxisIsScrollable) {
+                            return 'middle';
                         }
-                    >
-                        {label}
-                    </text>
-                ))}
+
+                        if (axisLabels.length === 1) {
+                            return 'middle';
+                        }
+
+                        if (index === 0) {
+                            return 'start';
+                        }
+
+                        if (index === axisLabels.length - 1) {
+                            return 'end';
+                        }
+
+                        return 'middle';
+                    };
+                    return (
+                        <text
+                            key={`${label}-${index}`}
+                            x={axisLabelPositions[index]}
+                            y="218"
+                            textAnchor={getTickAnchor()}
+                        >
+                            {label}
+                        </text>
+                    );
+                })}
             </g>
         </svg>
     );

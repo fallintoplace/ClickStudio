@@ -204,23 +204,34 @@ function renderCandlestickControls({
                                         </select>
                                     </label>
                                 ))}
-                                {(['bid', 'ask', 'spread', 'quoteActivity'] as const).map(field => (
-                                    <label key={field}>
-                                        {field === 'bid' || field === 'ask'
-                                            ? field.toUpperCase()
-                                            : field === 'spread'
-                                              ? chartCopy.spreadBps
-                                              : chartCopy.quoteActivity}
-                                        <select
-                                            value={candle[field] ?? ''}
-                                            onChange={event =>
-                                                patchCandle(field, event.target.value)
-                                            }
-                                        >
-                                            {optionalColumns(candle[field])}
-                                        </select>
-                                    </label>
-                                ))}
+                                {(['bid', 'ask', 'spread', 'quoteActivity'] as const).map(field => {
+                                    const getFieldLabel = () => {
+                                        switch (field) {
+                                            case 'bid':
+                                            case 'ask':
+                                                return field.toUpperCase();
+
+                                            case 'spread':
+                                                return chartCopy.spreadBps;
+
+                                            default:
+                                                return chartCopy.quoteActivity;
+                                        }
+                                    };
+                                    return (
+                                        <label key={field}>
+                                            {getFieldLabel()}
+                                            <select
+                                                value={candle[field] ?? ''}
+                                                onChange={event =>
+                                                    patchCandle(field, event.target.value)
+                                                }
+                                            >
+                                                {optionalColumns(candle[field])}
+                                            </select>
+                                        </label>
+                                    );
+                                })}
                             </div>
                         </ChartPopover>
                     </ChartToolbar>

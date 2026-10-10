@@ -111,23 +111,31 @@ export function CreateTableDialog({ connection, databases, onClose, onCreated }:
         if (event.key === 'ArrowDown') {
             event.preventDefault();
             setDatabaseOptionsOpen(true);
-            setActiveDatabaseOption(current =>
-                databaseOptions.length === 0
-                    ? -1
-                    : current < 0 || current >= databaseOptions.length - 1
-                      ? 0
-                      : current + 1,
-            );
+            setActiveDatabaseOption(current => {
+                if (databaseOptions.length === 0) {
+                    return -1;
+                }
+
+                if (current < 0 || current >= databaseOptions.length - 1) {
+                    return 0;
+                }
+
+                return current + 1;
+            });
         } else if (event.key === 'ArrowUp') {
             event.preventDefault();
             setDatabaseOptionsOpen(true);
-            setActiveDatabaseOption(current =>
-                databaseOptions.length === 0
-                    ? -1
-                    : current <= 0 || current >= databaseOptions.length
-                      ? databaseOptions.length - 1
-                      : current - 1,
-            );
+            setActiveDatabaseOption(current => {
+                if (databaseOptions.length === 0) {
+                    return -1;
+                }
+
+                if (current <= 0 || current >= databaseOptions.length) {
+                    return databaseOptions.length - 1;
+                }
+
+                return current - 1;
+            });
         } else if (event.key === 'Enter' && databaseOptionsOpen) {
             event.preventDefault();
             const selectedDatabase = databaseOptions[highlightedDatabaseOption];
@@ -171,33 +179,52 @@ export function CreateTableDialog({ connection, databases, onClose, onCreated }:
         }
     }
 
-    const databaseHelp =
-        databaseTouched && !databaseIsValid
-            ? database
-                ? 'Use letters, numbers, and underscores. Start with a letter or _.'
-                : 'Choose or type a database name.'
-            : 'Choose a database or type its name.';
-    const tableHelp =
-        tableTouched && !tableIsValid
-            ? table
-                ? 'Use letters, numbers, and underscores. Start with a letter or _.'
-                : 'A table name is required.'
-            : table
-              ? 'Names can use letters, numbers, and underscores.'
-              : 'Enter a table name to enable Create table.';
-    const createDisabledReason = !databaseIsValid
-        ? 'Select or type a valid database name.'
-        : !tableIsValid
-          ? table
-              ? 'Use a valid table name to continue.'
-              : 'Enter a table name to continue.'
-          : !columnsAreValid
-            ? 'Give each column a valid name.'
-            : !columnNamesAreUnique
-              ? 'Column names must be unique.'
-              : !orderBy
-                ? 'Choose a sorting key to continue.'
-                : '';
+    let databaseHelp:
+        | 'Use letters, numbers, and underscores. Start with a letter or _.'
+        | 'Choose or type a database name.'
+        | 'Choose a database or type its name.';
+
+    if (databaseTouched && !databaseIsValid) {
+        if (database) {
+            databaseHelp = 'Use letters, numbers, and underscores. Start with a letter or _.';
+        } else {
+            databaseHelp = 'Choose or type a database name.';
+        }
+    } else {
+        databaseHelp = 'Choose a database or type its name.';
+    }
+    let tableHelp: string;
+
+    if (tableTouched && !tableIsValid) {
+        if (table) {
+            tableHelp = 'Use letters, numbers, and underscores. Start with a letter or _.';
+        } else {
+            tableHelp = 'A table name is required.';
+        }
+    } else if (table) {
+        tableHelp = 'Names can use letters, numbers, and underscores.';
+    } else {
+        tableHelp = 'Enter a table name to enable Create table.';
+    }
+    let createDisabledReason: string;
+
+    if (!databaseIsValid) {
+        createDisabledReason = 'Select or type a valid database name.';
+    } else if (!tableIsValid) {
+        if (table) {
+            createDisabledReason = 'Use a valid table name to continue.';
+        } else {
+            createDisabledReason = 'Enter a table name to continue.';
+        }
+    } else if (!columnsAreValid) {
+        createDisabledReason = 'Give each column a valid name.';
+    } else if (!columnNamesAreUnique) {
+        createDisabledReason = 'Column names must be unique.';
+    } else if (!orderBy) {
+        createDisabledReason = 'Choose a sorting key to continue.';
+    } else {
+        createDisabledReason = '';
+    }
 
     return (
         <dialog

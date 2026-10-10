@@ -412,13 +412,21 @@ export function validateImage(data: string): string {
         'IMAGE_SIZE',
         'Images must be at most 2 MB',
     );
-    const valid =
-        match[1] === 'png'
-            ? buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
-            : match[1] === 'jpeg'
-              ? buffer[0] === 255 && buffer[1] === 216 && buffer[2] === 255
-              : buffer.toString('ascii', 0, 4) === 'RIFF' &&
+    let valid: boolean;
+
+    switch (match[1]) {
+        case 'png':
+            valid = buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+            break;
+        case 'jpeg':
+            valid = buffer[0] === 255 && buffer[1] === 216 && buffer[2] === 255;
+            break;
+        default:
+            valid =
+                buffer.toString('ascii', 0, 4) === 'RIFF' &&
                 buffer.toString('ascii', 8, 12) === 'WEBP';
+            break;
+    }
     requireThat(valid, 400, 'IMAGE_TYPE', 'The file contents do not match the image type');
     return data;
 }

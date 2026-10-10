@@ -32,14 +32,18 @@ export function usePendingExecution({
     const [pending, setPending] = useState<PendingExecution>();
     const [retainedResult, setRetainedResult] = useState<RetainedExecutionResult>();
     const current = pending?.draftId === activeDraftId ? pending : undefined;
-    const isPending = Boolean(
-        current &&
-        (current.scriptId
-            ? script?.id !== current.scriptId || script?.status === 'running'
-            : current.runId
-              ? run?.id !== current.runId || !terminal(run)
-              : busy === 'run' || busy === 'script'),
-    );
+    const isExecutionPending = (current: PendingExecution) => {
+        if (current.scriptId) {
+            return script?.id !== current.scriptId || script?.status === 'running';
+        }
+
+        if (current.runId) {
+            return run?.id !== current.runId || !terminal(run);
+        }
+
+        return busy === 'run' || busy === 'script';
+    };
+    const isPending = Boolean(current && isExecutionPending(current));
 
     return {
         execution: isPending ? current : undefined,

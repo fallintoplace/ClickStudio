@@ -23,54 +23,97 @@ export function ImportJobStatus({
     onForget: () => void;
 }) {
     const rowCount = job?.rows ?? pendingImport?.rows ?? 0;
-    const statusTone =
-        job?.status === 'succeeded'
-            ? 'is-success'
-            : job?.status === 'unknown'
-              ? 'is-unknown'
-              : job?.status === 'running'
-                ? 'is-running'
-                : 'is-checking';
+    let statusTone: 'is-success' | 'is-unknown' | 'is-running' | 'is-checking';
+
+    switch (job?.status) {
+        case 'succeeded':
+            statusTone = 'is-success';
+            break;
+        case 'unknown':
+            statusTone = 'is-unknown';
+            break;
+        case 'running':
+            statusTone = 'is-running';
+            break;
+        default:
+            statusTone = 'is-checking';
+            break;
+    }
     const inspectableDestination =
         job?.status === 'unknown' && job.tableExists && Boolean(job.table);
     const destinationWasOpened =
         inspectableDestination && pendingImport?.id === job.id && pendingImport.inspectionOpened;
 
-    return (
-        <section aria-label="Import status" className="space-y-4">
-            <div
-                className={`import-status-card ${statusTone} rounded-xl border p-5 ${job?.status === 'succeeded' ? 'border-[var(--green)]/30 bg-[var(--green)]/5' : job?.status === 'unknown' ? 'border-[var(--amber)]/35 bg-[var(--amber)]/5' : 'border-[var(--line)] bg-[var(--page)]'}`}
-            >
-                <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--muted)]">
-                    {job?.status === 'succeeded'
-                        ? 'Import complete'
-                        : job?.status === 'unknown'
-                          ? 'Import not confirmed'
-                          : 'Import running'}
-                </span>
-                <h3 role="status" className="mt-1 text-base font-semibold">
-                    {job?.status === 'succeeded'
-                        ? browserDemoImport
-                            ? `Saved ${formatImportRowCount(rowCount)} to ${job.table ?? pendingImport?.table}`
-                            : job.reviewedAt
-                              ? `You confirmed the imported rows in ${job.table ?? pendingImport?.table}`
-                              : `${rowCount.toLocaleString()} source ${rowCount === 1 ? 'row' : 'rows'} processed successfully`
-                        : job?.status === 'unknown'
-                          ? inspectableDestination
-                              ? `ClickHouse couldn’t confirm the rows in ${job.table}.`
-                              : 'We couldn’t confirm the import.'
-                          : `${browserDemoImport ? 'Saving' : 'Inserting'} ${formatImportRowCount(rowCount)}…`}
-                </h3>
-                {job?.status === 'unknown' ? (
+    const getStatusCardClass = () => {
+        switch (job?.status) {
+            case 'succeeded':
+                return 'border-[var(--green)]/30 bg-[var(--green)]/5';
+
+            case 'unknown':
+                return 'border-[var(--amber)]/35 bg-[var(--amber)]/5';
+
+            default:
+                return 'border-[var(--line)] bg-[var(--page)]';
+        }
+    };
+    const getStatusHeading = () => {
+        switch (job?.status) {
+            case 'succeeded':
+                return 'Import complete';
+
+            case 'unknown':
+                return 'Import not confirmed';
+
+            default:
+                return 'Import running';
+        }
+    };
+    const getStatusSummary = () => {
+        switch (job?.status) {
+            case 'succeeded':
+                if (browserDemoImport) {
+                    return `Saved ${formatImportRowCount(rowCount)} to ${job.table ?? pendingImport?.table}`;
+                }
+
+                if (job.reviewedAt) {
+                    return `You confirmed the imported rows in ${job.table ?? pendingImport?.table}`;
+                }
+
+                return `${rowCount.toLocaleString()} source ${rowCount === 1 ? 'row' : 'rows'} processed successfully`;
+
+            case 'unknown':
+                if (inspectableDestination) {
+                    return `ClickHouse couldn’t confirm the rows in ${job.table}.`;
+                }
+
+                return 'We couldn’t confirm the import.';
+
+            default:
+                return `${browserDemoImport ? 'Saving' : 'Inserting'} ${formatImportRowCount(rowCount)}…`;
+        }
+    };
+    const renderStatusDetails = () => {
+        switch (job?.status) {
+            case 'unknown': {
+                const getInspectionInstructions = () => {
+                    if (inspectableDestination) {
+                        if (destinationWasOpened) {
+                            return `After checking ${job.table}, confirm whether the rows are there.`;
+                        }
+
+                        return `The table exists, but it may contain all, some, or none of this file’s rows. Open it to check.`;
+                    }
+
+                    return `ClickHouse couldn’t confirm the import. The rows may already be in ${job.table ?? pendingImport?.table ?? 'the table'}.`;
+                };
+                return (
                     <p className="mt-2 whitespace-pre-wrap break-words text-xs leading-relaxed text-[var(--text-soft)]">
-                        {job.error ??
-                            (inspectableDestination
-                                ? destinationWasOpened
-                                    ? `After checking ${job.table}, confirm whether the rows are there.`
-                                    : `The table exists, but it may contain all, some, or none of this file’s rows. Open it to check.`
-                                : `ClickHouse couldn’t confirm the import. The rows may already be in ${job.table ?? pendingImport?.table ?? 'the table'}.`)}
+                        {job.error ?? getInspectionInstructions()}
                     </p>
-                ) : job?.status === 'running' ? (
+                );
+            }
+            case 'running':
+                return (
                     <p className="mt-2 text-xs text-[var(--muted)]">
                         {job.reconciliationRequired
                             ? 'ClickHouse still reports this import as active.'
@@ -78,19 +121,46 @@ export function ImportJobStatus({
                         Close to leave it tracked, or forget its status to continue. Forgetting does
                         not cancel a write already sent to ClickHouse.
                     </p>
-                ) : job?.status === 'succeeded' ? (
+                );
+
+            case 'succeeded': {
+                const getDemoPersistenceMessage = () => {
+                    if (browserDemoImport) {
+                        if (job.demoPersisted) {
+                            return 'Rows are saved in this browser and are ready to inspect in the sample workspace.';
+                        }
+
+                        return 'Rows are available in this tab. Browser storage was unavailable, so they will not survive a refresh.';
+                    }
+
+                    return 'Refreshing the object list and selecting the destination table.';
+                };
+                return (
                     <p className="mt-2 text-xs text-[var(--text-soft)]">
-                        {browserDemoImport
-                            ? job.demoPersisted
-                                ? 'Rows are saved in this browser and are ready to inspect in the sample workspace.'
-                                : 'Rows are available in this tab. Browser storage was unavailable, so they will not survive a refresh.'
-                            : 'Refreshing the object list and selecting the destination table.'}
+                        {getDemoPersistenceMessage()}
                     </p>
-                ) : (
+                );
+            }
+            default:
+                return (
                     <p className="mt-2 text-xs text-[var(--muted)]">
                         Checking the saved import job…
                     </p>
-                )}
+                );
+        }
+    };
+    return (
+        <section aria-label="Import status" className="space-y-4">
+            <div
+                className={`import-status-card ${statusTone} rounded-xl border p-5 ${getStatusCardClass()}`}
+            >
+                <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--muted)]">
+                    {getStatusHeading()}
+                </span>
+                <h3 role="status" className="mt-1 text-base font-semibold">
+                    {getStatusSummary()}
+                </h3>
+                {renderStatusDetails()}
             </div>
             {browserDemoImport && job?.status === 'succeeded' && job.demoRows?.length ? (
                 <div className="overflow-hidden rounded-xl border border-[var(--line)]">

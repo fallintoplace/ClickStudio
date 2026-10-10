@@ -24,16 +24,30 @@ export function StorageExplorer({
     const content = (
         <div className="native-storage">
             <div className="native-tabs" role="group" aria-label="Storage views">
-                {(['parts', 'merges', 'mutations'] as const).map(value => (
-                    <button
-                        type="button"
-                        key={value}
-                        aria-pressed={tab === value}
-                        onClick={() => setTab(value)}
-                    >
-                        {value === 'parts' ? 'Parts' : value === 'merges' ? 'Merges' : 'Mutations'}
-                    </button>
-                ))}
+                {(['parts', 'merges', 'mutations'] as const).map(value => {
+                    const getViewLabel = () => {
+                        switch (value) {
+                            case 'parts':
+                                return 'Parts';
+
+                            case 'merges':
+                                return 'Merges';
+
+                            default:
+                                return 'Mutations';
+                        }
+                    };
+                    return (
+                        <button
+                            type="button"
+                            key={value}
+                            aria-pressed={tab === value}
+                            onClick={() => setTab(value)}
+                        >
+                            {getViewLabel()}
+                        </button>
+                    );
+                })}
             </div>
             {tab === 'parts' ? (
                 <PartsExplorer embedded connection={connection} table={table} copy={copy} />

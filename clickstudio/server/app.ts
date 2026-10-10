@@ -745,15 +745,22 @@ export function createApp(
             typeof error === 'object' &&
             'type' in error &&
             error.type === 'entity.too.large';
-        res.status(
-            tooLarge
-                ? 413
-                : error instanceof AppError
-                  ? error.status
-                  : error instanceof SyntaxError
-                    ? 400
-                    : 500,
-        ).json({
+        const getErrorStatus = () => {
+            if (tooLarge) {
+                return 413;
+            }
+
+            if (error instanceof AppError) {
+                return error.status;
+            }
+
+            if (error instanceof SyntaxError) {
+                return 400;
+            }
+
+            return 500;
+        };
+        res.status(getErrorStatus()).json({
             error: { ...parsed, message: redact(parsed.message) },
             requestId: res.locals.requestId,
         });
@@ -1666,21 +1673,24 @@ function registerImportRoutes({
         });
     });
     app.post('/api/imports/:id/mapping', async (req, res) => {
-        const v = body(req),
-            deduplicationToken =
-                v.deduplicationToken === null
-                    ? null
-                    : v.deduplicationToken === undefined
-                      ? undefined
-                      : text(v.deduplicationToken, 'deduplication token', 36),
-            mapping = await imports.map(
-                principal(res),
-                id(req),
-                identifier(v.connectionId, 'connectionId'),
-                text(v.table, 'table', 256),
-                mappingFields(v.fields),
-                deduplicationToken,
-            );
+        const v = body(req);
+        let deduplicationToken: string | null | undefined;
+
+        if (v.deduplicationToken === null) {
+            deduplicationToken = null;
+        } else if (v.deduplicationToken === undefined) {
+            deduplicationToken = undefined;
+        } else {
+            deduplicationToken = text(v.deduplicationToken, 'deduplication token', 36);
+        }
+        const mapping = await imports.map(
+            principal(res),
+            id(req),
+            identifier(v.connectionId, 'connectionId'),
+            text(v.table, 'table', 256),
+            mappingFields(v.fields),
+            deduplicationToken,
+        );
         res.json({
             ...mapping,
             ...(deduplicationToken === null ? { deduplicationToken: null } : {}),

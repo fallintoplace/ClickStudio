@@ -49,14 +49,19 @@ export function createHelpExplainActions({
     const explainActions: HelpExplainAction[] = explainDefinitions.map(definition => {
         const unavailableReason =
             definition.capability?.available === false ? definition.capability.reason : undefined;
-        const title = !trusted
-            ? copy.runActionTrustRequired
-            : busy
-              ? copy.runActionWait
-              : unsupportedParameters
-                ? copy.runActionRemoveParameters
-                : (unavailableReason ??
-                  (definition.kind === 'analyze' ? copy.runtimeExecutesQuery : undefined));
+        let title: string | undefined;
+
+        if (!trusted) {
+            title = copy.runActionTrustRequired;
+        } else if (busy) {
+            title = copy.runActionWait;
+        } else if (unsupportedParameters) {
+            title = copy.runActionRemoveParameters;
+        } else {
+            title =
+                unavailableReason ??
+                (definition.kind === 'analyze' ? copy.runtimeExecutesQuery : undefined);
+        }
         return {
             id: definition.id,
             label: definition.label,

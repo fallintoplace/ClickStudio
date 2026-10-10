@@ -28,66 +28,25 @@ export function createChartSvgRenderer({
     chartRows,
     chartXTicks,
 }: ChartSvgModel) {
-    return (categoryAxisIsScrollable: boolean) => (
-        <svg
-            className={categoryAxisIsScrollable ? 'chart-category-plot' : undefined}
-            viewBox={categoryAxisIsScrollable ? `0 0 ${plotRight} 230` : '0 0 760 230'}
-            preserveAspectRatio={categoryAxisIsScrollable ? 'none' : undefined}
-            style={
-                categoryAxisIsScrollable
-                    ? ({ '--chart-plot-width': `${plotRight}px` } as CSSProperties)
-                    : undefined
-            }
-            role="img"
-            aria-label={chartAriaLabel}
-        >
-            {[plotTop, plotMiddle, plotBottom].map(value => (
-                <line
-                    key={value}
-                    x1={plotLeft}
-                    x2={plotRight}
-                    y1={value}
-                    y2={value}
-                    className="chart-gridline"
-                />
-            ))}
-            {!categoryAxisIsScrollable &&
-                chartYTicks.map(tick => (
-                    <text
-                        key={`${tick.position}-${tick.value}`}
-                        className="chart-y-tick-label"
-                        x={plotLeft - 24}
-                        y={tick.position}
-                        textAnchor="end"
-                        dominantBaseline="middle"
-                    >
-                        {compactNumber.format(tick.value)}
-                    </text>
-                ))}
-            {chartKind !== 'scatter' && (
-                <line
-                    x1={plotLeft}
-                    x2={plotRight}
-                    y1={zeroY}
-                    y2={zeroY}
-                    className="chart-zero-line"
-                />
-            )}
-            {chartKind === 'scatter'
-                ? scatterPoints.map((point, index) => (
-                      <circle
-                          key={index}
-                          cx={scatterX(point.x)}
-                          cy={scatterY(point.y)}
-                          r="3.5"
-                          className="chart-point"
-                          style={{ fill: seriesColor(0), stroke: seriesColor(0) }}
-                      >
-                          <title>{`${result.columns[xIndex]?.name}: ${formatCount(point.x, locale)} · ${result.columns[yIndex]?.name}: ${formatCount(point.y, locale)}`}</title>
-                      </circle>
-                  ))
-                : chartKind === 'line'
-                  ? plotSeries.map(series => {
+    return (categoryAxisIsScrollable: boolean) => {
+        const renderSeries = () => {
+            switch (chartKind) {
+                case 'scatter':
+                    return scatterPoints.map((point, index) => (
+                        <circle
+                            key={index}
+                            cx={scatterX(point.x)}
+                            cy={scatterY(point.y)}
+                            r="3.5"
+                            className="chart-point"
+                            style={{ fill: seriesColor(0), stroke: seriesColor(0) }}
+                        >
+                            <title>{`${result.columns[xIndex]?.name}: ${formatCount(point.x, locale)} · ${result.columns[yIndex]?.name}: ${formatCount(point.y, locale)}`}</title>
+                        </circle>
+                    ));
+
+                case 'line':
+                    return plotSeries.map(series => {
                         const segments = splitChartSegments(series.points);
                         return (
                             <g
@@ -126,8 +85,10 @@ export function createChartSvgRenderer({
                                     ))}
                             </g>
                         );
-                    })
-                  : plotSeries.flatMap((series, seriesIndex) =>
+                    });
+
+                default:
+                    return plotSeries.flatMap((series, seriesIndex) =>
                         series.points.flatMap(point => {
                             if (point.value === null) return [];
                             const valueY = y(point.value),
@@ -158,29 +119,89 @@ export function createChartSvgRenderer({
                                 />,
                             ];
                         }),
-                    )}
-            <g className="chart-x-labels">
-                {chartXTicks.map((tick, index) => (
-                    <text
-                        key={`${tick.position}-${categoryAxisIsScrollable ? index : tick.label}`}
-                        x={tick.position}
-                        y="218"
-                        textAnchor={
-                            categoryAxisIsScrollable
-                                ? 'middle'
-                                : chartXTicks.length === 1
-                                  ? 'middle'
-                                  : index === 0
-                                    ? 'start'
-                                    : index === chartXTicks.length - 1
-                                      ? 'end'
-                                      : 'middle'
-                        }
-                    >
-                        {tick.label}
-                    </text>
+                    );
+            }
+        };
+        return (
+            <svg
+                className={categoryAxisIsScrollable ? 'chart-category-plot' : undefined}
+                viewBox={categoryAxisIsScrollable ? `0 0 ${plotRight} 230` : '0 0 760 230'}
+                preserveAspectRatio={categoryAxisIsScrollable ? 'none' : undefined}
+                style={
+                    categoryAxisIsScrollable
+                        ? ({ '--chart-plot-width': `${plotRight}px` } as CSSProperties)
+                        : undefined
+                }
+                role="img"
+                aria-label={chartAriaLabel}
+            >
+                {[plotTop, plotMiddle, plotBottom].map(value => (
+                    <line
+                        key={value}
+                        x1={plotLeft}
+                        x2={plotRight}
+                        y1={value}
+                        y2={value}
+                        className="chart-gridline"
+                    />
                 ))}
-            </g>
-        </svg>
-    );
+                {!categoryAxisIsScrollable &&
+                    chartYTicks.map(tick => (
+                        <text
+                            key={`${tick.position}-${tick.value}`}
+                            className="chart-y-tick-label"
+                            x={plotLeft - 24}
+                            y={tick.position}
+                            textAnchor="end"
+                            dominantBaseline="middle"
+                        >
+                            {compactNumber.format(tick.value)}
+                        </text>
+                    ))}
+                {chartKind !== 'scatter' && (
+                    <line
+                        x1={plotLeft}
+                        x2={plotRight}
+                        y1={zeroY}
+                        y2={zeroY}
+                        className="chart-zero-line"
+                    />
+                )}
+                {renderSeries()}
+                <g className="chart-x-labels">
+                    {chartXTicks.map((tick, index) => {
+                        const getTickAnchor = (): 'middle' | 'start' | 'end' => {
+                            if (categoryAxisIsScrollable) {
+                                return 'middle';
+                            }
+
+                            if (chartXTicks.length === 1) {
+                                return 'middle';
+                            }
+
+                            if (index === 0) {
+                                return 'start';
+                            }
+
+                            if (index === chartXTicks.length - 1) {
+                                return 'end';
+                            }
+
+                            return 'middle';
+                        };
+                        return (
+                            <text
+                                key={`${tick.position}-${categoryAxisIsScrollable ? index : tick.label}`}
+                                x={tick.position}
+                                y="218"
+                                textAnchor={getTickAnchor()}
+                            >
+                                {tick.label}
+                            </text>
+                        );
+                    })}
+                </g>
+            </svg>
+        );
+    };
 }

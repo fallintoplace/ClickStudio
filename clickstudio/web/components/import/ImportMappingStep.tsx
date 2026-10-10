@@ -85,6 +85,28 @@ export function ImportMappingStep({
     duplicateDestinations: ReturnType<typeof useImportWizardController>['duplicateDestinations'];
     sampleColumns: ReturnType<typeof useImportWizardController>['sampleColumns'];
 }) {
+    const getDestinationHeading = () => {
+        if (browserCloudImport) {
+            if (selectedDestinationChoice === 'existing') {
+                return 'Choose a table';
+            }
+
+            return 'Choose where the rows go';
+        }
+
+        return 'Choose a table';
+    };
+    const getDestinationInstructions = () => {
+        if (browserCloudImport) {
+            if (selectedDestinationChoice === 'existing') {
+                return 'Select a table above. Matching columns will be filled in for you.';
+            }
+
+            return 'Choose “Add to a table” or “Create a table” to continue.';
+        }
+
+        return 'Select a destination above. Matching columns will be filled in for you.';
+    };
     return (
         <section aria-label="Map source columns" className="import-mapping-step import-setup">
             <div className="import-setup-source">
@@ -265,20 +287,8 @@ export function ImportMappingStep({
                                 aria-hidden="true"
                             />
                             <div>
-                                <strong>
-                                    {browserCloudImport
-                                        ? selectedDestinationChoice === 'existing'
-                                            ? 'Choose a table'
-                                            : 'Choose where the rows go'
-                                        : 'Choose a table'}
-                                </strong>
-                                <p>
-                                    {browserCloudImport
-                                        ? selectedDestinationChoice === 'existing'
-                                            ? 'Select a table above. Matching columns will be filled in for you.'
-                                            : 'Choose “Add to a table” or “Create a table” to continue.'
-                                        : 'Select a destination above. Matching columns will be filled in for you.'}
-                                </p>
+                                <strong>{getDestinationHeading()}</strong>
+                                <p>{getDestinationInstructions()}</p>
                             </div>
                         </div>
                     )}

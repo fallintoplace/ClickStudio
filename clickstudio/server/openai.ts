@@ -81,12 +81,15 @@ function isContextLengthError(error: unknown): error is APIError {
 }
 
 function logProviderFailure(stage: string, error: unknown, inputTokens?: number) {
-    const errorType =
-        error instanceof APIConnectionTimeoutError
-            ? 'APIConnectionTimeoutError'
-            : error instanceof Error
-              ? error.name
-              : 'unknown';
+    let errorType: string;
+
+    if (error instanceof APIConnectionTimeoutError) {
+        errorType = 'APIConnectionTimeoutError';
+    } else if (error instanceof Error) {
+        errorType = error.name;
+    } else {
+        errorType = 'unknown';
+    }
     const details =
         error instanceof APIError
             ? {
@@ -250,12 +253,22 @@ export class OpenAIDriver implements AssistantDriver {
             }
             if (response.status !== 'completed' || !response.output_text) {
                 const reason = response.incomplete_details?.reason;
-                const message =
-                    reason === 'max_output_tokens'
-                        ? 'The assistant response reached its length limit. Try asking for a smaller part at a time. No draft was changed.'
-                        : reason === 'content_filter'
-                          ? 'The response was stopped by the content filter. No draft was changed.'
-                          : 'The assistant stopped before completing a response. No draft was changed.';
+                let message: string;
+
+                switch (reason) {
+                    case 'max_output_tokens':
+                        message =
+                            'The assistant response reached its length limit. Try asking for a smaller part at a time. No draft was changed.';
+                        break;
+                    case 'content_filter':
+                        message =
+                            'The response was stopped by the content filter. No draft was changed.';
+                        break;
+                    default:
+                        message =
+                            'The assistant stopped before completing a response. No draft was changed.';
+                        break;
+                }
                 throw new AppError(502, 'AI_INCOMPLETE', message);
             }
             const sourceMap = new Map<string, AssistantSource>();

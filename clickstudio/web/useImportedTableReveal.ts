@@ -195,13 +195,19 @@ export function useImportedTableReveal({
             if (latestImportIdRef.current !== target.id) return;
             latestImportIdRef.current = undefined;
             setImportedTableTarget(current => (current?.id === target.id ? undefined : current));
-            setNotice(
-                target.source === 'partial'
-                    ? `Selected ${target.table} in Objects. Check whether the imported rows are there.`
-                    : target.source === 'sql'
-                      ? `Created ${target.table} from imported SQL. The table is selected in Objects.`
-                      : `Imported ${(target.rows ?? 0).toLocaleString()} ${target.rows === 1 ? 'row' : 'rows'} into ${target.table}. The table is selected in Objects.`,
-            );
+            const getRevealMessage = () => {
+                switch (target.source) {
+                    case 'partial':
+                        return `Selected ${target.table} in Objects. Check whether the imported rows are there.`;
+
+                    case 'sql':
+                        return `Created ${target.table} from imported SQL. The table is selected in Objects.`;
+
+                    default:
+                        return `Imported ${(target.rows ?? 0).toLocaleString()} ${target.rows === 1 ? 'row' : 'rows'} into ${target.table}. The table is selected in Objects.`;
+                }
+            };
+            setNotice(getRevealMessage());
         },
         [setNotice],
     );

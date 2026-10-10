@@ -43,11 +43,15 @@ test('Statements without a result set do not show the empty SELECT message', asy
             const createdAt = new Date(Date.UTC(2026, 0, sequence)).toISOString();
             const isSelect = /^\s*SELECT\b/i.test(input.sql);
             const columns = isSelect ? [{ name: 'value', type: 'UInt64' }] : [];
-            const writtenRows = /^\s*INSERT\b/i.test(input.sql)
-                ? 2
-                : /^\s*(?:DELETE|CREATE)\b/i.test(input.sql)
-                  ? 0
-                  : undefined;
+            let writtenRows: 0 | 2 | undefined;
+
+            if (/^\s*INSERT\b/i.test(input.sql)) {
+                writtenRows = 2;
+            } else if (/^\s*(?:DELETE|CREATE)\b/i.test(input.sql)) {
+                writtenRows = 0;
+            } else {
+                writtenRows = undefined;
+            }
             const run = {
                 dataSource: 'fixture',
                 id,

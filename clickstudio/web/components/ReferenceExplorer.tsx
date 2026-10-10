@@ -383,54 +383,63 @@ export function ReferenceExplorer({
                                             : undefined
                                     }
                                 >
-                                    {visibleResults.map((entry, index) => (
-                                        <button
-                                            ref={
-                                                canLoadMore && index === visibleResults.length - 1
-                                                    ? lastVisibleResultRef
-                                                    : undefined
+                                    {visibleResults.map((entry, index) => {
+                                        const getEntryIcon = ():
+                                            'database' | 'table' | 'documents' | 'column' => {
+                                            if (entry.type === 'System Table') {
+                                                return 'table';
                                             }
-                                            id={`reference-option-${index}`}
-                                            data-reference-index={index}
-                                            key={referenceId(entry)}
-                                            type="button"
-                                            role="option"
-                                            aria-selected={index === activeIndex}
-                                            className={cx(
-                                                'reference-result',
-                                                referenceResultTone(entry.type),
-                                                index === activeIndex && 'is-active',
-                                            )}
-                                            onMouseEnter={() => setActiveIndex(index)}
-                                            onClick={() => {
-                                                setActiveIndex(index);
-                                                void openEntry(entry);
-                                            }}
-                                        >
-                                            <span className="reference-result-glyph">
-                                                <Icon
-                                                    name={
-                                                        entry.type === 'System Table'
-                                                            ? 'table'
-                                                            : entry.type.includes('Engine')
-                                                              ? 'database'
-                                                              : entry.type.includes('Type')
-                                                                ? 'column'
-                                                                : 'documents'
-                                                    }
-                                                />
-                                            </span>
-                                            <span className="reference-result-copy">
-                                                <strong>
-                                                    {entry.type === 'System Table'
-                                                        ? `system.${entry.name}`
-                                                        : entry.name}
-                                                </strong>
-                                                <small>{entry.type}</small>
-                                            </span>
-                                            <span className="history-open">›</span>
-                                        </button>
-                                    ))}
+
+                                            if (entry.type.includes('Engine')) {
+                                                return 'database';
+                                            }
+
+                                            if (entry.type.includes('Type')) {
+                                                return 'column';
+                                            }
+
+                                            return 'documents';
+                                        };
+                                        return (
+                                            <button
+                                                ref={
+                                                    canLoadMore &&
+                                                    index === visibleResults.length - 1
+                                                        ? lastVisibleResultRef
+                                                        : undefined
+                                                }
+                                                id={`reference-option-${index}`}
+                                                data-reference-index={index}
+                                                key={referenceId(entry)}
+                                                type="button"
+                                                role="option"
+                                                aria-selected={index === activeIndex}
+                                                className={cx(
+                                                    'reference-result',
+                                                    referenceResultTone(entry.type),
+                                                    index === activeIndex && 'is-active',
+                                                )}
+                                                onMouseEnter={() => setActiveIndex(index)}
+                                                onClick={() => {
+                                                    setActiveIndex(index);
+                                                    void openEntry(entry);
+                                                }}
+                                            >
+                                                <span className="reference-result-glyph">
+                                                    <Icon name={getEntryIcon()} />
+                                                </span>
+                                                <span className="reference-result-copy">
+                                                    <strong>
+                                                        {entry.type === 'System Table'
+                                                            ? `system.${entry.name}`
+                                                            : entry.name}
+                                                    </strong>
+                                                    <small>{entry.type}</small>
+                                                </span>
+                                                <span className="history-open">›</span>
+                                            </button>
+                                        );
+                                    })}
                                 </div>
                             )}
                         </>

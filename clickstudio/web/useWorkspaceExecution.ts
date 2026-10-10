@@ -277,17 +277,22 @@ export function useWorkspaceExecution({
         draft.activeRunId = selected.id;
         draft.runIds = [selected.id];
         if (!addDraft(draft)) return;
-        setViewForDraft(
-            draft.id,
-            selected.kind === 'plan'
-                ? 'plan'
-                : selected.kind === 'pipeline'
-                  ? 'pipeline'
-                  : selected.kind === 'analyze'
-                    ? 'runtime'
-                    : 'results',
-            true,
-        );
+        const getSelectedView = (): ResultsView => {
+            switch (selected.kind) {
+                case 'plan':
+                    return 'plan';
+
+                case 'pipeline':
+                    return 'pipeline';
+
+                case 'analyze':
+                    return 'runtime';
+
+                default:
+                    return 'results';
+            }
+        };
+        setViewForDraft(draft.id, getSelectedView(), true);
         panels.revealPanelTemporarily('results', draft.id);
         setNotice(`Opened retained run ${selected.queryId}. No query was rerun.`);
     };
@@ -577,19 +582,25 @@ function createDraftExecutor({
                     )
                         trackSchemaRefresh(created.id, draft.id, importedSqlBaseline);
                     setRunForRun(created.id, created, true);
-                    setViewForDraft(
-                        draft.id,
-                        kind === 'explain'
-                            ? 'indexes'
-                            : kind === 'plan'
-                              ? 'plan'
-                              : kind === 'pipeline'
-                                ? 'pipeline'
-                                : kind === 'analyze'
-                                  ? 'runtime'
-                                  : (options.view ?? 'results'),
-                        true,
-                    );
+                    const getExplainView = (): ResultsView => {
+                        switch (kind) {
+                            case 'explain':
+                                return 'indexes';
+
+                            case 'plan':
+                                return 'plan';
+
+                            case 'pipeline':
+                                return 'pipeline';
+
+                            case 'analyze':
+                                return 'runtime';
+
+                            default:
+                                return options.view ?? 'results';
+                        }
+                    };
+                    setViewForDraft(draft.id, getExplainView(), true);
                     update(draft.id, current => ({
                         ...current,
                         activeRunId: created.id,
@@ -601,15 +612,25 @@ function createDraftExecutor({
                         setExampleChartRunId(options.view === 'chart' ? created.id : undefined);
                 }
                 if (options.expandResults) panels.revealPanelTemporarily('results', draft.id);
-                const successNotice = isScript
-                    ? demoMode
-                        ? 'Sample results were generated. Script SQL was not sent to ClickHouse.'
-                        : 'Script submitted to the selected ClickHouse connection.'
-                    : options.preview
-                      ? demoMode
-                          ? 'Sample preview generated. SQL was not sent to ClickHouse.'
-                          : 'Table preview submitted to the selected ClickHouse connection.'
-                      : undefined;
+                let successNotice: string | undefined;
+
+                if (isScript) {
+                    if (demoMode) {
+                        successNotice =
+                            'Sample results were generated. Script SQL was not sent to ClickHouse.';
+                    } else {
+                        successNotice = 'Script submitted to the selected ClickHouse connection.';
+                    }
+                } else if (options.preview) {
+                    if (demoMode) {
+                        successNotice = 'Sample preview generated. SQL was not sent to ClickHouse.';
+                    } else {
+                        successNotice =
+                            'Table preview submitted to the selected ClickHouse connection.';
+                    }
+                } else {
+                    successNotice = undefined;
+                }
                 if (!isFrontendDemoPreview && successNotice) setNotice(successNotice);
                 void loadHistory().catch(() => undefined);
             },

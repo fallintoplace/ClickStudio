@@ -51,16 +51,25 @@ export function RestoreSqlMenu({
         );
         if (!items.length) return;
         const current = items.indexOf(document.activeElement as HTMLButtonElement);
-        const next =
-            event.key === 'ArrowDown'
-                ? (current + 1) % items.length
-                : event.key === 'ArrowUp'
-                  ? (current - 1 + items.length) % items.length
-                  : event.key === 'Home'
-                    ? 0
-                    : event.key === 'End'
-                      ? items.length - 1
-                      : undefined;
+        let next: number | undefined;
+
+        switch (event.key) {
+            case 'ArrowDown':
+                next = (current + 1) % items.length;
+                break;
+            case 'ArrowUp':
+                next = (current - 1 + items.length) % items.length;
+                break;
+            case 'Home':
+                next = 0;
+                break;
+            case 'End':
+                next = items.length - 1;
+                break;
+            default:
+                next = undefined;
+                break;
+        }
         if (next === undefined) return;
         event.preventDefault();
         items[next]?.focus();

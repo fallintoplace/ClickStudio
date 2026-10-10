@@ -635,34 +635,36 @@ function previewRowsFor(sql: string): PreviewRows {
 export function resultFor(run: Run): Result {
     const preview = previewRowsFor(run.sql);
     const columns = run.kind === 'query' ? preview.columns : [{ name: 'explain', type: 'String' }];
-    const resultRows =
-        run.kind === 'query'
-            ? preview.rows
-            : [
-                  [
-                      run.kind === 'analyze'
-                          ? DEMO_EXPLAIN_ANALYZE
-                          : run.kind === 'plan'
-                            ? JSON.stringify([
-                                  {
-                                      Plan: {
-                                          'Node Type': 'Expression',
-                                          'Node Id': 'Expression_2',
-                                          Description: 'Sample plan only; SQL is not evaluated.',
-                                          Plans: [
-                                              {
-                                                  'Node Type': 'ReadFromFixture',
-                                                  'Node Id': 'ReadFromFixture_0',
-                                              },
-                                          ],
-                                      },
-                                  },
-                              ])
-                            : run.kind === 'pipeline'
-                              ? 'digraph { read [label="ReadFromFixture"]; filter [label="FilterTransform × 2"]; output [label="Output"]; read -> filter; filter -> output; }'
-                              : demoIndexAnalysis,
-                  ],
-              ];
+    const getExplainText = () => {
+        switch (run.kind) {
+            case 'analyze':
+                return DEMO_EXPLAIN_ANALYZE;
+
+            case 'plan':
+                return JSON.stringify([
+                    {
+                        Plan: {
+                            'Node Type': 'Expression',
+                            'Node Id': 'Expression_2',
+                            Description: 'Sample plan only; SQL is not evaluated.',
+                            Plans: [
+                                {
+                                    'Node Type': 'ReadFromFixture',
+                                    'Node Id': 'ReadFromFixture_0',
+                                },
+                            ],
+                        },
+                    },
+                ]);
+
+            case 'pipeline':
+                return 'digraph { read [label="ReadFromFixture"]; filter [label="FilterTransform × 2"]; output [label="Output"]; read -> filter; filter -> output; }';
+
+            default:
+                return demoIndexAnalysis;
+        }
+    };
+    const resultRows = run.kind === 'query' ? preview.rows : [[getExplainText()]];
     return {
         runId: run.id,
         queryId: run.queryId,

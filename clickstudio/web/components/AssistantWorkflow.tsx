@@ -65,7 +65,15 @@ function sqlDiffRows(changes: readonly SqlDiffChange[]): SqlDiffRow[] {
     return changes.flatMap(change => {
         const lines = change.value.split('\n');
         if (lines.at(-1) === '') lines.pop();
-        const kind = change.added ? 'added' : change.removed ? 'removed' : 'context';
+        let kind: 'added' | 'removed' | 'context';
+
+        if (change.added) {
+            kind = 'added';
+        } else if (change.removed) {
+            kind = 'removed';
+        } else {
+            kind = 'context';
+        }
         return lines.map(text => {
             const row: SqlDiffRow = {
                 kind,
@@ -119,19 +127,31 @@ function AssistantSqlProposalDiff({
     const stale = pending && proposal.baseSql !== currentSql;
     const unsafe = proposal.quality?.status === 'fail';
     const inspectOnly = proposal.action === 'review' || proposal.action === 'explain';
-    const status =
-        proposal.decision === 'pending'
-            ? 'Needs review'
-            : proposal.decision === 'accepted'
-              ? 'Applied'
-              : 'Rejected';
-    const reviewMessage = stale
-        ? 'The SQL draft changed. Ask again to review the current draft.'
-        : unsafe
-          ? 'A required check failed. This proposal can’t be applied.'
-          : inspectOnly
-            ? 'This reply is for review only and can’t be applied.'
-            : 'Applying updates your draft only. Press Run when you are ready to execute it.';
+    let status: 'Needs review' | 'Applied' | 'Rejected';
+
+    switch (proposal.decision) {
+        case 'pending':
+            status = 'Needs review';
+            break;
+        case 'accepted':
+            status = 'Applied';
+            break;
+        default:
+            status = 'Rejected';
+            break;
+    }
+    let reviewMessage: string;
+
+    if (stale) {
+        reviewMessage = 'The SQL draft changed. Ask again to review the current draft.';
+    } else if (unsafe) {
+        reviewMessage = 'A required check failed. This proposal can’t be applied.';
+    } else if (inspectOnly) {
+        reviewMessage = 'This reply is for review only and can’t be applied.';
+    } else {
+        reviewMessage =
+            'Applying updates your draft only. Press Run when you are ready to execute it.';
+    }
 
     return (
         <div className="assistant-sql-review">
@@ -173,24 +193,34 @@ function AssistantSqlProposalDiff({
                             aria-label="Line-by-line SQL changes"
                         >
                             <code>
-                                {rows.map((row, index) => (
-                                    <span
-                                        className={`sql-proposal-diff-line is-${row.kind}`}
-                                        key={`${row.kind}-${index}`}
-                                    >
-                                        <span className="sql-proposal-diff-gutter">
-                                            {row.oldLine ?? ''} {row.newLine ?? ''}
+                                {rows.map((row, index) => {
+                                    const getDiffPrefix = () => {
+                                        switch (row.kind) {
+                                            case 'added':
+                                                return '+';
+
+                                            case 'removed':
+                                                return '−';
+
+                                            default:
+                                                return ' ';
+                                        }
+                                    };
+                                    return (
+                                        <span
+                                            className={`sql-proposal-diff-line is-${row.kind}`}
+                                            key={`${row.kind}-${index}`}
+                                        >
+                                            <span className="sql-proposal-diff-gutter">
+                                                {row.oldLine ?? ''} {row.newLine ?? ''}
+                                            </span>
+                                            <span className="sql-proposal-diff-sign">
+                                                {getDiffPrefix()}
+                                            </span>
+                                            <span>{row.text || ' '}</span>
                                         </span>
-                                        <span className="sql-proposal-diff-sign">
-                                            {row.kind === 'added'
-                                                ? '+'
-                                                : row.kind === 'removed'
-                                                  ? '−'
-                                                  : ' '}
-                                        </span>
-                                        <span>{row.text || ' '}</span>
-                                    </span>
-                                ))}
+                                    );
+                                })}
                             </code>
                         </pre>
                     )}
@@ -324,6 +354,47 @@ function AssistantExecutionOption({
         statement => statement.operation === 'update' || statement.operation === 'delete',
     );
 
+    const getOptionLabel = () => {
+        if (alternative) {
+            return 'ALTERNATIVE';
+        }
+
+        if (statements.length > 1) {
+            return 'SCRIPT PLAN';
+        }
+
+        return 'RECOMMENDED OPTION';
+    };
+    const getRunTitle = () => {
+        if (alternative) {
+            return `Run alternative: ${title}`;
+        }
+
+        if (statements.length > 1) {
+            return `Run all ${statements.length} statements`;
+        }
+
+        return `Run recommended option: ${title}`;
+    };
+    const getRunLabel = () => {
+        if (alternative) {
+            return 'Run this alternative';
+        }
+
+        if (statements.length > 1) {
+            return `Run all ${statements.length} statements`;
+        }
+
+        if (firstOperation === 'read') {
+            return 'Run query';
+        }
+
+        if (firstOperation) {
+            return `Run ${operationLabels[firstOperation]}`;
+        }
+
+        return 'Run SQL';
+    };
     return (
         <section
             className="assistant-execution-option"
@@ -332,13 +403,7 @@ function AssistantExecutionOption({
         >
             <header className="assistant-execution-heading">
                 <div>
-                    <span className="eyebrow">
-                        {alternative
-                            ? 'ALTERNATIVE'
-                            : statements.length > 1
-                              ? 'SCRIPT PLAN'
-                              : 'RECOMMENDED OPTION'}
-                    </span>
+                    <span className="eyebrow">{getOptionLabel()}</span>
                     <strong>{title}</strong>
                     {summary && <p>{summary}</p>}
                     {hasMutation && (
@@ -419,24 +484,10 @@ function AssistantExecutionOption({
                         variant="primary"
                         onClick={() => onRunQuery(sql)}
                         disabled={runBlocked}
-                        aria-label={
-                            alternative
-                                ? `Run alternative: ${title}`
-                                : statements.length > 1
-                                  ? `Run all ${statements.length} statements`
-                                  : `Run recommended option: ${title}`
-                        }
+                        aria-label={getRunTitle()}
                     >
                         <Icon name="play" />
-                        {alternative
-                            ? 'Run this alternative'
-                            : statements.length > 1
-                              ? `Run all ${statements.length} statements`
-                              : firstOperation === 'read'
-                                ? 'Run query'
-                                : firstOperation
-                                  ? `Run ${operationLabels[firstOperation]}`
-                                  : 'Run SQL'}
+                        {getRunLabel()}
                     </Button>
                 </footer>
             )}
@@ -530,6 +581,28 @@ function AssistantOutput({
     const supportingDetailCount =
         proposal.assumptions.length + proposal.caveats.length + sources.length;
     const hasSupportingDetails = supportingDetailCount > 0;
+    const getProposalLabel = () => {
+        if (alternatives.length) {
+            return 'Recommended option';
+        }
+
+        if (proposalIsScript) {
+            return 'Script plan';
+        }
+
+        return 'SQL action';
+    };
+    const getRunQueryLabel = () => {
+        if (busy) {
+            return 'Starting…';
+        }
+
+        if (stale) {
+            return 'Run older query';
+        }
+
+        return 'Run this query';
+    };
     return (
         <div className={cx('proposal-card', beginner && 'beginner-proposal-card')}>
             <div className="proposal-heading">
@@ -650,13 +723,7 @@ function AssistantOutput({
                         <div className="assistant-execution-options">
                             <AssistantExecutionOption
                                 key={`${proposal.id}:recommended`}
-                                title={
-                                    alternatives.length
-                                        ? 'Recommended option'
-                                        : proposalIsScript
-                                          ? 'Script plan'
-                                          : 'SQL action'
-                                }
+                                title={getProposalLabel()}
                                 sql={proposalSql}
                                 accepted={proposal.decision === 'accepted'}
                                 busy={busy}
@@ -697,7 +764,7 @@ function AssistantOutput({
                                 disabled={runDisabled(proposalSql) || busy}
                             >
                                 <Icon name="play" />
-                                {busy ? 'Starting…' : stale ? 'Run older query' : 'Run this query'}
+                                {getRunQueryLabel()}
                             </Button>
                         </div>
                     )}
@@ -759,6 +826,39 @@ export function AssistantWorkflow(props: AssistantWorkflowProps) {
             event.preventDefault();
             if (!busy && question.trim()) ask();
         }
+    };
+    const renderSubmitAction = () => {
+        if (busy) {
+            if (cancelable) {
+                return (
+                    <Button
+                        variant="danger"
+                        onClick={onCancelRequest}
+                        aria-label="Stop assistant response"
+                        title="Stop generating"
+                    >
+                        Stop
+                    </Button>
+                );
+            }
+
+            return (
+                <Button variant="secondary" disabled>
+                    {phase === 'deciding' ? 'Applying…' : 'Working…'}
+                </Button>
+            );
+        }
+
+        return (
+            <Button
+                variant="primary"
+                disabled={!trusted || !schemaReady || !question.trim()}
+                onClick={ask}
+            >
+                <Icon name="send" />
+                Send
+            </Button>
+        );
     };
     return (
         <section className="assistant-panel animate-enter" aria-label="Ask AI">
@@ -892,31 +992,7 @@ export function AssistantWorkflow(props: AssistantWorkflowProps) {
                     </ScrollEdgeFrame>
                     <div className="assistant-composer-footer">
                         <span>Shift+Enter for a new line</span>
-                        {busy ? (
-                            cancelable ? (
-                                <Button
-                                    variant="danger"
-                                    onClick={onCancelRequest}
-                                    aria-label="Stop assistant response"
-                                    title="Stop generating"
-                                >
-                                    Stop
-                                </Button>
-                            ) : (
-                                <Button variant="secondary" disabled>
-                                    {phase === 'deciding' ? 'Applying…' : 'Working…'}
-                                </Button>
-                            )
-                        ) : (
-                            <Button
-                                variant="primary"
-                                disabled={!trusted || !schemaReady || !question.trim()}
-                                onClick={ask}
-                            >
-                                <Icon name="send" />
-                                Send
-                            </Button>
-                        )}
+                        {renderSubmitAction()}
                     </div>
                     <details className="assistant-disclosure">
                         <summary>What gets sent and saved?</summary>

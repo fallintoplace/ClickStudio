@@ -115,3 +115,45 @@ test('Runtime graph node count is bounded and reports truncation', () => {
     assert.equal(evidence.pipeline.nodes.length, 240);
     assert.equal(evidence.pipeline.truncated, true);
 });
+
+test('Parser accepts line and row arrays without coercing unrelated values', () => {
+    const ignored = {
+        toString() {
+            throw new Error('Unrelated values must not be coerced');
+        },
+    };
+    const expected = parseExplainAnalyze(output);
+    const lines = output.split('\n');
+    for (const input of [lines, lines.map(line => [line]), [...lines, ignored, null, 42]]) {
+        const actual = parseExplainAnalyze(input);
+        assert.deepEqual(actual.summary, expected.summary);
+        assert.deepEqual(actual.pipeline.nodes, expected.pipeline.nodes);
+        assert.deepEqual(actual.pipeline.edges, expected.pipeline.edges);
+    }
+    assert.equal(parseExplainAnalyze(ignored), undefined);
+});
+
+for (const duration of ['1000000 ns', '1000 us', '1000 µs', '1000 μs', '1 ms', '0.001 s']) {
+    test(`Runtime timing normalizes ${duration} to milliseconds`, () => {
+        const evidence = parseExplainAnalyze(`Output: x\nRoot\n  time ${duration}`);
+        assert.equal(evidence.pipeline.nodes[0].durationMs, 1);
+    });
+}
+
+for (const [suffix, factor] of [
+    ['k', 1e3],
+    ['m', 1e6],
+    ['million', 1e6],
+    ['b', 1e9],
+    ['billion', 1e9],
+    ['t', 1e12],
+    ['trillion', 1e12],
+]) {
+    test(`Runtime graph compares ${suffix} row counts with unscaled counts`, () => {
+        const evidence = parseExplainAnalyze(
+            `Output: x\nRoot\n└──ReadFirst\n  I/O: rows 0 → 2 ${suffix}\n└──ReadSecond\n  I/O: rows 0 → ${factor}`,
+        );
+        assert.equal(evidence.pipeline.edges[0].flow, 1);
+        assert.equal(evidence.pipeline.edges[1].flow, 0.5);
+    });
+}

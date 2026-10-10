@@ -73,13 +73,19 @@ export function HeatmapGrid({
                                         const value = heatmap.cells.get(key);
                                         const hasRow = heatmap.present.has(key);
                                         const missing = !hasRow;
-                                        const cellDescription = missing
-                                            ? result.completeness === 'truncated'
-                                                ? chartCopy.heatmapNotRetained
-                                                : chartCopy.heatmapNoReturnedRow
-                                            : value === undefined
-                                              ? chartCopy.heatmapNullMeasure
-                                              : formatCount(value, locale);
+                                        let cellDescription: string;
+
+                                        if (missing) {
+                                            if (result.completeness === 'truncated') {
+                                                cellDescription = chartCopy.heatmapNotRetained;
+                                            } else {
+                                                cellDescription = chartCopy.heatmapNoReturnedRow;
+                                            }
+                                        } else if (value === undefined) {
+                                            cellDescription = chartCopy.heatmapNullMeasure;
+                                        } else {
+                                            cellDescription = formatCount(value, locale);
+                                        }
                                         const plotted = value ?? 0;
                                         const intensity =
                                             heatmapMaximum > 0 ? plotted / heatmapMaximum : 0;

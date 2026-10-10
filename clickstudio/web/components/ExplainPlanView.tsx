@@ -43,11 +43,16 @@ function PlanProperty({ property }: { property: ExplainPlanProperty }) {
 }
 
 function planNodeType(node: ExplainPlanNode, unknownStep: string, depthLimit: string) {
-    return node.type === 'Unknown step'
-        ? unknownStep
-        : node.type === 'Depth limit reached'
-          ? depthLimit
-          : node.type;
+    switch (node.type) {
+        case 'Unknown step':
+            return unknownStep;
+
+        case 'Depth limit reached':
+            return depthLimit;
+
+        default:
+            return node.type;
+    }
 }
 
 function planGraph(plan: ExplainPlan, unknownStep: string, depthLimit: string) {

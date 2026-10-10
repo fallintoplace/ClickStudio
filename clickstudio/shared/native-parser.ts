@@ -133,14 +133,17 @@ export function parseNativeParseResult(value: unknown): NativeParseResult {
     const error = value.error === undefined ? undefined : parseNativeError(value.error);
     if (value.error !== undefined && !error)
         throw new Error('ClickHouse parser returned invalid diagnostics');
-    const highlights =
-        value.highlights === undefined
-            ? undefined
-            : Array.isArray(value.highlights)
-              ? value.highlights
-                    .map(parseNativeHighlight)
-                    .filter((item): item is NativeHighlight => Boolean(item))
-              : undefined;
+    let highlights;
+
+    if (value.highlights === undefined) {
+        highlights = undefined;
+    } else if (Array.isArray(value.highlights)) {
+        highlights = value.highlights
+            .map(parseNativeHighlight)
+            .filter((item): item is NativeHighlight => Boolean(item));
+    } else {
+        highlights = undefined;
+    }
     const result: NativeParseResult = {};
     if (error) result.error = error;
     if (highlights) result.highlights = highlights;
@@ -221,11 +224,15 @@ function compactNativeErrorMessage(
     location: ReturnType<typeof clickHouseErrorLocation>,
 ): string {
     const firstLine = (error.message.split(/\r?\n|Expected one of:/i, 1)[0] ?? '').trim();
-    const summary = location
-        ? `${location.kind} · line ${location.line}, column ${location.column}${location.token ? ` · near “${location.token.slice(0, 40)}${location.token.length > 40 ? '…' : ''}”` : ''}`
-        : firstLine.length > 160
-          ? `${firstLine.slice(0, 159)}…`
-          : firstLine;
+    let summary: string;
+
+    if (location) {
+        summary = `${location.kind} · line ${location.line}, column ${location.column}${location.token ? ` · near “${location.token.slice(0, 40)}${location.token.length > 40 ? '…' : ''}”` : ''}`;
+    } else if (firstLine.length > 160) {
+        summary = `${firstLine.slice(0, 159)}…`;
+    } else {
+        summary = firstLine;
+    }
     const expected = error.expected?.length
         ? `Expected: ${error.expected.slice(0, 8).join(' · ')}${error.expected.length > 8 ? ' · …' : ''}`
         : '';

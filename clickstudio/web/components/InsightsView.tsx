@@ -75,151 +75,21 @@ export function InsightsView({
     const flamegraphAvailable = flamegraphCapability?.available === true;
     return (
         <ScrollEdgeFrame<HTMLDivElement> className="insights-view-frame">
-            {ref => (
-                <div ref={ref} className="insights-view animate-enter">
-                    <div
-                        className="insights-mode-tabs"
-                        role="tablist"
-                        aria-label="Execution insight views"
-                    >
-                        <button
-                            id="insights-overview-tab"
-                            type="button"
-                            role="tab"
-                            aria-selected={tab === 'overview'}
-                            aria-controls="insights-overview-panel"
-                            onClick={() => setTab('overview')}
-                        >
-                            Overview
-                        </button>
-                        <button
-                            id="insights-flamegraph-tab"
-                            type="button"
-                            role="tab"
-                            aria-selected={tab === 'flamegraph'}
-                            aria-controls="insights-flamegraph-panel"
-                            onClick={() => setTab('flamegraph')}
-                        >
-                            CPU profile
-                        </button>
-                    </div>
-                    <div
-                        id="insights-overview-panel"
-                        role="tabpanel"
-                        aria-labelledby="insights-overview-tab"
-                        hidden={tab !== 'overview'}
-                    >
-                        <div className="insights-heading">
-                            <div>
-                                <span className="eyebrow">EXECUTION INSIGHTS</span>
-                                <h3>What happened when this ran?</h3>
-                                <p>
-                                    Measurements come from this run's execution and ClickHouse query
-                                    log.
-                                </p>
-                            </div>
-                            {!profile && (
-                                <Button variant="secondary" onClick={onLoad} disabled={loading}>
-                                    {loading ? 'Loading…' : 'Load execution details'}
-                                </Button>
-                            )}
-                        </div>
-                        {comparison && <RunComparisonLauncher {...comparison} />}
-                        <div className="insight-metrics">
-                            {metrics.map(metric => (
-                                <article className="insight-metric" key={metric.label}>
-                                    <span className="insight-icon">
-                                        <Icon name={metric.icon} />
-                                    </span>
-                                    <span className="eyebrow">{metric.label}</span>
-                                    <strong>{metric.value}</strong>
-                                </article>
-                            ))}
-                        </div>
-                        <section
-                            className="run-analysis"
-                            aria-label="Run and query plan comparison"
-                        >
-                            <div className="run-analysis-heading">
-                                <div>
-                                    <span className="eyebrow">RUN + EXPLAIN</span>
-                                    <strong>Measured execution, then its plan</strong>
-                                </div>
-                                {pipelineAvailable && (
-                                    <Button
-                                        variant="secondary"
-                                        className="toolbar-small"
-                                        onClick={onLoadPipeline}
-                                        disabled={loading}
-                                    >
-                                        {loading
-                                            ? 'Loading…'
-                                            : hasClickHousePlan
-                                              ? 'Refresh pipeline'
-                                              : 'Load ClickHouse pipeline'}
-                                    </Button>
-                                )}
-                            </div>
-                            <div className="run-analysis-columns">
-                                <article>
-                                    <span className="eyebrow">THIS RUN</span>
-                                    <strong>
-                                        {Math.round(summary?.durationMs ?? run.elapsedMs)} ms
-                                    </strong>
-                                    <small>
-                                        {summary?.readRows
-                                            ? `${Number(summary.readRows).toLocaleString()} rows scanned`
-                                            : 'Scan count unavailable'}{' '}
-                                        ·{' '}
-                                        {summary?.readBytes
-                                            ? formatBytes(summary.readBytes)
-                                            : 'bytes unavailable'}
-                                    </small>
-                                    <code>{run.queryId}</code>
-                                </article>
-                                <article>
-                                    <span className="eyebrow">QUERY PLAN</span>
-                                    <strong>{plan?.nodes.length ?? 0} operators</strong>
-                                    <small>
-                                        {hasClickHousePlan
-                                            ? 'EXPLAIN PIPELINE · ClickHouse'
-                                            : 'Estimated from SQL shape'}
-                                    </small>
-                                    <small>
-                                        {plannedStages} planned · {measuredStages} measured ·{' '}
-                                        {estimatedStages} estimated
-                                    </small>
-                                </article>
-                            </div>
-                            {plan ? (
-                                <>
-                                    <div
-                                        className="run-analysis-stages"
-                                        aria-label="Pipeline stages"
-                                    >
-                                        {plan.nodes.slice(0, 8).map((node, index) => (
-                                            <span key={node.id}>
-                                                <i>{String(index + 1).padStart(2, '0')}</i>
-                                                <strong>{node.label}</strong>
-                                                <small>{node.status}</small>
-                                            </span>
-                                        ))}
-                                        {plan.nodes.length > 8 && (
-                                            <small>+{plan.nodes.length - 8} more operators</small>
-                                        )}
-                                    </div>
-                                    <p className="profile-note">{plan.notice}</p>
-                                    <PipelineGraph pipeline={plan} />
-                                </>
-                            ) : (
-                                <div className="pipeline-graph-empty">
-                                    {pipelineAvailable
-                                        ? 'Load the ClickHouse pipeline to inspect its operators and data flow.'
-                                        : 'Pipeline graph evidence is unavailable for this connection.'}
-                                </div>
-                            )}
-                        </section>
-                        {profile?.insights.length ? (
+            {ref => {
+                const getLoadPipelineLabel = () => {
+                    if (loading) {
+                        return 'Loading…';
+                    }
+
+                    if (hasClickHousePlan) {
+                        return 'Refresh pipeline';
+                    }
+
+                    return 'Load ClickHouse pipeline';
+                };
+                const renderInsights = () => {
+                    if (profile?.insights.length) {
+                        return (
                             <div className="insight-list">
                                 {profile.insights.map(insight => (
                                     <article
@@ -234,67 +104,27 @@ export function InsightsView({
                                     </article>
                                 ))}
                             </div>
-                        ) : profile ? (
+                        );
+                    }
+
+                    if (profile) {
+                        return (
                             <div className="profile-empty">
                                 No deterministic issue was identified in the available evidence.
                             </div>
-                        ) : (
-                            <p className="profile-note">
-                                Query log details can take a short time to appear after execution.
-                                Values marked unavailable are not inferred.
-                            </p>
-                        )}
-                        {profile?.notice && <p className="profile-note">{profile.notice}</p>}
-                    </div>
-                    <section
-                        id="insights-flamegraph-panel"
-                        className="insights-flamegraph-panel"
-                        role="tabpanel"
-                        aria-labelledby="insights-flamegraph-tab"
-                        hidden={tab !== 'flamegraph'}
-                    >
-                        <div className="flamegraph-heading">
-                            <div>
-                                <span className="eyebrow">RUN-SCOPED PROFILER SAMPLES</span>
-                                <h3>CPU profile</h3>
-                                <p>
-                                    Call stacks recorded for query <code>{run.queryId}</code>.
-                                </p>
-                            </div>
-                            {flamegraph && traceTypes.length > 1 && (
-                                <div
-                                    className="parts-view-control flamegraph-trace-types"
-                                    role="group"
-                                    aria-label="Trace sample type"
-                                >
-                                    {traceTypes.map(type => (
-                                        <button
-                                            key={type}
-                                            type="button"
-                                            aria-pressed={selectedTraceType === type}
-                                            onClick={() => setTraceType(type)}
-                                        >
-                                            {type === 'CPU' ? 'CPU time' : 'Wall time'}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                            {!flamegraph && flamegraphAvailable && (
-                                <Button
-                                    variant="secondary"
-                                    onClick={onLoadFlamegraph}
-                                    disabled={loading || !terminal(run)}
-                                    title={
-                                        !terminal(run)
-                                            ? 'Wait for the query to finish before loading profiler samples.'
-                                            : undefined
-                                    }
-                                >
-                                    {loading ? 'Loading…' : 'Load profile'}
-                                </Button>
-                            )}
-                        </div>
-                        {!flamegraphAvailable ? (
+                        );
+                    }
+
+                    return (
+                        <p className="profile-note">
+                            Query log details can take a short time to appear after execution.
+                            Values marked unavailable are not inferred.
+                        </p>
+                    );
+                };
+                const renderFlamegraph = () => {
+                    if (!flamegraphAvailable) {
+                        return (
                             <div className="observability-state" role="status">
                                 <strong>
                                     Profiler samples are unavailable for this connection.
@@ -304,11 +134,19 @@ export function InsightsView({
                                         'Test the connection to check access to system.trace_log symbol data.'}
                                 </p>
                             </div>
-                        ) : !terminal(run) ? (
+                        );
+                    }
+
+                    if (!terminal(run)) {
+                        return (
                             <div className="observability-state" role="status">
                                 Wait for this execution to finish before loading its profile.
                             </div>
-                        ) : !flamegraph ? (
+                        );
+                    }
+
+                    if (!flamegraph) {
+                        return (
                             <div className="observability-state">
                                 <strong>
                                     Inspect sampled ClickHouse call stacks for this run.
@@ -318,7 +156,11 @@ export function InsightsView({
                                     may appear after a short flush delay.
                                 </p>
                             </div>
-                        ) : totalSamples === 0 ? (
+                        );
+                    }
+
+                    if (totalSamples === 0) {
+                        return (
                             <div className="observability-empty">
                                 <span className="observability-empty-mark">⌁</span>
                                 <strong>
@@ -326,7 +168,11 @@ export function InsightsView({
                                 </strong>
                                 <p>ClickHouse may not have sampled this query during its run.</p>
                             </div>
-                        ) : flamegraph.symbolizedSamples === 0 ? (
+                        );
+                    }
+
+                    if (flamegraph.symbolizedSamples === 0) {
+                        return (
                             <div className="observability-empty">
                                 <span className="observability-empty-mark">⌁</span>
                                 <strong>
@@ -337,7 +183,11 @@ export function InsightsView({
                                     render the call tree.
                                 </p>
                             </div>
-                        ) : selectedTraceType && flamegraph.series[selectedTraceType] ? (
+                        );
+                    }
+
+                    if (selectedTraceType && flamegraph.series[selectedTraceType]) {
+                        return (
                             <>
                                 <FlamegraphView
                                     key={`${run.id}:${selectedTraceType}`}
@@ -350,18 +200,217 @@ export function InsightsView({
                                     </p>
                                 )}
                             </>
-                        ) : (
-                            <div className="observability-empty">
-                                <strong>
-                                    No {traceType === 'CPU' ? 'CPU' : 'wall-clock'} samples were
-                                    recorded.
-                                </strong>
-                                <p>Choose the other sample type if it is available.</p>
+                        );
+                    }
+
+                    return (
+                        <div className="observability-empty">
+                            <strong>
+                                No {traceType === 'CPU' ? 'CPU' : 'wall-clock'} samples were
+                                recorded.
+                            </strong>
+                            <p>Choose the other sample type if it is available.</p>
+                        </div>
+                    );
+                };
+                return (
+                    <div ref={ref} className="insights-view animate-enter">
+                        <div
+                            className="insights-mode-tabs"
+                            role="tablist"
+                            aria-label="Execution insight views"
+                        >
+                            <button
+                                id="insights-overview-tab"
+                                type="button"
+                                role="tab"
+                                aria-selected={tab === 'overview'}
+                                aria-controls="insights-overview-panel"
+                                onClick={() => setTab('overview')}
+                            >
+                                Overview
+                            </button>
+                            <button
+                                id="insights-flamegraph-tab"
+                                type="button"
+                                role="tab"
+                                aria-selected={tab === 'flamegraph'}
+                                aria-controls="insights-flamegraph-panel"
+                                onClick={() => setTab('flamegraph')}
+                            >
+                                CPU profile
+                            </button>
+                        </div>
+                        <div
+                            id="insights-overview-panel"
+                            role="tabpanel"
+                            aria-labelledby="insights-overview-tab"
+                            hidden={tab !== 'overview'}
+                        >
+                            <div className="insights-heading">
+                                <div>
+                                    <span className="eyebrow">EXECUTION INSIGHTS</span>
+                                    <h3>What happened when this ran?</h3>
+                                    <p>
+                                        Measurements come from this run's execution and ClickHouse
+                                        query log.
+                                    </p>
+                                </div>
+                                {!profile && (
+                                    <Button variant="secondary" onClick={onLoad} disabled={loading}>
+                                        {loading ? 'Loading…' : 'Load execution details'}
+                                    </Button>
+                                )}
                             </div>
-                        )}
-                    </section>
-                </div>
-            )}
+                            {comparison && <RunComparisonLauncher {...comparison} />}
+                            <div className="insight-metrics">
+                                {metrics.map(metric => (
+                                    <article className="insight-metric" key={metric.label}>
+                                        <span className="insight-icon">
+                                            <Icon name={metric.icon} />
+                                        </span>
+                                        <span className="eyebrow">{metric.label}</span>
+                                        <strong>{metric.value}</strong>
+                                    </article>
+                                ))}
+                            </div>
+                            <section
+                                className="run-analysis"
+                                aria-label="Run and query plan comparison"
+                            >
+                                <div className="run-analysis-heading">
+                                    <div>
+                                        <span className="eyebrow">RUN + EXPLAIN</span>
+                                        <strong>Measured execution, then its plan</strong>
+                                    </div>
+                                    {pipelineAvailable && (
+                                        <Button
+                                            variant="secondary"
+                                            className="toolbar-small"
+                                            onClick={onLoadPipeline}
+                                            disabled={loading}
+                                        >
+                                            {getLoadPipelineLabel()}
+                                        </Button>
+                                    )}
+                                </div>
+                                <div className="run-analysis-columns">
+                                    <article>
+                                        <span className="eyebrow">THIS RUN</span>
+                                        <strong>
+                                            {Math.round(summary?.durationMs ?? run.elapsedMs)} ms
+                                        </strong>
+                                        <small>
+                                            {summary?.readRows
+                                                ? `${Number(summary.readRows).toLocaleString()} rows scanned`
+                                                : 'Scan count unavailable'}{' '}
+                                            ·{' '}
+                                            {summary?.readBytes
+                                                ? formatBytes(summary.readBytes)
+                                                : 'bytes unavailable'}
+                                        </small>
+                                        <code>{run.queryId}</code>
+                                    </article>
+                                    <article>
+                                        <span className="eyebrow">QUERY PLAN</span>
+                                        <strong>{plan?.nodes.length ?? 0} operators</strong>
+                                        <small>
+                                            {hasClickHousePlan
+                                                ? 'EXPLAIN PIPELINE · ClickHouse'
+                                                : 'Estimated from SQL shape'}
+                                        </small>
+                                        <small>
+                                            {plannedStages} planned · {measuredStages} measured ·{' '}
+                                            {estimatedStages} estimated
+                                        </small>
+                                    </article>
+                                </div>
+                                {plan ? (
+                                    <>
+                                        <div
+                                            className="run-analysis-stages"
+                                            aria-label="Pipeline stages"
+                                        >
+                                            {plan.nodes.slice(0, 8).map((node, index) => (
+                                                <span key={node.id}>
+                                                    <i>{String(index + 1).padStart(2, '0')}</i>
+                                                    <strong>{node.label}</strong>
+                                                    <small>{node.status}</small>
+                                                </span>
+                                            ))}
+                                            {plan.nodes.length > 8 && (
+                                                <small>
+                                                    +{plan.nodes.length - 8} more operators
+                                                </small>
+                                            )}
+                                        </div>
+                                        <p className="profile-note">{plan.notice}</p>
+                                        <PipelineGraph pipeline={plan} />
+                                    </>
+                                ) : (
+                                    <div className="pipeline-graph-empty">
+                                        {pipelineAvailable
+                                            ? 'Load the ClickHouse pipeline to inspect its operators and data flow.'
+                                            : 'Pipeline graph evidence is unavailable for this connection.'}
+                                    </div>
+                                )}
+                            </section>
+                            {renderInsights()}
+                            {profile?.notice && <p className="profile-note">{profile.notice}</p>}
+                        </div>
+                        <section
+                            id="insights-flamegraph-panel"
+                            className="insights-flamegraph-panel"
+                            role="tabpanel"
+                            aria-labelledby="insights-flamegraph-tab"
+                            hidden={tab !== 'flamegraph'}
+                        >
+                            <div className="flamegraph-heading">
+                                <div>
+                                    <span className="eyebrow">RUN-SCOPED PROFILER SAMPLES</span>
+                                    <h3>CPU profile</h3>
+                                    <p>
+                                        Call stacks recorded for query <code>{run.queryId}</code>.
+                                    </p>
+                                </div>
+                                {flamegraph && traceTypes.length > 1 && (
+                                    <div
+                                        className="parts-view-control flamegraph-trace-types"
+                                        role="group"
+                                        aria-label="Trace sample type"
+                                    >
+                                        {traceTypes.map(type => (
+                                            <button
+                                                key={type}
+                                                type="button"
+                                                aria-pressed={selectedTraceType === type}
+                                                onClick={() => setTraceType(type)}
+                                            >
+                                                {type === 'CPU' ? 'CPU time' : 'Wall time'}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                                {!flamegraph && flamegraphAvailable && (
+                                    <Button
+                                        variant="secondary"
+                                        onClick={onLoadFlamegraph}
+                                        disabled={loading || !terminal(run)}
+                                        title={
+                                            !terminal(run)
+                                                ? 'Wait for the query to finish before loading profiler samples.'
+                                                : undefined
+                                        }
+                                    >
+                                        {loading ? 'Loading…' : 'Load profile'}
+                                    </Button>
+                                )}
+                            </div>
+                            {renderFlamegraph()}
+                        </section>
+                    </div>
+                );
+            }}
         </ScrollEdgeFrame>
     );
 }

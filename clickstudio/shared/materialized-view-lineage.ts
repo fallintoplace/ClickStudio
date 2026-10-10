@@ -119,11 +119,22 @@ export function buildMaterializedViewLineage(
             ? materializedViewDefinition(definition, reference.database)
             : undefined;
         const refresh = refreshes.get(id);
+        const getNodeKind = (): 'materialized-view' | 'table' | 'external' => {
+            if (materialized) {
+                return 'materialized-view';
+            }
+
+            if (row) {
+                return 'table';
+            }
+
+            return 'external';
+        };
         nodes.set(id, {
             ...reference,
             id,
             engine: engine || 'Metadata outside this snapshot',
-            kind: materialized ? 'materialized-view' : row ? 'table' : 'external',
+            kind: getNodeKind(),
             mode: refresh && parsed?.mode !== 'append-incremental' ? 'refreshable' : parsed?.mode,
             schedule: parsed?.schedule,
             definition: materialized ? definition : undefined,

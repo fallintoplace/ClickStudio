@@ -274,11 +274,15 @@ export function closeDraft(state: WorkspaceState, draftId: string): WorkspaceSta
 
 export function reopenDraft(state: WorkspaceState, draftId?: string): WorkspaceState {
     const closedTabs = state.closedTabs ?? [];
-    const draftIndex = draftId
-        ? closedTabs.findIndex(draft => draft.id === draftId)
-        : closedTabs.length
-          ? 0
-          : -1;
+    let draftIndex: number;
+
+    if (draftId) {
+        draftIndex = closedTabs.findIndex(draft => draft.id === draftId);
+    } else if (closedTabs.length) {
+        draftIndex = 0;
+    } else {
+        draftIndex = -1;
+    }
     const draft = closedTabs[draftIndex];
     if (!draft || state.tabs.length >= MAX_TABS) return state;
     // Keep the saved revision, selection, checkpoints and run references unchanged.

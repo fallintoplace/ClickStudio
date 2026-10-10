@@ -59,6 +59,15 @@ export function demoMergeTreePartRows() {
         if (leftActive !== rightActive) return leftActive ? -1 : 1;
         const leftBytes = BigInt(left.compressed_bytes ?? '0');
         const rightBytes = BigInt(right.compressed_bytes ?? '0');
-        return leftBytes === rightBytes ? 0 : rightBytes > leftBytes ? 1 : -1;
+
+        if (leftBytes === rightBytes) {
+            return 0;
+        }
+
+        if (rightBytes > leftBytes) {
+            return 1;
+        }
+
+        return -1;
     });
 }

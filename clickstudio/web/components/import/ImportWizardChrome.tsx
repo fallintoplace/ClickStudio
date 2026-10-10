@@ -21,15 +21,37 @@ export function ImportWizardHeader({
     closeQueryMode: () => void;
     closeWizard: ReturnType<typeof useImportWizardController>['closeWizard'];
 }) {
+    const getImportSourceLabel = () => {
+        if (browserDemoImport) {
+            return 'Interview demo · browser sandbox';
+        }
+
+        if (browserCloudImport) {
+            return 'ClickHouse Cloud';
+        }
+
+        return 'ClickHouse data';
+    };
+    const getImportDescription = () => {
+        if (importKind === 'query') {
+            return 'Open a SQL file as a new draft. It will not run until you choose Run.';
+        }
+
+        if (browserDemoImport) {
+            return 'Preview, map, and save rows into this browser’s sample dataset.';
+        }
+
+        if (browserCloudImport) {
+            return 'Preview, map, and import rows with your connected Cloud account.';
+        }
+
+        return 'Preview, map, and review rows before inserting them.';
+    };
     return (
         <header className="import-wizard-header flex items-start justify-between gap-5 border-b border-[var(--line)] px-5 py-4 sm:px-7">
             <div className="min-w-0">
                 <span className="import-wizard-eyebrow text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--muted)]">
-                    {browserDemoImport
-                        ? 'Interview demo · browser sandbox'
-                        : browserCloudImport
-                          ? 'ClickHouse Cloud'
-                          : 'ClickHouse data'}
+                    {getImportSourceLabel()}
                 </span>
                 <h2
                     id="import-wizard-title"
@@ -38,13 +60,7 @@ export function ImportWizardHeader({
                     Import data
                 </h2>
                 <p className="import-wizard-description mt-1 text-xs text-[var(--text-soft)]">
-                    {importKind === 'query'
-                        ? 'Open a SQL file as a new draft. It will not run until you choose Run.'
-                        : browserDemoImport
-                          ? 'Preview, map, and save rows into this browser’s sample dataset.'
-                          : browserCloudImport
-                            ? 'Preview, map, and import rows with your connected Cloud account.'
-                            : 'Preview, map, and review rows before inserting them.'}
+                    {getImportDescription()}
                 </p>
             </div>
             <button

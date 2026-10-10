@@ -21,11 +21,17 @@ export function QueryFailureNotice({
     location?: { line: number; column: number };
 }) {
     const diagnostic = queryFailureSummary(error);
-    const title = diagnostic.syntax
-        ? diagnostic.token
-            ? copy.syntaxErrorNearToken.replace('{token}', diagnostic.token)
-            : copy.syntaxError
-        : copy.queryFailed;
+    let title: string;
+
+    if (diagnostic.syntax) {
+        if (diagnostic.token) {
+            title = copy.syntaxErrorNearToken.replace('{token}', diagnostic.token);
+        } else {
+            title = copy.syntaxError;
+        }
+    } else {
+        title = copy.queryFailed;
+    }
     const lineOffset =
         sql && errorRange && location
             ? location.line - sqlErrorLineColumn(sql, errorRange.from).line

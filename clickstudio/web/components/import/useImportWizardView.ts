@@ -76,15 +76,22 @@ export function useImportWizardView(
     const [queryFileError, setQueryFileError] = useState('');
     const [openingQuery, setOpeningQuery] = useState(false);
     const [destinationChoice, setDestinationChoice] = useState<'existing' | 'create'>();
-    const selectedDestinationChoice =
-        destinationChoice ??
-        (creatingTable
-            ? 'create'
-            : target
-              ? 'existing'
-              : browserCloudImport && availableTargets.length
-                ? 'existing'
-                : undefined);
+    const getDefaultDestinationChoice = (): 'existing' | 'create' | undefined => {
+        if (creatingTable) {
+            return 'create';
+        }
+
+        if (target) {
+            return 'existing';
+        }
+
+        if (browserCloudImport && availableTargets.length) {
+            return 'existing';
+        }
+
+        return undefined;
+    };
+    const selectedDestinationChoice = destinationChoice ?? getDefaultDestinationChoice();
     const liveMappingIssue = useMemo(() => {
         if (
             !preview ||

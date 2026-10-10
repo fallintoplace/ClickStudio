@@ -207,13 +207,17 @@ export function useObjectExplorerState(props: ObjectExplorerProps) {
     useEffect(() => {
         if (search || expandedIds.size || !model.databases.length) return;
         const database = model.databases[0]!;
-        const firstCategory: ExplorerCategoryKind | undefined = database.tables.length
-            ? 'table'
-            : database.views.length
-              ? 'view'
-              : database.dictionaries.length
-                ? 'dictionary'
-                : undefined;
+        let firstCategory: ExplorerCategoryKind | undefined;
+
+        if (database.tables.length) {
+            firstCategory = 'table';
+        } else if (database.views.length) {
+            firstCategory = 'view';
+        } else if (database.dictionaries.length) {
+            firstCategory = 'dictionary';
+        } else {
+            firstCategory = undefined;
+        }
         if (!firstCategory) return;
         setExpandedIds(new Set([database.id, explorerCategoryId(database.name, firstCategory)]));
     }, [expandedIds.size, model.databases, search]);

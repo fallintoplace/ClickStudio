@@ -15,12 +15,15 @@ const rows = (value: unknown): EvidenceRow[] =>
     Array.isArray(value) ? value.filter(isEvidenceRow) : [];
 const field = (row: EvidenceRow | undefined, key: string) => row?.[key];
 const numberValue = (input: unknown) => {
-    const number =
-        typeof input === 'number'
-            ? input
-            : typeof input === 'string' && input.trim()
-              ? Number(input)
-              : NaN;
+    let number: number;
+
+    if (typeof input === 'number') {
+        number = input;
+    } else if (typeof input === 'string' && input.trim()) {
+        number = Number(input);
+    } else {
+        number = NaN;
+    }
     return Number.isFinite(number) ? number : undefined;
 };
 const integerText = (input: unknown) =>
@@ -141,6 +144,22 @@ const MAX_PIPELINE_GRAPH_EDGES = 480;
 
 type DotToken = { kind: 'value' | 'arrow' | 'punctuation'; value: string };
 
+function decodeDotEscape(escaped: string): string {
+    switch (escaped) {
+        case 'n':
+        case 'l':
+        case 'r':
+            return '\n';
+        case 't':
+            return '\t';
+        case '"':
+        case '\\':
+            return escaped;
+        default:
+            return `\\${escaped}`;
+    }
+}
+
 function tokenizeDot(source: string): { tokens: DotToken[]; truncated: boolean } {
     const input = source.slice(0, MAX_PIPELINE_DOT_CHARS);
     const tokens: DotToken[] = [];
@@ -172,14 +191,7 @@ function tokenizeDot(source: string): { tokens: DotToken[]; truncated: boolean }
             while (index < input.length && input[index] !== '"') {
                 if (input[index] === '\\' && index + 1 < input.length) {
                     const escaped = input[index + 1]!;
-                    value +=
-                        escaped === 'n' || escaped === 'l' || escaped === 'r'
-                            ? '\n'
-                            : escaped === 't'
-                              ? '\t'
-                              : escaped === '"' || escaped === '\\'
-                                ? escaped
-                                : `\\${escaped}`;
+                    value += decodeDotEscape(escaped);
                     index += 2;
                 } else value += input[index++]!;
             }

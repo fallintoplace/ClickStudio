@@ -50,6 +50,7 @@ export default defineConfig([
             'max-depth': ['error', 6],
             'max-params': ['error', 8],
             'no-empty': ['error', { allowEmptyCatch: true }],
+            'no-nested-ternary': 'error',
             'no-useless-escape': 'off',
             'prefer-const': 'off',
             '@typescript-eslint/no-unused-vars': [

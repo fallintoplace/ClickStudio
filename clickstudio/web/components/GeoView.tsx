@@ -118,12 +118,17 @@ function MapCanvas({
     const minimum = Math.min(...measures, 0),
         maximum = Math.max(...measures, 0),
         range = maximum - minimum;
-    const intensity = (feature: GeoFeature) =>
-        feature.measure === null
-            ? 34
-            : range === 0
-              ? 76
-              : 28 + 66 * ((feature.measure - minimum) / range);
+    const intensity = (feature: GeoFeature) => {
+        if (feature.measure === null) {
+            return 34;
+        }
+
+        if (range === 0) {
+            return 76;
+        }
+
+        return 28 + 66 * ((feature.measure - minimum) / range);
+    };
     const pointRadius = (feature: GeoFeature) =>
         feature.measure === null || range === 0
             ? 5

@@ -29,15 +29,19 @@ export function prepareChartSelection(result: Result, chart: Draft['chart']) {
         chart.x < result.columns.length &&
         (temporalType(result.columns[chart.x]?.type ?? '') ||
             /^(?:time|timestamp|datetime|date)$/i.test(result.columns[chart.x]?.name ?? ''));
-    const candleX = chartXIsTime
-        ? chart.x
-        : suggestion.config.kind === 'candlestick'
-          ? suggestion.config.x
-          : namedTime >= 0
-            ? namedTime
-            : fallbackTime >= 0
-              ? fallbackTime
-              : suggestion.config.x;
+    let candleX: number;
+
+    if (chartXIsTime) {
+        candleX = chart.x;
+    } else if (suggestion.config.kind === 'candlestick') {
+        candleX = suggestion.config.x;
+    } else if (namedTime >= 0) {
+        candleX = namedTime;
+    } else if (fallbackTime >= 0) {
+        candleX = fallbackTime;
+    } else {
+        candleX = suggestion.config.x;
+    }
     const activeCandle = chart.candlestick ?? inferredCandle;
     const activeCandleValid = Boolean(
         activeCandle &&
