@@ -286,7 +286,6 @@ export const english = {
         fixWithAi: 'Fix with AI',
         lastExecutionFailed: 'Last execution failed',
         output: 'Output',
-        closeOutput: 'Close output',
         showOutput: 'Show output',
         syntaxError: 'Syntax error',
         syntaxErrorNearToken: 'Syntax error near {token}',

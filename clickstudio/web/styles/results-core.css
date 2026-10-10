@@ -455,20 +455,40 @@
     align-items: center;
     gap: 8px 12px;
   }
-  .result-failure-heading > .status-light {
+  .result-failure-title {
+    display: flex;
+    min-width: 0;
+    max-width: 100%;
+    align-items: center;
+    gap: 12px;
+  }
+  .result-failure-title > .status-light {
     width: 7px;
     height: 7px;
     flex: none;
     box-shadow: none;
   }
   .result-failure-heading h3 {
+    max-width: 100%;
     margin: 0;
     color: var(--red);
     font-size: 13px;
     font-weight: 600;
+    overflow-wrap: anywhere;
   }
   .result-failure-fix {
-    margin-left: auto;
+    min-height: 32px;
+    padding-inline: 12px;
+    flex: none;
+    border-color: var(--red);
+    background: var(--red);
+    color: var(--page);
+    font-size: 11px;
+    font-weight: 700;
+    box-shadow: var(--shadow-inset);
+  }
+  .result-failure-fix:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--red) 90%, var(--text));
   }
   .result-failure-summary {
     max-width: 100ch;

@@ -53,7 +53,6 @@ export type WorkspaceResultsPanelActions = Readonly<{
     onSelectView: (view: ResultsView) => void;
     onSelectScriptRun: (runId: string) => void;
     onSelectScriptError: () => void;
-    onCloseOutput: () => void;
     onCancel: () => void;
     onPage: (page: number) => void;
     onPatch: (values: Partial<Draft>) => void;
@@ -527,17 +526,6 @@ function renderResultsHeader({
                 >
                     <Icon className="panel-toggle-icon" name="chevron" />
                 </Button>
-                {showFailure && (
-                    <Button
-                        variant="ghost"
-                        className="panel-window-button"
-                        aria-label={copy.common.closeOutput}
-                        title={copy.common.closeOutput}
-                        onClick={actions.onCloseOutput}
-                    >
-                        <Icon name="close" />
-                    </Button>
-                )}
             </div>
         </div>
     );

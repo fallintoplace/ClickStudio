@@ -11,7 +11,6 @@ type WorkspaceCommonTranslation = Pick<
     | 'sourceDeleted'
     | 'lastExecutionFailed'
     | 'output'
-    | 'closeOutput'
     | 'showOutput'
     | 'queryFailed'
     | 'fixWithAi'
@@ -153,7 +152,6 @@ export const workspaceCommonTranslations: Record<
         fixWithAi: '用 AI 修复',
         lastExecutionFailed: '上次执行失败',
         output: '输出',
-        closeOutput: '关闭输出',
         showOutput: '显示输出',
         syntaxError: '语法错误',
         errorLocation: '第 {line} 行，第 {column} 列',

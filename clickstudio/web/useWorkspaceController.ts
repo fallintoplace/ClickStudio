@@ -170,18 +170,16 @@ export function useWorkspaceController({
     const script = active.scriptId ? scripts[active.scriptId] : undefined;
     const [draftView, setViewForDraft] = useScopedValue<ResultsView>(active.id);
     const view = draftView ?? 'results';
-    const [outputClosed, setOutputClosedForDraft] = useScopedValue<boolean>(active.id);
     const [selectedScriptResult, setSelectedScriptResult] = useScopedValue<string>(active.id);
     const setView = useCallback<Dispatch<SetStateAction<ResultsView>>>(
         next => {
-            setOutputClosedForDraft(active.id, false);
             setViewForDraft(
                 active.id,
                 current => (typeof next === 'function' ? next(current ?? 'results') : next),
                 true,
             );
         },
-        [active.id, setViewForDraft, setOutputClosedForDraft],
+        [active.id, setViewForDraft],
     );
     const [exampleChartRunId, setExampleChartRunId] = useState<string>();
     const ui = useWorkspaceUiState({ experience, revealActiveTab, active });
@@ -330,7 +328,6 @@ export function useWorkspaceController({
         trusted,
         unsupportedParameters,
         nativeParseSnapshot,
-        outputClosed,
         pendingExecution,
         editor,
         demoMode,
@@ -345,7 +342,6 @@ export function useWorkspaceController({
         scriptFollowRef,
         trackSchemaRefresh,
         setExampleChartRunId,
-        setOutputClosedForDraft,
         setViewForDraft,
         data,
         ui,
@@ -519,7 +515,6 @@ export function useWorkspaceController({
         setSelectedScriptResult,
         scriptFollowRef,
         update,
-        setOutputClosedForDraft,
         inspectorDocked,
         storageError,
         workspace,
@@ -736,7 +731,6 @@ function useWorkspaceExecutionView({
     trusted,
     unsupportedParameters,
     nativeParseSnapshot,
-    outputClosed,
     pendingExecution,
     editor,
     demoMode,
@@ -751,7 +745,6 @@ function useWorkspaceExecutionView({
     scriptFollowRef,
     trackSchemaRefresh,
     setExampleChartRunId,
-    setOutputClosedForDraft,
     setViewForDraft,
     data,
     ui,
@@ -767,7 +760,6 @@ function useWorkspaceExecutionView({
     trusted: boolean;
     unsupportedParameters: boolean;
     nativeParseSnapshot: NativeParseSnapshot | undefined;
-    outputClosed: boolean | undefined;
     pendingExecution: ReturnType<typeof usePendingExecution>;
     editor: import('react').RefObject<EditorHandle | null>;
     demoMode: WorkspaceProps['demoMode'];
@@ -784,7 +776,6 @@ function useWorkspaceExecutionView({
     setExampleChartRunId: import('react').Dispatch<
         import('react').SetStateAction<string | undefined>
     >;
-    setOutputClosedForDraft: ReturnType<typeof useScopedValue<boolean>>[1];
     setViewForDraft: ReturnType<typeof useScopedValue<ResultsView>>[1];
     data: ReturnType<typeof useWorkspaceData>;
     ui: ReturnType<typeof useWorkspaceUiState>;
@@ -836,15 +827,13 @@ function useWorkspaceExecutionView({
         visibleResultsView,
     } = viewState;
 
-    const outputVisible =
-        !outputClosed &&
-        Boolean(
-            run ||
-            failedQueryError ||
-            script ||
-            pendingExecution.execution ||
-            requestedResultsView === 'sqlmap',
-        );
+    const outputVisible = Boolean(
+        run ||
+        failedQueryError ||
+        script ||
+        pendingExecution.execution ||
+        requestedResultsView === 'sqlmap',
+    );
     const panels = useWorkspacePanels({
         activeDraftId: active.id,
         compactViewport,
@@ -901,7 +890,6 @@ function useWorkspaceExecutionView({
         setNotice,
         clearFailedQueryError,
         storeFailedQueryError,
-        setOutputClosedForDraft,
         setViewForDraft,
     });
 
@@ -1091,7 +1079,6 @@ function createWorkspaceControllerModel({
     setSelectedScriptResult,
     scriptFollowRef,
     update,
-    setOutputClosedForDraft,
     inspectorDocked,
     storageError,
     workspace,
@@ -1139,7 +1126,6 @@ function createWorkspaceControllerModel({
     setSelectedScriptResult: ReturnType<typeof useScopedValue<string>>[1];
     scriptFollowRef: ReturnType<typeof useScriptExecution>;
     update: (id: string, change: (draft: Draft) => Draft) => void;
-    setOutputClosedForDraft: ReturnType<typeof useScopedValue<boolean>>[1];
     inspectorDocked: boolean;
     storageError: ReturnType<typeof useWorkspacePersistence>;
     workspace: WorkspaceState;
@@ -1259,7 +1245,6 @@ function createWorkspaceControllerModel({
         setSelectedScriptResult,
         scriptFollowRef,
         update,
-        setOutputClosedForDraft,
         loadFlamegraph,
         inspectorDocked,
         error,

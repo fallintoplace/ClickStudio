@@ -40,19 +40,13 @@ export function QueryFailureNotice({
         <div className="result-failure" data-testid="query-failure">
             <div className="result-failure-message" role="alert">
                 <div className="result-failure-heading">
-                    <span className="status-light is-error" aria-hidden="true" />
-                    <h3>{title}</h3>
-                    {location && (
-                        <span className="result-failure-location">
-                            {copy.errorLocation
-                                .replace('{line}', String(location.line))
-                                .replace('{column}', String(location.column))}
-                        </span>
-                    )}
-                    <code className="result-failure-code">{error.code}</code>
+                    <div className="result-failure-title">
+                        <span className="status-light is-error" aria-hidden="true" />
+                        <h3>{title}</h3>
+                    </div>
                     {onFixWithAi && (
                         <Button
-                            variant="secondary"
+                            variant="danger"
                             className="result-failure-fix"
                             onClick={onFixWithAi}
                             disabled={fixBusy}
@@ -61,6 +55,14 @@ export function QueryFailureNotice({
                             {copy.fixWithAi}
                         </Button>
                     )}
+                    {location && (
+                        <span className="result-failure-location">
+                            {copy.errorLocation
+                                .replace('{line}', String(location.line))
+                                .replace('{column}', String(location.column))}
+                        </span>
+                    )}
+                    <code className="result-failure-code">{error.code}</code>
                 </div>
                 {!diagnostic.syntax && diagnostic.message && (
                     <p className="result-failure-summary">{diagnostic.message}</p>

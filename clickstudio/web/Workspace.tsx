@@ -175,7 +175,6 @@ export function Workspace({
         setSelectedScriptResult,
         scriptFollowRef,
         update,
-        setOutputClosedForDraft,
         loadFlamegraph,
     } = model;
 
@@ -308,10 +307,6 @@ export function Workspace({
                 onSelectScriptError: () => {
                     setSelectedScriptResult(active.id, '');
                     setView('results');
-                },
-                onCloseOutput: () => {
-                    setOutputClosedForDraft(active.id, true);
-                    editor.current?.focus();
                 },
                 onCancel: () => void cancel(),
                 onPage: setPage,

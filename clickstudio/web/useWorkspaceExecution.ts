@@ -49,7 +49,6 @@ type WorkspaceExecutionOptions = {
     setNotice: (notice: string) => void;
     clearFailedQueryError: (draftId: string) => void;
     storeFailedQueryError: (failure: FailedQueryError) => void;
-    setOutputClosedForDraft: ReturnType<typeof useScopedValue<boolean>>[1];
     setViewForDraft: ReturnType<typeof useScopedValue<ResultsView>>[1];
 };
 
@@ -112,7 +111,6 @@ export function useWorkspaceExecution({
     setNotice,
     clearFailedQueryError,
     storeFailedQueryError,
-    setOutputClosedForDraft,
     setViewForDraft,
 }: WorkspaceExecutionOptions) {
     const executionFailureRef = useRef<string | undefined>(undefined);
@@ -170,7 +168,6 @@ export function useWorkspaceExecution({
     const recordFailedQueryError = (failure: FailedQueryError) => {
         executionFailureRef.current = failure.draftId;
         storeFailedQueryError(failure);
-        setOutputClosedForDraft(failure.draftId, false, true);
         if (workspaceRef.current.activeId !== failure.draftId) return;
         setViewForDraft(failure.draftId, 'results', true);
         panels.revealPanelTemporarily('results', failure.draftId);
@@ -183,7 +180,6 @@ export function useWorkspaceExecution({
         importedReveal,
         experience,
         clearFailedQueryError,
-        setOutputClosedForDraft,
         active,
         pendingExecution,
         recordFailedQueryError,
@@ -360,7 +356,6 @@ function createDraftExecutor({
     importedReveal,
     experience,
     clearFailedQueryError,
-    setOutputClosedForDraft,
     active,
     pendingExecution,
     recordFailedQueryError,
@@ -383,7 +378,6 @@ function createDraftExecutor({
     importedReveal: WorkspaceExecutionOptions['importedReveal'];
     experience: WorkspaceExecutionOptions['experience'];
     clearFailedQueryError: WorkspaceExecutionOptions['clearFailedQueryError'];
-    setOutputClosedForDraft: WorkspaceExecutionOptions['setOutputClosedForDraft'];
     active: WorkspaceExecutionOptions['active'];
     pendingExecution: WorkspaceExecutionOptions['pendingExecution'];
     recordFailedQueryError: (failure: FailedQueryError) => void;
@@ -505,7 +499,6 @@ function createDraftExecutor({
                         : {}),
                 };
                 clearFailedQueryError(draft.id);
-                setOutputClosedForDraft(draft.id, false, true);
                 const previousResult =
                     draft.id === active.id && run && terminal(run) && resultPage
                         ? { draftId: draft.id, run, page: resultPage, pageIndex: page }

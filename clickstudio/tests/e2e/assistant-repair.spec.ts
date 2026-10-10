@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import type { Proposal } from '../../shared/types.js';
+import type { ApiError, Proposal } from '../../shared/types.js';
 import { jsonRecord, replaceSql, trust } from './helpers.js';
 
 async function installRepair(page: Page, repairedSql: string) {
@@ -43,22 +43,23 @@ async function installRepair(page: Page, repairedSql: string) {
     return requests;
 }
 
-async function rejectQuery(page: Page) {
+async function rejectQuery(
+    page: Page,
+    error: ApiError = {
+        code: 'UNKNOWN_IDENTIFIER',
+        message: 'Unknown column event_count',
+        position: 12,
+    },
+) {
     await page.route('**/api/runs', async route => {
         if (route.request().method() !== 'POST') return route.continue();
         await route.fulfill({
             status: 400,
-            json: {
-                error: {
-                    code: 'UNKNOWN_IDENTIFIER',
-                    message: 'Unknown column event_count',
-                    position: 12,
-                },
-            },
+            json: { error },
         });
     });
     await page.getByTestId('run-button').click();
-    await expect(page.getByTestId('query-failure')).toContainText('UNKNOWN_IDENTIFIER');
+    await expect(page.getByTestId('query-failure')).toContainText(error.code);
     await page.unroute('**/api/runs');
 }
 
@@ -137,6 +138,48 @@ test('Fix with AI keeps the full draft when a selected statement fails', async (
     await page.getByRole('button', { name: 'Apply to draft', exact: true }).click();
     await expect(page.locator('.cm-line')).toHaveText(repairedDraft.split('\n'));
 });
+
+for (const theme of ['Dark', 'Light'])
+    test(`Fix with AI stays visible beside long errors in narrow ${theme.toLowerCase()} panels`, async ({
+        page,
+    }, testInfo) => {
+        await page.emulateMedia({ reducedMotion: 'reduce' });
+        await trust(page);
+        await page.getByRole('radio', { name: `${theme} theme`, exact: true }).click();
+        await replaceSql(page, 'SELECT event_count FROM demo.events');
+        await rejectQuery(page, {
+            code: 'CLICKHOUSE_62',
+            message:
+                'Syntax error: failed at position 1 (an_exceptionally_long_failed_sql_keyword). Expected one of: SELECT.',
+        });
+        const failure = page.getByTestId('query-failure');
+        const fix = failure.getByRole('button', { name: 'Fix with AI', exact: true });
+        for (const width of [900, 720]) {
+            await page.setViewportSize({ width, height: 900 });
+            await fix.scrollIntoViewIfNeeded();
+            await expect(fix).toBeVisible();
+            const bounds = (await failure.boundingBox())!;
+            const fixBounds = (await fix.boundingBox())!;
+            const titleBounds = (await failure.locator('.result-failure-title h3').boundingBox())!;
+            const statusBounds = (await failure
+                .locator('.result-failure-title .status-light')
+                .boundingBox())!;
+            expect(statusBounds.y + statusBounds.height / 2).toBeCloseTo(
+                titleBounds.y + titleBounds.height / 2,
+                0,
+            );
+            const detailsBounds = (await failure.locator('details > summary').boundingBox())!;
+            expect(fixBounds.x).toBeGreaterThanOrEqual(bounds.x);
+            expect(fixBounds.x + fixBounds.width).toBeLessThanOrEqual(bounds.x + bounds.width);
+            expect(
+                fixBounds.x < detailsBounds.x + detailsBounds.width &&
+                    fixBounds.x + fixBounds.width > detailsBounds.x &&
+                    fixBounds.y < detailsBounds.y + detailsBounds.height &&
+                    fixBounds.y + fixBounds.height > detailsBounds.y,
+            ).toBe(false);
+            await page.screenshot({ path: testInfo.outputPath(`error-${width}.png`) });
+        }
+    });
 
 test('Fix with AI uses the failed script statement instead of an earlier successful run', async ({
     page,

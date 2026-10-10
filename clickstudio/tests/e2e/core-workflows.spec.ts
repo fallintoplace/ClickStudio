@@ -740,7 +740,7 @@ test('The execution indicator clears when run submission fails', async ({ page }
     }
 });
 
-test('Failed execution replaces visible results and can close, reopen and retry', async ({
+test('Failed execution replaces visible results and can collapse, reopen and retry', async ({
     page,
 }, testInfo) => {
     await trust(page);
@@ -778,19 +778,26 @@ test('Failed execution replaces visible results and can close, reopen and retry'
         await expect(page.locator('.execution-bar')).not.toContainText('Query failed');
         await expect(page.locator('.query-failed-status')).toHaveText('Last execution failed');
         await expect(failure.locator('details')).not.toHaveAttribute('open');
+        await expect(
+            results.getByRole('button', { name: 'Close output', exact: true }),
+        ).toHaveCount(0);
         await page.screenshot({ path: testInfo.outputPath('failed-output.png') });
         await results.getByRole('button', { name: 'Collapse Query results', exact: true }).click();
         await expect(failure).toBeHidden();
         await page.locator('.query-failed-status').click();
         await expect(failure).toBeVisible();
-        await results.getByRole('button', { name: 'Close output', exact: true }).click();
-        await expect(results).toHaveCount(0);
-        await expect(page.locator('.workspace-content')).not.toHaveClass(/has-panel-split|has-run/);
-        await expect(page.locator('.cm-content')).toBeFocused();
+        await results.getByRole('button', { name: 'Collapse Query results', exact: true }).click();
+        await expect(failure).toBeHidden();
+        await expect(results).toHaveClass(/is-collapsed/);
+        await expect(page.locator('.workspace-content')).not.toHaveClass(/has-panel-split/);
+        await expect(
+            results.getByRole('button', { name: 'Expand Query results', exact: true }),
+        ).toBeVisible();
         await openBlankSql(page);
         await expect(page.locator('.query-failed-status')).toHaveCount(0);
         await page.getByRole('tab').filter({ hasText: 'Getting started.sql' }).click();
-        await expect(results).toHaveCount(0);
+        await expect(results).toHaveClass(/is-collapsed/);
+        await expect(failure).toBeHidden();
         await page.locator('.query-failed-status').click();
         await expect(failure).toBeVisible();
 
@@ -805,9 +812,16 @@ test('Failed execution replaces visible results and can close, reopen and retry'
         await page.getByRole('tab').filter({ hasText: 'Getting started.sql' }).first().click();
         await page.locator('.query-failed-status').click();
         await expect(failure).toBeVisible();
-        await results.getByRole('button', { name: 'Close output', exact: true }).click();
+        await results.getByRole('button', { name: 'Collapse Query results', exact: true }).click();
         await replaceSql(page, 'SELECT 1');
-        await runQuery(page);
+        await runButton(page).click();
+        await expect(page.locator('.execution-bar')).toHaveAttribute(
+            'data-run-status',
+            'succeeded',
+        );
+        await expect(results).toHaveClass(/is-collapsed/);
+        await results.getByRole('button', { name: 'Expand Query results', exact: true }).click();
+        await expect(results.getByRole('table', { name: 'Retained query rows' })).toBeVisible();
         await expect(failure).toHaveCount(0);
         await expect(page.locator('.query-failed-status')).toHaveCount(0);
         await expect(page.locator('.execution-bar')).toHaveAttribute(
@@ -891,6 +905,47 @@ for (const theme of ['Dark', 'Light'])
             await runButton(page).click();
             const failure = results.getByTestId('query-failure');
             await expect(failure).toBeVisible();
+            await expect(
+                results.getByRole('button', { name: 'Close output', exact: true }),
+            ).toHaveCount(0);
+            const fix = failure.getByRole('button', { name: 'Fix with AI', exact: true });
+            await expect(fix).toBeVisible();
+            const titleBounds = (await failure
+                .locator('.result-failure-heading h3')
+                .boundingBox())!;
+            const fixBounds = (await fix.boundingBox())!;
+            expect(fixBounds.x - titleBounds.x - titleBounds.width).toBeGreaterThanOrEqual(8);
+            expect(fixBounds.x - titleBounds.x - titleBounds.width).toBeLessThanOrEqual(16);
+            expect(fixBounds.y + fixBounds.height / 2).toBeCloseTo(
+                titleBounds.y + titleBounds.height / 2,
+                0,
+            );
+            const contrast = await fix.evaluate(element => {
+                const style = getComputedStyle(element);
+                const rgb = (color: string) =>
+                    color
+                        .match(/[\d.]+/g)!
+                        .slice(0, 3)
+                        .map(Number);
+                const luminance = (color: number[]) =>
+                    color.reduce((sum, value, index) => {
+                        const channel = value / 255;
+                        const linear =
+                            channel <= 0.04045
+                                ? channel / 12.92
+                                : ((channel + 0.055) / 1.055) ** 2.4;
+                        return sum + linear * [0.2126, 0.7152, 0.0722][index]!;
+                    }, 0);
+                const background = rgb(style.backgroundColor);
+                const light = luminance(rgb(style.color));
+                const dark = luminance(background);
+                return {
+                    red: background[0]! > background[1]! && background[0]! > background[2]!,
+                    ratio: (Math.max(light, dark) + 0.05) / (Math.min(light, dark) + 0.05),
+                };
+            });
+            expect(contrast.red).toBe(true);
+            expect(contrast.ratio).toBeGreaterThanOrEqual(4.5);
             await expect(page.locator('.editor-surface').getByTestId('query-failure')).toHaveCount(
                 0,
             );
@@ -1136,8 +1191,10 @@ test('Failed output stays docked while editor markers open in a separate window'
     await page.locator('.result-failure-diagnostics summary').click();
     await expect(page.locator('.result-failure-detail')).toBeVisible();
     await expect(page.getByRole('table')).toHaveCount(0);
-    await page.getByRole('button', { name: 'Close output', exact: true }).click();
-    await expect(page.locator('.results-surface')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Close output', exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Collapse Query results', exact: true }).click();
+    await expect(page.getByTestId('query-failure')).toBeHidden();
+    await expect(page.locator('.results-surface')).toHaveClass(/is-collapsed/);
     await page.locator('.query-failed-status').click();
     await expect(page.getByTestId('query-failure')).toBeVisible();
 });
