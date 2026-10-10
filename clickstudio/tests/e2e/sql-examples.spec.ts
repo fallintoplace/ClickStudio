@@ -61,6 +61,35 @@ test('SQL examples search handles no matches and Escape restores focus', async (
     await expect(trigger).toBeFocused();
 });
 
+test('Help section navigation preserves search until the panel is reopened', async ({ page }) => {
+    await trust(page);
+    const trigger = page.getByTestId('new-sql');
+    await trigger.click();
+    const dialog = page.getByRole('dialog', { name: 'Explore ClickStudio', exact: true });
+    const search = dialog.getByTestId('sql-example-search');
+    await search.fill('Top countries');
+    const examplesTab = dialog.getByTestId('help-section-examples');
+    await examplesTab.click();
+    await examplesTab.press('End');
+    const compareTab = dialog.getByTestId('help-section-compare');
+    await expect(compareTab).toBeFocused();
+    await expect(compareTab).toHaveAttribute('aria-selected', 'true');
+    await compareTab.press('Home');
+    const tourTab = dialog.getByTestId('help-section-tour');
+    await expect(tourTab).toBeFocused();
+    await tourTab.press('ArrowRight');
+    await expect(examplesTab).toBeFocused();
+    await expect(search).toHaveValue('Top countries');
+    await expect(dialog.getByTestId('sql-example-preview-starter-top-countries')).toBeVisible();
+    await expect(page.locator('#root')).toHaveJSProperty('inert', true);
+    await examplesTab.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+    await expect(page.locator('#root')).toHaveJSProperty('inert', false);
+    await trigger.click();
+    await expect(search).toHaveValue('');
+});
+
 test('Help tour exposes ClickStudio native workflows from one place', async ({ page }) => {
     await trust(page);
     await expect(page.getByRole('button', { name: 'Open observability' })).toHaveCount(0);
