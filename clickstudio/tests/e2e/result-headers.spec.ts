@@ -212,11 +212,11 @@ for (const theme of ['Light', 'Dark'])
         });
     }
 
-test('Very long result types remain readable and scrollable in a narrow viewport', async ({
+test('Very long result types remain readable and scrollable in a narrow desktop window', async ({
     page,
 }) => {
     const type = `Tuple(${Array.from({ length: 80 }, (_, index) => `field_${index} Nullable(Decimal(18, 2))`).join(', ')})`;
-    await page.setViewportSize({ width: 390, height: 720 });
+    await page.setViewportSize({ width: 900, height: 720 });
     await page.route(
         url => url.pathname.endsWith('/result'),
         async route => {
@@ -243,7 +243,7 @@ test('Very long result types remain readable and scrollable in a narrow viewport
     await expect(tooltip).toHaveText(`payload${type}`);
     const bounds = await tooltip.boundingBox();
     expect(bounds!.x).toBeGreaterThanOrEqual(8);
-    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(382);
+    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(892);
     expect(bounds!.width).toBeLessThanOrEqual(360);
     expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(712);
     expect(bounds!.y + bounds!.height).toBeLessThanOrEqual((await header.boundingBox())!.y + 2);

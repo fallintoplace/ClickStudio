@@ -58,7 +58,6 @@ test('Standard exposes assignment actions and can run a query without opening AI
             contextRequests++;
     });
     await page.addInitScript(() => localStorage.setItem('clickstudio:experience', 'beginner'));
-    await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/');
 
     const editor = page.getByRole('textbox', { name: 'SQL editor', exact: true });
@@ -543,7 +542,7 @@ test('An older accepted proposal says which SQL will run', async ({ page }) => {
     const diffToggle = sqlDiff.locator(':scope > summary');
     const diffCounts = sqlDiff.locator('.sql-proposal-diff-count');
     const diffChevron = sqlDiff.locator('.sql-proposal-diff-chevron svg');
-    await expect(diffChevron).toHaveAttribute('viewBox', '0 0 16 16');
+    await expect(diffChevron).toHaveAttribute('viewBox', '0 0 24 24');
     const expectDiffChevronLayout = async () => {
         const [toggleBox, countsBox, chevronBox] = await Promise.all([
             diffToggle.boundingBox(),
@@ -903,12 +902,9 @@ for (const theme of ['Dark', 'Light'])
             page.getByRole('button', { name: 'Visualize SQL structure', exact: true }),
         ).toHaveCount(0);
         await expect(page.getByRole('tab', { name: 'SQL map', exact: true })).toHaveCount(0);
-        for (const width of [1440, 720, 390]) {
+        for (const width of [1440, 900]) {
             await page.setViewportSize({ width, height: 900 });
-            await expect(page.getByTestId('save-query').locator('svg')).toHaveCSS(
-                'width',
-                width <= 560 ? '15px' : '14px',
-            );
+            await expect(page.getByTestId('save-query').locator('svg')).toHaveCSS('width', '14px');
             const readActionStyles = () =>
                 header
                     .locator('[data-testid="save-query"], [data-testid="run-button"]')

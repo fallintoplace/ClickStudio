@@ -221,7 +221,7 @@ for (const mode of ['Standard', 'Experimental'])
             await page.getByRole('radio', { name: `${theme} theme`, exact: true }).click();
             for (const accent of ['Cyan accent', 'ClickHouse yellow accent']) {
                 await page.getByRole('button', { name: accent, exact: true }).click();
-                for (const width of [1440, 900, 720, 390]) {
+                for (const width of [1440, 900]) {
                     await page.setViewportSize({ width, height: 1000 });
                     await expectResultsToolbarFits(header);
                     await openResultFilter(header);
@@ -251,7 +251,7 @@ for (const mode of ['Standard', 'Experimental'])
     });
 
 for (const mode of ['Standard', 'Experimental']) {
-    test(`Results toolbar fits desktop and narrow screens in both themes in ${mode} mode`, async ({
+    test(`Results toolbar fits wide and narrow desktop windows in both themes in ${mode} mode`, async ({
         page,
     }) => {
         await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -265,7 +265,7 @@ for (const mode of ['Standard', 'Experimental']) {
         const expectToolbarFits = () => expectResultsToolbarFits(header);
         for (const theme of ['Dark', 'Light']) {
             await page.getByRole('radio', { name: `${theme} theme`, exact: true }).click();
-            for (const width of [1440, 720, 390]) {
+            for (const width of [1440, 900]) {
                 await page.setViewportSize({ width, height: 900 });
                 await expect
                     .poll(() =>

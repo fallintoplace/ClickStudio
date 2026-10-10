@@ -14,6 +14,7 @@ export default defineConfig({
     reporter: [['line'], ['html', { open: 'never' }]],
     use: {
         baseURL,
+        viewport: { width: 1280, height: 720 },
         trace: 'retain-on-failure',
         screenshot: 'only-on-failure',
         storageState: {

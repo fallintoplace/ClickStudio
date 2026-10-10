@@ -230,11 +230,6 @@ for (const accent of ['Cyan accent', 'ClickHouse yellow accent']) {
         await dialog.locator('.import-kind-button.is-query').click();
         await expect(dialog.locator('.import-file-picker-query')).toBeVisible();
         await expectReadableText(dialog, 'SQL file');
-        await page.setViewportSize({ width: 390, height: 844 });
-        await expectReadableText(dialog, 'Mobile import');
-        expect(
-            await page.evaluate(() => document.documentElement.scrollWidth - innerWidth),
-        ).toBeLessThanOrEqual(1);
     });
 }
 

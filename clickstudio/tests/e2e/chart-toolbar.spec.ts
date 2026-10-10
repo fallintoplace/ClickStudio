@@ -155,8 +155,8 @@ for (const mode of ['Standard', 'Experimental'])
             await page.keyboard.press('Escape');
             for (const accent of ['Cyan accent', 'ClickHouse yellow accent']) {
                 await page.getByRole('button', { name: accent, exact: true }).click();
-                for (const width of [1440, 900, 390, 320]) {
-                    await page.setViewportSize({ width, height: width >= 900 ? 1000 : 640 });
+                for (const width of [1440, 900]) {
+                    await page.setViewportSize({ width, height: 1000 });
                     await expectToolbarFits(toolbar);
                     expect(
                         await page.evaluate(
@@ -179,7 +179,7 @@ for (const mode of ['Standard', 'Experimental'])
                     await expectPopoverFits(page, details);
                     await page.keyboard.press('Escape');
                     await expect(details).toBeHidden();
-                    if (accent === 'ClickHouse yellow accent' && (width === 1440 || width === 390))
+                    if (accent === 'ClickHouse yellow accent' && width === 1440)
                         await page.screenshot({
                             path: info.outputPath(`chart-toolbar-${width}.png`),
                         });
@@ -196,7 +196,7 @@ for (const mode of ['Standard', 'Experimental'])
 test('Many long measure names stay scrollable in the dropdown without growing the toolbar', async ({
     page,
 }) => {
-    await page.setViewportSize({ width: 390, height: 640 });
+    await page.setViewportSize({ width: 1440, height: 1000 });
     const names = Array.from(
         { length: 60 },
         (_, index) => `measure_${index}_${'long_column_name_'.repeat(4)}`,
@@ -275,7 +275,7 @@ test('Candlestick mappings open under Setup and keep their selections', async ({
     await expect(popup.getByRole('combobox', { name: 'Quote updates', exact: true })).toHaveValue(
         '8',
     );
-    await page.setViewportSize({ width: 390, height: 640 });
+    await page.setViewportSize({ width: 900, height: 800 });
     await expect(popup).toBeHidden();
     await expectToolbarFits(toolbar);
     await toolbar.getByRole('button', { name: 'Setup', exact: true }).click();
@@ -310,7 +310,7 @@ test('Row-count charts use the compact toolbar and keep their counting explanati
     await toolbar.getByLabel('X axis', { exact: true }).selectOption('1');
     await expect(toolbar.getByRole('heading')).toHaveText('Rows by service');
     await expect(results.locator('.chart-bar')).toHaveCount(2);
-    await page.setViewportSize({ width: 390, height: 640 });
+    await page.setViewportSize({ width: 900, height: 800 });
     await expectToolbarFits(toolbar);
 });
 
@@ -355,7 +355,7 @@ test('Custom chart titles remain inline while explanations move to details', asy
                 .evaluate(element => element.getBoundingClientRect().height),
         )
         .toBeLessThanOrEqual(44);
-    await page.setViewportSize({ width: 390, height: 640 });
+    await page.setViewportSize({ width: 900, height: 800 });
     await expectToolbarFits(results.locator('.chart-toolbar'));
 });
 

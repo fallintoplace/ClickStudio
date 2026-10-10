@@ -278,8 +278,6 @@ for (const theme of ['Dark', 'Light'])
             await expect(importDialog).toHaveCSS('box-shadow', dialogShadow);
             expect(await backdrop(importDialog, true)).toEqual(scrim);
             await expect(importDialog).toHaveCSS('border-radius', '8px');
-            await page.setViewportSize({ width: 390, height: 844 });
-            await expect(importDialog).toHaveCSS('border-radius', '8px');
             const step = importDialog.locator('.import-step-item.is-current .import-step-number');
             await expect(step).toHaveCSS('border-radius', '2px');
             const stepColors = await step.evaluate(element => {
@@ -290,10 +288,9 @@ for (const theme of ['Dark', 'Light'])
             await page.keyboard.press('Escape');
             await expect(importDialog).toBeHidden();
             await expect(runButton(page)).toHaveCSS('border-radius', '4px');
-            await expect(runButton(page)).toHaveCSS('height', '34px');
-            await expect(page.getByTestId('save-query')).toHaveCSS('height', '34px');
+            await expect(runButton(page)).toHaveCSS('height', '32px');
+            await expect(page.getByTestId('save-query')).toHaveCSS('height', '28px');
             await runButton(page).click({ trial: true });
-            await page.setViewportSize({ width: 1440, height: 900 });
 
             const otherTheme = theme === 'Dark' ? 'Light' : 'Dark';
             await page.getByRole('radio', { name: `${otherTheme} theme`, exact: true }).click();
@@ -311,7 +308,7 @@ for (const theme of ['Dark', 'Light'])
     test(`${theme} scroll cues track overflow without covering sticky headers or row numbers`, async ({
         page,
     }) => {
-        await page.setViewportSize({ width: 720, height: 900 });
+        await page.setViewportSize({ width: 900, height: 900 });
         await page.route(
             url => url.pathname.endsWith('/result'),
             async route => {

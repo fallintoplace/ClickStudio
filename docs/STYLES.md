@@ -31,7 +31,7 @@ npm run test:e2e:styles
 
 The visual tests compare full-page screenshots against `tests/fixtures/styles/reference.css.gz`, a frozen Vite development stylesheet. They replace only static Vite styles in one browser operation, leaving runtime editor styles in place, then render the reference and current styles on the same DOM in the same browser. This makes the comparison portable across operating systems without introducing production minification differences. Computed colors, typography, borders and geometry must match exactly, including pseudo-elements and file inputs. The pixel comparison tolerates antialiasing noise; the report contains reference, current and diff images.
 
-Coverage includes both themes, both accents, both workspace modes, desktop/mobile layouts, collapsed panels, help features, native explorers, file/SQL import states and Cloud destinations for existing/new tables. Contrast and workflow assertions remain in the other browser tests. This reference catches CSS changes; it is not a historical baseline for React markup or runtime chart code.
+Coverage includes both themes, both accents, both workspace modes, wide and narrow desktop windows, collapsed panels, help features, native explorers, file/SQL import states and Cloud destinations for existing/new tables. Contrast and workflow assertions remain in the other browser tests. This reference catches CSS changes; it is not a historical baseline for React markup or runtime chart code.
 
 For an intentional visual change, first inspect the current UI and existing report, then regenerate the reference from source:
 

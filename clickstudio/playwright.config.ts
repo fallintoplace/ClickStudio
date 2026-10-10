@@ -18,6 +18,7 @@ export default defineConfig({
     testIgnore: ['**/preview.spec.ts'],
     use: {
         baseURL,
+        viewport: { width: 1280, height: 720 },
         trace: 'retain-on-failure',
         screenshot: 'only-on-failure',
         storageState: {

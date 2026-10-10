@@ -422,11 +422,6 @@ for (const theme of ['Dark', 'Light']) {
             await replaceSql(page, 'SELECT 42');
             await expect(results.locator('.result-provenance-header')).toHaveCount(0);
             await expect(page.locator('.execution-bar')).toHaveAttribute('data-query-id', queryId);
-            await page.setViewportSize({ width: 390, height: 844 });
-            await expect(results.locator('.result-provenance-header')).toHaveCount(0);
-            expect(
-                await page.evaluate(() => document.documentElement.scrollWidth),
-            ).toBeLessThanOrEqual(390);
         }
         await runQuery(page);
         await expect(results.locator('.result-provenance-header')).toHaveCount(0);
@@ -954,15 +949,6 @@ for (const theme of ['Dark', 'Light'])
             expect(expanded.height).toBeCloseTo(before.height, 0);
             await page.keyboard.press('Enter');
             await expect(failure.locator('.result-failure-detail')).toBeHidden();
-            await page.setViewportSize({ width: 390, height: 844 });
-            await expect(failure).toBeVisible();
-            await expect(
-                results.getByRole('button', { name: 'Close output', exact: true }),
-            ).toBeInViewport();
-            expect(
-                await page.evaluate(() => document.documentElement.scrollWidth),
-            ).toBeLessThanOrEqual(390);
-            await page.screenshot({ path: testInfo.outputPath('error-mobile.png') });
             await replaceSql(page, 'SELECT 2');
             await expect(failure.locator('.result-failure-location')).toHaveText(
                 'Line 2, column 1',
@@ -1516,25 +1502,6 @@ test('Native parser can be retried after a temporary worker failure', async ({ p
     await trust(page);
     const retry = page.getByRole('button', { name: 'Retry parser', exact: true });
     await expect(retry).toBeVisible();
-    await page.setViewportSize({ width: 390, height: 900 });
-    const header = page.locator('.editor-heading');
-    const bounds = await header.boundingBox();
-    expect(bounds).not.toBeNull();
-    for (const button of [
-        retry,
-        page.getByTestId('format-sql'),
-        page.getByTestId('save-query'),
-        runButton(page),
-    ]) {
-        await expect(button).toBeVisible();
-        const buttonBounds = await button.boundingBox();
-        expect(buttonBounds).not.toBeNull();
-        expect(buttonBounds!.x).toBeGreaterThanOrEqual(bounds!.x);
-        expect(buttonBounds!.x + buttonBounds!.width).toBeLessThanOrEqual(
-            bounds!.x + bounds!.width,
-        );
-        await button.click({ trial: true });
-    }
     await retry.click();
     await page.setViewportSize({ width: 1440, height: 900 });
     await openWorkspacePanel(page, 'parser');

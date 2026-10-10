@@ -54,13 +54,8 @@ for (const theme of ['Light', 'Dark']) {
                 await runButton(page).click();
                 await expect(page.locator('.results-header .result-pagination')).toBeVisible();
                 await expectReferenceStyles(page, info, 'paged-results');
-                for (const viewport of [
-                    { width: 900, height: 740 },
-                    { width: 390, height: 844 },
-                ]) {
-                    await page.setViewportSize(viewport);
-                    await expectReferenceStyles(page, info, `responsive-${viewport.width}`);
-                }
+                await page.setViewportSize({ width: 900, height: 740 });
+                await expectReferenceStyles(page, info, 'responsive-900');
                 await page.setViewportSize({ width: 1440, height: 1000 });
                 const results = page.getByRole('region', { name: 'Query results', exact: true });
                 await results.getByRole('tab', { name: 'Chart', exact: true }).click();
@@ -78,13 +73,6 @@ for (const theme of ['Light', 'Dark']) {
                 ).toBeVisible();
                 await expectReferenceStyles(page, info, 'chart-details');
                 await page.keyboard.press('Escape');
-                await page.setViewportSize({ width: 390, height: 844 });
-                await expectReferenceStyles(page, info, 'compact-chart-mobile');
-                await results.getByRole('button', { name: 'Measures', exact: true }).click();
-                await expect(
-                    results.getByRole('dialog', { name: 'Measures', exact: true }),
-                ).toBeVisible();
-                await expectReferenceStyles(page, info, 'chart-measures-mobile');
             });
         }
 
@@ -144,10 +132,6 @@ for (const theme of ['Light', 'Dark']) {
                 await expectReferenceStyles(page, info, `native-${section}`);
             }
             await storage.getByRole('button', { name: 'Close', exact: true }).click();
-            await page.setViewportSize({ width: 390, height: 844 });
-            await page.getByRole('button', { name: 'Help', exact: true }).click();
-            await help.getByTestId('help-section-storage').click();
-            await expectReferenceStyles(page, info, 'storage-mobile');
         });
 
         test(`CSS preserves ${theme}, ${accent} Cloud import destinations`, async ({
@@ -162,36 +146,31 @@ for (const theme of ['Light', 'Dark']) {
             await page.getByRole('button', { name: 'Import', exact: true }).last().click();
             const dialog = await previewCsv(page);
             await expect(dialog.locator('.import-destination-choice')).toBeVisible();
-            const compareSizes = async (state: string) => {
-                for (const width of [1440, 600, 390]) {
-                    await page.setViewportSize({ width, height: width === 1440 ? 1000 : 844 });
-                    await expectReferenceStyles(page, info, `${state}-${width}`);
-                }
-                await page.setViewportSize({ width: 1440, height: 1000 });
-            };
-            await compareSizes('cloud-choose-table');
+            const compareStyles = (state: string) =>
+                expectReferenceStyles(page, info, `${state}-1440`);
+            await compareStyles('cloud-choose-table');
             await chooseExistingCloudTable(dialog);
             await expect(dialog.getByLabel('Map day to destination')).toHaveValue('day');
-            await compareSizes('cloud-existing-table');
+            await compareStyles('cloud-existing-table');
             await dialog.getByRole('radio', { name: /Create a table/ }).check();
             await dialog.getByLabel('New table name').fill('imported_events');
             await expect(dialog.getByLabel('Type for day')).toHaveValue('Date');
-            await compareSizes('cloud-create-table');
+            await compareStyles('cloud-create-table');
             await dialog.getByRole('button', { name: 'Review import', exact: true }).click();
             await expect(
                 dialog.getByRole('heading', {
                     name: 'Ready to import into default.imported_events',
                 }),
             ).toBeVisible();
-            await compareSizes('cloud-review');
+            await compareStyles('cloud-review');
             await dialog
                 .getByRole('button', { name: 'Create table and import', exact: true })
                 .click();
             await expect(dialog).toContainText('2 source rows processed successfully');
-            await compareSizes('cloud-success');
+            await compareStyles('cloud-success');
         });
 
-        test(`CSS preserves ${theme}, ${accent} import states on desktop and mobile`, async ({
+        test(`CSS preserves ${theme}, ${accent} import states on desktop`, async ({
             page,
         }, info) => {
             await page.setViewportSize({ width: 1440, height: 1000 });
@@ -240,46 +219,41 @@ for (const theme of ['Light', 'Dark']) {
             );
             await page.getByRole('button', { name: 'Import', exact: true }).click();
             const dialog = page.getByRole('dialog', { name: 'Import data', exact: true });
-            const compareSizes = async (state: string) => {
-                for (const width of [1440, 600, 390]) {
-                    await page.setViewportSize({ width, height: width === 1440 ? 1000 : 844 });
-                    await expectReferenceStyles(page, info, `${state}-${width}`);
-                }
-                await page.setViewportSize({ width: 1440, height: 1000 });
-            };
-            await compareSizes('file');
+            const compareStyles = (state: string) =>
+                expectReferenceStyles(page, info, `${state}-1440`);
+            await compareStyles('file');
             await dialog.locator('.import-file-picker').hover();
             await expectReferenceStyles(page, info, 'file-hover', page, false);
             await dialog.locator('.import-kind-button.is-query').click();
             await dialog.getByLabel('Choose a SQL query file').focus();
-            await compareSizes('sql-file-focus');
+            await compareStyles('sql-file-focus');
             await dialog.getByLabel('Choose a SQL query file').setInputFiles({
                 name: 'notes.txt',
                 mimeType: 'text/plain',
                 buffer: Buffer.from('notes'),
             });
             await expect(dialog.getByRole('alert')).toBeVisible();
-            await compareSizes('sql-file-error');
+            await compareStyles('sql-file-error');
             await dialog.locator('.import-kind-button').first().click();
             await previewCsv(page);
-            await compareSizes('mapping-disabled');
+            await compareStyles('mapping-disabled');
             await chooseExistingTable(dialog);
             const day = dialog.getByLabel('Map day to destination');
             await day.selectOption('events');
             await expect(day).toHaveAttribute('aria-invalid', 'true');
             await day.focus();
-            await compareSizes('mapping-invalid');
+            await compareStyles('mapping-invalid');
             await day.selectOption('day');
             await dialog.getByLabel('Map day to destination').focus();
-            await compareSizes('mapping-focus');
+            await compareStyles('mapping-focus');
             await dialog.getByRole('button', { name: 'Review import', exact: true }).click();
             await expect(
                 dialog.getByRole('region', { name: 'Review import', exact: true }),
             ).toBeVisible();
-            await compareSizes('review');
+            await compareStyles('review');
             await dialog.getByRole('button', { name: 'Import rows', exact: true }).click();
             await expect(dialog).toContainText('2 source rows processed successfully');
-            await compareSizes('success');
+            await compareStyles('success');
         });
     }
 }

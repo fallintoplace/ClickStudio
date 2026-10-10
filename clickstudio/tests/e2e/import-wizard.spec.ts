@@ -95,17 +95,6 @@ test('File import previews, maps, and reports a successful insert without typed 
         .evaluateAll(headers => headers.map(header => header.getBoundingClientRect().width));
     expect(mappingColumnWidths[1]).toBeGreaterThan(mappingColumnWidths[0]!);
     expect(mappingColumnWidths[2]).toBeLessThan(mappingColumnWidths[0]!);
-    await page.setViewportSize({ width: 390, height: 844 });
-    const viewportOverflow = await page.evaluate(
-        () =>
-            Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - innerWidth,
-    );
-    expect(viewportOverflow).toBeLessThanOrEqual(1);
-    const mappingScroll = await dialog.locator('.import-column-map').evaluate(element => ({
-        clientWidth: element.clientWidth,
-        scrollWidth: element.scrollWidth,
-    }));
-    expect(mappingScroll.scrollWidth).toBeGreaterThan(mappingScroll.clientWidth);
     await expect(dialog.getByLabel('Map day to destination')).toHaveValue('day');
     await dialog.getByRole('button', { name: 'Review import', exact: true }).click();
     const review = dialog.getByRole('region', { name: 'Review import', exact: true });
@@ -621,7 +610,7 @@ test('Import setup opens at the top after reading a file', async ({ page }) => {
     );
 
     await page.getByRole('button', { name: 'Import', exact: true }).click();
-    await page.setViewportSize({ width: 600, height: 450 });
+    await page.setViewportSize({ width: 1280, height: 450 });
     const dialog = await previewCsv(page);
     const main = dialog.locator('.import-wizard-main');
     await expect(dialog.getByRole('region', { name: 'Map source columns' })).toBeVisible();

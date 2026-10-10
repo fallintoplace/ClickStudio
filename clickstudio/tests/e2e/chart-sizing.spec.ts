@@ -66,7 +66,7 @@ for (const fixture of [
 
         const plot = results.locator('.chart-category-plot');
         await expect(plot).toBeVisible();
-        for (const width of [1680, 1120, 720]) {
+        for (const width of [1680, 1120, 900]) {
             await page.setViewportSize({ width, height: 950 });
             await expect
                 .poll(async () =>

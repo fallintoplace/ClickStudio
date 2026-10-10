@@ -25,12 +25,6 @@ test('Materialized views have selectable dependency edges and refresh details', 
     await expect(
         page.getByRole('button', { name: 'View dependencies', exact: true }),
     ).toBeFocused();
-    await page.setViewportSize({ width: 390, height: 844 });
-    await page.locator('.icon-rail').getByRole('button', { name: 'Objects', exact: true }).click();
-    await page.getByRole('button', { name: 'View dependencies', exact: true }).click();
-    await expect(dialog).toHaveCSS('border-radius', '0px');
-    await dialog.getByRole('button', { name: 'Close explorer', exact: true }).click();
-    await expect(dialog).toHaveCount(0);
 });
 
 test('Storage tabs show merge flow and honest mutation completion', async ({ page }, info) => {

@@ -55,15 +55,10 @@ test('Cloud actions stay outside the source picker and disconnect preserves anot
     page,
 }) => {
     await mockCloudEndpoint(page);
-    await page.setViewportSize({ width: 384, height: 768 });
     await connectPreviewCloud(page);
 
     const disconnectButton = page.getByRole('button', { name: 'Disconnect Cloud' });
     await expect(disconnectButton).toBeVisible();
-    const bounds = await disconnectButton.boundingBox();
-    expect(bounds).not.toBeNull();
-    if (!bounds) throw new Error('Disconnect button should have a visible bounding box.');
-    expect(bounds.x + bounds.width).toBeLessThanOrEqual(384);
 
     await page.locator('.connection-trigger').click();
     await page
