@@ -423,11 +423,21 @@
     min-width: 26px;
     min-height: 30px;
     padding: 0;
+    color: var(--text);
+  }
+  .result-pagination .button-base:disabled {
+    color: var(--muted);
+    opacity: 0.25;
+  }
+  .result-pagination .button-base:hover:not(:disabled) {
+    background: var(--active-surface);
+    color: var(--accent);
   }
   .result-pagination svg {
     width: 15px;
     height: 15px;
     flex: none;
+    stroke-width: 2;
   }
   .has-error-output .results-title h2 {
     position: relative;
