@@ -1373,14 +1373,28 @@ for (const mode of ['Standard', 'Experimental'])
             editorPopup.getByRole('button', { name: /Float|Maximize|Restore/ }),
         ).toHaveCount(0);
         await expect(page.locator('.detached-query-placeholder-content')).toHaveCount(0);
-        await expect(page.getByText('Editor open in another window')).toHaveCount(0);
+        await expect(page.locator('.detached-query-location')).toHaveText(
+            'Editor open in another window',
+        );
         await expect(page.locator('.workspace-panel-splitter')).toHaveCount(0);
         const workspaceBounds = await page.locator('.workspace-content').boundingBox();
         const placeholderBounds = await page.locator('.detached-query-placeholder').boundingBox();
         const outputBounds = await page.locator('.results-surface').boundingBox();
+        const headingBounds = await page
+            .locator('.detached-query-placeholder .editor-heading')
+            .boundingBox();
+        const dockBounds = await page
+            .locator('.detached-query-placeholder')
+            .getByRole('button', { name: 'Dock editor here' })
+            .boundingBox();
         expect(workspaceBounds).not.toBeNull();
+        expect(headingBounds).not.toBeNull();
+        expect(dockBounds).not.toBeNull();
         expect(placeholderBounds?.height).toBeLessThan(80);
         expect(outputBounds?.height).toBeGreaterThan(workspaceBounds!.height * 0.7);
+        const headingRight = headingBounds!.x + headingBounds!.width;
+        const dockRight = dockBounds!.x + dockBounds!.width;
+        expect(headingRight - dockRight).toBeLessThan(24);
         const editedSql = 'SELECT number AS value FROM numbers(3)';
         await replaceSql(editorPopup, editedSql);
         await page
@@ -1421,6 +1435,9 @@ test('Detached beginner editor leaves only a compact workspace header without re
     await expect(editorPopup.locator('#sql-editor-content')).toBeVisible();
     await expect(editorPopup.locator('.panel-collapse-button')).toHaveCount(0);
     await expect(page.locator('.detached-query-placeholder-content')).toHaveCount(0);
+    await expect(page.locator('.detached-query-location')).toHaveText(
+        'Editor open in another window',
+    );
     const placeholderBounds = await page.locator('.detached-query-placeholder').boundingBox();
     expect(placeholderBounds?.height).toBeLessThan(80);
 });

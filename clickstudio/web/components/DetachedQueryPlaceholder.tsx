@@ -21,7 +21,9 @@ export function DetachedQueryPlaceholder({
                 <div className="editor-file-heading">
                     <span className="file-type-icon">SQL</span>
                     <div className="document-name">
-                        <span className="eyebrow">{copy.query}</span>
+                        <span className="eyebrow detached-query-location">
+                            {copy.detachedQueryStatus}
+                        </span>
                         <span className="detached-query-name" title={name}>
                             {name}
                         </span>

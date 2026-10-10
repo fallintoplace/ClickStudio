@@ -185,6 +185,11 @@
   }
 }
 
+.detached-query-placeholder .editor-heading-actions,
+.detached-query-window-root .editor-heading-actions {
+  padding-right: 0;
+}
+
 @media (max-width: 760px) {
   .pipeline-graph-svg {
     transform: none;

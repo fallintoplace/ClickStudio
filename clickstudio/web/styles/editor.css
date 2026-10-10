@@ -186,8 +186,10 @@
   .detached-query-window-root .editor-frame {
     min-height: 0;
   }
-  .detached-query-placeholder .editor-heading-actions {
-    padding-right: 0;
+  .detached-query-location {
+    color: var(--text-soft);
+    font-size: 9px;
+    letter-spacing: 0.08em;
   }
   .detached-query-name {
     overflow: hidden;
