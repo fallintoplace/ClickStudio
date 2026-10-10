@@ -209,7 +209,7 @@ function AssistantOutput({ mode, sql, turn, busy, onDecideProposal, onRunQuery, 
         } catch { return []; }
     });
     const findingCards = proposal.findings.map((item, index) => <div className="proposal-finding" key={`${index}-${item.severity}-${item.message}`}><strong>{item.severity}</strong><AssistantMarkdown text={item.message} sources={sources} className="assistant-proposal-markdown"/><AssistantMarkdown text={item.evidence} sources={sources} className="assistant-proposal-markdown assistant-proposal-finding-evidence"/></div>);
-    const supportingDetailCount = proposal.assumptions.length + proposal.caveats.length + sources.length + (proposalSql === null ? findingCards.length : 0);
+    const supportingDetailCount = proposal.assumptions.length + proposal.caveats.length + sources.length;
     const hasSupportingDetails = supportingDetailCount > 0;
     return <div className={cx('proposal-card', beginner && 'beginner-proposal-card')}>
         <div className="proposal-heading">
@@ -218,11 +218,13 @@ function AssistantOutput({ mode, sql, turn, busy, onDecideProposal, onRunQuery, 
         </div>
         {stale && <p className="assistant-stale-proposal" role="status">This accepted query comes from an earlier SQL draft. Running it uses the SQL shown here.</p>}
         {proposal.clarification && <div className="callout"><AssistantMarkdown text={proposal.clarification} sources={sources} className="assistant-proposal-markdown"/></div>}
-        {proposalSql !== null && findingCards}
+        {findingCards.length > 0 && <details className="assistant-supporting-details">
+            <summary>Details <span>{findingCards.length}</span></summary>
+            <div className="assistant-supporting-details-content">{findingCards}</div>
+        </details>}
         {hasSupportingDetails && <details className="assistant-supporting-details">
-            <summary>Details <span>{supportingDetailCount}</span></summary>
+            <summary>Assumptions, notes and sources <span>{supportingDetailCount}</span></summary>
             <div className="assistant-supporting-details-content">
-                {proposalSql === null && findingCards}
                 {proposal.assumptions.map((item, index) => <div className="proposal-point" key={`${index}-${item}`}><span>ASSUMPTION</span><AssistantMarkdown text={item} sources={sources} className="assistant-proposal-markdown"/></div>)}
                 {proposal.caveats.map((item, index) => <div className="proposal-point" key={`${index}-${item}`}><span>NOTE</span><AssistantMarkdown text={item} sources={sources} className="assistant-proposal-markdown"/></div>)}
                 {sources.length > 0 && <div className="assistant-web-sources"><span className="eyebrow">WEB SOURCES</span><ul>{sources.map(source => <li key={source.url}><a href={source.url} target="_blank" rel="noopener noreferrer">{source.label}</a></li>)}</ul></div>}
