@@ -224,7 +224,7 @@ test('Static production preview loads the native parser and exports retained sam
     await expect(table).toBeVisible();
     await table.click();
 
-    await page.locator('.inspector-footer').getByRole('button', { name: 'Export', exact: true }).click();
+    await page.getByRole('button', { name: 'Export', exact: true }).click();
     const exportDialog = page.getByRole('dialog', { name: 'Export' });
     const [download] = await Promise.all([
         page.waitForEvent('download'),
@@ -233,7 +233,7 @@ test('Static production preview loads the native parser and exports retained sam
     const csv = await readFile(await download.path(), 'utf8');
     expect(csv.split('\r\n')[0]).toContain('day');
     expect(csv).toContain('events');
-    await page.locator('.inspector-footer').getByRole('button', { name: 'Export', exact: true }).click();
+    await page.getByRole('button', { name: 'Export', exact: true }).click();
     const [queryDownload] = await Promise.all([
         page.waitForEvent('download'),
         page.getByRole('dialog', { name: 'Export' }).getByRole('button', { name: /Export query/ }).click(),

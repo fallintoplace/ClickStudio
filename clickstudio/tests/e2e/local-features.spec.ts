@@ -88,7 +88,7 @@ test('Result export downloads the complete retained CSV from the server', async 
     const runs = countRuns(page);
     await trust(page);
     await run(page);
-    await page.locator('.inspector-footer').getByRole('button', { name: 'Export', exact: true }).click();
+    await page.getByRole('button', { name: 'Export', exact: true }).click();
     const exportDialog = page.getByRole('dialog', { name: 'Export', exact: true });
     await expect(exportDialog).toBeVisible();
     const [download] = await Promise.all([
@@ -174,7 +174,7 @@ test('Local Cloud connection restores after refresh and exports retained rows fr
     await expect(resultTable).toBeVisible();
     await expect(resultTable).toContainText('2026-01-02');
 
-    await page.locator('.inspector-footer').getByRole('button', { name: 'Export', exact: true }).click();
+    await page.getByRole('button', { name: 'Export', exact: true }).click();
     const exportDialog = page.getByRole('dialog', { name: 'Export', exact: true });
     const [download] = await Promise.all([
         page.waitForEvent('download'),
