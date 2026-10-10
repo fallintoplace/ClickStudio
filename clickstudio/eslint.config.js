@@ -66,11 +66,4 @@ export default defineConfig([
       "react-hooks/exhaustive-deps": "error",
     },
   },
-  {
-    files: ["web/Workspace.tsx"],
-    rules: {
-      "complexity": ["error", 300],
-      "max-lines-per-function": ["error", { max: 850, skipBlankLines: true, skipComments: true }],
-    },
-  },
 ]);
