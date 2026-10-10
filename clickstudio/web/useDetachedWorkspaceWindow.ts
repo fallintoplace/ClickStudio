@@ -134,7 +134,3 @@ function useDetachedWorkspaceWindow(windowName: string, rootClassName: string, l
 export function useDetachedEditorWindow() {
     return useDetachedWorkspaceWindow('clickstudio-query-editor', 'detached-query-window-root workspace-root', 'Detached SQL editor');
 }
-
-export function useDetachedResultsWindow() {
-    return useDetachedWorkspaceWindow('clickstudio-query-results', 'detached-results-window-root workspace-root', 'Detached query results');
-}

@@ -557,33 +557,6 @@
     display: flex;
     gap: 8px;
   }
-  .select-control {
-    position: relative;
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    color: var(--muted);
-    font-size: 9px;
-  }
-  .select-control select {
-    max-width: 128px;
-    appearance: none;
-    padding: 7px 24px 7px 9px;
-    border: 1px solid var(--line);
-    border-radius: var(--radius-compact);
-    background: var(--panel);
-    color: var(--text-soft);
-    font-size: 10px;
-    cursor: pointer;
-  }
-  .select-chevron {
-    position: absolute;
-    right: 6px; /* stylelint-disable-next-line declaration-no-important -- Preserve component icon and control dimensions above utility styles. */
-    width: 13px !important; /* stylelint-disable-next-line declaration-no-important -- Preserve component icon and control dimensions above utility styles. */
-    height: 13px !important;
-    pointer-events: none;
-    color: var(--muted);
-  }
   .connection-env.is-demo {
     color: var(--amber);
   }
@@ -1164,9 +1137,6 @@
     gap: 12px;
     padding: 0 14px;
   }
-  .topbar-preferences .select-control > span {
-    display: none;
-  }
 }
 
 @media (max-height: 860px) and (min-width: 851px) {
@@ -1186,8 +1156,7 @@
   }
   .topbar > .brand-lockup .brand-name small,
   .topbar-divider,
-  .mode-caption,
-  .topbar-preferences .select-control > span {
+  .mode-caption {
     display: none;
   }
   .brand-lockup {
@@ -1218,11 +1187,6 @@
   }
   .topbar-preferences {
     gap: 4px;
-  }
-  .select-control select {
-    max-width: 82px;
-    padding: 6px 21px 6px 6px;
-    font-size: 9px;
   }
   .connection-env {
     font-size: 7px;
@@ -1331,9 +1295,6 @@
   }
   .topbar-preferences {
     order: 3;
-  }
-  .select-control select {
-    max-width: 91px;
   }
   .connection-wrap {
     order: 1;

@@ -581,17 +581,6 @@
     flex: none;
     box-shadow: none;
   }
-  .result-execution-header {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    color: var(--text-soft);
-    font-size: 9px;
-  }
-  .result-execution-header .loading-orbit {
-    width: 14px;
-    height: 14px;
-  }
   .result-execution-progress {
     display: grid;
     flex: none;
@@ -881,7 +870,6 @@
   }
   .result-empty-state,
   .result-loading,
-  .empty-workspace,
   .inspector-empty,
   .profile-empty {
     display: flex;
@@ -916,134 +904,6 @@
     flex-direction: row;
     color: var(--text-soft);
     font-size: 10px;
-  }
-  .results-surface:has(.empty-workspace) {
-    background: radial-gradient(
-      ellipse at 50% 40%,
-      color-mix(in srgb, var(--accent) 5%, var(--panel)),
-      var(--panel) 64%
-    );
-  }
-  .empty-workspace {
-    position: relative;
-    overflow: hidden;
-    gap: 12px;
-    padding: 26px;
-  }
-  .empty-workspace::before {
-    position: absolute;
-    width: 430px;
-    height: 220px;
-    border-radius: 50%;
-    background: color-mix(in srgb, var(--accent) 7%, transparent);
-    content: "";
-    filter: blur(76px);
-  }
-  .empty-graphic {
-    position: relative;
-    display: grid;
-    width: 86px;
-    height: 86px;
-    place-items: center;
-    margin-bottom: 3px;
-  }
-  .empty-core {
-    z-index: var(--z-local-raised);
-    display: grid;
-    width: 46px;
-    height: 46px;
-    place-items: center;
-    border: 1px solid color-mix(in srgb, var(--accent) 46%, transparent);
-    border-radius: var(--radius-panel);
-    background: linear-gradient(
-      145deg,
-      color-mix(in srgb, var(--accent) 19%, transparent),
-      color-mix(in srgb, var(--accent) 4%, transparent)
-    );
-    color: var(--accent);
-    box-shadow: none;
-    transform: rotate(-8deg);
-  }
-  .empty-orbit {
-    position: absolute;
-    inset: 6px;
-    border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
-    border-radius: 50%;
-    animation: orbit 13s linear infinite;
-  }
-  .empty-orbit::after {
-    position: absolute;
-    top: 8px;
-    left: 8px;
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    background: var(--accent);
-    content: "";
-    box-shadow: var(--status-ring);
-    color: var(--accent);
-  }
-  .empty-orbit.orbit-two {
-    inset: 15px -4px;
-    border-color: color-mix(in srgb, var(--signal-accent) 24%, transparent);
-    animation-direction: reverse;
-    animation-duration: 18s;
-    transform: rotate(55deg);
-  }
-  .empty-orbit.orbit-two::after {
-    top: auto;
-    bottom: 8px;
-    left: 15px;
-    background: var(--signal-accent);
-    box-shadow: var(--status-ring);
-    color: var(--signal-accent);
-  }
-  .empty-spark {
-    position: absolute;
-    width: 3px;
-    height: 3px;
-    border-radius: 50%;
-    background: var(--accent);
-    box-shadow: var(--status-ring);
-    animation: sparkle 2s ease-in-out infinite;
-    color: var(--accent);
-  }
-  .spark-one {
-    top: 1px;
-    right: 13px;
-  }
-  .spark-two {
-    bottom: 10px;
-    left: 2px;
-    animation-delay: 0.7s;
-  }
-  .empty-workspace .eyebrow {
-    color: var(--accent);
-  }
-  .empty-workspace h3 {
-    position: relative;
-    margin: 0;
-    color: var(--text);
-    font-family: var(--font-display);
-    font-size: clamp(22px, 2vw, 31px);
-    font-weight: 660;
-    letter-spacing: -0.045em;
-    line-height: 1.05;
-  }
-  .empty-workspace h3 em {
-    color: var(--accent);
-    font-style: normal;
-  }
-  .empty-workspace p {
-    max-width: 390px;
-    margin: 0 0 5px;
-    color: var(--text-soft);
-    font-size: 10px;
-    line-height: 1.7;
-  }
-  .empty-workspace > .button-base {
-    min-height: 34px;
-    padding-inline: 14px;
   }
 }
 
@@ -1103,44 +963,6 @@
     min-height: 47px;
     padding-top: 5px;
     padding-bottom: 5px;
-  }
-  .empty-workspace {
-    gap: 7px;
-    padding: 10px;
-  }
-  .empty-graphic {
-    display: grid;
-    width: 42px;
-    height: 42px;
-    margin-bottom: 0;
-  }
-  .empty-core {
-    width: 28px;
-    height: 28px;
-    border-radius: var(--radius-panel);
-  }
-  .empty-core svg {
-    width: 14px;
-    height: 14px;
-  }
-  .empty-orbit {
-    inset: 1px;
-  }
-  .empty-orbit.orbit-two {
-    inset: 7px -4px;
-  }
-  .empty-workspace h3 {
-    font-size: 23px;
-    line-height: 0.99;
-  }
-  .empty-workspace p {
-    max-width: 380px;
-    margin-bottom: 2px;
-    font-size: 9px;
-    line-height: 1.45;
-  }
-  .empty-workspace > .button-base {
-    min-height: 31px;
   }
 }
 

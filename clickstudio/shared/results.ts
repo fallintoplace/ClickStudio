@@ -270,23 +270,3 @@ export function csvCell(value: Json | undefined, type?: string): string {
 export function exportCsv(result: Pick<Result, 'columns' | 'rows'>): string {
     return [result.columns.map(c => csvCell(c.name)).join(','), ...result.rows.map(r => r.map((value, index) => csvCell(value, result.columns[index]?.type)).join(','))].join('\r\n');
 }
-export function columnStats(rows: Row[], index: number) {
-    let nulls = 0;
-    const values = new Set<string>();
-    let min: number | null = null, max: number | null = null;
-    for (const row of rows) {
-        const value = row[index];
-        if (value === null || value === undefined) {
-            nulls++;
-            continue;
-        }
-        values.add(displayValue(value));
-        const n = chartNumber(value);
-        if (n !== null) {
-            min = min === null ? n : Math.min(min, n);
-            max = max === null ? n : Math.max(max, n);
-        }
-    }
-    return { scope: 'retained rows only' as const, rows: rows.length, nulls, distinct: values.size,
-        min, max };
-}

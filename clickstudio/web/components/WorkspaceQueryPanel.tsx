@@ -86,7 +86,6 @@ export function WorkspaceQueryPanel({
         demoMode,
     } = state;
     const { statementCount, editorErrorContext, editorErrorRange } = viewState;
-    const { queryPanelRef } = panels;
     const selectedSql = active.to > active.from ? active.sql.slice(active.from, active.to) : undefined;
     const queryNameAtFocus = useRef(active.name);
     const sqlToRun = selectedSql ?? active.sql;
@@ -111,7 +110,6 @@ export function WorkspaceQueryPanel({
         disabled={Boolean(busy) || !active.name.trim()}
     ><Icon name="documents"/>{copy.common.save}</Button>;
     return <section
-        ref={queryPanelRef}
         className={cx('editor-surface', viewState.failureError && !state.executionPending && 'has-error-output', panels.queryCollapsed && 'is-collapsed')}
     >
         <div className="editor-heading">

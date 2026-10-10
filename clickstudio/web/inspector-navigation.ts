@@ -39,10 +39,6 @@ export const PRIMARY_INSPECTOR_NAVIGATION = INSPECTOR_NAVIGATION.filter(
     (item): item is PrimaryInspectorDestination => item.group === 'primary',
 );
 
-export function isPrimaryInspector(inspector: Inspector): inspector is PrimaryInspector {
-    return PRIMARY_INSPECTOR_NAVIGATION.some(item => item.id === inspector);
-}
-
 export const EXPERT_BROWSE_NAVIGATION = INSPECTOR_NAVIGATION.filter(
     (item): item is SecondaryInspectorDestination => item.group === 'more' && item.railSection === 'browse',
 );

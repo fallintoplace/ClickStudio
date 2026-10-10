@@ -47,10 +47,6 @@ export function RailButton({ icon, label, active, accent, disabled, testId, onCl
     return <button className={cx('rail-icon-button', active && 'is-active', accent && 'is-accent')} type="button" title={label} aria-label={label} aria-pressed={active} disabled={disabled} data-testid={testId} onClick={onClick}><Icon name={icon}/><span className="rail-tooltip">{label}</span></button>;
 }
 
-export function EmptyWorkspace({ onRun, beginner }: { onRun: () => void; beginner: boolean }) {
-    return <div className="empty-workspace"><div className="empty-graphic"><span className="empty-orbit orbit-one"/><span className="empty-orbit orbit-two"/><span className="empty-core"><Icon name="bolt"/></span><span className="empty-spark spark-one"/><span className="empty-spark spark-two"/></div><span className="eyebrow">YOUR NEXT INSIGHT STARTS HERE</span><h3>Make the data<br/><em>say something.</em></h3><p>{beginner ? 'Run SQL to see your data. Select text to run only that selection.' : 'Run all SQL in the editor, or select SQL to run only that selection. Your query, run, and evidence stay linked.'}</p><Button variant="primary" onClick={onRun}><Icon name="play"/>Focus SQL editor</Button></div>;
-}
-
 export function ScriptResults({ script, runs, activeRunId, onSelectRun, onSelectError, errorSelected = false, onCancel, cancelDisabled, cancelAfterCurrentStatement = false }: {
     script: Script;
     runs: Run[];

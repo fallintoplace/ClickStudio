@@ -1,5 +1,4 @@
 import type { Column, Result } from './types.js';
-import { exportCsv } from './results.js';
 
 /** Column identity is its position, never its possibly duplicated display name. */
 export function visibleColumns(count: number, hidden: readonly number[]): number[] {
@@ -28,8 +27,4 @@ export function projectResultColumns(result: Pick<Result, 'columns' | 'rows'>, i
     if (!indexes.length || new Set(indexes).size !== indexes.length || indexes.some(index => !Number.isSafeInteger(index) || index < 0 || index >= result.columns.length))
         throw new Error('Choose at least one valid, distinct result column.');
     return { columns: indexes.map(index => result.columns[index]!), rows: result.rows.map(row => indexes.map(index => row[index]!)) };
-}
-
-export function exportFilteredCsv(result: Pick<Result, 'columns' | 'rows'>, indexes: readonly number[]): string {
-    return exportCsv(projectResultColumns(result, indexes));
 }

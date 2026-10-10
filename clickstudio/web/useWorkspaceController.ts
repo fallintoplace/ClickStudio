@@ -39,7 +39,6 @@ import type {
 } from './workspace-types';
 
 import { useDetachedQueryEditor } from './useDetachedQueryEditor';
-import { useDetachedResultsPanel } from './useDetachedResultsPanel';
 import { useWorkspaceDocumentSave } from './useWorkspaceDocumentSave';
 import { useWorkspaceExecution } from './useWorkspaceExecution';
 import { useWorkspaceNotifications } from './useWorkspaceNotifications';
@@ -287,7 +286,6 @@ export function useWorkspaceController({ connection, connectionLabel, connection
         hasOutput: outputVisible,
     });
     const detachedEditor = useDetachedQueryEditor({ activeDraftId: active.id, activeName: active.name, experience, panels, editorRef: editor, copy: copy.common, setError, setNotice });
-    const detachedResults = useDetachedResultsPanel({ activeDraftId: active.id, activeName: active.name, resultsTitle: viewState.resultsTitle, experience, panels, copy: copy.common, setError, setNotice });
 
 
     const { perform, execute, runExample, cancel, openRun, openNewDraft, openSqlDraft, startBlankSql, addDraft } = useWorkspaceExecution({
@@ -468,7 +466,7 @@ export function useWorkspaceController({ connection, connectionLabel, connection
         nativeParseSnapshot, execute, busy, unsupportedParameters, parameters, pendingExecution, cancelling, patch,
         saveDraft, formatActiveSql, cancel, runActionTitle, setNativeParserStatus, setNativeParseSnapshot,
         detachedEditor, panels, viewState, failedQueryError, script, setSelectedScriptResult, scriptFollowRef,
-        update, detachedResults, setOutputClosedForDraft, loadFlamegraph, inspectorDocked, error, setError, notice,
+        update, setOutputClosedForDraft, loadFlamegraph, inspectorDocked, error, setError, notice,
         setNotice, storageError, drawerOpen, setImportOpen, setExportOpen, workspace, savingDraftIds,
         finishTabRename, clearFailedQueryError, helpPanelOpen, openExamples, helpPanelSection, setHelpPanelSection,
         closeHelpPanel, setObservabilityOpen, sqlExamples, sqlMapStatement, sqlMapParseStatement, queryTreeAvailable,

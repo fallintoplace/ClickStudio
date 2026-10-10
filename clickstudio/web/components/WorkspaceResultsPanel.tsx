@@ -15,7 +15,7 @@ import { ExplainIndexesView } from './ExplainIndexesView';
 import { ExplainPlanView } from './ExplainPlanView';
 import { PipelineGraph } from './PipelineGraph';
 import { SqlFlowView } from './SqlFlowView';
-import { Button, cx, Icon, Status } from './ui';
+import { Button, cx, Icon } from './ui';
 import { ScriptResults } from './WorkspaceChrome';
 import { ScrollEdgeFrame } from './ScrollEdgeShadows';
 import { QueryFailureNotice } from './QueryFailureNotice';
@@ -52,7 +52,6 @@ export type WorkspaceResultsPanelActions = Readonly<{
     onSelectView: (view: ResultsView) => void;
     onSelectScriptRun: (runId: string) => void;
     onSelectScriptError: () => void;
-    onDockDetached: () => void;
     onCloseOutput: () => void;
     onCancel: () => void;
     onPage: (page: number) => void;
@@ -68,13 +67,11 @@ export function WorkspaceResultsPanel({
     actions,
     panels,
     viewState,
-    detached = false,
 }: {
     state: WorkspaceResultsPanelState;
     actions: WorkspaceResultsPanelActions;
     panels: WorkspacePanelController;
     viewState: WorkspaceViewState;
-    detached?: boolean;
 }) {
     const [tableToolbar, setTableToolbar] = useState<HTMLDivElement | null>(null);
     const {
@@ -122,7 +119,6 @@ export function WorkspaceResultsPanel({
         failureError,
         failureSql,
     } = viewState;
-    const { resultsPanelRef } = panels;
 
     const showPreviousResult = Boolean(execution && retainedExecutionResult && visibleResultsView === 'results');
     const resultsRun = showPreviousResult ? retainedExecutionResult!.run : run;
@@ -134,10 +130,9 @@ export function WorkspaceResultsPanel({
     const showFailure = Boolean(failureError && !execution && visibleResultsView !== 'sqlmap');
     const previousSuccessfulResult = Boolean((failedAttempt || (failedScriptStatement && !failedScriptStatement.runId)) && run?.resultState === 'reopenable' && run.status !== 'failed');
 
-    if (!run && !execution && !failedAttempt && !failedScriptStatement && visibleResultsView !== 'sqlmap' && !detached) return null;
+    if (!run && !execution && !failedAttempt && !failedScriptStatement && visibleResultsView !== 'sqlmap') return null;
 
     return <section
-        ref={resultsPanelRef}
         className={cx('results-surface', showFailure && 'has-error-output', experience === 'expert' && 'results-expert', panels.resultsCollapsed && 'is-collapsed')}
         aria-label={resultsPanelLabel}
     >
@@ -145,23 +140,16 @@ export function WorkspaceResultsPanel({
             <div className="results-title">
                 {!showFailure && <span className="results-mark"><Icon name={visibleResultsView === 'sqlmap' || visibleResultsView === 'pipeline' || visibleResultsView === 'indexes' || visibleResultsView === 'runtime' ? 'pipeline' : 'chart'}/></span>}
                 <div>{!showFailure && <span className="eyebrow">{resultsEyebrow}</span>}<h2>{showFailure ? copy.common.output : resultsTitle}</h2></div>
-                {detached && panels.resultsCollapsed && failureError && visibleResultsView !== 'sqlmap'
-                    ? <span className="result-execution-header" data-run-status="failed" role="status"><span className="status-light is-error"/>{copy.common.queryFailed}</span>
-                    : detached && panels.resultsCollapsed && execution && visibleResultsView !== 'sqlmap'
-                    ? <span className="result-execution-header"><span className="loading-orbit" aria-hidden="true"/>{copy.common.statusRunning}</span>
-                    : detached && !failureError && !execution && run && visibleResultsView !== 'sqlmap' && <Status run={run} copy={copy.common}/>}
             </div>
             <div className="results-actions">
                 <div ref={setTableToolbar} className="results-table-tools" hidden={panels.resultsCollapsed || showFailure}/>
                 {!showFailure && previousSuccessfulResult && visibleResultsView !== 'results' && !(visibleResultsView === 'chart' && snapshotChart?.config.kind === 'table') && <span className="result-previous-run" title={copy.common.previousResultsDescription}>{copy.common.previousRun}</span>}
-                {detached && <Button variant="ghost" className="panel-window-button" aria-label={copy.common.dockResultsPanel} title={copy.common.dockResultsPanel} onClick={actions.onDockDetached}><Icon name="dock"/></Button>}
                 {!showFailure && run && resultTabs.length > 1 && <div className="results-tabs" role="tablist" aria-label={copy.common.workspaceOutput}>{resultTabs.map(tab => <button key={tab} role="tab" aria-selected={visibleResultsView === tab} type="button" onClick={() => actions.onSelectView(tab)}>{resultsTabLabel(tab, copy.common)}</button>)}</div>}
                 <Button variant="ghost" className="panel-collapse-button" aria-label={`${panels.resultsCollapsed ? copy.common.expand : copy.common.collapse} ${resultsPanelLabel}`} aria-expanded={!panels.resultsCollapsed} aria-controls="query-results-content" title={panels.resultsCollapsed ? copy.common.expandOutput : copy.common.collapseOutput} onClick={() => panels.setResultsCollapsed(value => !value)}><Icon className="panel-toggle-icon" name="chevron"/></Button>
                 {showFailure && <Button variant="ghost" className="panel-window-button" aria-label={copy.common.closeOutput} title={copy.common.closeOutput} onClick={actions.onCloseOutput}><Icon name="close"/></Button>}
             </div>
         </div>
         <ScrollEdgeFrame<HTMLDivElement> className="results-content-frame" hidden={panels.resultsCollapsed}>{ref => <div id="query-results-content" ref={ref} className={cx('panel-content results-content', (showFailure || ['insights', 'indexes', 'plan', 'pipeline', 'runtime'].includes(visibleResultsView)) && 'results-content-scrollable')} hidden={panels.resultsCollapsed}>
-            {detached && !run && !execution && !failedAttempt && visibleResultsView !== 'sqlmap' && <div className="detached-results-empty"><Icon name="chart"/><span>{copy.common.detachedResultsEmpty}</span></div>}
             {visibleResultsView === 'sqlmap' && <SqlFlowView copy={copy.common} sql={sqlMapStatement?.sql ?? active.sql} sourceOffset={sqlMapStatement?.from ?? 0} parseResult={sqlMapParseStatement?.result} parserEnabled={nativeParserEnabled} parserStatus={nativeParserStatus} parseDurationMs={nativeParseSnapshot?.elapsedMs} connectionId={connection.id} parameters={active.parameters} analyzerAvailable={queryTreeAvailable} analyzerUnavailableReason={queryTreeUnavailableReason} onRevealRange={actions.onRevealRange}/>}
             {execution && visibleResultsView !== 'sqlmap' && <div className={cx('result-execution-progress', !showPreviousResult && 'is-initial')} aria-busy="true">
                 <div className="result-execution-heading"><span className="loading-orbit" aria-hidden="true"/><span role="status" aria-live="polite">{copy.common.statusRunning}</span><strong className="result-execution-query" title={active.name}>{active.name}</strong>{showPreviousResult && <span className="result-execution-previous">Previous result</span>}</div>

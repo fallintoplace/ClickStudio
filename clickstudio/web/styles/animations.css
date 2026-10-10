@@ -32,22 +32,6 @@
     transform: rotate(360deg);
   }
 }
-@keyframes orbit {
-  to {
-    transform: rotate(360deg);
-  }
-}
-@keyframes sparkle {
-  0%,
-  100% {
-    opacity: 0.4;
-    transform: scale(0.7);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.5);
-  }
-}
 @keyframes statusPulse {
   0%,
   100% {

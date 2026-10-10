@@ -1,6 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import type { Run } from '../../shared/types';
-import type { Inspector, SelectOption } from '../workspace-types';
+import type { Inspector } from '../workspace-types';
 import type { Copy } from '../i18n';
 
 export const terminal = (run?: Run) => Boolean(run && ['succeeded', 'truncated', 'failed', 'cancelled', 'timed_out', 'interrupted'].includes(run.status));
@@ -42,11 +42,8 @@ const iconPaths = {
     previousPage: <path d="M19 12H5m7-7-7 7 7 7"/>,
     nextPage: <path d="M5 12h14m-7-7 7 7-7 7"/>,
     lastPage: <path d="M19 5v14M5 5l7 7-7 7"/>,
-    floatPanel: <><rect x="3" y="8" width="13" height="12" rx="2"/><path d="M3 12h13"/><rect x="9" y="3" width="12" height="12" rx="2"/><path d="M9 7h12"/></>,
     newWindow: <><rect x="3" y="5" width="18" height="15" rx="2"/><path d="M3 9h18M13 3h8v8M21 3l-9 9"/></>,
     dock: <><rect x="4" y="5" width="16" height="14" rx="2"/><path d="m15 9-5 5m0 0h4m-4 0v-4"/></>,
-    maximize: <path d="M5 9V5h4m6 0h4v4m0 6v4h-4m-6 0H5v-4"/>,
-    restore: <><rect x="5" y="7" width="12" height="12" rx="1.5"/><path d="M8 7V5h11v11h-2"/></>,
     plus: <path d="M12 5v14M5 12h14"/>,
     lock: <><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 1 1 8 0v3"/></>,
     importFile: <><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></>,
@@ -85,15 +82,6 @@ export function Status({ run, copy }: { run?: Run; copy?: Copy['common'] }) {
     const label = key && copy ? copy[key] : run?.status ?? copy?.statusReady ?? 'Ready';
     return <span data-run-status={run?.status ?? 'ready'} className="inline-flex items-center gap-2 text-[11px] capitalize text-muted"><span className={cx('status-light', kind)}/>{label}</span>;
 }
-
-export function SelectControl<Value extends string>({ label, value, options, onChange }: { label: string; value: Value; options: readonly SelectOption<Value>[]; onChange: (value: Value) => void }) {
-    const selectOption = (rawValue: string) => {
-        const option = options.find(candidate => candidate.value === rawValue);
-        if (option) onChange(option.value);
-    };
-    return <label className="select-control"><span>{label}</span><select value={value} onChange={event => selectOption(event.target.value)}>{options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select><Icon name="chevron" className="select-chevron"/></label>;
-}
-
 
 export function formatBytes(value?: string | number): string {
     if (value === undefined) return '—';

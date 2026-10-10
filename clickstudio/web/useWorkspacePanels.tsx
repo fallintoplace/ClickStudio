@@ -32,8 +32,6 @@ export function useWorkspacePanels({
         return recoverWorkspacePanelLayout(stored, panelViewport());
     });
     const [temporaryReveals, setTemporaryReveals] = useState<Partial<Record<WorkspacePanelId, string>>>({});
-    const queryPanelRef = useRef<HTMLElement>(null);
-    const resultsPanelRef = useRef<HTMLElement>(null);
     const workspaceContentRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -120,8 +118,6 @@ export function useWorkspacePanels({
         clearTemporaryPanelReveal,
         panelLayout,
         setPanelLayout,
-        queryPanelRef,
-        resultsPanelRef,
         workspaceContentRef,
         canSplitPanels,
         workspaceLayoutStyle,

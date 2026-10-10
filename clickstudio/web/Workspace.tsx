@@ -4,7 +4,6 @@ import { sqlReferencesQualifiedTable } from '../shared/table-deletion';
 import type { Result, Run, Schema, SchemaTable } from '../shared/types';
 import { api, download } from './api';
 import { DetachedQueryPlaceholder } from './components/DetachedQueryPlaceholder';
-import { DetachedResultsPlaceholder } from './components/DetachedResultsPlaceholder';
 import { ExportDialog } from './components/ExportDialog';
 import { HelpButton } from './components/HelpButton';
 import { ImportWizard } from './components/ImportWizard';
@@ -102,7 +101,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         trusted, restoreDocumentRevision, selectableRunId, nativeParserStatus, nativeParseSnapshot, execute, busy,
         unsupportedParameters, parameters, pendingExecution, cancelling, patch, saveDraft, formatActiveSql, cancel,
         runActionTitle, setNativeParserStatus, setNativeParseSnapshot, detachedEditor, panels, viewState,
-        failedQueryError, script, setSelectedScriptResult, scriptFollowRef, update, detachedResults,
+        failedQueryError, script, setSelectedScriptResult, scriptFollowRef, update,
         setOutputClosedForDraft, loadFlamegraph, inspectorDocked, error, setError, notice, setNotice, storageError,
         drawerOpen, setImportOpen, setExportOpen, workspace, savingDraftIds, finishTabRename, clearFailedQueryError,
         helpPanelOpen, openExamples, helpPanelSection, setHelpPanelSection, closeHelpPanel, setObservabilityOpen,
@@ -228,15 +227,15 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
             onSelectView: nextView => { setView(nextView); if (nextView === 'insights') void perform(loadProfile, 'save'); },
             onSelectScriptRun: runId => { setSelectedScriptResult(active.id, `${active.scriptId}:${runId}`); if (active.scriptId) scriptFollowRef.current = { scriptId: active.scriptId, enabled: false }; update(active.id, draft => ({ ...draft, activeRunId: runId })); setView('results'); },
             onSelectScriptError: () => { setSelectedScriptResult(active.id, ''); setView('results'); },
-            onCloseOutput: () => { detachedResults.closeResults(); setOutputClosedForDraft(active.id, true); editor.current?.focus(); },
-            onDockDetached: detachedResults.dockResults, onCancel: () => void cancel(), onPage: setPage, onPatch: patch,
+            onCloseOutput: () => { setOutputClosedForDraft(active.id, true); editor.current?.focus(); },
+            onCancel: () => void cancel(), onPage: setPage, onPatch: patch,
             onLoadProfile: () => void perform(loadProfile, 'save'), onLoadPipeline: () => void perform(loadPipeline, 'save'), onLoadFlamegraph: () => void perform(loadFlamegraph, 'save'),
             onRevealRange: (from, to) => {
                 panels.revealPanelTemporarily('query', active.id);
                 window.requestAnimationFrame(() => { editor.current?.revealRange(from, to); editor.current?.focus(); });
             },
         }}
-        panels={panels} viewState={viewState} detached={Boolean(detachedResults.detached)}
+        panels={panels} viewState={viewState}
     />;
 
     return <div className={cx('workspace-root', experience === 'expert' && 'is-expert', experience === 'beginner' && 'is-beginner', inspectorDocked && 'has-inspector-dock')}>
@@ -285,10 +284,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
                     cancelTabRename={cancelTabRename}
                     onActivate={draftId => setWorkspace(current => ({ ...current, activeId: draftId }))}
                     onClose={draftId => {
-                        if (workspace.tabs.length === 1) {
-                            detachedEditor.closeEditor();
-                            detachedResults.closeResults();
-                        }
+                        if (workspace.tabs.length === 1) detachedEditor.closeEditor();
                         setWorkspace(current => closeDraft(current, draftId));
                         clearFailedQueryError(draftId);
                     }}
@@ -392,17 +388,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
 
                     {outputVisible && <WorkspacePanelSplitter panels={panels}/>}
 
-                    {outputVisible && (detachedResults.detached
-                        ? <DetachedResultsPlaceholder
-                            title={viewState.resultsTitle}
-                            eyebrow={viewState.resultsEyebrow}
-                            queryName={active.name}
-                            copy={copy.common}
-                            collapsed={panels.resultsCollapsed}
-                            onFocus={detachedResults.focusResults}
-                            onDock={detachedResults.dockResults}
-                        />
-                        : resultsPanel)}
+                    {outputVisible && resultsPanel}
                 </div> : <section className="empty-sql-workspace" role="tabpanel" aria-label={copy.common.noSqlTabsOpen}>
                     <Icon name="documents"/>
                     <h2>{copy.common.noSqlTabsOpen}</h2>
@@ -419,6 +405,5 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         <RestoreRevisionDialog revision={restoreRevisionConfirmation?.revision} locale={locale} onClose={() => setRestoreRevisionConfirmation(undefined)} onConfirm={() => { const revision = restoreRevisionConfirmation; if (!revision) return; setRestoreRevisionConfirmation(undefined); restoreDocumentRevision(revision, true); }}/>
         <ExecutionBar run={run} failedAttempt={Boolean(failedQueryError || (viewState.failureError && run?.status !== 'failed' && !pendingExecution.execution))} failureInToolbar={Boolean(viewState.failureError && !pendingExecution.execution)} eventState={eventState} onOpenDetails={() => showInspector('details')} scriptRunning={script?.status === 'running'} copy={copy.common} helpButton={<HelpButton copy={copy.common} open={helpPanelOpen} onOpen={openHelp}/>}/>
         {detachedEditor.detached && createPortal(queryPanel, detachedEditor.detached.container)}
-        {outputVisible && detachedResults.detached && createPortal(resultsPanel, detachedResults.detached.container)}
     </div>;
 }
