@@ -441,19 +441,6 @@
     flex: none;
     stroke-width: 2;
   }
-  .has-error-output .results-title h2 {
-    position: relative;
-    color: var(--text);
-  }
-  .has-error-output .results-title h2::after {
-    position: absolute;
-    bottom: -14px;
-    left: 0;
-    width: 44px;
-    height: 2px;
-    background: var(--accent-cyan);
-    content: "";
-  }
   .result-failure {
     position: relative;
     min-width: 0;

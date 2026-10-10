@@ -75,6 +75,9 @@ for (const mode of ['beginner', 'expert'])
             'data-run-status',
             'succeeded',
         );
+        const header = page.locator('.results-header');
+        const title = header.getByRole('heading', { name: 'Results', exact: true });
+        await expect(title).toBeVisible();
         const failedSql = 'SELECT day, event_count FROM demo.events ORDER BY day';
         const repairedSql = failedSql.replace('event_count', 'events');
         const requests = await installRepair(page, repairedSql);
@@ -83,11 +86,11 @@ for (const mode of ['beginner', 'expert'])
         await composer.fill('Keep my unfinished question');
         await replaceSql(page, failedSql);
         await rejectQuery(page);
+        await expect(title).toBeVisible();
         await page.getByRole('button', { name: 'Collapse Query results', exact: true }).click();
         await expect(page.getByTestId('query-failure')).toBeHidden();
-        const fix = page
-            .locator('.results-header')
-            .getByRole('button', { name: 'Fix with AI', exact: true });
+        await expect(title).toBeVisible();
+        const fix = header.getByRole('button', { name: 'Fix with AI', exact: true });
         await expect(fix).toBeVisible();
         await fix.click();
         await expect(page.getByTestId('assistant-proposal-summary')).toHaveText(
@@ -119,6 +122,7 @@ for (const mode of ['beginner', 'expert'])
             'succeeded',
         );
         await expect(fix).toHaveCount(0);
+        await expect(title).toBeVisible();
         await page.reload();
         await page.getByTestId('open-ai').click();
         await expect(page.getByTestId('assistant-proposal-summary')).toHaveText(
@@ -147,7 +151,7 @@ test('Fix with AI keeps the full draft when a selected statement fails', async (
 });
 
 for (const theme of ['Dark', 'Light'])
-    test(`Fix with AI stays in the Output header above long errors in narrow ${theme.toLowerCase()} panels`, async ({
+    test(`Fix with AI stays in the Results header above long errors in narrow ${theme.toLowerCase()} panels`, async ({
         page,
     }, testInfo) => {
         await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -169,6 +173,12 @@ for (const theme of ['Dark', 'Light'])
             await page.setViewportSize({ width, height: 900 });
             await fix.scrollIntoViewIfNeeded();
             await expect(fix).toBeVisible();
+            await expect(
+                header.getByRole('heading', { name: 'Results', exact: true }),
+            ).toBeVisible();
+            await expect(header.locator('.eyebrow')).toHaveText('WORKSPACE OUTPUT');
+            if (width === 900) await expect(header.locator('.results-mark')).toBeVisible();
+            else await expect(header.locator('.results-mark')).toBeHidden();
             const bounds = (await header.boundingBox())!;
             const failureBounds = (await failure.boundingBox())!;
             const fixBounds = (await fix.boundingBox())!;
@@ -188,6 +198,30 @@ for (const theme of ['Dark', 'Light'])
             await page.screenshot({ path: testInfo.outputPath(`error-${width}.png`) });
         }
     });
+
+test('Fix with AI uses the Results header after viewing an EXPLAIN pipeline', async ({ page }) => {
+    await trust(page);
+    await page.getByTestId('run-action-explain-pipeline').click();
+    const header = page.locator('.results-header');
+    await expect(
+        header.getByRole('heading', { name: 'ClickHouse pipeline', exact: true }),
+    ).toBeVisible();
+    await expect(page.locator('.execution-bar')).toHaveAttribute('data-run-status', 'succeeded');
+    const failedSql = 'SELECT event_count FROM demo.events';
+    const requests = await installRepair(page, failedSql.replace('event_count', 'events'));
+    await replaceSql(page, failedSql);
+    await rejectQuery(page);
+    const results = page.getByRole('region', { name: 'Query results', exact: true });
+    await expect(results.getByTestId('query-failure')).toBeVisible();
+    await expect(header.getByRole('heading', { name: 'Results', exact: true })).toBeVisible();
+    await expect(header.locator('.eyebrow')).toHaveText('WORKSPACE OUTPUT');
+    await expect(
+        header.getByRole('button', { name: 'Collapse Query results', exact: true }),
+    ).toBeVisible();
+    await header.getByRole('button', { name: 'Fix with AI', exact: true }).click();
+    await expect(page.getByTestId('assistant-proposal-summary')).toBeVisible();
+    expect(requests[0]).toMatchObject({ sql: failedSql, repair: { sql: failedSql } });
+});
 
 test('Fix with AI uses the failed script statement instead of an earlier successful run', async ({
     page,

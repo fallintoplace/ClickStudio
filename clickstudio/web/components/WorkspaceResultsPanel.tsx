@@ -156,7 +156,7 @@ export function WorkspaceResultsPanel({
                 experience === 'expert' && 'results-expert',
                 panels.resultsCollapsed && 'is-collapsed',
             )}
-            aria-label={resultsPanelLabel}
+            aria-label={showFailure ? copy.common.queryResults : resultsPanelLabel}
         >
             {renderResultsHeader({
                 showFailure,
@@ -450,27 +450,27 @@ function renderResultsHeader({
         failureSql,
     } = viewState;
     const { copy, run, assistantBusy, busy } = state;
+    const headerView = showFailure ? 'results' : visibleResultsView;
+    const headerPanelLabel = showFailure ? copy.common.queryResults : resultsPanelLabel;
 
     return (
         <div className="results-header">
             <div className="results-title">
-                {!showFailure && (
-                    <span className="results-mark">
-                        <Icon
-                            name={
-                                visibleResultsView === 'sqlmap' ||
-                                visibleResultsView === 'pipeline' ||
-                                visibleResultsView === 'indexes' ||
-                                visibleResultsView === 'runtime'
-                                    ? 'pipeline'
-                                    : 'chart'
-                            }
-                        />
-                    </span>
-                )}
+                <span className="results-mark">
+                    <Icon
+                        name={
+                            headerView === 'sqlmap' ||
+                            headerView === 'pipeline' ||
+                            headerView === 'indexes' ||
+                            headerView === 'runtime'
+                                ? 'pipeline'
+                                : 'chart'
+                        }
+                    />
+                </span>
                 <div>
-                    {!showFailure && <span className="eyebrow">{resultsEyebrow}</span>}
-                    <h2>{showFailure ? copy.common.output : resultsTitle}</h2>
+                    <span className="eyebrow">{resultsEyebrow}</span>
+                    <h2>{showFailure ? copy.common.results : resultsTitle}</h2>
                 </div>
             </div>
             <div className="results-actions">
@@ -523,7 +523,7 @@ function renderResultsHeader({
                 <Button
                     variant="ghost"
                     className="panel-collapse-button"
-                    aria-label={`${panels.resultsCollapsed ? copy.common.expand : copy.common.collapse} ${resultsPanelLabel}`}
+                    aria-label={`${panels.resultsCollapsed ? copy.common.expand : copy.common.collapse} ${headerPanelLabel}`}
                     aria-expanded={!panels.resultsCollapsed}
                     aria-controls="query-results-content"
                     title={

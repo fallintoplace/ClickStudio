@@ -770,7 +770,7 @@ test('Failed execution replaces visible results and can collapse, reopen and ret
         const failure = page.getByTestId('query-failure');
         await expect(failure).toContainText('SYNTAX_ERROR');
         await expect(failure).toContainText('Syntax error at position 15');
-        await expect(results.getByRole('heading', { name: 'Output', exact: true })).toBeVisible();
+        await expect(results.getByRole('heading', { name: 'Results', exact: true })).toBeVisible();
         await expect(results.getByRole('table')).toHaveCount(0);
         await expect(results.locator('.result-provenance-header')).toHaveCount(0);
         await expect(page.locator('.execution-bar')).toHaveAttribute('data-run-status', 'failed');
@@ -869,7 +869,7 @@ test('A query failure in another draft remains discoverable without showing its 
 
 for (const theme of ['Dark', 'Light'])
     for (const mode of ['Standard', 'Experimental']) {
-        test(`Failed Output preserves the split in ${theme.toLowerCase()} ${mode} mode`, async ({
+        test(`Failed Results preserve the header and split in ${theme.toLowerCase()} ${mode} mode`, async ({
             page,
         }, testInfo) => {
             await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -885,6 +885,12 @@ for (const theme of ['Dark', 'Light'])
                 );
                 await new Promise(requestAnimationFrame);
             });
+            const header = results.locator('.results-header');
+            const title = header.getByRole('heading', { name: 'Results', exact: true });
+            await expect(title).toBeVisible();
+            const headerBefore = (await header.boundingBox())!;
+            const titleBefore = (await title.boundingBox())!;
+            const markBefore = (await header.locator('.results-mark').boundingBox())!;
             const before = (await results.boundingBox())!;
             const runBefore = (await runButton(page).boundingBox())!;
             const saveBefore = (await page.getByTestId('save-query').boundingBox())!;
@@ -908,7 +914,21 @@ for (const theme of ['Dark', 'Light'])
             await expect(
                 results.getByRole('button', { name: 'Close output', exact: true }),
             ).toHaveCount(0);
-            const header = results.locator('.results-header');
+            await expect(title).toBeVisible();
+            await expect(header.locator('.eyebrow')).toHaveText('WORKSPACE OUTPUT');
+            await expect(header.locator('.results-mark')).toBeVisible();
+            expect(
+                await title.evaluate(element => getComputedStyle(element, '::after').content),
+            ).toBe('none');
+            for (const [element, previous] of [
+                [header, headerBefore],
+                [title, titleBefore],
+                [header.locator('.results-mark'), markBefore],
+            ] as const) {
+                const current = (await element.boundingBox())!;
+                for (const dimension of ['x', 'y', 'width', 'height'] as const)
+                    expect(current[dimension]).toBeCloseTo(previous[dimension], 0);
+            }
             const fix = header.getByRole('button', { name: 'Fix with AI', exact: true });
             await expect(fix).toBeVisible();
             await expect(
@@ -981,6 +1001,10 @@ for (const theme of ['Dark', 'Light'])
             ).toHaveText(['SELECT 1', 'GROUP BY\n^']);
             await expect(results.getByRole('table')).toHaveCount(0);
             await expect(results.locator('.result-row-count')).toHaveCount(0);
+            await expect(header.getByRole('button', { name: 'Filter', exact: true })).toHaveCount(
+                0,
+            );
+            await expect(header.getByRole('tablist')).toHaveCount(0);
             await expect(page.locator('.toast-error')).toHaveCount(0);
             await expect(page.locator('.query-failed-status')).toBeVisible();
             await expect(page.locator('.cm-server-error-line')).toContainText('GROUP BY');
