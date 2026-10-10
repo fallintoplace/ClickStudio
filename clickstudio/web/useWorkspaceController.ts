@@ -149,7 +149,7 @@ export function useWorkspaceController({
     const workspaceRef = useRef(workspace);
     workspaceRef.current = workspace;
     const tabs = useWorkspaceTabs(workspace, setWorkspace);
-    const { active, revealActiveTab, finishTabRename: updateTabRename } = tabs;
+    const { active, finishTabRename: updateTabRename } = tabs;
     const emptySqlActionRef = useRef<HTMLButtonElement>(null);
     const previousTabCount = useRef(workspace.tabs.length);
     useEffect(() => {
@@ -182,7 +182,7 @@ export function useWorkspaceController({
         [active.id, setViewForDraft],
     );
     const [exampleChartRunId, setExampleChartRunId] = useState<string>();
-    const ui = useWorkspaceUiState({ experience, revealActiveTab, active });
+    const ui = useWorkspaceUiState({ experience, active });
     const {
         busy,
         setError,
@@ -923,32 +923,20 @@ function useWorkspaceExecutionView({
     };
 }
 
-function useWorkspaceHelpState({
-    revealActiveTab,
-}: {
-    revealActiveTab: ReturnType<typeof useWorkspaceTabs>['revealActiveTab'];
-}) {
+function useWorkspaceHelpState() {
     const [helpPanelOpen, setHelpPanelOpen] = useState(false);
     const [observabilityOpen, setObservabilityOpen] = useState(false);
     const [helpPanelSection, setHelpPanelSection] = useState<HelpPanelSection>('tour');
     const helpPanelOpenerRef = useRef<HTMLButtonElement | null>(null);
-    const openHelpPanel = useCallback(
-        (section: HelpPanelSection, opener: HTMLButtonElement) => {
-            helpPanelOpenerRef.current = opener;
-            if (section === 'examples') revealActiveTab();
-            setHelpPanelSection(section);
-            setHelpPanelOpen(true);
-        },
-        [revealActiveTab],
-    );
+    const openHelpPanel = useCallback((section: HelpPanelSection, opener: HTMLButtonElement) => {
+        helpPanelOpenerRef.current = opener;
+        setHelpPanelSection(section);
+        setHelpPanelOpen(true);
+    }, []);
     const closeHelpPanel = useCallback((restoreFocus = true) => {
         setHelpPanelOpen(false);
         if (restoreFocus) window.requestAnimationFrame(() => helpPanelOpenerRef.current?.focus());
     }, []);
-    const openExamples = useCallback(
-        (opener: HTMLButtonElement) => openHelpPanel('examples', opener),
-        [openHelpPanel],
-    );
     const openHelp = useCallback(
         (opener: HTMLButtonElement) => openHelpPanel('tour', opener),
         [openHelpPanel],
@@ -956,7 +944,6 @@ function useWorkspaceHelpState({
 
     return {
         helpPanelOpen,
-        openExamples,
         helpPanelSection,
         setHelpPanelSection,
         closeHelpPanel,
@@ -968,11 +955,9 @@ function useWorkspaceHelpState({
 
 function useWorkspaceUiState({
     experience,
-    revealActiveTab,
     active,
 }: {
     experience: WorkspaceProps['experience'];
-    revealActiveTab: ReturnType<typeof useWorkspaceTabs>['revealActiveTab'];
     active: ReturnType<typeof useWorkspaceTabs>['active'];
 }) {
     const [inspectorsByExperience, setInspectorsByExperience] = useState<
@@ -1000,14 +985,13 @@ function useWorkspaceUiState({
     const [restoreRevisionConfirmation, setRestoreRevisionConfirmation] = useState<QueryDocument>();
     const {
         helpPanelOpen,
-        openExamples,
         helpPanelSection,
         setHelpPanelSection,
         closeHelpPanel,
         setObservabilityOpen,
         observabilityOpen,
         openHelp,
-    } = useWorkspaceHelpState({ revealActiveTab });
+    } = useWorkspaceHelpState();
     const [busy, setBusy] = useState<BusyAction>('');
     const [cancelling, setCancelling] = useState(false);
     const { error, setError, notice, setNotice } = useWorkspaceNotifications();
@@ -1042,7 +1026,6 @@ function useWorkspaceUiState({
         setImportOpen,
         setExportOpen,
         helpPanelOpen,
-        openExamples,
         helpPanelSection,
         setHelpPanelSection,
         closeHelpPanel,
@@ -1164,7 +1147,6 @@ function createWorkspaceControllerModel({
         setExportOpen,
         clearFailedQueryError,
         helpPanelOpen,
-        openExamples,
         helpPanelSection,
         setHelpPanelSection,
         closeHelpPanel,
@@ -1265,7 +1247,6 @@ function createWorkspaceControllerModel({
         finishTabRename,
         clearFailedQueryError,
         helpPanelOpen,
-        openExamples,
         helpPanelSection,
         setHelpPanelSection,
         closeHelpPanel,

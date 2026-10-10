@@ -37,9 +37,6 @@ export type AssistantWorkflowProps = {
     error: string;
     notice: string;
     trusted: boolean;
-    database: string;
-    serverLabel: string;
-    schemaFetchedAt?: string;
     onAskAI: () => void;
     onCancelRequest: () => void;
     schemaReady: boolean;
@@ -796,9 +793,6 @@ export function AssistantWorkflow(props: AssistantWorkflowProps) {
         notice,
         onAskAI,
         onCancelRequest,
-        database,
-        serverLabel,
-        schemaFetchedAt,
         schemaReady,
         schemaLoading,
         schemaStatus,
@@ -809,9 +803,6 @@ export function AssistantWorkflow(props: AssistantWorkflowProps) {
     } = props;
     const transcriptViewport = useRef<HTMLDivElement>(null);
     const activeChat = chats.find(chat => chat.id === activeChatId);
-    const schemaTime = schemaFetchedAt
-        ? new Date(schemaFetchedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        : undefined;
 
     useLayoutEffect(() => {
         const viewport = transcriptViewport.current;
@@ -958,20 +949,6 @@ export function AssistantWorkflow(props: AssistantWorkflowProps) {
                         >
                             {schemaLoading ? 'Loading…' : 'Refresh schema'}
                         </Button>
-                    </div>
-                )}
-                {trusted && (
-                    <div className="assistant-context-meta" aria-label="Ask AI context">
-                        <span>
-                            Database <strong>{database}</strong>
-                        </span>
-                        <i>·</i>
-                        <span>{serverLabel}</span>
-                        {schemaTime && (
-                            <span className="assistant-context-schema">
-                                Schema refreshed {schemaTime}
-                            </span>
-                        )}
                     </div>
                 )}
                 <div className="assistant-chat-composer">

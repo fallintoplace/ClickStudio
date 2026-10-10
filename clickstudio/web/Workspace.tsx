@@ -364,7 +364,6 @@ function createInspectorProps({
 }) {
     const {
         serverVersion: playgroundServerVersion,
-        serverVersionLoading: playgroundServerVersionLoading,
         schema,
         schemaLoading,
         schemaLoadingMore,
@@ -441,8 +440,6 @@ function createInspectorProps({
             connection.id === PLAYGROUND_CONNECTION_ID
                 ? playgroundServerVersion
                 : connection.manifest?.serverVersion,
-        serverVersionLoading:
-            connection.id === PLAYGROUND_CONNECTION_ID && playgroundServerVersionLoading,
         schema,
         schemaLoading,
         schemaLoadingMore,
@@ -577,6 +574,14 @@ function renderWorkspaceLayout({
     const { active } = model.tabs;
 
     const { run, eventState } = model.evidence;
+    let serverLabel = 'ClickHouse version unavailable';
+    if (connection.dataSource === 'fixture') {
+        serverLabel = 'Sample data';
+    } else if (inspectorProps.serverVersion) {
+        serverLabel = `ClickHouse ${inspectorProps.serverVersion}`;
+    } else if (model.data.serverVersionLoading) {
+        serverLabel = 'ClickHouse …';
+    }
 
     const {
         inspectorDocked,
@@ -893,6 +898,7 @@ function renderWorkspaceLayout({
                 eventState={eventState}
                 onOpenDetails={() => showInspector('details')}
                 scriptRunning={script?.status === 'running'}
+                serverLabel={serverLabel}
                 copy={copy.common}
                 helpButton={
                     <HelpButton copy={copy.common} open={helpPanelOpen} onOpen={openHelp} />
@@ -952,7 +958,6 @@ function renderDocumentTabs({
         detachedEditor,
         clearFailedQueryError,
         helpPanelOpen,
-        openExamples,
         helpPanelSection,
         setHelpPanelSection,
         closeHelpPanel,
@@ -1013,10 +1018,7 @@ function renderDocumentTabs({
                         type="button"
                         aria-label={copy.common.newSql}
                         title={copy.common.newSql}
-                        aria-haspopup="dialog"
-                        aria-expanded={helpPanelOpen}
-                        aria-controls="workspace-help-panel"
-                        onClick={event => openExamples(event.currentTarget)}
+                        onClick={startBlankSql}
                     >
                         <Icon name="plus" />
                     </button>

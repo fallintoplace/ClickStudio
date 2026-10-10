@@ -5,7 +5,6 @@
     .field-input,
     .field-textarea,
     .parameter-field input,
-    .object-search,
     .create-table-control,
     .result-filter,
     .native-search input,
@@ -40,8 +39,7 @@
     .import-create-column-row input,
     .import-create-column-row select,
     .import-column-map tbody td > select
-  ):focus,
-:root[data-theme="click-light"] .object-search:focus-within {
+  ):focus {
   border-color: var(--focus-color);
 }
 

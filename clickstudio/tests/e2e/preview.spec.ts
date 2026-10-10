@@ -1,12 +1,63 @@
 import { readFile } from 'node:fs/promises';
 import { test, expect } from '@playwright/test';
-import { openWorkspacePanel } from './helpers.js';
+import { openSqlExamples, openWorkspacePanel } from './helpers.js';
 import {
     previewCloudSchema,
     mockCloudEndpoint,
     connectPreviewCloud,
     chooseExistingCloudTable,
 } from './cloud-import-helpers.js';
+
+test('Footer shows version detection and keeps connection versions isolated in static preview', async ({
+    page,
+}) => {
+    let releaseVersion: () => void = () => {};
+    const versionGate = new Promise<void>(resolve => {
+        releaseVersion = resolve;
+    });
+    await page.route('https://sql-clickhouse.clickhouse.com:8443/**', async route => {
+        const sql = route.request().postData() ?? '';
+        if (sql.includes('SELECT version() AS version')) {
+            await versionGate;
+            await route.fulfill({
+                body: '["version"]\n["String"]\n["26.6.1.2326"]\n',
+                contentType: 'text/plain',
+            });
+        } else {
+            await route.fulfill({ body: '[]\n[]\n', contentType: 'text/plain' });
+        }
+    });
+    await mockCloudEndpoint(page);
+    try {
+        await page.goto('/');
+        const version = page.getByTestId('server-version');
+        await expect(version).toHaveText('ClickHouse …');
+        await page.getByRole('button', { name: 'Connect Cloud', exact: true }).click();
+        const dialog = page.getByRole('dialog', { name: 'Connect to your service' });
+        await dialog.getByLabel('HTTPS host').fill('service.region.provider.clickhouse.cloud:8443');
+        await dialog.getByLabel('Database').fill('default');
+        await dialog.getByLabel('Username').fill('demo');
+        await dialog.getByLabel('Password').fill('demo-password');
+        await dialog.getByRole('button', { name: 'Connect service' }).click();
+        await expect(version).toHaveText('ClickHouse 26.1');
+        releaseVersion();
+        await expect(version).toHaveText('ClickHouse 26.1');
+        await page.locator('.connection-trigger').click();
+        await page
+            .getByRole('dialog', { name: 'Data source options' })
+            .getByRole('button', { name: /ClickHouse Playground/ })
+            .click();
+        await expect(version).toHaveText('ClickHouse 26.6.1.2326');
+        await page.locator('.connection-trigger').click();
+        await page
+            .getByRole('dialog', { name: 'Data source options' })
+            .getByRole('button', { name: /Sample data/ })
+            .click();
+        await expect(version).toHaveText('Sample data');
+    } finally {
+        releaseVersion();
+    }
+});
 
 test('Connect Cloud matches neutral secondary controls in both themes and accents', async ({
     page,
@@ -304,9 +355,7 @@ test('Playground examples preview real SQL and open a draft without executing it
             exampleSqlRequests.push(requestText);
     });
     await page.goto('/');
-    await page.getByTestId('new-sql').click();
-
-    const dialog = page.getByRole('dialog', { name: 'Explore ClickStudio', exact: true });
+    const dialog = await openSqlExamples(page);
     await expect(dialog).toBeVisible();
     await expect(dialog.getByText('ClickHouse Playground', { exact: true })).toBeVisible();
     await dialog.getByTestId('sql-example-category-openSource').click();
@@ -402,8 +451,7 @@ test('Charts filter opens a localized chart example in a new SQL tab without exe
     });
 
     await page.goto('/');
-    await page.getByTestId('new-sql').click();
-    const dialog = page.getByRole('dialog', { name: 'Explore ClickStudio', exact: true });
+    const dialog = await openSqlExamples(page);
     await dialog.getByTestId('sql-example-category-charts').click();
 
     const forexExample = dialog.getByTestId('sql-example-forex-eur-usd-monthly');

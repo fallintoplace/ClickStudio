@@ -2,8 +2,10 @@ import { test, expect, type Page } from '@playwright/test';
 import {
     currentQueryId,
     openBlankSql,
+    replaceSql,
     runButton,
     runIdentity,
+    jsonRecord,
     trust,
     trustCurrentConnection,
 } from './helpers.js';
@@ -14,6 +16,38 @@ function countRunRequests(page: Page) {
         if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/runs') count++;
     });
     return () => count;
+}
+
+for (const mode of ['Standard', 'Experimental']) {
+    test(`${mode} plus opens a blank SQL tab and preserves the current draft`, async ({ page }) => {
+        await page.addInitScript(
+            experience => localStorage.setItem('clickstudio:experience', experience),
+            mode === 'Standard' ? 'beginner' : 'expert',
+        );
+        const runs = countRunRequests(page);
+        await trust(page);
+        const sql = 'SELECT 42 AS keep_my_draft';
+        await replaceSql(page, sql);
+        const tabs = page.getByRole('tablist', { name: 'SQL documents', exact: true });
+        const originalTab = tabs.getByRole('tab').first();
+        const originalName = await originalTab.getAttribute('aria-label');
+        await page.getByRole('button', { name: 'Collapse SQL query', exact: true }).click();
+
+        await page.getByTestId('new-sql').click();
+
+        await expect(tabs.getByRole('tab')).toHaveCount(2);
+        await expect(tabs.getByRole('tab').last()).toHaveAttribute('aria-selected', 'true');
+        await expect(page.locator('.cm-content')).toHaveText('');
+        await expect(page.locator('.cm-content')).toBeFocused();
+        await expect(page.locator('#sql-editor-content')).toBeVisible();
+        await expect(page.getByRole('dialog', { name: 'Explore ClickStudio' })).toHaveCount(0);
+        await expect(page.locator('.execution-bar')).toHaveAttribute('data-run-status', 'ready');
+        expect(originalName).not.toBeNull();
+        await page.getByRole('tab', { name: originalName!, exact: true }).click();
+        await page.getByRole('button', { name: 'Expand SQL query', exact: true }).click();
+        await expect(page.locator('.cm-content')).toHaveText(sql);
+        expect(runs()).toBe(0);
+    });
 }
 
 test('Execution IDs are available from copyable details instead of the footer', async ({
@@ -46,6 +80,98 @@ async function switchConnection(page: Page, name: string) {
         .click();
     await expect(picker).toContainText(name);
 }
+
+test('Server version stays visible through execution and follows the active connection', async ({
+    page,
+}) => {
+    const versions = ['26.6.1.2326', '25.8.4.13'];
+    await page.route('**/api/connections', async route => {
+        const response = await route.fetch();
+        const connections: unknown[] = await response.json();
+        await route.fulfill({
+            response,
+            json: connections.map((value, index) => {
+                const connection = jsonRecord(value, 'Connection');
+                return {
+                    ...connection,
+                    name: `Version ${index + 1}`,
+                    dataSource: 'clickhouse',
+                    manifest: {
+                        ...jsonRecord(connection.manifest, 'Connection manifest'),
+                        serverVersion: versions[index],
+                    },
+                };
+            }),
+        });
+    });
+    await page.goto('/');
+    const footer = page.locator('.execution-bar');
+    const version = footer.getByTestId('server-version');
+    await expect(footer).toHaveAttribute('data-run-status', 'ready');
+    await expect(version).toHaveText('ClickHouse 26.6.1.2326');
+    await trustCurrentConnection(page);
+
+    let releaseRun: () => void = () => {};
+    const runGate = new Promise<void>(resolve => {
+        releaseRun = resolve;
+    });
+    const runCollection = (url: URL) => url.pathname === '/api/runs';
+    await page.route(runCollection, async route => {
+        if (route.request().method() !== 'POST') return route.continue();
+        const response = await route.fetch();
+        await route.fulfill({
+            response,
+            json: {
+                ...(await response.json()),
+                status: 'running',
+                serverVersion: 'old-run-version',
+            },
+        });
+    });
+    await page.route(/^.*\/api\/runs\/[^/]+(?:\/events)?$/, async route => {
+        await runGate;
+        await route.continue();
+    });
+    try {
+        await runButton(page).click();
+        await expect(footer).toHaveAttribute('data-run-status', 'running');
+        await expect(version).toHaveText('ClickHouse 26.6.1.2326');
+        await expect(footer.locator('.execution-link-state')).toHaveText('Reconnecting');
+        for (const width of [320, 390, 900, 1440]) {
+            await page.setViewportSize({ width, height: 900 });
+            await expect(version).toBeInViewport();
+            const bounds = await version.boundingBox();
+            expect(bounds).not.toBeNull();
+            expect(bounds!.x).toBeGreaterThanOrEqual(0);
+            expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
+            expect(
+                await footer.evaluate(element => element.scrollWidth - element.clientWidth),
+            ).toBe(0);
+        }
+    } finally {
+        releaseRun();
+    }
+    await expect(footer).toHaveAttribute('data-run-status', 'succeeded');
+    await expect(version).toHaveText('ClickHouse 26.6.1.2326');
+    await expect(footer).not.toContainText('Complete');
+
+    await page.unroute(runCollection);
+    await page.route(runCollection, route =>
+        route.request().method() === 'POST'
+            ? route.fulfill({ status: 400, json: { code: 'QUERY_TEST_FAILED', message: 'Failed' } })
+            : route.continue(),
+    );
+    await runButton(page).click();
+    await expect(footer).toHaveAttribute('data-run-status', 'failed');
+    await expect(version).toHaveText('ClickHouse 26.6.1.2326');
+    await openBlankSql(page);
+    await expect(footer).toHaveAttribute('data-run-status', 'ready');
+    await expect(version).toHaveText('ClickHouse 26.6.1.2326');
+    await switchConnection(page, 'Version 2');
+    await expect(version).toHaveText('ClickHouse 25.8.4.13');
+    await switchConnection(page, 'Version 1');
+    await expect(version).toHaveText('ClickHouse 26.6.1.2326');
+});
 
 test('Run, chart, save and reload preserve the same execution evidence', async ({ page }) => {
     const runs = countRunRequests(page);

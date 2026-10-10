@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { trust } from './helpers.js';
+import { openSqlExamples, trust } from './helpers.js';
 
 test('SQL examples open in a new tab without changing or running the current query', async ({
     page,
@@ -23,8 +23,7 @@ test('SQL examples open in a new tab without changing or running the current que
     await collapseButton.click();
     await expect(page.locator('#sql-editor-content')).toBeHidden();
 
-    await page.getByTestId('new-sql').click();
-    const dialog = page.getByRole('dialog', { name: 'Explore ClickStudio', exact: true });
+    const dialog = await openSqlExamples(page);
     await expect(dialog).toBeVisible();
     await expect(dialog.getByText('Sample data', { exact: true })).toBeVisible();
     await dialog.getByTestId('sql-example-search').fill('Top countries');
@@ -50,9 +49,8 @@ test('SQL examples open in a new tab without changing or running the current que
 
 test('SQL examples search handles no matches and Escape restores focus', async ({ page }) => {
     await trust(page);
-    const trigger = page.getByTestId('new-sql');
-    await trigger.click();
-    const dialog = page.getByRole('dialog', { name: 'Explore ClickStudio', exact: true });
+    const trigger = page.getByRole('button', { name: 'Help', exact: true });
+    const dialog = await openSqlExamples(page);
     const search = dialog.getByTestId('sql-example-search');
     await search.fill('query-with-no-matching-example');
     await expect(dialog.getByRole('status')).toHaveText('No examples match your search.');
@@ -63,9 +61,8 @@ test('SQL examples search handles no matches and Escape restores focus', async (
 
 test('Help section navigation preserves search until the panel is reopened', async ({ page }) => {
     await trust(page);
-    const trigger = page.getByTestId('new-sql');
-    await trigger.click();
-    const dialog = page.getByRole('dialog', { name: 'Explore ClickStudio', exact: true });
+    const trigger = page.getByRole('button', { name: 'Help', exact: true });
+    const dialog = await openSqlExamples(page);
     const search = dialog.getByTestId('sql-example-search');
     await search.fill('Top countries');
     const examplesTab = dialog.getByTestId('help-section-examples');
@@ -86,7 +83,7 @@ test('Help section navigation preserves search until the panel is reopened', asy
     await expect(dialog).toHaveCount(0);
     await expect(trigger).toBeFocused();
     await expect(page.locator('#root')).toHaveJSProperty('inert', false);
-    await trigger.click();
+    await openSqlExamples(page);
     await expect(search).toHaveValue('');
 });
 

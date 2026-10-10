@@ -74,11 +74,13 @@ test('Connection review tests capabilities before trust and can retest after res
 
     await page.goto('/');
     await expect(page.locator('.connection-quick-status')).toHaveText('Test needed');
+    await expect(page.getByTestId('server-version')).toHaveText('ClickHouse version unavailable');
     await page.locator('.connection-trigger').click();
     const menu = page.getByRole('dialog', { name: 'Connection details' });
     await menu.getByRole('button', { name: 'Test connection', exact: true }).click();
     await expect.poll(() => tests).toBe(1);
     await expect(page.locator('.connection-quick-status')).toHaveText('Review needed');
+    await expect(page.getByTestId('server-version')).toHaveText('ClickHouse 24.6');
     await expect(menu.getByRole('button', { name: 'Trust connection', exact: true })).toBeVisible();
     expect(trusts).toBe(0);
 
@@ -90,6 +92,7 @@ test('Connection review tests capabilities before trust and can retest after res
     manifest = undefined;
     await page.reload();
     await expect(page.locator('.connection-quick-status')).toHaveText('Retest needed');
+    await expect(page.getByTestId('server-version')).toHaveText('ClickHouse version unavailable');
     await page.locator('.connection-trigger').click();
     const restartedMenu = page.getByRole('dialog', { name: 'Connection details' });
     await restartedMenu.getByRole('button', { name: 'Retest connection', exact: true }).click();

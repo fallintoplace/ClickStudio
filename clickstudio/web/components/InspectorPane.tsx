@@ -36,7 +36,6 @@ export type InspectorPaneProps = {
     setInspector: (inspector: Inspector) => void;
     connection: Connected;
     serverVersion?: string;
-    serverVersionLoading?: boolean;
     schema?: Schema;
     schemaLoading: boolean;
     schemaLoadingMore?: boolean;
@@ -130,7 +129,6 @@ export function InspectorPane({
     setInspector,
     connection,
     serverVersion,
-    serverVersionLoading = false,
     schema,
     schemaLoading,
     schemaLoadingMore,
@@ -226,17 +224,6 @@ export function InspectorPane({
         assistantServerVersion = serverVersion;
     } else {
         assistantServerVersion = serverVersion ?? connection.manifest?.serverVersion;
-    }
-    let assistantServerLabel: string;
-
-    if (connection.dataSource === 'fixture') {
-        assistantServerLabel = 'Sample data';
-    } else if (assistantServerVersion) {
-        assistantServerLabel = `ClickHouse ${assistantServerVersion}`;
-    } else if (serverVersionLoading) {
-        assistantServerLabel = 'Detecting ClickHouse version…';
-    } else {
-        assistantServerLabel = 'ClickHouse version unavailable';
     }
 
     useEffect(() => {
@@ -491,9 +478,6 @@ export function InspectorPane({
                         error={assistantError}
                         notice={assistantNotice}
                         trusted={trusted}
-                        database={connection.database}
-                        serverLabel={assistantServerLabel}
-                        schemaFetchedAt={schema?.fetchedAt}
                         onAskAI={() => onAskAI(schema, assistantServerVersion, connection.database)}
                         onCancelRequest={onCancelAssistantRequest}
                         schemaReady={Boolean(schema) && !schemaLoading && !schemaError}

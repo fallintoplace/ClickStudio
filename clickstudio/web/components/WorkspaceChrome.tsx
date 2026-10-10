@@ -245,6 +245,7 @@ export function ExecutionBar({
     eventState,
     onOpenDetails,
     scriptRunning,
+    serverLabel,
     helpButton,
     copy,
 }: {
@@ -254,6 +255,7 @@ export function ExecutionBar({
     eventState: RunEventState;
     onOpenDetails: () => void;
     scriptRunning: boolean;
+    serverLabel: string;
     helpButton: ReactNode;
     copy: Copy['common'];
 }) {
@@ -298,30 +300,6 @@ export function ExecutionBar({
             </span>
         );
     };
-    const getEventTone = () => {
-        switch (eventState) {
-            case 'live':
-                return 'is-trusted';
-
-            case 'reconnecting':
-                return 'is-warning';
-
-            default:
-                return '';
-        }
-    };
-    const getEventLabel = () => {
-        switch (eventState) {
-            case 'live':
-                return copy.statusLiveUpdates;
-
-            case 'reconnecting':
-                return copy.statusReconnecting;
-
-            default:
-                return copy.statusComplete;
-        }
-    };
     return (
         <footer
             className={cx('execution-bar', executionInProgress && 'is-running')}
@@ -337,11 +315,21 @@ export function ExecutionBar({
                     <>
                         {!failureInToolbar && <span className="execution-separator" />}
                         <strong>{elapsedMs?.toLocaleString()} ms</strong>
-                        <span className="execution-link-state">
-                            <span className={cx('status-light', getEventTone())} />
-                            {getEventLabel()}
-                        </span>
                     </>
+                )}
+                <span className="execution-server-version" data-testid="server-version">
+                    {serverLabel}
+                </span>
+                {currentRun && eventState !== 'idle' && (
+                    <span className="execution-link-state">
+                        <span
+                            className={cx(
+                                'status-light',
+                                eventState === 'live' ? 'is-trusted' : 'is-warning',
+                            )}
+                        />
+                        {eventState === 'live' ? copy.statusLiveUpdates : copy.statusReconnecting}
+                    </span>
                 )}
             </div>
             {currentRun && (hasTelemetry || currentRun.kind !== 'query') && (

@@ -1994,29 +1994,6 @@
     padding-inline: 8px;
     font-size: 8px;
   }
-  .assistant-context-meta {
-    display: flex;
-    min-width: 0;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 5px 7px;
-    color: var(--muted);
-    font-size: 8px;
-    line-height: 1.4;
-  }
-  .assistant-context-meta strong {
-    color: var(--text-soft);
-    font-family: var(--font-mono);
-    font-size: 9px;
-    font-weight: 570;
-  }
-  .assistant-context-meta i {
-    color: var(--line-bright);
-    font-style: normal;
-  }
-  .assistant-context-schema {
-    margin-left: auto;
-  }
   .assistant-chat-composer {
     display: grid;
     min-width: 0;
@@ -2704,7 +2681,9 @@
     height: 6px;
   }
   .execution-state {
-    flex: none;
+    min-width: 0;
+    flex: 0 1 auto;
+    flex-wrap: wrap;
   }
   .execution-state > strong {
     color: var(--text);
@@ -2716,12 +2695,16 @@
     height: 15px;
     background: var(--line-bright);
   }
-  .execution-link-state {
+  .execution-link-state,
+  .execution-server-version {
     display: inline-flex;
     align-items: center;
     gap: 6px;
     color: var(--muted);
     font-size: 8px;
+  }
+  .execution-server-version {
+    white-space: nowrap;
   }
   .execution-link-state .status-light {
     width: 5px;
@@ -3083,8 +3066,8 @@
   border-color: var(--line);
 }
 
-:root[data-theme="click-light"] .reference-result-copy small {
-  color: color-mix(in srgb, var(--reference-kind-color) 84%, var(--text));
+:root[data-theme="click-light"] :is(.object-tree-label, .reference-result-copy) small {
+  color: color-mix(in srgb, var(--explorer-row-accent) 84%, var(--text));
 }
 
 :root[data-theme="click-light"] .column-type-dot {

@@ -26,6 +26,34 @@ for (const theme of ['Light', 'Dark']) {
                 await page.getByRole('button', { name: accent, exact: true }).click();
                 await page.getByText(mode, { exact: true }).click();
                 await expectReferenceStyles(page, info, 'empty-workspace');
+                const inspector = page.locator('.inspector-pane');
+                if (!(await inspector.isVisible()))
+                    await page
+                        .locator('.icon-rail')
+                        .getByRole('button', { name: 'Objects', exact: true })
+                        .click();
+                await inspector
+                    .getByRole('navigation', { name: 'Workspace browser', exact: true })
+                    .getByRole('button', { name: 'Reference', exact: true })
+                    .click();
+                const reference = inspector.locator('.reference-results');
+                await expect(reference).toBeVisible();
+                await expectReferenceStyles(page, info, 'reference-list');
+                await reference.getByRole('option').first().click();
+                await expect(inspector.locator('.reference-entry')).toBeVisible();
+                await expectReferenceStyles(page, info, 'reference-details');
+                await inspector.locator('.reference-back').click();
+                await inspector
+                    .getByRole('navigation', { name: 'Workspace browser', exact: true })
+                    .getByRole('button', { name: 'Objects', exact: true })
+                    .click();
+                await expect(
+                    inspector.locator('.object-tree-row.is-database .object-kind-glyph').first(),
+                ).toHaveCSS('color', theme === 'Dark' ? 'rgb(250, 255, 105)' : 'rgb(107, 93, 0)');
+                await inspector.getByText('events', { exact: true }).first().click();
+                await expect(inspector.getByLabel('Selected object')).toBeVisible();
+                await expectReferenceStyles(page, info, 'object-details');
+                await inspector.getByRole('button', { name: '‹ Objects', exact: true }).click();
                 await runButton(page).click();
                 await expect(page.locator('.execution-bar')).toHaveAttribute(
                     'data-run-status',
@@ -73,6 +101,15 @@ for (const theme of ['Light', 'Dark']) {
                 ).toBeVisible();
                 await expectReferenceStyles(page, info, 'chart-details');
                 await page.keyboard.press('Escape');
+                await inspector
+                    .getByRole('navigation', { name: 'Workspace browser', exact: true })
+                    .getByRole('button', { name: 'AI', exact: true })
+                    .click();
+                await expect(
+                    page.getByRole('textbox', { name: 'Ask AI', exact: true }),
+                ).toBeVisible();
+                await expect(page.locator('.assistant-context-meta')).toHaveCount(0);
+                await expectReferenceStyles(page, info, 'assistant-composer');
             });
         }
 

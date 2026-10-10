@@ -28,7 +28,13 @@ export async function currentQueryId(page: Page) {
 
 export async function openBlankSql(page: Page) {
     await page.getByTestId('new-sql').click();
-    await page.getByTestId('blank-sql').click();
+}
+
+export async function openSqlExamples(page: Page) {
+    await page.getByRole('button', { name: 'Help', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Explore ClickStudio', exact: true });
+    await dialog.getByTestId('help-section-examples').click();
+    return dialog;
 }
 
 export async function replaceSql(page: Page, sql: string) {
