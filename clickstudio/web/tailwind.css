@@ -1,3 +1,11 @@
+@layer theme, base, components, utilities;
+
+/* Preserve native/help precedence below the workspace's dialog chrome. */
+@import "./styles/native-explorers.css";
+@import "./styles/native-comparison.css";
+@import "./styles/help-comparison.css";
+@import "./styles/help-dependencies.css";
+@import "./styles/help-storage.css";
 @import "tailwindcss";
 @import "./styles/foundation.css";
 @import "./styles/app-chrome.css";
@@ -6,10 +14,11 @@
 @import "./styles/scroll-edge-shadows.css";
 @import "./styles/visualizations.css";
 @import "./styles/inspector-assistant.css";
+@import "./styles/animations.css";
 @import "./styles/responsive.css";
 @import "./styles/object-explorer.css";
 @import "./styles/import-wizard.css";
 @import "./styles/panel-chrome.css";
 @import "./styles/observability.css";
 @import "./styles/help.css";
-@import "./styles/light-mode.css";
+@import "./styles/controls.css";

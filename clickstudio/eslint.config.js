@@ -66,4 +66,21 @@ export default defineConfig([
       "react-hooks/exhaustive-deps": "error",
     },
   },
+  {
+    files: ["web/**/*.{ts,tsx}"],
+    ignores: ["web/main.tsx"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["**/*.css"],
+              message: "Import application styles through web/tailwind.css to keep cascade order explicit.",
+            },
+          ],
+        },
+      ],
+    },
+  },
 ]);

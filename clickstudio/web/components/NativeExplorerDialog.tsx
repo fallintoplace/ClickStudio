@@ -1,6 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { Button } from './ui';
-import '../styles/native-explorers.css';
 
 export function NativeExplorerDialog({ title, description, onClose, children, closeLabel = 'Close explorer' }: { closeLabel?: string; title: string; description?: string; onClose: () => void; children: ReactNode }) {
     const root = useRef<HTMLElement>(null), close = useRef(onClose);

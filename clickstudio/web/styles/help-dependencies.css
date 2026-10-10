@@ -1,0 +1,379 @@
+.workspace-help-dependencies .workspace-help-feature-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 4px;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+  scrollbar-width: thin;
+}
+.workspace-help-dependencies .native-lineage-meta-toolbar,
+.workspace-help-dependencies .native-lineage-controls {
+  display: flex;
+  min-width: 0;
+  flex: none;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border: 1px solid var(--help-border);
+  border-radius: var(--help-radius-control);
+  background: var(--help-surface);
+}
+.workspace-help-dependencies .native-lineage-meta-toolbar {
+  min-height: 40px;
+}
+.workspace-help-dependencies .native-snapshot-meta {
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: var(--help-text-meta);
+  font-weight: 650;
+  letter-spacing: 0.055em;
+}
+.workspace-help-dependencies .native-snapshot-meta::before {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: var(--status-ring);
+  content: "";
+  color: var(--accent);
+}
+.workspace-help-dependencies .native-lineage-meta-toolbar .button-base {
+  min-height: 30px;
+  flex: none;
+  padding: 4px 10px;
+  border-color: var(--help-border-strong);
+  border-radius: var(--help-radius-control);
+  background: color-mix(in srgb, var(--help-surface) 70%, var(--panel));
+  font-size: var(--help-text-meta);
+}
+.workspace-help-dependencies
+  .native-lineage-meta-toolbar
+  .button-base:hover:not(:disabled) {
+  border-color: var(--help-selected-border);
+  background: var(--help-selected-surface);
+}
+.workspace-help-dependencies .native-lineage-controls {
+  min-height: 48px;
+  justify-content: space-between;
+  padding: 6px 8px 6px 12px;
+}
+.workspace-help-dependencies .native-lineage-controls .native-search {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  color: var(--text-soft);
+  font-size: var(--help-text-small);
+  font-weight: 620;
+}
+.workspace-help-dependencies .native-lineage-controls .native-search input {
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  padding: 7px 10px;
+  border-color: var(--help-border);
+  border-radius: var(--radius-control);
+  background: var(--help-code-surface);
+  font-size: var(--help-text-small);
+  transition:
+    border-color 0.14s ease,
+    box-shadow 0.14s ease;
+}
+.workspace-help-dependencies
+  .native-lineage-controls
+  .native-search
+  input:focus-visible {
+  border-color: var(--help-selected-border);
+  outline: none;
+  box-shadow: var(--help-focus-ring);
+}
+.workspace-help-dependencies .native-lineage-controls > span {
+  flex: none;
+  padding: 6px 9px;
+  border: 1px solid var(--help-border);
+  border-radius: var(--radius-label);
+  background: color-mix(in srgb, var(--panel-raised) 70%, transparent);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: var(--help-text-meta);
+  font-variant-numeric: tabular-nums;
+}
+.workspace-help-dependencies .native-lineage-map-heading {
+  align-items: center;
+  gap: 8px;
+  margin: 3px 1px -3px;
+}
+.workspace-help-dependencies .native-lineage-map-heading strong {
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 730;
+  letter-spacing: -0.015em;
+}
+.workspace-help-dependencies .native-lineage-map-heading span {
+  color: var(--muted);
+  font-size: var(--help-text-meta);
+}
+.workspace-help-dependencies .native-lineage-legend {
+  gap: 6px;
+  margin: 0 0 1px;
+  color: var(--text-soft);
+  font-size: var(--help-text-meta);
+}
+.workspace-help-dependencies .native-lineage-legend span {
+  display: inline-flex;
+  min-height: 25px;
+  align-items: center;
+  padding: 4px 8px;
+  border: 1px solid var(--help-border);
+  border-radius: var(--radius-label);
+  background: var(--help-surface);
+  white-space: nowrap;
+}
+.workspace-help-dependencies .native-lineage-legend span::before {
+  width: 16px;
+  margin-right: 7px;
+}
+.workspace-help-dependencies .native-lineage-layout {
+  grid-template-columns: minmax(0, 1.65fr) minmax(280px, 0.82fr);
+  align-items: stretch;
+  gap: 10px;
+  min-height: 390px;
+}
+.workspace-help-dependencies .native-lineage-canvas {
+  min-width: 0;
+  min-height: 390px;
+  max-height: 520px;
+  border-color: var(--help-border-strong);
+  border-radius: var(--help-radius-card);
+  background:
+    radial-gradient(
+      circle at 18% 0%,
+      color-mix(in srgb, var(--accent) 7%, transparent),
+      transparent 40%
+    ),
+    linear-gradient(
+      color-mix(in srgb, var(--help-border) 22%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--help-border) 22%, transparent) 1px,
+      transparent 1px
+    ),
+    var(--help-code-surface);
+  background-size:
+    auto,
+    32px 32px,
+    32px 32px,
+    auto;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+  scrollbar-width: thin;
+}
+.workspace-help-dependencies .native-edge {
+  stroke-width: 2.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.86;
+  vector-effect: non-scaling-stroke;
+}
+.workspace-help-dependencies .native-lineage-node rect {
+  fill: color-mix(in srgb, var(--help-surface) 84%, var(--panel-raised));
+  stroke-width: 1.6;
+  transition:
+    fill 0.14s ease,
+    stroke-width 0.14s ease;
+}
+.workspace-help-dependencies .native-lineage-node:hover rect,
+.workspace-help-dependencies .native-lineage-node:focus-visible rect {
+  fill: color-mix(
+    in srgb,
+    var(--help-selected-surface) 64%,
+    var(--panel-raised)
+  );
+}
+.workspace-help-dependencies .native-lineage-node.is-selected rect,
+.workspace-help-dependencies .native-lineage-node:focus-visible rect {
+  stroke-width: 2.6;
+}
+.workspace-help-dependencies .native-node-details {
+  max-height: 520px;
+  padding: 16px;
+  border-color: var(--help-border-strong);
+  border-radius: var(--help-radius-card);
+  background: linear-gradient(
+    150deg,
+    color-mix(in srgb, var(--accent) 4%, var(--help-surface)),
+    var(--help-surface) 46%
+  );
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+  scrollbar-width: thin;
+}
+.workspace-help-dependencies .native-node-details.is-beginner > .eyebrow {
+  display: inline-flex;
+  align-items: center;
+  min-height: 23px;
+  padding: 4px 8px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--help-border));
+  border-radius: var(--radius-label);
+  background: color-mix(in srgb, var(--accent) 7%, var(--help-surface));
+  color: var(--accent);
+  font-size: 9px;
+  font-weight: 740;
+  letter-spacing: 0.09em;
+}
+.workspace-help-dependencies .native-node-details h3 {
+  margin: 10px 0 0;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.45;
+}
+.workspace-help-dependencies
+  .native-node-details.is-beginner
+  .native-node-explanation {
+  margin: 7px 0 13px;
+  font-size: var(--help-text-small);
+  line-height: 1.5;
+}
+.workspace-help-dependencies .native-node-details.is-beginner .native-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 12px 0;
+}
+.workspace-help-dependencies
+  .native-node-details.is-beginner
+  .native-metrics
+  div {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--help-border);
+  border-radius: var(--help-radius-control);
+  background: color-mix(in srgb, var(--help-code-surface) 74%, transparent);
+}
+.workspace-help-dependencies
+  .native-node-details.is-beginner
+  .native-metrics
+  dt {
+  margin-bottom: 5px;
+  font-size: 9px;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+}
+.workspace-help-dependencies
+  .native-node-details.is-beginner
+  .native-metrics
+  dd {
+  color: var(--accent);
+  font-size: 20px;
+  font-weight: 680;
+}
+.workspace-help-dependencies .native-node-details.is-beginner > .native-notes {
+  margin: 10px 0 0;
+  padding: 9px 10px;
+  border-left: 2px solid
+    color-mix(in srgb, var(--accent) 58%, var(--help-border));
+  border-radius: 0 var(--radius-control) var(--radius-control) 0;
+  background: color-mix(in srgb, var(--accent) 4%, var(--help-surface));
+  font-size: var(--help-text-meta);
+}
+.workspace-help-dependencies
+  .native-node-details.is-beginner
+  .native-relationships {
+  gap: 0;
+  margin: 12px 0;
+  border-color: var(--help-border);
+}
+.workspace-help-dependencies
+  .native-node-details.is-beginner
+  .native-relationships
+  p {
+  gap: 4px;
+  margin: 0;
+  padding: 9px 1px;
+  border-bottom: 1px solid var(--help-border);
+}
+.workspace-help-dependencies
+  .native-node-details.is-beginner
+  .native-relationships
+  p:last-child {
+  border-bottom: 0;
+}
+.workspace-help-dependencies
+  .native-node-details.is-beginner
+  .native-relationships
+  span,
+.workspace-help-dependencies .native-node-details.is-beginner details summary {
+  font-size: var(--help-text-meta);
+}
+.workspace-help-dependencies .native-lineage-primer {
+  gap: 9px;
+  margin: 0;
+  padding: 11px 12px 9px;
+  border-color: color-mix(in srgb, var(--accent) 22%, var(--help-border));
+  border-radius: var(--help-radius-card);
+  background: linear-gradient(
+    110deg,
+    color-mix(in srgb, var(--accent) 5%, var(--help-surface)),
+    var(--help-surface) 56%
+  );
+}
+.workspace-help-dependencies .native-lineage-primer-flow article {
+  border-color: var(--help-border);
+  border-radius: var(--help-radius-control);
+  background: color-mix(in srgb, var(--help-code-surface) 76%, transparent);
+}
+.workspace-help-dependencies .native-lineage-primer-note {
+  font-size: var(--help-text-meta);
+}
+.workspace-help-dependencies .native-lineage-notes {
+  padding: 8px 10px;
+  border: 1px solid var(--help-border);
+  border-radius: var(--help-radius-control);
+  background: var(--help-surface);
+}
+.workspace-help-dependencies .native-lineage-notes summary {
+  color: var(--text-soft);
+  font-size: var(--help-text-meta);
+}
+.workspace-help-dependencies .native-lineage-notes p {
+  font-size: var(--help-text-meta);
+}
+
+@media (max-width: 900px) {
+  .workspace-help-dependencies .native-lineage-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .workspace-help-dependencies .native-node-details {
+    max-height: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .workspace-help-dependencies .native-lineage-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .workspace-help-dependencies .native-lineage-controls .native-search {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+  .workspace-help-dependencies .native-lineage-controls > span {
+    align-self: flex-start;
+  }
+  .workspace-help-dependencies .native-lineage-primer-flow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .workspace-help-dependencies .native-lineage-primer-arrow {
+    transform: rotate(90deg);
+  }
+  .workspace-help-dependencies .native-lineage-canvas {
+    min-height: 320px;
+    max-height: 360px;
+  }
+}

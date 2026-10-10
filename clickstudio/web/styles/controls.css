@@ -1,0 +1,58 @@
+/* Light theme */
+
+:root[data-theme="click-light"]
+  :where(
+    .field-input,
+    .field-textarea,
+    .parameter-field input,
+    .object-search,
+    .create-table-control,
+    .result-filter,
+    .native-search input,
+    .native-run-picker select,
+    .native-lineage-database select,
+    .chart-controls select,
+    .import-destination-select select,
+    .import-new-table-fields input,
+    .import-new-table-fields select,
+    .import-create-column-row input,
+    .import-create-column-row select,
+    .import-column-map tbody td > select
+  ) {
+  border-color: var(--control-border);
+  background: var(--panel);
+}
+
+:root[data-theme="click-light"]
+  :where(
+    .field-input,
+    .field-textarea,
+    .parameter-field input,
+    .create-table-control,
+    .result-filter,
+    .native-search input,
+    .native-run-picker select,
+    .native-lineage-database select,
+    .chart-controls select,
+    .import-destination-select select,
+    .import-new-table-fields input,
+    .import-new-table-fields select,
+    .import-create-column-row input,
+    .import-create-column-row select,
+    .import-column-map tbody td > select
+  ):focus,
+:root[data-theme="click-light"] .object-search:focus-within {
+  border-color: var(--focus-color);
+}
+
+:root[data-theme="click-light"]
+  :is(input, select, textarea)[aria-invalid="true"],
+:root[data-theme="click-light"]
+  :is(input, select, textarea)[aria-invalid="true"]:focus {
+  border-color: var(--red);
+}
+
+:root[data-theme="click-light"] :is(input, textarea)::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}

@@ -1,135 +1,798 @@
 @layer components {
-    .observability-shell { display: grid; min-height: 0; flex: 1; grid-template-rows: auto minmax(0, 1fr); gap: 4px; }
-    .native-tabs.observability-tabs { flex: none; margin: 0; }
-    .native-tabs.observability-tabs button[aria-selected="true"] { border-color: color-mix(in srgb, var(--accent) 42%, var(--line)); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); color: var(--accent); }
-    .observability-tabpanel { display: flex; min-height: 0; flex-direction: column; gap: 8px; overflow: auto; outline: none; }
-    .observability-tabpanel:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
-    .observability-profile-hint { margin: 0; padding: 7px 10px; border: 1px solid var(--line); border-radius: var(--radius-panel); background: color-mix(in srgb, var(--panel) 68%, transparent); color: var(--muted); font-size: 9px; }
-    .observability-profile-hint strong { color: var(--text-soft); }
-    .workload-view, .replication-view { display: grid; min-width: 0; align-content: start; gap: 10px; padding: 2px; }
-    .observability-view-heading, .workload-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-    .observability-view-heading > div:first-child { display: grid; gap: 3px; }
-    .observability-view-heading h3, .flamegraph-heading h3 { margin: 2px 0 0; color: var(--text); font-family: var(--font-display); font-size: 16px; font-weight: 720; letter-spacing: -.02em; }
-    .observability-view-heading p, .flamegraph-heading p { margin: 0; color: var(--muted); font-size: 9px; }
-    .observability-view-heading p code, .flamegraph-heading p code { color: var(--text-soft); font-family: var(--font-mono); }
-    .workload-controls { display: flex; align-items: center; gap: 8px; }
-    .workload-controls .parts-view-control { flex: none; }
-    .workload-controls .button-base { min-height: 32px; }
-    .observability-refresh { min-height: 31px; padding: 0 10px; border: 1px solid var(--line-bright); border-radius: var(--radius-control); background: var(--panel); color: var(--text-soft); font: inherit; font-size: 9px; cursor: pointer; }
-    .observability-refresh:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
-    .observability-refresh:disabled { opacity: .5; cursor: wait; }
-    .observability-scope { display: flex; min-height: 27px; align-items: center; gap: 8px; padding: 0 9px; border: 1px solid var(--line); border-radius: var(--radius-panel); background: color-mix(in srgb, var(--panel) 70%, transparent); color: var(--muted); font-family: var(--font-mono); font-size: 8px; }
-    .observability-scope .status-light { width: 6px; height: 6px; }
-    .observability-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; }
-    .observability-metrics article { display: grid; min-width: 0; gap: 5px; padding: 9px 10px; border: 1px solid var(--line); border-radius: var(--radius-panel); background: linear-gradient(125deg, color-mix(in srgb, var(--accent) 4%, var(--panel-raised)), var(--panel-raised)); }
-    .observability-metrics article > span { overflow: hidden; color: var(--muted); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
-    .observability-metrics article > strong { overflow: hidden; color: var(--text); font-family: var(--font-mono); font-size: 14px; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
-    .observability-metrics article.has-warning { border-color: color-mix(in srgb, var(--amber) 35%, var(--line)); }
-    .observability-metrics article.has-warning > strong { color: var(--amber); }
-    .observability-state, .observability-empty { display: grid; min-height: 86px; align-content: center; justify-items: center; gap: 6px; padding: 14px; border: 1px dashed var(--line-bright); border-radius: var(--radius-panel); background: color-mix(in srgb, var(--panel) 60%, transparent); color: var(--muted); font-size: 9px; text-align: center; }
-    .observability-state strong, .observability-empty strong { color: var(--text-soft); font-size: 10px; font-weight: 650; }
-    .observability-state p, .observability-empty p { max-width: 600px; margin: 0; line-height: 1.55; }
-    .observability-state.is-error { border-color: color-mix(in srgb, var(--red) 40%, var(--line)); color: var(--red); }
-    .observability-empty-mark { color: var(--accent); font-size: 20px; line-height: 1; }
-    .workload-scatter-card { display: grid; min-width: 0; gap: 7px; padding: 9px; border: 1px solid var(--line); border-radius: var(--radius-panel); background: radial-gradient(ellipse at 45% 0, color-mix(in srgb, var(--accent) 5%, transparent), transparent 60%), var(--panel); }
-    .workload-section-heading { min-height: 24px; }
-    .workload-section-heading > div { display: grid; gap: 2px; }
-    .workload-section-heading > div > strong { color: var(--text-soft); font-size: 9px; }
-    .workload-chart-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--muted); font-size: 8px; }
-    .workload-chart-legend i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: var(--status-ring); color: var(--accent); }
-    .workload-chart-legend i.is-error { margin-left: 4px; background: var(--red); box-shadow: none; }
-    .workload-scatter-frame { max-width: 100%; border: 1px solid color-mix(in srgb, var(--line) 70%, transparent); border-radius: var(--radius-panel); background: color-mix(in srgb, var(--page) 35%, transparent); }
-    .workload-scatter-scroll { max-width: 100%; overflow-x: auto; border-radius: inherit; background: transparent; }
-    .workload-scatter-svg { display: block; width: 100%; min-width: 690px; height: auto; }
-    .workload-axis line { stroke: color-mix(in srgb, var(--line-bright) 46%, transparent); stroke-width: 1; stroke-dasharray: 2 4; }
-    .workload-axis text { fill: var(--muted); font-family: var(--font-mono); font-size: 9px; }
-    .workload-scatter-point { fill: color-mix(in srgb, var(--accent) 72%, var(--panel)); fill-opacity: .72; stroke: var(--accent); stroke-width: 1.25; cursor: pointer; transition: fill-opacity .16s ease, opacity .16s ease; }
-    .workload-scatter-point:hover, .workload-scatter-point:focus-visible { fill-opacity: 1; stroke-width: 2.3; outline: none; }
-    .workload-scatter-point.is-error { fill: color-mix(in srgb, var(--red) 72%, var(--panel)); stroke: var(--red); }
-    .workload-scatter-point.is-muted { opacity: .17; }
-    .workload-browser { display: grid; min-width: 0; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 8px; }
-    .workload-family-list, .workload-family-detail { display: grid; min-width: 0; align-content: start; gap: 6px; padding: 9px; border: 1px solid var(--line); border-radius: var(--radius-panel); background: color-mix(in srgb, var(--panel-raised) 74%, transparent); }
-    .workload-family-list > button { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 9px; padding: 8px; border: 1px solid transparent; border-radius: var(--radius-control); background: var(--panel); color: var(--text-soft); text-align: left; cursor: pointer; }
-    .workload-family-list > button:hover, .workload-family-list > button.is-selected { border-color: color-mix(in srgb, var(--accent) 42%, var(--line)); background: color-mix(in srgb, var(--accent) 7%, var(--panel)); }
-    .workload-family-list > button > span { display: grid; min-width: 0; gap: 5px; }
-    .workload-family-list code, .workload-family-detail code { overflow: hidden; color: var(--text); font-family: var(--font-mono); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
-    .workload-family-list small { overflow: hidden; color: var(--muted); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
-    .workload-family-list > button > strong { flex: none; color: var(--accent); font-family: var(--font-mono); font-size: 9px; }
-    .workload-family-detail > div:first-child { display: grid; min-width: 0; gap: 5px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
-    .workload-family-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
-    .workload-family-stats > span { display: grid; min-width: 0; gap: 4px; padding: 6px; border-radius: var(--radius-label); background: color-mix(in srgb, var(--panel) 75%, transparent); }
-    .workload-family-stats small { color: var(--muted); font-size: 7px; }
-    .workload-family-stats strong { overflow: hidden; color: var(--text-soft); font-family: var(--font-mono); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
-    .workload-family-detail > p { margin: 0; color: var(--muted); font-size: 9px; }
-    .observability-footnote { margin: 0; color: var(--muted); font-size: 8px; }
-    .replication-table-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-    .replication-table-card { display: grid; min-width: 0; align-content: start; gap: 9px; padding: 10px; border: 1px solid var(--line); border-radius: var(--radius-control); background: linear-gradient(145deg, color-mix(in srgb, var(--green) 3%, var(--panel-raised)), var(--panel-raised)); }
-    .replication-table-card.has-warning { border-color: color-mix(in srgb, var(--amber) 37%, var(--line)); background: linear-gradient(145deg, color-mix(in srgb, var(--amber) 5%, var(--panel-raised)), var(--panel-raised)); }
-    .replication-table-card > header { display: flex; min-width: 0; align-items: center; gap: 8px; }
-    .replication-health-dot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: var(--green); box-shadow: var(--status-ring); color: var(--green); }
-    .replication-health-dot.is-warning { background: var(--amber); box-shadow: var(--status-ring); color: var(--amber); }
-    .replication-table-card header > div { min-width: 0; }
-    .replication-table-card h4 { overflow: hidden; margin: 1px 0 0; color: var(--text); font-family: var(--font-mono); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
-    .replication-health-label { margin-left: auto; color: var(--green); font-size: 8px; text-transform: uppercase; }
-    .replication-table-card.has-warning .replication-health-label { color: var(--amber); }
-    .replication-table-meta { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
-    .replication-table-meta > span { display: grid; min-width: 0; gap: 4px; padding: 6px; border: 1px solid var(--line); border-radius: var(--radius-label); background: color-mix(in srgb, var(--panel) 70%, transparent); }
-    .replication-table-meta small { color: var(--muted); font-size: 7px; }
-    .replication-table-meta strong, .replication-table-meta code { overflow: hidden; color: var(--text-soft); font-family: var(--font-mono); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
-    .replication-flags { display: flex; flex-wrap: wrap; gap: 5px; }
-    .replication-flags > span { padding: 4px 6px; border: 1px solid var(--line); border-radius: var(--radius-label); background: color-mix(in srgb, var(--panel) 65%, transparent); color: var(--muted); font-size: 7px; }
-    .replication-flags > span.is-warning { border-color: color-mix(in srgb, var(--amber) 34%, var(--line)); color: var(--amber); }
-    .replication-queue-list { display: grid; gap: 4px; padding-top: 7px; border-top: 1px solid var(--line); }
-    .replication-queue-list > div { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 5px 10px; padding: 6px 7px; border-radius: var(--radius-panel); background: color-mix(in srgb, var(--panel) 65%, transparent); color: var(--muted); font-size: 7px; }
-    .replication-queue-list strong { color: var(--text-soft); font-family: var(--font-mono); font-size: 8px; }
-    .replication-queue-list small { grid-column: 1 / -1; color: var(--muted); font-size: 7px; }
-    .insights-view > [role="tabpanel"][hidden] { display: none; }
-    .insights-mode-tabs { display: flex; flex: none; align-items: center; gap: 4px; width: max-content; max-width: 100%; padding: 3px; border: 1px solid var(--line); border-radius: var(--radius-control); background: color-mix(in srgb, var(--panel) 78%, transparent); }
-    .insights-mode-tabs button { min-height: 28px; padding: 0 10px; border: 1px solid transparent; border-radius: var(--radius-control); background: transparent; color: var(--muted); font: inherit; font-size: 8px; font-weight: 650; cursor: pointer; }
-    .insights-mode-tabs button[aria-selected="true"] { border-color: color-mix(in srgb, var(--accent) 34%, var(--line)); background: color-mix(in srgb, var(--accent) 9%, var(--panel-raised)); color: var(--accent); }
-    .insights-mode-tabs button:focus-visible, .observability-tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-    .insights-view > [role="tabpanel"]:not([hidden]) { display: grid; min-width: 0; gap: 9px; align-content: start; }
-    .insights-view > #insights-flamegraph-panel { flex: 1; }
-    .flamegraph-heading { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 10px; }
-    .flamegraph-heading > div:first-child { display: grid; min-width: 0; gap: 3px; }
-    .flamegraph-heading h3 { font-size: 14px; }
-    .flamegraph-heading p code { display: inline-block; max-width: 260px; overflow: hidden; vertical-align: bottom; text-overflow: ellipsis; white-space: nowrap; }
-    .flamegraph-trace-types { flex: none; }
-    .flamegraph-trace-types button { font-size: 8px; }
-    .flamegraph-view { display: grid; min-width: 0; gap: 7px; }
-    .flamegraph-summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; color: var(--text-soft); font-size: 8px; }
-    .flamegraph-summary > span { display: inline-flex; align-items: center; gap: 7px; font-family: var(--font-mono); }
-    .flamegraph-summary small { color: var(--muted); font-size: 8px; }
-    .flamegraph-signal { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: var(--status-ring); color: var(--accent); }
-    .flamegraph-canvas-frame { max-width: 100%; border: 1px solid color-mix(in srgb, var(--accent) 21%, var(--line)); border-radius: var(--radius-panel); background: radial-gradient(ellipse at 50% 0, color-mix(in srgb, var(--accent) 8%, transparent), transparent 60%), var(--panel); }
-    .flamegraph-canvas { max-width: 100%; overflow: auto; border-radius: inherit; background: transparent; }
-    .flamegraph-svg { display: block; width: 100%; min-width: 700px; height: auto; }
-    .flamegraph-node rect { fill: color-mix(in srgb, var(--accent) 24%, var(--panel-raised)); stroke: color-mix(in srgb, var(--accent) 43%, var(--line-bright)); stroke-width: 1; cursor: pointer; transition: fill .15s ease, stroke .15s ease; }
-    .flamegraph-node.depth-2 rect { fill: color-mix(in srgb, var(--accent) 19%, var(--panel-raised)); }
-    .flamegraph-node.depth-3 rect { fill: color-mix(in srgb, var(--cyan, var(--accent)) 17%, var(--panel-raised)); }
-    .flamegraph-node.depth-4 rect, .flamegraph-node.depth-5 rect { fill: color-mix(in srgb, var(--violet) 13%, var(--panel-raised)); }
-    .flamegraph-node rect:hover, .flamegraph-node rect:focus-visible, .flamegraph-node.is-selected rect { stroke: var(--accent); stroke-width: 2; filter: none; outline: none; }
-    .flamegraph-node text { fill: var(--text); font-family: var(--font-mono); font-size: 10px; pointer-events: none; }
-    .flamegraph-detail { display: grid; min-height: 51px; gap: 5px; padding: 8px 9px; border: 1px solid var(--line); border-radius: var(--radius-panel); background: color-mix(in srgb, var(--panel-raised) 76%, transparent); }
-    .flamegraph-detail > strong { color: var(--text); font-family: var(--font-mono); font-size: 9px; overflow-wrap: anywhere; }
-    .flamegraph-detail > div { display: flex; flex-wrap: wrap; gap: 6px 13px; color: var(--muted); font-size: 8px; }
-    .flamegraph-detail code { color: var(--accent); font-family: var(--font-mono); }
-    .flamegraph-detail p { margin: 0; color: var(--muted); font-size: 8px; }
-    @media (max-width: 850px) {
-        .observability-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-        .replication-table-list { grid-template-columns: minmax(0, 1fr); }
+  .observability-shell {
+    display: grid;
+    min-height: 0;
+    flex: 1;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 4px;
+  }
+  .native-tabs.observability-tabs {
+    flex: none;
+    margin: 0;
+  }
+  .native-tabs.observability-tabs button[aria-selected="true"] {
+    border-color: color-mix(in srgb, var(--accent) 42%, var(--line));
+    background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+    color: var(--accent);
+  }
+  .observability-tabpanel {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    gap: 8px;
+    overflow: auto;
+    outline: none;
+  }
+  .observability-tabpanel:focus-visible {
+    box-shadow: inset 0 0 0 2px var(--accent);
+  }
+  .observability-profile-hint {
+    margin: 0;
+    padding: 7px 10px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-panel);
+    background: color-mix(in srgb, var(--panel) 68%, transparent);
+    color: var(--muted);
+    font-size: 9px;
+  }
+  .observability-profile-hint strong {
+    color: var(--text-soft);
+  }
+  .workload-view,
+  .replication-view {
+    display: grid;
+    min-width: 0;
+    align-content: start;
+    gap: 10px;
+    padding: 2px;
+  }
+  .observability-view-heading,
+  .workload-section-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .observability-view-heading > div:first-child {
+    display: grid;
+    gap: 3px;
+  }
+  .observability-view-heading h3,
+  .flamegraph-heading h3 {
+    margin: 2px 0 0;
+    color: var(--text);
+    font-family: var(--font-display);
+    font-size: 16px;
+    font-weight: 720;
+    letter-spacing: -0.02em;
+  }
+  .observability-view-heading p,
+  .flamegraph-heading p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 9px;
+  }
+  .observability-view-heading p code,
+  .flamegraph-heading p code {
+    color: var(--text-soft);
+    font-family: var(--font-mono);
+  }
+  .workload-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .workload-controls .parts-view-control {
+    flex: none;
+  }
+  .workload-controls .button-base {
+    min-height: 32px;
+  }
+  .observability-refresh {
+    min-height: 31px;
+    padding: 0 10px;
+    border: 1px solid var(--line-bright);
+    border-radius: var(--radius-control);
+    background: var(--panel);
+    color: var(--text-soft);
+    font: inherit;
+    font-size: 9px;
+    cursor: pointer;
+  }
+  .observability-refresh:hover:not(:disabled) {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .observability-refresh:disabled {
+    opacity: 0.5;
+    cursor: wait;
+  }
+  .observability-scope {
+    display: flex;
+    min-height: 27px;
+    align-items: center;
+    gap: 8px;
+    padding: 0 9px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-panel);
+    background: color-mix(in srgb, var(--panel) 70%, transparent);
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 8px;
+  }
+  .observability-scope .status-light {
+    width: 6px;
+    height: 6px;
+  }
+  .observability-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 7px;
+  }
+  .observability-metrics article {
+    display: grid;
+    min-width: 0;
+    gap: 5px;
+    padding: 9px 10px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-panel);
+    background: linear-gradient(
+      125deg,
+      color-mix(in srgb, var(--accent) 4%, var(--panel-raised)),
+      var(--panel-raised)
+    );
+  }
+  .observability-metrics article > span {
+    overflow: hidden;
+    color: var(--muted);
+    font-size: 8px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .observability-metrics article > strong {
+    overflow: hidden;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .observability-metrics article.has-warning {
+    border-color: color-mix(in srgb, var(--amber) 35%, var(--line));
+  }
+  .observability-metrics article.has-warning > strong {
+    color: var(--amber);
+  }
+  .observability-state,
+  .observability-empty {
+    display: grid;
+    min-height: 86px;
+    align-content: center;
+    justify-items: center;
+    gap: 6px;
+    padding: 14px;
+    border: 1px dashed var(--line-bright);
+    border-radius: var(--radius-panel);
+    background: color-mix(in srgb, var(--panel) 60%, transparent);
+    color: var(--muted);
+    font-size: 9px;
+    text-align: center;
+  }
+  .observability-state strong,
+  .observability-empty strong {
+    color: var(--text-soft);
+    font-size: 10px;
+    font-weight: 650;
+  }
+  .observability-state p,
+  .observability-empty p {
+    max-width: 600px;
+    margin: 0;
+    line-height: 1.55;
+  }
+  .observability-state.is-error {
+    border-color: color-mix(in srgb, var(--red) 40%, var(--line));
+    color: var(--red);
+  }
+  .observability-empty-mark {
+    color: var(--accent);
+    font-size: 20px;
+    line-height: 1;
+  }
+  .workload-scatter-card {
+    display: grid;
+    min-width: 0;
+    gap: 7px;
+    padding: 9px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-panel);
+    background:
+      radial-gradient(
+        ellipse at 45% 0,
+        color-mix(in srgb, var(--accent) 5%, transparent),
+        transparent 60%
+      ),
+      var(--panel);
+  }
+  .workload-section-heading {
+    min-height: 24px;
+  }
+  .workload-section-heading > div {
+    display: grid;
+    gap: 2px;
+  }
+  .workload-section-heading > div > strong {
+    color: var(--text-soft);
+    font-size: 9px;
+  }
+  .workload-chart-legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    color: var(--muted);
+    font-size: 8px;
+  }
+  .workload-chart-legend i {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: var(--status-ring);
+    color: var(--accent);
+  }
+  .workload-chart-legend i.is-error {
+    margin-left: 4px;
+    background: var(--red);
+    box-shadow: none;
+  }
+  .workload-scatter-frame {
+    max-width: 100%;
+    border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+    border-radius: var(--radius-panel);
+    background: color-mix(in srgb, var(--page) 35%, transparent);
+  }
+  .workload-scatter-scroll {
+    max-width: 100%;
+    overflow-x: auto;
+    border-radius: inherit;
+    background: transparent;
+  }
+  .workload-scatter-svg {
+    display: block;
+    width: 100%;
+    min-width: 690px;
+    height: auto;
+  }
+  .workload-axis line {
+    stroke: color-mix(in srgb, var(--line-bright) 46%, transparent);
+    stroke-width: 1;
+    stroke-dasharray: 2 4;
+  }
+  .workload-axis text {
+    fill: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 9px;
+  }
+  .workload-scatter-point {
+    fill: color-mix(in srgb, var(--accent) 72%, var(--panel));
+    fill-opacity: 0.72;
+    stroke: var(--accent);
+    stroke-width: 1.25;
+    cursor: pointer;
+    transition:
+      fill-opacity 0.16s ease,
+      opacity 0.16s ease;
+  }
+  .workload-scatter-point:hover,
+  .workload-scatter-point:focus-visible {
+    fill-opacity: 1;
+    stroke-width: 2.3;
+    outline: none;
+  }
+  .workload-scatter-point.is-error {
+    fill: color-mix(in srgb, var(--red) 72%, var(--panel));
+    stroke: var(--red);
+  }
+  .workload-scatter-point.is-muted {
+    opacity: 0.17;
+  }
+  .workload-browser {
+    display: grid;
+    min-width: 0;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    gap: 8px;
+  }
+  .workload-family-list,
+  .workload-family-detail {
+    display: grid;
+    min-width: 0;
+    align-content: start;
+    gap: 6px;
+    padding: 9px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-panel);
+    background: color-mix(in srgb, var(--panel-raised) 74%, transparent);
+  }
+  .workload-family-list > button {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: space-between;
+    gap: 9px;
+    padding: 8px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-control);
+    background: var(--panel);
+    color: var(--text-soft);
+    text-align: left;
+    cursor: pointer;
+  }
+  .workload-family-list > button:hover,
+  .workload-family-list > button.is-selected {
+    border-color: color-mix(in srgb, var(--accent) 42%, var(--line));
+    background: color-mix(in srgb, var(--accent) 7%, var(--panel));
+  }
+  .workload-family-list > button > span {
+    display: grid;
+    min-width: 0;
+    gap: 5px;
+  }
+  .workload-family-list code,
+  .workload-family-detail code {
+    overflow: hidden;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 8px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .workload-family-list small {
+    overflow: hidden;
+    color: var(--muted);
+    font-size: 8px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .workload-family-list > button > strong {
+    flex: none;
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 9px;
+  }
+  .workload-family-detail > div:first-child {
+    display: grid;
+    min-width: 0;
+    gap: 5px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--line);
+  }
+  .workload-family-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .workload-family-stats > span {
+    display: grid;
+    min-width: 0;
+    gap: 4px;
+    padding: 6px;
+    border-radius: var(--radius-label);
+    background: color-mix(in srgb, var(--panel) 75%, transparent);
+  }
+  .workload-family-stats small {
+    color: var(--muted);
+    font-size: 7px;
+  }
+  .workload-family-stats strong {
+    overflow: hidden;
+    color: var(--text-soft);
+    font-family: var(--font-mono);
+    font-size: 8px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .workload-family-detail > p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 9px;
+  }
+  .observability-footnote {
+    margin: 0;
+    color: var(--muted);
+    font-size: 8px;
+  }
+  .replication-table-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .replication-table-card {
+    display: grid;
+    min-width: 0;
+    align-content: start;
+    gap: 9px;
+    padding: 10px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-control);
+    background: linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--green) 3%, var(--panel-raised)),
+      var(--panel-raised)
+    );
+  }
+  .replication-table-card.has-warning {
+    border-color: color-mix(in srgb, var(--amber) 37%, var(--line));
+    background: linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--amber) 5%, var(--panel-raised)),
+      var(--panel-raised)
+    );
+  }
+  .replication-table-card > header {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 8px;
+  }
+  .replication-health-dot {
+    width: 8px;
+    height: 8px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: var(--status-ring);
+    color: var(--green);
+  }
+  .replication-health-dot.is-warning {
+    background: var(--amber);
+    box-shadow: var(--status-ring);
+    color: var(--amber);
+  }
+  .replication-table-card header > div {
+    min-width: 0;
+  }
+  .replication-table-card h4 {
+    overflow: hidden;
+    margin: 1px 0 0;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .replication-health-label {
+    margin-left: auto;
+    color: var(--green);
+    font-size: 8px;
+    text-transform: uppercase;
+  }
+  .replication-table-card.has-warning .replication-health-label {
+    color: var(--amber);
+  }
+  .replication-table-meta {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 5px;
+  }
+  .replication-table-meta > span {
+    display: grid;
+    min-width: 0;
+    gap: 4px;
+    padding: 6px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-label);
+    background: color-mix(in srgb, var(--panel) 70%, transparent);
+  }
+  .replication-table-meta small {
+    color: var(--muted);
+    font-size: 7px;
+  }
+  .replication-table-meta strong,
+  .replication-table-meta code {
+    overflow: hidden;
+    color: var(--text-soft);
+    font-family: var(--font-mono);
+    font-size: 8px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .replication-flags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+  .replication-flags > span {
+    padding: 4px 6px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-label);
+    background: color-mix(in srgb, var(--panel) 65%, transparent);
+    color: var(--muted);
+    font-size: 7px;
+  }
+  .replication-flags > span.is-warning {
+    border-color: color-mix(in srgb, var(--amber) 34%, var(--line));
+    color: var(--amber);
+  }
+  .replication-queue-list {
+    display: grid;
+    gap: 4px;
+    padding-top: 7px;
+    border-top: 1px solid var(--line);
+  }
+  .replication-queue-list > div {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 5px 10px;
+    padding: 6px 7px;
+    border-radius: var(--radius-panel);
+    background: color-mix(in srgb, var(--panel) 65%, transparent);
+    color: var(--muted);
+    font-size: 7px;
+  }
+  .replication-queue-list strong {
+    color: var(--text-soft);
+    font-family: var(--font-mono);
+    font-size: 8px;
+  }
+  .replication-queue-list small {
+    grid-column: 1 / -1;
+    color: var(--muted);
+    font-size: 7px;
+  }
+  .insights-view > [role="tabpanel"][hidden] {
+    display: none;
+  }
+  .insights-mode-tabs {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 4px;
+    width: max-content;
+    max-width: 100%;
+    padding: 3px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-control);
+    background: color-mix(in srgb, var(--panel) 78%, transparent);
+  }
+  .insights-mode-tabs button {
+    min-height: 28px;
+    padding: 0 10px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-control);
+    background: transparent;
+    color: var(--muted);
+    font: inherit;
+    font-size: 8px;
+    font-weight: 650;
+    cursor: pointer;
+  }
+  .insights-mode-tabs button[aria-selected="true"] {
+    border-color: color-mix(in srgb, var(--accent) 34%, var(--line));
+    background: color-mix(in srgb, var(--accent) 9%, var(--panel-raised));
+    color: var(--accent);
+  }
+  .insights-mode-tabs button:focus-visible,
+  .observability-tabs button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+  .insights-view > [role="tabpanel"]:not([hidden]) {
+    display: grid;
+    min-width: 0;
+    gap: 9px;
+    align-content: start;
+  }
+  .insights-view > #insights-flamegraph-panel {
+    flex: 1;
+  }
+  .flamegraph-heading {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .flamegraph-heading > div:first-child {
+    display: grid;
+    min-width: 0;
+    gap: 3px;
+  }
+  .flamegraph-heading h3 {
+    font-size: 14px;
+  }
+  .flamegraph-heading p code {
+    display: inline-block;
+    max-width: 260px;
+    overflow: hidden;
+    vertical-align: bottom;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .flamegraph-trace-types {
+    flex: none;
+  }
+  .flamegraph-trace-types button {
+    font-size: 8px;
+  }
+  .flamegraph-view {
+    display: grid;
+    min-width: 0;
+    gap: 7px;
+  }
+  .flamegraph-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    color: var(--text-soft);
+    font-size: 8px;
+  }
+  .flamegraph-summary > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-family: var(--font-mono);
+  }
+  .flamegraph-summary small {
+    color: var(--muted);
+    font-size: 8px;
+  }
+  .flamegraph-signal {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: var(--status-ring);
+    color: var(--accent);
+  }
+  .flamegraph-canvas-frame {
+    max-width: 100%;
+    border: 1px solid color-mix(in srgb, var(--accent) 21%, var(--line));
+    border-radius: var(--radius-panel);
+    background:
+      radial-gradient(
+        ellipse at 50% 0,
+        color-mix(in srgb, var(--accent) 8%, transparent),
+        transparent 60%
+      ),
+      var(--panel);
+  }
+  .flamegraph-canvas {
+    max-width: 100%;
+    overflow: auto;
+    border-radius: inherit;
+    background: transparent;
+  }
+  .flamegraph-svg {
+    display: block;
+    width: 100%;
+    min-width: 700px;
+    height: auto;
+  }
+  .flamegraph-node rect {
+    fill: color-mix(in srgb, var(--accent) 24%, var(--panel-raised));
+    stroke: color-mix(in srgb, var(--accent) 43%, var(--line-bright));
+    stroke-width: 1;
+    cursor: pointer;
+    transition:
+      fill 0.15s ease,
+      stroke 0.15s ease;
+  }
+  .flamegraph-node.depth-2 rect {
+    fill: color-mix(in srgb, var(--accent) 19%, var(--panel-raised));
+  }
+  .flamegraph-node.depth-3 rect {
+    fill: color-mix(
+      in srgb,
+      var(--cyan, var(--accent)) 17%,
+      var(--panel-raised)
+    );
+  }
+  .flamegraph-node.depth-4 rect,
+  .flamegraph-node.depth-5 rect {
+    fill: color-mix(in srgb, var(--violet) 13%, var(--panel-raised));
+  }
+  .flamegraph-node rect:hover,
+  .flamegraph-node rect:focus-visible,
+  .flamegraph-node.is-selected rect {
+    stroke: var(--accent);
+    stroke-width: 2;
+    filter: none;
+    outline: none;
+  }
+  .flamegraph-node text {
+    fill: var(--text);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    pointer-events: none;
+  }
+  .flamegraph-detail {
+    display: grid;
+    min-height: 51px;
+    gap: 5px;
+    padding: 8px 9px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-panel);
+    background: color-mix(in srgb, var(--panel-raised) 76%, transparent);
+  }
+  .flamegraph-detail > strong {
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    overflow-wrap: anywhere;
+  }
+  .flamegraph-detail > div {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 13px;
+    color: var(--muted);
+    font-size: 8px;
+  }
+  .flamegraph-detail code {
+    color: var(--accent);
+    font-family: var(--font-mono);
+  }
+  .flamegraph-detail p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 8px;
+  }
+  @media (max-width: 850px) {
+    .observability-metrics {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
-    @media (max-width: 620px) {
-        .observability-view-heading, .flamegraph-heading { align-items: flex-start; flex-direction: column; }
-        .workload-controls { width: 100%; flex-wrap: wrap; }
-        .workload-controls .parts-view-control { max-width: 100%; overflow-x: auto; }
-        .workload-browser { grid-template-columns: minmax(0, 1fr); }
-        .workload-family-list { max-height: 240px; overflow: auto; }
-        .replication-table-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-        .replication-queue-list > div { grid-template-columns: minmax(0, 1fr) auto; }
-        .replication-queue-list > div > span:nth-of-type(2) { grid-column: 1 / -1; }
+    .replication-table-list {
+      grid-template-columns: minmax(0, 1fr);
     }
-    @media (prefers-reduced-motion: reduce) {
-        .workload-scatter-point { transition: none; }
+  }
+  @media (max-width: 620px) {
+    .observability-view-heading,
+    .flamegraph-heading {
+      align-items: flex-start;
+      flex-direction: column;
     }
+    .workload-controls {
+      width: 100%;
+      flex-wrap: wrap;
+    }
+    .workload-controls .parts-view-control {
+      max-width: 100%;
+      overflow-x: auto;
+    }
+    .workload-browser {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .workload-family-list {
+      max-height: 240px;
+      overflow: auto;
+    }
+    .replication-table-meta {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .replication-queue-list > div {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+    .replication-queue-list > div > span:nth-of-type(2) {
+      grid-column: 1 / -1;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .workload-scatter-point {
+      transition: none;
+    }
+  }
+} /* Light theme */
+
+:root[data-theme="click-light"]
+  :is(
+    .observability-metrics article:not(.has-warning),
+    .workload-scatter-card,
+    .flamegraph-canvas-frame
+  ) {
+  background: var(--panel-raised);
+  border-color: var(--line);
 }
