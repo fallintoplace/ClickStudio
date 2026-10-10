@@ -36,14 +36,14 @@ export function ExportDialog({
             onClick={event => {
                 if (event.target === dialogRef.current) onClose();
             }}
-            className="m-auto w-[min(480px,calc(100vw-2rem))] max-w-none overflow-hidden rounded-2xl border border-[var(--line-bright)] bg-[var(--panel)] p-0 text-[var(--text)] shadow-[var(--shadow-dialog)]"
+            className="transfer-dialog"
         >
-            <header className="flex items-start justify-between gap-4 border-b border-[var(--line)] px-5 py-4">
+            <header className="transfer-dialog-header">
                 <div>
-                    <h2 id="export-dialog-title" className="text-base font-semibold">
+                    <h2 id="export-dialog-title" className="transfer-dialog-title">
                         Export
                     </h2>
-                    <p className="mt-1 text-xs text-[var(--text-soft)]">
+                    <p className="transfer-dialog-description">
                         Choose the query or its result rows.
                     </p>
                 </div>
@@ -51,12 +51,12 @@ export function ExportDialog({
                     Close
                 </Button>
             </header>
-            <div className="grid gap-2 p-5">
+            <div className="transfer-dialog-body grid gap-2 overflow-y-auto">
                 <button
                     type="button"
                     disabled={!queryAvailable}
                     onClick={onExportQuery}
-                    className="export-option flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--page)] p-4 text-left transition hover:border-[var(--line-bright)] hover:bg-[var(--panel-hover)] disabled:cursor-not-allowed disabled:opacity-45"
+                    className="export-option transfer-dialog-option"
                 >
                     <Icon name="documents" className="mt-0.5 shrink-0 text-[var(--accent)]" />
                     <span className="grid gap-1">
@@ -70,7 +70,7 @@ export function ExportDialog({
                     type="button"
                     disabled={!rowsAvailable}
                     onClick={onExportRows}
-                    className="export-option flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--page)] p-4 text-left transition hover:border-[var(--line-bright)] hover:bg-[var(--panel-hover)] disabled:cursor-not-allowed disabled:opacity-45"
+                    className="export-option transfer-dialog-option"
                 >
                     <Icon name="table" className="mt-0.5 shrink-0 text-[var(--accent)]" />
                     <span className="grid gap-1">

@@ -590,7 +590,9 @@ test('Fixture workspace explains that imports never write sample data', async ({
     await expect(dialog.getByLabel('Choose a CSV, JSON, or NDJSON file')).toHaveCount(0);
 });
 
-test('Import setup opens at the top after reading a file', async ({ page }) => {
+test('Import setup opens at the top and keeps actions visible on short and narrow screens', async ({
+    page,
+}) => {
     await mockWritableWorkspace(page);
     await page.route('**/api/imports/preview', route =>
         route.fulfill({
@@ -615,4 +617,27 @@ test('Import setup opens at the top after reading a file', async ({ page }) => {
     const main = dialog.locator('.import-wizard-main');
     await expect(dialog.getByRole('region', { name: 'Map source columns' })).toBeVisible();
     expect(await main.evaluate(element => element.scrollTop)).toBe(0);
+
+    for (const viewport of [
+        { width: 1280, height: 450 },
+        { width: 640, height: 640 },
+        { width: 390, height: 600 },
+    ]) {
+        await page.setViewportSize(viewport);
+        const bounds = await dialog.boundingBox();
+        expect(bounds).not.toBeNull();
+        expect(bounds!.x).toBeGreaterThanOrEqual(0);
+        expect(bounds!.y).toBeGreaterThanOrEqual(0);
+        expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(viewport.width);
+        expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(viewport.height);
+        await expect(dialog.getByRole('button', { name: 'Close import wizard' })).toBeInViewport();
+        await expect(
+            dialog.getByRole('button', { name: 'Choose a destination', exact: true }),
+        ).toBeInViewport();
+        expect(await main.evaluate(element => element.scrollWidth - element.clientWidth)).toBe(0);
+        await main.evaluate(element => {
+            element.scrollTop = element.scrollHeight;
+        });
+        await expect(dialog.locator('.import-preview-table tbody tr').last()).toBeInViewport();
+    }
 });

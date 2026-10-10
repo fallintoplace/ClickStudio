@@ -3,6 +3,7 @@ import {
     IMPORT_FILE_SIZE_LABEL,
     IMPORT_ROW_LIMIT_LABEL,
 } from '../../../shared/import-limits';
+import { Button } from '../ui';
 import { formatImportColumnCount } from '../import-wizard-model';
 import { useImportWizardController } from '../useImportWizardController';
 
@@ -159,39 +160,33 @@ export function ImportWizardFooter({
         return 'Import rows';
     };
     return (
-        <footer className="import-wizard-footer flex flex-wrap items-center justify-between gap-3 border-t border-[var(--line)] bg-[var(--page)] px-5 py-3 sm:px-7">
-            <span className="import-wizard-footer-note text-[10px] text-[var(--muted)]">
-                {getStepHint()}
-            </span>
+        <footer className="import-wizard-footer">
+            <span className="import-wizard-footer-note">{getStepHint()}</span>
             <div className="flex items-center gap-2">
                 {importKind === 'query' && (
-                    <button
-                        type="button"
+                    <Button
                         onClick={() => void openQueryFile()}
                         disabled={!queryFile || Boolean(queryFileError) || openingQuery}
-                        className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
+                        variant="primary"
                     >
                         {openingQuery ? 'Opening…' : 'Open query'}
-                    </button>
+                    </Button>
                 )}
                 {importKind === 'rows' && (
                     <>
                         {recoveryState === 'ready' && step === 'review' && (
-                            <button
-                                type="button"
+                            <Button
                                 onClick={() => {
                                     setStep('mapping');
                                     setError('');
                                 }}
                                 disabled={Boolean(busy)}
-                                className="rounded-lg border border-[var(--line)] px-3 py-2 text-xs text-[var(--text-soft)] hover:bg-[var(--panel-hover)] disabled:opacity-50"
                             >
                                 Back
-                            </button>
+                            </Button>
                         )}
                         {recoveryState === 'ready' && !importUnavailable && step === 'file' && (
-                            <button
-                                type="button"
+                            <Button
                                 onClick={() => void previewFile()}
                                 disabled={
                                     !file ||
@@ -200,14 +195,13 @@ export function ImportWizardFooter({
                                     Boolean(busy) ||
                                     (!availableTargets.length && !browserCloudImport)
                                 }
-                                className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
+                                variant="primary"
                             >
                                 {busy === 'preview' ? 'Reading file…' : 'Read file and continue'}
-                            </button>
+                            </Button>
                         )}
                         {recoveryState === 'ready' && !importUnavailable && step === 'mapping' && (
-                            <button
-                                type="button"
+                            <Button
                                 onClick={() => void previewMapping()}
                                 disabled={
                                     !target ||
@@ -218,41 +212,34 @@ export function ImportWizardFooter({
                                     Boolean(liveMappingIssue) ||
                                     Boolean(busy)
                                 }
-                                className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
+                                variant="primary"
                             >
                                 {getReviewActionLabel()}
-                            </button>
+                            </Button>
                         )}
                         {recoveryState === 'ready' && !importUnavailable && step === 'review' && (
-                            <button
-                                type="button"
+                            <Button
                                 onClick={() => void commitImport()}
                                 disabled={Boolean(busy)}
-                                className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
+                                variant="primary"
                             >
                                 {getCommitActionLabel()}
-                            </button>
+                            </Button>
                         )}
                         {recoveryState === 'ready' &&
                             step === 'status' &&
                             job?.status === 'succeeded' && (
                                 <>
-                                    <button
-                                        type="button"
-                                        onClick={importAnotherFile}
-                                        disabled={Boolean(busy)}
-                                        className="rounded-lg border border-[var(--line)] px-3 py-2 text-xs text-[var(--text-soft)] transition hover:bg-[var(--panel-hover)] disabled:opacity-40"
-                                    >
+                                    <Button onClick={importAnotherFile} disabled={Boolean(busy)}>
                                         Import another file
-                                    </button>
-                                    <button
-                                        type="button"
+                                    </Button>
+                                    <Button
                                         onClick={() => void closeWizard()}
                                         disabled={Boolean(busy)}
-                                        className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:opacity-40"
+                                        variant="primary"
                                     >
                                         Done
-                                    </button>
+                                    </Button>
                                 </>
                             )}
                     </>

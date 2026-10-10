@@ -279,7 +279,8 @@ for (const theme of ['Dark', 'Light'])
             expect(await backdrop(importDialog, true)).toEqual(scrim);
             await expect(importDialog).toHaveCSS('border-radius', '4px');
             const step = importDialog.locator('.import-step-item.is-current .import-step-number');
-            await expect(step).toHaveCSS('border-radius', '2px');
+            await expect(step).toHaveCSS('border-radius', '0px');
+            await expect(step).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
             const stepColors = await step.evaluate(element => {
                 const style = getComputedStyle(element);
                 return { text: style.color, fill: style.backgroundColor };

@@ -11,7 +11,7 @@ export function ImportSqlFileStep({
     queryFileError: string;
 }) {
     return (
-        <section aria-label="Import SQL query" className="space-y-4">
+        <section aria-label="Import SQL query">
             <div>
                 <h3 className="text-sm font-semibold">Open a SQL query file</h3>
                 <p className="mt-1 text-xs leading-relaxed text-[var(--text-soft)]">

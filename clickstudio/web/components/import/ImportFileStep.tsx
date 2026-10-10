@@ -37,7 +37,7 @@ export function ImportFileStep({
     availableTargets: ReturnType<typeof useImportWizardController>['availableTargets'];
 }) {
     return (
-        <section aria-label="Choose and preview a file" className="space-y-4">
+        <section aria-label="Choose and preview a file">
             {!preview ? (
                 <>
                     {browserDemoImport && (

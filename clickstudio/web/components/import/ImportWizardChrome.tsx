@@ -1,6 +1,6 @@
 import { importSteps } from '../import-wizard-model';
 import { useImportWizardController } from '../useImportWizardController';
-import { Icon } from '../ui';
+import { Button, Icon } from '../ui';
 
 export function ImportWizardHeader({
     browserDemoImport,
@@ -48,23 +48,17 @@ export function ImportWizardHeader({
         return 'Preview, map, and review rows before inserting them.';
     };
     return (
-        <header className="import-wizard-header flex items-start justify-between gap-5 border-b border-[var(--line)] px-5 py-4 sm:px-7">
+        <header className="import-wizard-header transfer-dialog-header">
             <div className="min-w-0">
-                <span className="import-wizard-eyebrow text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--muted)]">
-                    {getImportSourceLabel()}
-                </span>
-                <h2
-                    id="import-wizard-title"
-                    className="import-wizard-title mt-1 text-lg font-semibold tracking-tight"
-                >
-                    Import data
-                </h2>
-                <p className="import-wizard-description mt-1 text-xs text-[var(--text-soft)]">
-                    {getImportDescription()}
-                </p>
+                <div className="transfer-dialog-heading">
+                    <h2 id="import-wizard-title" className="transfer-dialog-title">
+                        Import data
+                    </h2>
+                    <span className="transfer-dialog-context">{getImportSourceLabel()}</span>
+                </div>
+                <p className="transfer-dialog-description">{getImportDescription()}</p>
             </div>
-            <button
-                type="button"
+            <Button
                 aria-label="Close import wizard"
                 disabled={
                     openingQuery ||
@@ -73,10 +67,9 @@ export function ImportWizardHeader({
                         (Boolean(busy) || job?.status === 'running'))
                 }
                 onClick={() => (importKind === 'query' ? closeQueryMode() : void closeWizard())}
-                className="import-wizard-close rounded-lg border border-[var(--line)] px-3 py-2 text-xs text-[var(--text-soft)] transition hover:bg-[var(--panel-hover)] disabled:cursor-not-allowed disabled:opacity-40"
             >
                 Close
-            </button>
+            </Button>
         </header>
     );
 }

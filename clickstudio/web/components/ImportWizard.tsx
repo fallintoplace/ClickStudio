@@ -116,9 +116,9 @@ export function ImportWizard({ onImportQuery, importCopy, ...controllerProps }: 
                         void closeWizard();
                 }
             }}
-            className="import-wizard-dialog m-auto max-h-[min(90vh,800px)] w-[min(860px,calc(100vw-2rem))] max-w-none overflow-hidden rounded-2xl border border-[var(--line-bright)] bg-[var(--panel)] p-0 text-[var(--text)] shadow-[var(--shadow-dialog)]"
+            className="import-wizard-dialog transfer-dialog transfer-dialog--wizard"
         >
-            <div className="import-wizard-shell flex max-h-[min(90vh,800px)] flex-col">
+            <div className="import-wizard-shell flex flex-col">
                 <ImportWizardHeader
                     {...{
                         browserDemoImport,
@@ -138,7 +138,7 @@ export function ImportWizard({ onImportQuery, importCopy, ...controllerProps }: 
 
                 <main
                     key={importKind === 'query' ? 'query' : step}
-                    className={`import-wizard-main ${importKind === 'query' ? 'is-query' : `is-${step}`} min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-7`}
+                    className={`import-wizard-main transfer-dialog-body ${importKind === 'query' ? 'is-query' : `is-${step}`} min-h-0 flex-1 overflow-y-auto`}
                 >
                     {importKind === 'query' ? (
                         <ImportSqlFileStep {...{ chooseQueryFile, queryFile, queryFileError }} />

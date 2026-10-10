@@ -1,0 +1,125 @@
+.transfer-dialog {
+  --transfer-dialog-width: 480px;
+  margin: auto;
+  width: min(var(--transfer-dialog-width), calc(100vw - 2rem));
+  max-width: none;
+  max-height: min(92dvh, 940px);
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid var(--line-bright);
+  border-radius: var(--radius-dialog);
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: var(--shadow-dialog);
+}
+
+.transfer-dialog--wizard {
+  --transfer-dialog-width: 960px;
+}
+
+.transfer-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.transfer-dialog-header {
+  display: flex;
+  flex: none;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.transfer-dialog-header > div {
+  min-width: 0;
+}
+
+.transfer-dialog-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+
+.transfer-dialog-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: normal;
+}
+
+.transfer-dialog-context {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.transfer-dialog-description {
+  margin-top: 4px;
+  color: var(--text-soft);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.transfer-dialog-body {
+  min-height: 0;
+  padding: 20px;
+}
+
+.transfer-dialog-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  background: var(--page);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.16s ease,
+    background 0.16s ease;
+}
+
+.transfer-dialog-option:hover:not(:disabled) {
+  border-color: var(--line-bright);
+  background: var(--panel-hover);
+}
+
+.transfer-dialog-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.transfer-dialog :is(button, input, select):focus-visible {
+  outline: 2px solid var(--focus-color);
+  outline-offset: 2px;
+}
+
+.transfer-dialog .button-base:is(:hover, :active):not(:disabled) {
+  transform: none;
+}
+
+.transfer-dialog .button-primary:not(:disabled) {
+  background: var(--accent-action);
+}
+
+.transfer-dialog .button-primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent-action) 92%, var(--accent-ink));
+}
+
+@media (max-width: 640px) {
+  .transfer-dialog-header,
+  .transfer-dialog-body {
+    padding: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .transfer-dialog-option {
+    transition: none;
+  }
+}
