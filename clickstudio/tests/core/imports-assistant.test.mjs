@@ -441,6 +441,27 @@ test('Write SQL proposals can be applied to the draft without running them', asy
 test('AssistantService grounds generated SQL against the prepared schema', async () => { const f = aiFixture({ ...proposal, sql: 'SELECT * FROM default.events' }), c = f.ai.prepare(owner, f.input), p = await f.ai.propose(owner, c.id, true); assert.equal(p.quality.checks.find(check => check.id === 'grounding').status, 'pass'); });
 test('Evaluation report counts accepted and rejected proposals without exposing SQL', async () => { const f = aiFixture(), first = f.ai.prepare(owner, f.input), firstProposal = await f.ai.propose(owner, first.id, true); f.ai.decide(owner, firstProposal.id, 'accepted', 'local', 'SELECT 2'); const second = f.ai.prepare(owner, f.input), secondProposal = await f.ai.propose(owner, second.id, true); f.ai.decide(owner, secondProposal.id, 'rejected', 'local', 'SELECT 2'); const report = f.ai.evaluation(owner); assert.equal(report.total, 2); assert.equal(report.accepted, 1); assert.equal(report.rejected, 1); assert.equal(report.acceptanceRate, 50); assert.equal(report.latest[0].score, 100); assert.equal(Object.hasOwn(report.latest[0], 'sql'), false); });
 test('Static semantic checks warn on schema references that need execution evidence', () => { const quality = evaluateProposal({ ...proposal, sql: 'SELECT * FROM missing_table' }, 'generate', { schema: { truncated: false, tables: [{ database: 'default', name: 'events' }] } }); assert.equal(quality.status, 'warn'); assert.equal(quality.checks.find(check => check.id === 'grounding').status, 'warn'); });
+test('Assistant proposals preserve table references up to the Cloud schema limit', () => {
+    for (const count of [0, 50, 51, 499, 500]) {
+        const tables = Array.from({ length: count }, (_, index) => `default.table_${index}`);
+        assert.deepEqual(validateProposal({ ...proposal, tables }).tables, tables);
+    }
+});
+test('Assistant proposals reject malformed and oversized table lists', () => {
+    for (const tables of [undefined, null, 'default.events', {}, Array.from({ length: 501 }, (_, index) => `default.table_${index}`)])
+        assert.throws(() => validateProposal({ ...proposal, tables }), { code: 'AI_OUTPUT', message: 'Invalid tables' });
+    for (const tables of [[null], [1], [{}], ['x'.repeat(4001)]])
+        assert.throws(() => validateProposal({ ...proposal, tables }), { code: 'INVALID_REQUEST' });
+    assert.deepEqual(validateProposal({ ...proposal, tables: ['x'.repeat(4000)] }).tables, ['x'.repeat(4000)]);
+});
+test('Larger table lists do not increase the assumptions and caveats limits', () => {
+    const tables = Array.from({ length: 500 }, (_, index) => `default.table_${index}`);
+    for (const field of ['assumptions', 'caveats']) {
+        const notes = Array.from({ length: 50 }, (_, index) => `Note ${index}`);
+        assert.deepEqual(validateProposal({ ...proposal, tables, [field]: notes })[field], notes);
+        assert.throws(() => validateProposal({ ...proposal, tables, [field]: [...notes, 'One more'] }), { code: 'AI_OUTPUT', message: `Invalid ${field}` });
+    }
+});
 test('Assistant proposals validate named, independently runnable alternatives', () => {
     const content = validateProposal({ ...proposal, alternatives: [{ title: 'Delete instead', summary: 'Remove matching rows.', sql: 'ALTER TABLE events DELETE WHERE id = 1' }] });
     assert.deepEqual(content.alternatives, [{ title: 'Delete instead', summary: 'Remove matching rows.', sql: 'ALTER TABLE events DELETE WHERE id = 1' }]);

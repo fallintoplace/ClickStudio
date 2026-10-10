@@ -8,6 +8,7 @@ import { buildEvaluationReport, evaluateProposal, referencedTables } from './ass
 export const PROMPT_VERSION = 'clickstudio-assistant-v12';
 export const MAX_ASSISTANT_CONVERSATION_MESSAGES = 40;
 export const MAX_ASSISTANT_CONVERSATION_BYTES = 80_000;
+export const MAX_ASSISTANT_PROPOSAL_TABLES = 500;
 export const ASSISTANT_REQUEST_TIMEOUT_MS = 45_000;
 export const ASSISTANT_TIMEOUT_MESSAGE = 'The assistant took too long to respond. Try splitting the request into shorter questions. No SQL was applied or run.';
 
@@ -387,7 +388,7 @@ export class AssistantService {
 }
 export function validateProposal(value: unknown): ProposalContent {
     const v = record(value, 'model proposal');
-    const strings = (x: unknown, name: string) => { requireThat(Array.isArray(x) && x.length <= 50, 502, 'AI_OUTPUT', `Invalid ${name}`); return x.map(s => text(s, name, 4000, true)); };
+    const strings = (x: unknown, name: string, maxEntries = 50) => { requireThat(Array.isArray(x) && x.length <= maxEntries, 502, 'AI_OUTPUT', `Invalid ${name}`); return x.map(s => text(s, name, 4000, true)); };
     const alternatives = v.alternatives === undefined ? [] : (() => {
         requireThat(Array.isArray(v.alternatives) && v.alternatives.length <= 4, 502, 'AI_OUTPUT', 'Invalid alternatives');
         const parsed = v.alternatives.map((raw, index) => {
@@ -411,7 +412,7 @@ export function validateProposal(value: unknown): ProposalContent {
     })();
     requireThat(Array.isArray(v.findings) && v.findings.length <= 30, 502, 'AI_OUTPUT', 'Invalid review findings');
     return { sql: v.sql === null ? null : text(v.sql, 'proposed SQL', 100000), alternatives, summary: text(v.summary, 'summary', 20000, true),
-        assumptions: strings(v.assumptions, 'assumptions'), tables: strings(v.tables, 'tables'), caveats: strings(v.caveats, 'caveats'),
+        assumptions: strings(v.assumptions, 'assumptions'), tables: strings(v.tables, 'tables', MAX_ASSISTANT_PROPOSAL_TABLES), caveats: strings(v.caveats, 'caveats'),
         clarification: v.clarification === null ? null : text(v.clarification, 'clarification', 4000),
         ...(sources ? { sources } : {}),
         findings: v.findings.map(raw => {
