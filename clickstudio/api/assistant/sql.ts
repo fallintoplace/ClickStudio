@@ -12,6 +12,7 @@ import {
 } from '../../core/assistant.js';
 import { evaluateProposal } from '../../core/assistant-evaluation.js';
 import {
+    assistantRequestFrom,
     assistantResultFrom as resultFrom,
     assistantSchemaFrom as schemaFrom,
 } from '../../core/assistant-input.js';
@@ -112,7 +113,8 @@ async function post(request: Request): Promise<Response> {
         const database =
             body.database === undefined ? undefined : field(body.database, 'Database', 128);
         const schema = schemaFrom(body.schema, connectionId);
-        const includeRun = body.includeRun === true;
+        const { action, repair } = assistantRequestFrom(body.action, body.repair);
+        const includeRun = body.includeRun === true && !repair;
         if (includeRun) field(body.runId, 'Run ID', 200);
         const result =
             includeRun && body.result !== undefined ? resultFrom(body.result) : undefined;
@@ -129,14 +131,14 @@ async function post(request: Request): Promise<Response> {
         const built = buildContext({
             connectionId,
             database,
-            action: 'ask',
+            action,
             question,
             conversation,
             sql,
             schema,
             result,
-            evidenceSql,
-            error,
+            evidenceSql: repair?.sql ?? evidenceSql,
+            error: repair?.error ?? error,
             serverVersion,
             sensitiveColumns: (process.env.AI_SENSITIVE_COLUMNS ?? 'password,token,secret,api_key')
                 .split(',')
@@ -156,7 +158,7 @@ async function post(request: Request): Promise<Response> {
             id: randomUUID(),
             owner: 'vercel-session',
             connectionId,
-            action: 'ask',
+            action,
             createdAt: new Date().toISOString(),
             expiresAt: new Date(Date.now() + 60_000).toISOString(),
             baseSql: sql,
@@ -175,7 +177,7 @@ async function post(request: Request): Promise<Response> {
             id: randomUUID(),
             owner: 'vercel-session',
             connectionId,
-            action: 'ask',
+            action,
             createdAt: new Date().toISOString(),
             baseSql: sql,
             responseId: response.responseId,
@@ -183,7 +185,7 @@ async function post(request: Request): Promise<Response> {
             promptVersion: PROMPT_VERSION,
             contextSummary: built.summary,
             decision: 'pending',
-            quality: evaluateProposal(content, 'ask', {
+            quality: evaluateProposal(content, action, {
                 schema: { tables: schema.tables, truncated: schema.truncated },
             }),
         };

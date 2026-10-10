@@ -42,6 +42,7 @@ export type WorkspaceResultsPanelState = Readonly<{
     nativeParseSnapshot?: NativeParseSnapshot;
     trusted: boolean;
     busy: BusyAction;
+    assistantBusy: boolean;
     execution?: Readonly<{ sql: string }>;
     retainedExecutionResult?: Readonly<{ run: Run; page: ResultPage; pageIndex: number }>;
     cancelling: boolean;
@@ -60,6 +61,7 @@ export type WorkspaceResultsPanelActions = Readonly<{
     onLoadPipeline: () => void;
     onLoadFlamegraph: () => void;
     onRevealRange: (from: number, to: number) => void;
+    onFixWithAi: () => void;
 }>;
 
 export function WorkspaceResultsPanel({
@@ -95,6 +97,7 @@ export function WorkspaceResultsPanel({
         nativeParseSnapshot,
         trusted,
         busy,
+        assistantBusy,
         execution,
         retainedExecutionResult,
         cancelling,
@@ -262,6 +265,8 @@ export function WorkspaceResultsPanel({
                                 copy={copy.common}
                                 errorRange={viewState.failureRange}
                                 location={viewState.failureLocation}
+                                onFixWithAi={failureSql ? actions.onFixWithAi : undefined}
+                                fixBusy={assistantBusy || Boolean(busy)}
                             />
                         ) : (
                             <>

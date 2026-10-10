@@ -706,6 +706,66 @@ test('Ask AI uses browser Cloud schema and run evidence without resolving a loca
     assert.equal(driver.schemaCalls.length, 0);
 });
 
+for (const connectionId of ['demo', 'clickhouse-cloud'])
+    test(`Fix with AI repairs ${connectionId} failures without loading a retained run`, async t => {
+        const sql = 'SELECT 1;\nSELECT event_count FROM demo.events;\nSELECT 2;';
+        const repairedSql = sql.replace('event_count', 'events');
+        const error = '[UNKNOWN_IDENTIFIER] Unknown column event_count';
+        const assistant: AssistantDriver = {
+            available: true,
+            model: 'fixture',
+            propose: async context => {
+                assert.equal(context.action, 'repair');
+                assert.equal(context.baseSql, sql);
+                const payload = JSON.parse(context.payload.context) as Record<string, unknown>;
+                assert.equal(payload.evidenceSql, 'SELECT event_count FROM demo.events');
+                assert.equal(payload.error, error);
+                assert.equal(payload.result, undefined);
+                assert.match(context.payload.instructions, /minimal repair/);
+                return {
+                    content: {
+                        sql: repairedSql,
+                        summary: 'Use the events column.',
+                        assumptions: [],
+                        tables: ['demo.events'],
+                        caveats: [],
+                        clarification: null,
+                        findings: [],
+                    },
+                    responseId: 'repair-response',
+                };
+            },
+        };
+        const s = await start(undefined, undefined, undefined, new DemoDriver(), assistant);
+        t.after(() => s.stop());
+        if (connectionId === 'demo')
+            await s.call('/connections/demo/trust', { trusted: true, confirmation: 'demo' });
+        const schema = await new DemoDriver().schema('demo');
+        const response = await s.call('/assistant/sql', {
+            connectionId,
+            action: 'repair',
+            question: 'Fix this query error.',
+            sql,
+            database: 'demo',
+            schema,
+            includeRun: true,
+            runId: 'missing-older-run',
+            result: { rows: [['unrelated old result']] },
+            repair: { sql: 'SELECT event_count FROM demo.events', error },
+        });
+        assert.equal(response.status, 201);
+        const proposal = (await response.json()) as { id: string; action: string; sql: string };
+        assert.equal(proposal.action, 'repair');
+        assert.equal(proposal.sql, repairedSql);
+        const accepted = await s.call(`/assistant/proposals/${proposal.id}/decision`, {
+            connectionId,
+            decision: 'accepted',
+            currentSql: sql,
+        });
+        assert.equal(accepted.status, 200);
+        assert.equal(((await accepted.json()) as { decision: string }).decision, 'accepted');
+    });
+
 test('Voice sessions require trust and keep the provider behind the server', async t => {
     const calls: unknown[] = [];
     const s = await start(undefined, {

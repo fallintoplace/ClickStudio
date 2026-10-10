@@ -40,7 +40,11 @@ import {
     type AssistantDriver,
     validateAssistantConversation,
 } from '../core/assistant.js';
-import { assistantResultFrom, assistantSchemaFrom } from '../core/assistant-input.js';
+import {
+    assistantRequestFrom,
+    assistantResultFrom,
+    assistantSchemaFrom,
+} from '../core/assistant-input.js';
 import { ImportService, type ImportDriver } from '../core/imports.js';
 import {
     CREATE_TABLE_COLUMN_TYPES,
@@ -141,6 +145,7 @@ function registerAssistantSqlRoute(
             const question = text(v.question, 'question', 4000),
                 sql = text(v.sql, 'SQL', MAX_SQL_CHARS, true);
             const conversation = validateAssistantConversation(v.conversation);
+            const { action, repair } = assistantRequestFrom(v.action, v.repair);
             const schema = browserCloud
                 ? assistantSchemaFrom(v.schema, connectionId)
                 : await driver.schema(connectionId);
@@ -165,7 +170,7 @@ function registerAssistantSqlRoute(
             let result: Result | undefined;
             let evidenceSql: string | undefined;
             let errorMessage: string | undefined;
-            if (v.includeRun === true) {
+            if (v.includeRun === true && !repair) {
                 requireThat(
                     Boolean(v.runId),
                     400,
@@ -216,14 +221,14 @@ function registerAssistantSqlRoute(
             const context = ai.prepare(p, {
                 connectionId,
                 database,
-                action: 'ask',
+                action,
                 question,
                 conversation,
                 sql,
                 schema,
                 result,
-                evidenceSql,
-                error: errorMessage,
+                evidenceSql: repair?.sql ?? evidenceSql,
+                error: repair?.error ?? errorMessage,
                 serverVersion,
                 documentation,
                 sensitiveColumns: config.sensitiveColumns,

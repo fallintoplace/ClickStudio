@@ -283,6 +283,7 @@ export const english = {
         statusSucceeded: 'Succeeded',
         statusTruncated: 'Truncated',
         queryFailed: 'Query failed',
+        fixWithAi: 'Fix with AI',
         lastExecutionFailed: 'Last execution failed',
         output: 'Output',
         closeOutput: 'Close output',

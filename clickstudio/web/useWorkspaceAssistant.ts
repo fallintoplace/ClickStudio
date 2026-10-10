@@ -1,4 +1,4 @@
-import type { ProposalDecisionAction } from '../shared/assistant-types';
+import type { AssistantRepairContext, ProposalDecisionAction } from '../shared/assistant-types';
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { parseAssistantProposal } from '../shared/assistant-proposal';
 import type { AssistantConversationMessage, Result, Schema } from '../shared/types';
@@ -144,6 +144,10 @@ function chatTitle(question: string) {
 type AssistantPhase = 'preparing' | 'generating' | 'deciding';
 type AssistantRunContext = { result?: Result; evidenceSql?: string; error?: string };
 type AssistantRunContextLoader = (signal: AbortSignal) => Promise<AssistantRunContext>;
+type AssistantRequestOptions = {
+    repair?: AssistantRepairContext;
+    loadSchema?: () => Promise<Schema | undefined>;
+};
 type AssistantActivity = { chatId: string; turnId: string; phase: AssistantPhase };
 type ActiveAssistantRequest = {
     id: number;
@@ -317,18 +321,23 @@ export function useWorkspaceAssistant({
         serverVersion?: string,
         database?: string,
         loadRunContext?: AssistantRunContextLoader,
+        options?: AssistantRequestOptions,
     ) => {
         if (!trusted) return;
-        const question = assistantQuestion.trim();
+        const repair = options?.repair;
+        const requestIncludesRun = includeRun && !repair;
+        const question = repair
+            ? 'Fix this query error and return the updated SQL draft, keeping the other statements unchanged.'
+            : assistantQuestion.trim();
         if (!question) {
             setAssistantError('Ask a question or describe the SQL you want first.');
             return;
         }
-        if (!schema) {
+        if (!schema && !options?.loadSchema) {
             setAssistantError('Refresh the ClickHouse schema before asking the assistant.');
             return;
         }
-        if (includeRun && !activeRunId) {
+        if (requestIncludesRun && !activeRunId) {
             setAssistantError('Run a query before including its run context.');
             return;
         }
@@ -342,8 +351,8 @@ export function useWorkspaceAssistant({
             id: turnId,
             question,
             contextSql: active.sql,
-            includeRun,
-            ...(includeRun && activeRunId ? { runId: activeRunId } : {}),
+            includeRun: requestIncludesRun,
+            ...(requestIncludesRun && activeRunId ? { runId: activeRunId } : {}),
             status: 'pending' as const,
         };
         if (activeRequestRef.current)
@@ -358,9 +367,13 @@ export function useWorkspaceAssistant({
             turnId,
             controller,
         };
-        setActivity({ chatId, turnId, phase: includeRun ? 'preparing' : 'generating' });
+        setActivity({
+            chatId,
+            turnId,
+            phase: requestIncludesRun || !schema ? 'preparing' : 'generating',
+        });
         setAssistantError('');
-        setQuestionDrafts(current => ({ ...current, [chatId]: '' }));
+        if (!repair) setQuestionDrafts(current => ({ ...current, [chatId]: '' }));
         updateChat(chatId, chat => ({
             ...chat,
             title:
@@ -369,22 +382,26 @@ export function useWorkspaceAssistant({
             turns: [...chat.turns, turn],
         }));
         try {
-            const runContext = includeRun ? await loadRunContext?.(controller.signal) : undefined;
+            const currentSchema = schema ?? (await options?.loadSchema?.());
             controller.signal.throwIfAborted();
-            if (includeRun && !runContext)
+            if (!currentSchema) throw new Error('Could not load the ClickHouse schema. Try again.');
+            const runContext = repair
+                ? { evidenceSql: repair.sql, error: repair.error }
+                : requestIncludesRun
+                  ? await loadRunContext?.(controller.signal)
+                  : undefined;
+            controller.signal.throwIfAborted();
+            if (requestIncludesRun && !runContext)
                 throw new Error('Could not load the selected run context. Try again.');
-            const storedRunContext =
-                includeRun && runContext
-                    ? {
-                          ...(runContext.result
-                              ? { result: boundedAssistantResult(runContext.result) }
-                              : {}),
-                          ...(runContext.evidenceSql
-                              ? { evidenceSql: runContext.evidenceSql }
-                              : {}),
-                          ...(runContext.error ? { error: runContext.error } : {}),
-                      }
-                    : undefined;
+            const storedRunContext = runContext
+                ? {
+                      ...(runContext.result
+                          ? { result: boundedAssistantResult(runContext.result) }
+                          : {}),
+                      ...(runContext.evidenceSql ? { evidenceSql: runContext.evidenceSql } : {}),
+                      ...(runContext.error ? { error: runContext.error } : {}),
+                  }
+                : undefined;
             if (storedRunContext && JSON.stringify(storedRunContext).length > 60_000)
                 throw new Error(
                     'The selected run context is too large to keep in this chat. Start a new chat or select a smaller run.',
@@ -407,8 +424,8 @@ export function useWorkspaceAssistant({
                     conversation: history,
                     sql: active.sql,
                     schema: {
-                        ...schema,
-                        columns: schema.columns.map(
+                        ...currentSchema,
+                        columns: currentSchema.columns.map(
                             ({ database: columnDatabase, table, name, type }) => ({
                                 database: columnDatabase,
                                 table,
@@ -419,9 +436,10 @@ export function useWorkspaceAssistant({
                     },
                     serverVersion,
                     database,
-                    action: 'ask',
-                    runId: includeRun ? activeRunId : undefined,
-                    includeRun,
+                    action: repair ? 'repair' : 'ask',
+                    repair,
+                    runId: requestIncludesRun ? activeRunId : undefined,
+                    includeRun: requestIncludesRun,
                     result: storedRunContext?.result,
                     evidenceSql: storedRunContext?.evidenceSql,
                     error: storedRunContext?.error,

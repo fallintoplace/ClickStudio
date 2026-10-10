@@ -1,4 +1,6 @@
 import type { Json, Result, Schema, SchemaColumn, SchemaTable } from '../shared/types.js';
+import type { AssistantRepairContext } from '../shared/assistant-types.js';
+import { MAX_SQL_CHARS } from '../shared/query-limits.js';
 import { AppError } from './errors.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -13,6 +15,26 @@ function field(value: unknown, name: string, max: number, allowEmpty = false): s
             `${name} must be a string under ${max.toLocaleString()} characters.`,
         );
     return value;
+}
+
+export function assistantRequestFrom(
+    action: unknown,
+    repair: unknown,
+): { action: 'ask' | 'repair'; repair?: AssistantRepairContext } {
+    if (action === undefined || action === 'ask') return { action: 'ask' };
+    if (action !== 'repair' || !isRecord(repair))
+        throw new AppError(
+            400,
+            'INVALID_REQUEST',
+            'Send a valid assistant action and query error.',
+        );
+    return {
+        action,
+        repair: {
+            sql: field(repair.sql, 'Failed SQL', MAX_SQL_CHARS),
+            error: field(repair.error, 'Query error', 3_000),
+        },
+    };
 }
 
 export function assistantSchemaFrom(value: unknown, connectionId: string): Schema {

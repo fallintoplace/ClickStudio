@@ -9,6 +9,11 @@ export const ASSISTANT_ACTIONS = [
 ] as const;
 export type AssistantAction = (typeof ASSISTANT_ACTIONS)[number];
 
+export interface AssistantRepairContext {
+    sql: string;
+    error: string;
+}
+
 export const FINDING_SEVERITIES = ['high', 'medium', 'low'] as const;
 export type FindingSeverity = (typeof FINDING_SEVERITIES)[number];
 

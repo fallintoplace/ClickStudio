@@ -260,6 +260,7 @@ export function Workspace({
                 trusted,
                 busy,
                 execution: pendingExecution.execution,
+                assistantBusy: model.assistant.assistantBusy,
                 retainedExecutionResult: pendingExecution.retainedExecutionResult,
                 cancelling,
                 experience,
@@ -268,6 +269,34 @@ export function Workspace({
                 onSelectView: nextView => {
                     setView(nextView);
                     if (nextView === 'insights') void perform(loadProfile, 'save');
+                },
+                onFixWithAi: () => {
+                    const { failureSql, failureError } = viewState;
+                    if (!failureSql || !failureError) return;
+                    showInspector('assistant');
+                    void model.assistant.requestAssistantSql(
+                        schema,
+                        connection.id === PLAYGROUND_CONNECTION_ID
+                            ? model.data.serverVersion
+                            : connection.manifest?.serverVersion,
+                        connection.database,
+                        undefined,
+                        {
+                            repair: {
+                                sql: failureSql,
+                                error: [
+                                    `[${failureError.code}] ${failureError.message}`,
+                                    viewState.failureLocation
+                                        ? `Line ${viewState.failureLocation.line}, column ${viewState.failureLocation.column}`
+                                        : '',
+                                ]
+                                    .filter(Boolean)
+                                    .join('\n')
+                                    .slice(0, 3_000),
+                            },
+                            loadSchema: model.data.loadSchema,
+                        },
+                    );
                 },
                 onSelectScriptRun: runId => {
                     setSelectedScriptResult(active.id, `${active.scriptId}:${runId}`);

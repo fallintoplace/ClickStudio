@@ -14,6 +14,7 @@ type WorkspaceCommonTranslation = Pick<
     | 'closeOutput'
     | 'showOutput'
     | 'queryFailed'
+    | 'fixWithAi'
     | 'syntaxError'
     | 'errorLocation'
     | 'syntaxErrorNearToken'
@@ -149,6 +150,7 @@ export const workspaceCommonTranslations: Record<
         connectionChangedDescription: '这些结果来自其他连接。请在当前连接上重新运行查询以刷新。',
         sourceDeleted: '数据源已删除',
         queryFailed: '查询失败',
+        fixWithAi: '用 AI 修复',
         lastExecutionFailed: '上次执行失败',
         output: '输出',
         closeOutput: '关闭输出',

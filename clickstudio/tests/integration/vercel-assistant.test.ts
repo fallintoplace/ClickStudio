@@ -29,6 +29,91 @@ function assistantBody() {
     };
 }
 
+test('Vercel Fix with AI sends failure context without a saved run and returns a repair proposal', async t => {
+    const priorKey = process.env.OPENAI_API_KEY;
+    const priorFetch = globalThis.fetch;
+    process.env.OPENAI_API_KEY = 'test-key';
+    t.after(() => {
+        globalThis.fetch = priorFetch;
+        if (priorKey === undefined) delete process.env.OPENAI_API_KEY;
+        else process.env.OPENAI_API_KEY = priorKey;
+    });
+    const sql = 'SELECT 1;\nSELECT event_count FROM demo.events;\nSELECT 2;';
+    const repairedSql = sql.replace('event_count', 'events');
+    globalThis.fetch = async (input, init) => {
+        if (String(input).endsWith('/responses/input_tokens'))
+            return Response.json({ object: 'response.input_tokens', input_tokens: 200 });
+        const payload = JSON.parse(String(init?.body)) as {
+            instructions: string;
+            input: { content: { text: string }[] }[];
+        };
+        assert.match(payload.instructions, /minimal repair/);
+        const current = JSON.parse(payload.input[0]!.content[0]!.text) as {
+            context: Record<string, unknown>;
+        };
+        assert.equal(current.context.sql, sql);
+        assert.equal(current.context.evidenceSql, 'SELECT event_count FROM demo.events');
+        assert.equal(current.context.error, '[47] Unknown column event_count');
+        assert.equal(current.context.result, undefined);
+        return Response.json({
+            id: 'repair-response',
+            status: 'completed',
+            output_text: JSON.stringify({
+                sql: repairedSql,
+                summary: 'Use the events column.',
+                assumptions: [],
+                tables: ['demo.events'],
+                caveats: [],
+                clarification: null,
+                findings: [],
+            }),
+            output: [],
+        });
+    };
+    const response = await handler.fetch(
+        request({
+            ...assistantBody(),
+            sql,
+            action: 'repair',
+            includeRun: true,
+            result: { rows: [['old result']] },
+            repair: {
+                sql: 'SELECT event_count FROM demo.events',
+                error: '[47] Unknown column event_count',
+            },
+        }),
+    );
+    assert.equal(response.status, 201);
+    const proposal = (await response.json()) as { action: string; baseSql: string; sql: string };
+    assert.equal(proposal.action, 'repair');
+    assert.equal(proposal.baseSql, sql);
+    assert.equal(proposal.sql, repairedSql);
+});
+
+test('Vercel Fix with AI rejects incomplete failure context before calling the provider', async t => {
+    const priorKey = process.env.OPENAI_API_KEY;
+    const priorFetch = globalThis.fetch;
+    process.env.OPENAI_API_KEY = 'test-key';
+    t.after(() => {
+        globalThis.fetch = priorFetch;
+        if (priorKey === undefined) delete process.env.OPENAI_API_KEY;
+        else process.env.OPENAI_API_KEY = priorKey;
+    });
+    globalThis.fetch = async () => {
+        throw new Error('Invalid repair requests must not reach the provider');
+    };
+    for (const repair of [undefined, {}, { sql: 'SELECT 1' }, { sql: 'SELECT 1', error: '' }]) {
+        const response = await handler.fetch(
+            request({ ...assistantBody(), action: 'repair', repair }),
+        );
+        assert.equal(response.status, 400);
+        assert.equal(
+            ((await response.json()) as { error: { code: string } }).error.code,
+            'INVALID_REQUEST',
+        );
+    }
+});
+
 test('Vercel SQL generation requires a same-origin workspace request', async () => {
     const prior = process.env.OPENAI_API_KEY;
     process.env.OPENAI_API_KEY = '';
