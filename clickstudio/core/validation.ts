@@ -1,3 +1,4 @@
+import { MAX_SQL_CHARS } from '../shared/query-limits.js';
 import { DEFAULT_LIMITS, HARD_LIMITS, type Limits, type RunRequest, type Json } from '../shared/types.js';
 import { AppError, requireThat } from './errors.js';
 
@@ -63,12 +64,12 @@ export function runRequest(value: unknown): RunRequest {
             if (requestedLimits[key] !== undefined)
                 selectedLimits[key] = checkedLimits[key];
     }
-    const sourceFrom = v.sourceFrom === undefined ? undefined : integer(v.sourceFrom, 'sourceFrom', 0, 200000);
-    const sourceTo = v.sourceTo === undefined ? undefined : integer(v.sourceTo, 'sourceTo', 0, 200000);
+    const sourceFrom = v.sourceFrom === undefined ? undefined : integer(v.sourceFrom, 'sourceFrom', 0, MAX_SQL_CHARS);
+    const sourceTo = v.sourceTo === undefined ? undefined : integer(v.sourceTo, 'sourceTo', 0, MAX_SQL_CHARS);
     requireThat(sourceFrom === undefined ? sourceTo === undefined : sourceTo !== undefined && sourceTo >= sourceFrom, 400, 'INVALID_SOURCE_RANGE', 'sourceTo must be greater than or equal to sourceFrom');
     return {
         clientRequestId: identifier(v.clientRequestId, 'clientRequestId'),
-        connectionId: identifier(v.connectionId, 'connectionId'), sql: text(v.sql, 'SQL', 200000),
+        connectionId: identifier(v.connectionId, 'connectionId'), sql: text(v.sql, 'SQL', MAX_SQL_CHARS),
         kind, parameters: stringMap(v.parameters, 'parameters'),
         limits: requestedLimits === undefined ? undefined : selectedLimits, tags,
         ...(sourceFrom === undefined ? {} : { sourceFrom, sourceTo }),

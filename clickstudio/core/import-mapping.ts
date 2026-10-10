@@ -1,3 +1,4 @@
+import { MAX_IMPORT_COLUMNS } from '../shared/import-limits.js';
 import type { Json, SchemaColumn } from '../shared/types.js';
 
 export type ImportMappingColumn = Pick<SchemaColumn, 'name' | 'type' | 'defaultKind'>;
@@ -71,8 +72,8 @@ export function mapImportRows(
     destinationColumns: ImportMappingColumn[],
 ) {
     const entries = Object.entries(fields);
-    if (!entries.length || entries.length > 200 || new Set(entries.map(([, destination]) => destination)).size !== entries.length)
-        throw new ImportMappingError('IMPORT_MAPPING', 'Map 1–200 source columns to unique destination columns.');
+    if (!entries.length || entries.length > MAX_IMPORT_COLUMNS || new Set(entries.map(([, destination]) => destination)).size !== entries.length)
+        throw new ImportMappingError('IMPORT_MAPPING', `Map 1–${MAX_IMPORT_COLUMNS} source columns to unique destination columns.`);
 
     const writableColumns = destinationColumns.filter(column => !['MATERIALIZED', 'ALIAS'].includes(column.defaultKind.toUpperCase()));
     const writableByName = new Map(writableColumns.map(column => [column.name, column]));

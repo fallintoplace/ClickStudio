@@ -1,16 +1,16 @@
+import { MAX_IMPORT_FILE_BYTES, IMPORT_FILE_SIZE_LABEL, IMPORT_ROW_LIMIT_LABEL } from '../../shared/import-limits';
+import { MAX_SQL_FILE_BYTES, SQL_FILE_SIZE_LABEL } from '../../shared/query-limits';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api';
 import { cloudImportDatabases, CREATE_CLOUD_TABLE_TARGET } from '../cloud-import';
 import { ImportMappingError, mapImportRows, type ImportMappingColumn } from '../../core/import-mapping';
 import { ImportJobStatus } from './ImportJobStatus';
 import { ImportPreviewTable, ImportReviewRows } from './ImportPreviewTable';
-import { formatImportColumnCount, formatImportRowCount, MAX_FILE_BYTES, importSteps } from './import-wizard-model';
+import { formatImportColumnCount, formatImportRowCount, importSteps } from './import-wizard-model';
 import { useImportWizardController, type ImportWizardControllerOptions } from './useImportWizardController';
 import { Icon } from './ui';
 import type { Copy } from '../i18n';
 import type { Json } from '../../shared/types';
-
-const MAX_QUERY_FILE_BYTES = 200_000;
 
 function fillImportCopy(template: string, values: Record<string, string>) {
     return template.replace(/\{([A-Za-z][A-Za-z0-9_]*)\}/g, (placeholder, key: string) => values[key] ?? placeholder);
@@ -131,7 +131,7 @@ export function ImportWizard({ onImportQuery, importCopy, ...controllerProps }: 
         setQueryFileError('');
         if (!next) return;
         if (!next.name.toLowerCase().endsWith('.sql')) setQueryFileError('Choose a .sql file.');
-        else if (next.size > MAX_QUERY_FILE_BYTES) setQueryFileError('SQL files must be 200 KB or smaller.');
+        else if (next.size > MAX_SQL_FILE_BYTES) setQueryFileError(`SQL files must be ${SQL_FILE_SIZE_LABEL} or smaller.`);
     }
 
     function closeQueryMode() {
@@ -221,7 +221,7 @@ export function ImportWizard({ onImportQuery, importCopy, ...controllerProps }: 
                     <div><h3 className="text-sm font-semibold">Open a SQL query file</h3><p className="mt-1 text-xs leading-relaxed text-[var(--text-soft)]">The file opens as a new draft. It will not run until you choose Run.</p></div>
                     <label className="import-file-picker import-file-picker-query import-query-picker">
                         <span className="import-file-icon" aria-hidden="true"><Icon name="parser"/></span>
-                        <span className="import-file-copy"><strong>Choose a query file</strong><small>SQL · up to 200 KB</small></span>
+                        <span className="import-file-copy"><strong>Choose a query file</strong><small>SQL · up to {SQL_FILE_SIZE_LABEL}</small></span>
                         <input aria-label="Choose a SQL query file" type="file" accept=".sql,text/plain,application/sql" onChange={event => chooseQueryFile(event.target.files?.[0])} className="import-file-input" />
                     </label>
                     {queryFile && <div className="import-selected-file flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--line)] bg-[var(--page)] px-4 py-3 text-xs"><span className="min-w-0 truncate font-medium">{queryFile.name}</span><span className="text-[var(--muted)]">SQL · {(queryFile.size / 1024).toFixed(1)} KB</span></div>}
@@ -241,7 +241,7 @@ export function ImportWizard({ onImportQuery, importCopy, ...controllerProps }: 
                         {browserDemoImport && <div className="import-sample-card flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--line-bright)] bg-[var(--page)] p-4"><div><strong className="block text-sm">Try a sample import</strong><span className="mt-1 block text-xs text-[var(--muted)]">Six rows of marketing data, ready to preview.</span></div><button type="button" onClick={loadSampleFile} disabled={Boolean(busy)} className="rounded-lg border border-[var(--line-bright)] px-3 py-2 text-xs font-semibold text-[var(--text)] transition hover:bg-[var(--panel-hover)] disabled:opacity-50">{busy === 'preview' ? 'Loading sample…' : 'Load sample file'}</button></div>}
                         <label className="import-file-picker import-file-picker-rows">
                             <span className="import-file-icon" aria-hidden="true"><Icon name="importFile"/></span>
-                            <span className="import-file-copy"><strong>Choose a data file</strong><small>CSV, JSON, NDJSON, or JSONL · up to 2 MB</small></span>
+                            <span className="import-file-copy"><strong>Choose a data file</strong><small>CSV, JSON, NDJSON, or JSONL · up to {IMPORT_FILE_SIZE_LABEL}</small></span>
                             <input aria-label="Choose a CSV, JSON, or NDJSON file" type="file" accept=".csv,.json,.ndjson,.jsonl,text/csv,application/json" onChange={event => chooseRowsFile(event.target.files?.[0])} className="import-file-input" />
                         </label>
                         {file && <div className="import-selected-file flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--line)] bg-[var(--page)] px-4 py-3 text-xs"><span className="min-w-0 truncate font-medium">{file.name}</span><span className="text-[var(--muted)]">{format ? format.toUpperCase() : 'Unsupported'} · {(file.size / 1024).toFixed(1)} KB</span></div>}
@@ -429,12 +429,12 @@ export function ImportWizard({ onImportQuery, importCopy, ...controllerProps }: 
             </main>
 
             <footer className="import-wizard-footer flex flex-wrap items-center justify-between gap-3 border-t border-[var(--line)] bg-[var(--page)] px-5 py-3 sm:px-7">
-                <span className="import-wizard-footer-note text-[10px] text-[var(--muted)]">{importKind === 'query' ? 'SQL opens as a draft and does not run automatically' : browserDemoImport ? 'Browser demo · nothing is written to ClickHouse' : browserCloudImport ? 'CSV, JSON, or NDJSON · up to 2 MB and 10,000 rows' : step === 'file' ? 'CSV, JSON, or NDJSON · up to 2 MB and 10,000 rows' : step === 'mapping' ? target ? `${formatImportColumnCount(Object.keys(selectedFields).length)} mapped · review before writing` : 'Choose a table and match its columns' : step === 'review' ? 'Review the destination and row count before writing' : 'Import status is checked with ClickHouse'}</span>
+                <span className="import-wizard-footer-note text-[10px] text-[var(--muted)]">{importKind === 'query' ? 'SQL opens as a draft and does not run automatically' : browserDemoImport ? 'Browser demo · nothing is written to ClickHouse' : browserCloudImport ? `CSV, JSON, or NDJSON · up to ${IMPORT_FILE_SIZE_LABEL} and ${IMPORT_ROW_LIMIT_LABEL} rows` : step === 'file' ? `CSV, JSON, or NDJSON · up to ${IMPORT_FILE_SIZE_LABEL} and ${IMPORT_ROW_LIMIT_LABEL} rows` : step === 'mapping' ? target ? `${formatImportColumnCount(Object.keys(selectedFields).length)} mapped · review before writing` : 'Choose a table and match its columns' : step === 'review' ? 'Review the destination and row count before writing' : 'Import status is checked with ClickHouse'}</span>
                 <div className="flex items-center gap-2">
                     {importKind === 'query' && <button type="button" onClick={() => void openQueryFile()} disabled={!queryFile || Boolean(queryFileError) || openingQuery} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40">{openingQuery ? 'Opening…' : 'Open query'}</button>}
                     {importKind === 'rows' && <>
                     {recoveryState === 'ready' && step === 'review' && <button type="button" onClick={() => { setStep('mapping'); setError(''); }} disabled={Boolean(busy)} className="rounded-lg border border-[var(--line)] px-3 py-2 text-xs text-[var(--text-soft)] hover:bg-[var(--panel-hover)] disabled:opacity-50">Back</button>}
-                    {recoveryState === 'ready' && !importUnavailable && step === 'file' && <button type="button" onClick={() => void previewFile()} disabled={!file || !format || file.size > MAX_FILE_BYTES || Boolean(busy) || (!availableTargets.length && !browserCloudImport)} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40">{busy === 'preview' ? 'Reading file…' : 'Read file and continue'}</button>}
+                    {recoveryState === 'ready' && !importUnavailable && step === 'file' && <button type="button" onClick={() => void previewFile()} disabled={!file || !format || file.size > MAX_IMPORT_FILE_BYTES || Boolean(busy) || (!availableTargets.length && !browserCloudImport)} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40">{busy === 'preview' ? 'Reading file…' : 'Read file and continue'}</button>}
                     {recoveryState === 'ready' && !importUnavailable && step === 'mapping' && <button type="button" onClick={() => void previewMapping()} disabled={!target || !destinationNames.length || duplicateDestinations || !destinationColumns.length || createTableAlreadyExists || Boolean(liveMappingIssue) || Boolean(busy)} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40">{busy === 'mapping' ? 'Checking mapping…' : liveMappingIssue ? 'Fix column mapping' : !target ? browserCloudImport && selectedDestinationChoice === 'existing' ? 'Choose a table' : 'Choose a destination' : createTableAlreadyExists ? 'Choose another table name' : !destinationNames.length && destinationColumns.length > 0 ? 'Map a column first' : duplicateDestinations ? 'Fix duplicate columns' : !destinationColumns.length ? 'No writable columns' : 'Review import'}</button>}
                     {recoveryState === 'ready' && !importUnavailable && step === 'review' && <button type="button" onClick={() => void commitImport()} disabled={Boolean(busy)} className="rounded-lg bg-[var(--accent-action)] px-4 py-2 text-xs font-semibold text-[var(--accent-ink)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40">{busy === 'commit' ? browserDemoImport ? 'Saving…' : 'Starting…' : creatingTable ? 'Create table and import' : browserDemoImport ? 'Save demo rows' : 'Import rows'}</button>}
                     {recoveryState === 'ready' && step === 'status' && job?.status === 'succeeded' && <>

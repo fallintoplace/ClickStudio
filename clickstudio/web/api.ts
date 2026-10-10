@@ -32,7 +32,7 @@ function usesCloudWorkspacePreview(path: string) {
     return pathname === '/documents' || pathname.startsWith('/documents/') ||
         pathname === '/runs' || pathname.startsWith('/runs/') ||
         pathname === '/scripts' || pathname.startsWith('/scripts/') ||
-        pathname.startsWith('/connections/clickhouse-cloud/');
+        pathname.startsWith(`/connections/${CLICKHOUSE_CLOUD_CONNECTION_ID}/`);
 }
 
 function isCloudWorkspaceSelected() {

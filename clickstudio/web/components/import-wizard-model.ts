@@ -1,7 +1,8 @@
+import type { ImportFormat } from '../../shared/import-limits';
 import type { Json, Schema, SchemaColumn } from '../../shared/types';
 import { api } from '../api';
 
-export type ImportFormat = 'csv' | 'json' | 'ndjson';
+export type { ImportFormat } from '../../shared/import-limits';
 export type Step = 'file' | 'mapping' | 'review' | 'status';
 export const importSteps = [
     { id: 'file', label: 'File' },
@@ -59,7 +60,6 @@ export function isPendingImport(value: unknown): value is PendingImport {
         (!('inspectionOpened' in value) || typeof value.inspectionOpened === 'boolean');
 }
 
-export const MAX_FILE_BYTES = 2_000_000;
 export const importStateKey = (connectionId: string) => `clickstudio:import:${connectionId}:v1`;
 
 export function formatImportRowCount(count: number): string {

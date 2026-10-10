@@ -1,3 +1,4 @@
+import { MAX_SQL_CHARS } from '../shared/query-limits.js';
 import { isResult } from '../shared/run-wire.js';
 import { parseAssistantProposal } from '../shared/assistant-proposal.js';
 import type { Proposal, Result } from '../shared/types.js';
@@ -61,7 +62,7 @@ function recoverRunContext(value: unknown): AssistantChatRunContext | undefined 
         return undefined;
     }
     if (
-        (value.evidenceSql !== undefined && (typeof value.evidenceSql !== 'string' || value.evidenceSql.length > 200_000)) ||
+        (value.evidenceSql !== undefined && (typeof value.evidenceSql !== 'string' || value.evidenceSql.length > MAX_SQL_CHARS)) ||
         (value.error !== undefined && (typeof value.error !== 'string' || value.error.length > 3_000))) return undefined;
     let result: Result | undefined;
     if (value.result !== undefined) {
@@ -84,7 +85,7 @@ function isAssistantTurnStatus(value: unknown): value is AssistantTurnStatus {
 
 function recoverTurn(value: unknown): AssistantChatTurn | undefined {
     if (!record(value) || typeof value.id !== 'string' || typeof value.question !== 'string' || value.question.length > 4_000 ||
-        typeof value.contextSql !== 'string' || value.contextSql.length > 200_000 || typeof value.includeRun !== 'boolean' ||
+        typeof value.contextSql !== 'string' || value.contextSql.length > MAX_SQL_CHARS || typeof value.includeRun !== 'boolean' ||
         !isAssistantTurnStatus(value.status)) return undefined;
     const proposal = value.proposal === undefined ? undefined : parseAssistantProposal(value.proposal);
     if (value.proposal !== undefined && !proposal) return undefined;

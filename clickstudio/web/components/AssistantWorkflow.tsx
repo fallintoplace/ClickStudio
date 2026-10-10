@@ -1,3 +1,4 @@
+import { MAX_SCRIPT_STATEMENTS } from '../../shared/query-limits';
 import { useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { diffLines } from 'diff';
 import ReactMarkdown from 'react-markdown';
@@ -155,7 +156,7 @@ function AssistantExecutionOption({ title, summary, sql, accepted, busy, runDisa
     const statements = outline.statements;
     const hasUpdateBeforeDelete = statements.some((statement, index) => statement.operation === 'update' && statements.slice(index + 1).some(next => next.operation === 'delete'));
     const firstOperation = statements[0]?.operation;
-    const runBlocked = !accepted || busy || runDisabled(sql) || Boolean(outline.error) || !statements.length || statements.length > 50;
+    const runBlocked = !accepted || busy || runDisabled(sql) || Boolean(outline.error) || !statements.length || statements.length > MAX_SCRIPT_STATEMENTS;
     const hasMutation = statements.some(statement => statement.operation === 'update' || statement.operation === 'delete');
 
     return <section className="assistant-execution-option" aria-label={`Execution plan: ${title}`} data-testid="assistant-execution-option">
@@ -166,7 +167,7 @@ function AssistantExecutionOption({ title, summary, sql, accepted, busy, runDisa
         {outline.error && <p className="assistant-execution-error" role="alert">Could not split this SQL safely: {outline.error}</p>}
         {!outline.error && !statements.length && <p className="assistant-execution-error" role="alert">There are no SQL statements to run.</p>}
         <ol className="assistant-execution-steps" aria-label="Statements in execution order">
-            {statements.slice(0, 50).map((statement, index) => <li key={`${statement.from}-${index}`} data-operation={statement.operation}>
+            {statements.slice(0, MAX_SCRIPT_STATEMENTS).map((statement, index) => <li key={`${statement.from}-${index}`} data-operation={statement.operation}>
                 <details className="assistant-execution-step-details">
                     <summary className="assistant-execution-step-heading"><span className="assistant-execution-number">{index + 1}</span><span className={cx('assistant-operation-badge', `is-${statement.operation}`)}>{operationLabels[statement.operation]}</span><span className="assistant-execution-label">{statement.label || 'SQL statement'}</span><span className="assistant-execution-step-chevron" aria-hidden="true">⌄</span></summary>
                     <pre><code>{statement.sql}</code></pre>
@@ -174,7 +175,7 @@ function AssistantExecutionOption({ title, summary, sql, accepted, busy, runDisa
                 {accepted && statements.length > 1 && <Button variant="secondary" onClick={() => onRunQuery(statement.sql)} disabled={busy || runDisabled(statement.sql)} aria-label={`Run only statement ${index + 1}: ${operationLabels[statement.operation]}`}>Run only {operationLabels[statement.operation]}</Button>}
             </li>)}
         </ol>
-        {statements.length > 50 && <p className="assistant-execution-error" role="status">Showing the first 50 of {statements.length} statements. Scripts with more than 50 statements cannot run as one script.</p>}
+        {statements.length > MAX_SCRIPT_STATEMENTS && <p className="assistant-execution-error" role="status">Showing the first {MAX_SCRIPT_STATEMENTS} of {statements.length} statements. Scripts with more than {MAX_SCRIPT_STATEMENTS} statements cannot run as one script.</p>}
         {accepted && <footer className="assistant-execution-actions"><Button variant="primary" onClick={() => onRunQuery(sql)} disabled={runBlocked} aria-label={alternative ? `Run alternative: ${title}` : statements.length > 1 ? `Run all ${statements.length} statements` : `Run recommended option: ${title}`}><Icon name="play"/>{alternative ? 'Run this alternative' : statements.length > 1 ? `Run all ${statements.length} statements` : firstOperation === 'read' ? 'Run query' : firstOperation ? `Run ${operationLabels[firstOperation]}` : 'Run SQL'}</Button></footer>}
     </section>;
 }

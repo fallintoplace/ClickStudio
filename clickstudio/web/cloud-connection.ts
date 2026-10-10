@@ -1,3 +1,5 @@
+import type { ImportFormat } from '../shared/import-limits.js';
+import { CLICKHOUSE_CLOUD_CONNECTION_ID, CLOUD_QUERY_LIMITS } from '../shared/cloud-policy.js';
 import { DEFAULT_LIMITS, type Capability, type ClickHouseDocumentationEntry, type ClickHouseDocumentationSummary, type Column, type Connection, type Row, type Schema, type SchemaColumn } from '../shared/types.js';
 import type { ReplicationSnapshot } from '../shared/replication.js';
 import type { QueryLogSource, WorkloadSnapshot, WorkloadWindow } from '../shared/workload.js';
@@ -7,7 +9,7 @@ import type { CreateTableColumn } from '../shared/table-creation.js';
 import type { NativeExplorerRequest, NativeExplorerSnapshot } from '../shared/native-explorers.js';
 import type { MergeTreePartsSnapshot } from '../shared/parts.js';
 
-export const CLICKHOUSE_CLOUD_CONNECTION_ID = 'clickhouse-cloud';
+export { CLICKHOUSE_CLOUD_CONNECTION_ID } from '../shared/cloud-policy.js';
 
 export type CloudCredentials = { host: string; database: string; username: string; password: string };
 export type SavedCloudConnectionProfile = Pick<CloudCredentials, 'host' | 'database' | 'username'>;
@@ -15,7 +17,7 @@ export type CloudQueryResult = { queryId: string; columns: Column[]; rows: Row[]
 export type CloudImportJob = { id: string; connectionId: string; table: string; queryId: string; deduplicationToken?: string; rows: number; createdAt: string; status: 'running' | 'succeeded' | 'unknown'; error?: string; reviewedAt?: string; reconciliationRequired?: boolean; tableCreated?: boolean; tableExists?: boolean };
 export type CloudImportInput = {
     file: File;
-    format: 'csv' | 'json' | 'ndjson';
+    format: ImportFormat;
     target: string;
     fields: Record<string, string>;
     queryId: string;
@@ -147,7 +149,7 @@ function makeConnection(credentials: SavedCloudConnectionProfile, tested: CloudC
         username: credentials.username,
         readonly: false,
         trusted: true,
-        limits: { ...DEFAULT_LIMITS, rows: 1_000, bytes: 2_000_000, seconds: 45, threads: 4 },
+        limits: { ...DEFAULT_LIMITS, ...CLOUD_QUERY_LIMITS },
         manifest: {
             version: 1,
             serverVersion: tested.serverVersion,

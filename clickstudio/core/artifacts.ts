@@ -1,3 +1,4 @@
+import { MAX_SQL_CHARS } from '../shared/query-limits.js';
 import { randomUUID, randomBytes } from 'node:crypto';
 import type { ChartConfig, Comment, MetricContract, Principal, Published, QueryDocument } from '../shared/types.js';
 import { DEFAULT_LIMITS } from '../shared/types.js';
@@ -60,7 +61,7 @@ export class ArtifactService {
         }
         const now = new Date().toISOString();
         const document: QueryDocument = { id: documentId, owner: p.id, name: text(input.name, 'name', 180),
-            sql: text(input.sql, 'SQL', 200000, true), connectionId, revision: (old?.revision ?? 0) + 1,
+            sql: text(input.sql, 'SQL', MAX_SQL_CHARS, true), connectionId, revision: (old?.revision ?? 0) + 1,
             createdAt: old?.createdAt ?? now, updatedAt: now, parameters: stringMap(input.parameters, 'parameters'),
             chart: parseChart(input.chart), dependencies, kind,
             publishedRevision: old?.publishedRevision,

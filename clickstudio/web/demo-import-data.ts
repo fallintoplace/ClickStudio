@@ -1,6 +1,7 @@
+import { IMPORT_FILE_SIZE_LABEL, IMPORT_ROW_LIMIT_LABEL, MAX_IMPORT_FILE_BYTES, MAX_IMPORT_ROWS, MAX_IMPORT_COLUMNS, MAX_IMPORT_COLUMN_NAME_CHARS, type ImportFormat } from '../shared/import-limits.js';
 import type { Json } from '../shared/types.js';
 
-export type DemoImportFormat = 'csv' | 'json' | 'ndjson';
+export type DemoImportFormat = ImportFormat;
 export type DemoImportRow = Record<string, Json>;
 export type DemoImportColumn = { name: string; type: string };
 export type DemoImportQueryResult = { columns: DemoImportColumn[]; rows: Json[][] };
@@ -31,7 +32,7 @@ function parseCsv(source: string) {
         pushField();
         records.push(row);
         row = [];
-        if (records.length > 10001) throw new Error('Imports are limited to 10,000 rows');
+        if (records.length > MAX_IMPORT_ROWS + 1) throw new Error(`Imports are limited to ${IMPORT_ROW_LIMIT_LABEL} rows`);
     };
     for (let i = 0; i < input.length; i++) {
         const ch = input[i]!;
@@ -54,8 +55,8 @@ function parseCsv(source: string) {
     if (quoted) throw new Error('Unclosed quoted CSV field');
     if (field !== '' || row.length || afterQuote) pushRow();
     const columns = records.shift() ?? [];
-    if (!columns.length || columns.length > 200 || columns.some(column => !column.trim() || column.length > 256))
-        throw new Error('CSV needs 1–200 nonempty column names');
+    if (!columns.length || columns.length > MAX_IMPORT_COLUMNS || columns.some(column => !column.trim() || column.length > MAX_IMPORT_COLUMN_NAME_CHARS))
+        throw new Error(`CSV needs 1–${MAX_IMPORT_COLUMNS} nonempty column names`);
     if (new Set(columns).size !== columns.length) throw new Error('Duplicate CSV column names');
     const rows = records.map((values, index) => {
         if (values.length !== columns.length) throw new Error(`CSV row ${index + 2} has the wrong number of fields`);
@@ -82,7 +83,7 @@ function validateJson(value: unknown, depth = 0): Json {
 }
 
 export function parseImportFile(source: string, format: DemoImportFormat) {
-    if (new TextEncoder().encode(source).byteLength > 2_000_000) throw new Error('Import previews are limited to 2 MB');
+    if (new TextEncoder().encode(source).byteLength > MAX_IMPORT_FILE_BYTES) throw new Error(`Import previews are limited to ${IMPORT_FILE_SIZE_LABEL}`);
     if (format === 'csv') return parseCsv(source);
     let parsed: unknown;
     try {
@@ -92,19 +93,19 @@ export function parseImportFile(source: string, format: DemoImportFormat) {
     } catch {
         throw new Error('The uploaded JSON is invalid');
     }
-    if (!Array.isArray(parsed) || parsed.length === 0 || parsed.length > 10000)
-        throw new Error('Upload an array of 1–10,000 JSON objects');
+    if (!Array.isArray(parsed) || parsed.length === 0 || parsed.length > MAX_IMPORT_ROWS)
+        throw new Error(`Upload an array of 1–${IMPORT_ROW_LIMIT_LABEL} JSON objects`);
     const columns = new Set<string>();
     const rows = parsed.map(value => {
         const row = validateJson(value);
         if (row === null || Array.isArray(row) || typeof row !== 'object') throw new Error('Every JSON row must be an object');
         for (const key of Object.keys(row)) {
-            if (!key || key.length > 256) throw new Error('Invalid JSON field name');
+            if (!key || key.length > MAX_IMPORT_COLUMN_NAME_CHARS) throw new Error('Invalid JSON field name');
             columns.add(key);
         }
         return row;
     });
-    if (columns.size === 0 || columns.size > 200) throw new Error('Import previews support 1–200 columns');
+    if (columns.size === 0 || columns.size > MAX_IMPORT_COLUMNS) throw new Error(`Import previews support 1–${MAX_IMPORT_COLUMNS} columns`);
     return { columns: [...columns], rows };
 }
 

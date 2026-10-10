@@ -1,3 +1,4 @@
+import { MAX_SCRIPT_STATEMENTS, MAX_RESULT_PAGE_ROWS, DEFAULT_RESULT_PAGE_ROWS } from '../shared/query-limits.js';
 import { randomUUID } from 'node:crypto';
 import type { Column, Connection, Limits, Principal, Progress, Result, ResultPage, Row, Run, RunEvent, RunRequest, Script } from '../shared/types.js';
 import { splitSql } from '../shared/sql.js';
@@ -213,8 +214,8 @@ export class RunService {
         requireThat(result, 410, 'RESULT_EXPIRED', 'Result data was evicted. Rerun explicitly to obtain fresh data.');
         return result;
     }
-    page(principal: Principal, id: string, offset = 0, count = 200): ResultPage {
-        requireThat(Number.isSafeInteger(offset) && offset >= 0 && Number.isSafeInteger(count) && count >= 1 && count <= 1000, 400, 'INVALID_PAGE', 'Invalid result page');
+    page(principal: Principal, id: string, offset = 0, count = DEFAULT_RESULT_PAGE_ROWS): ResultPage {
+        requireThat(Number.isSafeInteger(offset) && offset >= 0 && Number.isSafeInteger(count) && count >= 1 && count <= MAX_RESULT_PAGE_ROWS, 400, 'INVALID_PAGE', 'Invalid result page');
         const result = this.result(principal, id);
         return { ...result, rows: result.rows.slice(offset, offset + count), offset, totalRows: result.rows.length,
             nextOffset: offset + count < result.rows.length ? offset + count : null };
@@ -437,7 +438,7 @@ export class RunService {
     submitScript(principal: Principal, input: unknown, stopOnError = true): Script {
         requireThat(!this.closed, 503, 'SHUTTING_DOWN', 'The server is shutting down');
         const request = runRequest(input), statements = splitSql(request.sql);
-        requireThat(statements.length > 0 && statements.length <= 50, 400, 'SCRIPT_SIZE', 'A script must contain 1–50 statements');
+        requireThat(statements.length > 0 && statements.length <= MAX_SCRIPT_STATEMENTS, 400, 'SCRIPT_SIZE', `A script must contain 1–${MAX_SCRIPT_STATEMENTS} statements`);
         requireThat(!request.kind || request.kind === 'query', 400, 'SCRIPT_KIND', 'Explain one statement at a time');
         for (const statement of statements)
             this.authorize(principal, { ...request, sql: statement.sql });

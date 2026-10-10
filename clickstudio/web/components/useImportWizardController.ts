@@ -1,3 +1,4 @@
+import { MAX_IMPORT_FILE_BYTES, IMPORT_PREVIEW_ROWS, IMPORT_FILE_SIZE_LABEL } from '../../shared/import-limits';
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { Json, Schema } from '../../shared/types';
 import { mapImportRows } from '../../core/import-mapping';
@@ -8,7 +9,6 @@ import { CREATE_TABLE_COLUMN_TYPES } from '../../shared/table-creation';
 import { DEMO_IMPORT_SAMPLE_CSV, parseImportFile } from '../demo-import-data';
 import { CREATE_CLOUD_TABLE_TARGET, cloudImportTargets, inferCloudImportColumns, preferredCloudImportDatabase, suggestCloudTableName, type CloudImportColumn } from '../cloud-import';
 import {
-    MAX_FILE_BYTES,
     fileFormat,
     importStateKey,
     initialFields,
@@ -556,11 +556,11 @@ function createImportWizardFileActions(context: ImportWizardFileActionContext) {
         const nextFormat = fileFormat(next);
         setFormat(nextFormat);
         if (!nextFormat) setError('Choose a .csv, .json, .ndjson, or .jsonl file.');
-        else if (next.size > MAX_FILE_BYTES) setError('This file is larger than the 2 MB import limit.');
+        else if (next.size > MAX_IMPORT_FILE_BYTES) setError(`This file is larger than the ${IMPORT_FILE_SIZE_LABEL} import limit.`);
     }
 
     async function previewSelectedFile(nextFile: File, nextFormat: ImportFormat) {
-        if (nextFile.size > MAX_FILE_BYTES || busy) return;
+        if (nextFile.size > MAX_IMPORT_FILE_BYTES || busy) return;
         setBusy('preview');
         setError('');
         try {
@@ -570,7 +570,7 @@ function createImportWizardFileActions(context: ImportWizardFileActionContext) {
                 const parsed = parseImportFile(source, nextFormat);
                 if (!parsed.rows.length) throw new Error('The input contains no data rows.');
                 setCloudRows(parsed.rows);
-                next = { id: crypto.randomUUID(), name: nextFile.name.slice(0, 128), format: nextFormat, columns: parsed.columns, rows: parsed.rows.slice(0, 20), rowCount: parsed.rows.length };
+                next = { id: crypto.randomUUID(), name: nextFile.name.slice(0, 128), format: nextFormat, columns: parsed.columns, rows: parsed.rows.slice(0, IMPORT_PREVIEW_ROWS), rowCount: parsed.rows.length };
             } else {
                 setCloudRows([]);
                 next = await post<ImportPreview>('/imports/preview', { name: nextFile.name, source, format: nextFormat });
@@ -584,7 +584,7 @@ function createImportWizardFileActions(context: ImportWizardFileActionContext) {
     }
 
     async function previewFile() {
-        if (!file || !format || file.size > MAX_FILE_BYTES || busy) return;
+        if (!file || !format || file.size > MAX_IMPORT_FILE_BYTES || busy) return;
         await previewSelectedFile(file, format);
     }
 

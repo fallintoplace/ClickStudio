@@ -1,3 +1,4 @@
+import { MAX_SQL_CHARS, MAX_RESULT_PAGE_ROWS, DEFAULT_MCP_RESULT_PAGE_ROWS } from '../shared/query-limits.js';
 import type { Express, Request, Response } from 'express';
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { createMcpHandler, McpServer, type CallToolResult } from '@modelcontextprotocol/server';
@@ -19,7 +20,7 @@ interface Dependencies {
 const owner: Principal = { id: 'local-owner', role: 'owner' };
 const idSchema = z.string().min(1).max(128).regex(/^[A-Za-z0-9][A-Za-z0-9_.:-]*$/);
 const nameSchema = z.string().min(1).max(128);
-const sqlSchema = z.string().min(1).max(200000);
+const sqlSchema = z.string().min(1).max(MAX_SQL_CHARS);
 const parameterMapSchema = z.record(
     z.string().regex(/^(?!__proto__$|constructor$|prototype$)[A-Za-z_][A-Za-z0-9_]{0,63}$/),
     z.string().max(4000),
@@ -80,7 +81,7 @@ async function reply(dependencies: Dependencies, operation: () => ToolData | Pro
         return toolResult({ ...(data?.run ? { runId: redactor(dependencies.config)(data.run.id) } : {}), error: safeError(dependencies.config, error) });
     }
 }
-function runData(dependencies: Dependencies, runId: string, offset = 0, count = 100): ToolData {
+function runData(dependencies: Dependencies, runId: string, offset = 0, count = DEFAULT_MCP_RESULT_PAGE_ROWS): ToolData {
     const run = dependencies.runs.get(owner, runId), summary = runSummary(dependencies.config, run);
     if (!['succeeded', 'truncated'].includes(run.status)) return { run: summary };
     try {
@@ -162,7 +163,7 @@ function createMcpServer(dependencies: Dependencies) {
     }, (input, ctx) => reply(dependencies, () => submit(dependencies, { ...input, kind: input.mode === 'indexes' ? 'explain' : input.mode }, ctx.mcpReq.signal)));
     server.registerTool('get_result', {
         description: 'Get current run status and a retained result page without executing SQL again. Returns nextOffset for further pages and completeness for query truncation. Expired or evicted results return an error, never a fresh query. Pending runs can be waited on for up to 30 seconds. Cancelling this request stops waiting; use cancel_query to stop the durable database run.',
-        inputSchema: z.strictObject({ runId: idSchema, offset: z.int().min(0).default(0), count: z.int().min(1).max(1000).default(100), waitSeconds: z.int().min(0).max(30).default(0) }),
+        inputSchema: z.strictObject({ runId: idSchema, offset: z.int().min(0).default(0), count: z.int().min(1).max(MAX_RESULT_PAGE_ROWS).default(DEFAULT_MCP_RESULT_PAGE_ROWS), waitSeconds: z.int().min(0).max(30).default(0) }),
         annotations: { ...readAnnotations, idempotentHint: true, openWorldHint: false },
     }, (input, ctx) => reply(dependencies, async () => {
         await waitForRun(dependencies.runs, input.runId, input.waitSeconds, ctx.mcpReq.signal);

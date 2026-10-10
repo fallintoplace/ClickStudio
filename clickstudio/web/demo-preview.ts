@@ -1,3 +1,5 @@
+import { MAX_SCRIPT_STATEMENTS, MAX_SQL_CHARS, DEFAULT_RESULT_PAGE_ROWS } from '../shared/query-limits.js';
+import { IMPORT_FORMATS, IMPORT_PREVIEW_ROWS } from '../shared/import-limits.js';
 import { nativeExplorerFixture } from '../shared/native-explorer-fixtures.js';
 import type { ApiError, ClickHouseDocumentationEntry, ProfilePipeline, QueryDocument, QueryProfile, Result, ResultPage, Run, Schema, Script } from '../shared/types.js';
 import { splitSql } from '../shared/sql.js';
@@ -62,8 +64,6 @@ export class RetainedRunUnavailableError extends Error {
 }
 
 type RequestOptions = { method?: string; body?: unknown; signal?: AbortSignal };
-const MAX_SCRIPT_STATEMENTS = 50;
-const MAX_SCRIPT_SQL_LENGTH = 200_000;
 const demoQueryTree = [
     'QUERY id: 0',
     '  PROJECTION COLUMNS',
@@ -474,8 +474,8 @@ export class DemoPreviewApi {
     private async importRequest(parts: string[], method: string, body: Record<string, unknown>, url: URL): Promise<unknown> {
         if (parts.length === 1 && method === 'GET') return [];
         if (parts[1] === 'preview' && method === 'POST') {
-            if (body.format !== 'csv' && body.format !== 'json' && body.format !== 'ndjson') throw new Error('Use CSV, JSON, or NDJSON');
-            const format: DemoImportFormat = body.format;
+            const format = IMPORT_FORMATS.find(format => format === body.format);
+            if (!format) throw new Error('Use CSV, JSON, or NDJSON');
             if (typeof body.source !== 'string' || typeof body.name !== 'string') throw new Error('Choose a file to preview');
             const parsed = parseDemoImport(body.source, format);
             if (!parsed.rows.length) throw new Error('The input contains no data rows');
@@ -483,7 +483,7 @@ export class DemoPreviewApi {
             const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
             const input = { id, name: body.name.slice(0, 128), format, ...parsed, expiresAt };
             this.demoImportInputs.set(id, input);
-            return { ...input, rows: input.rows.slice(0, 20), rowCount: input.rows.length };
+            return { ...input, rows: input.rows.slice(0, IMPORT_PREVIEW_ROWS), rowCount: input.rows.length };
         }
         const id = parts[1];
         if (!id) throw new Error('Import request is incomplete');
@@ -513,7 +513,7 @@ export class DemoPreviewApi {
             });
             const mapping = { id: crypto.randomUUID(), inputId: id, connectionId: 'demo', table: DEMO_IMPORT_TARGET, fields: fields as Record<string, string>, rows: mappedRows };
             this.demoImportMappings.set(mapping.id, mapping);
-            return { ...mapping, rows: mappedRows.slice(0, 20), rowCount: mappedRows.length };
+            return { ...mapping, rows: mappedRows.slice(0, IMPORT_PREVIEW_ROWS), rowCount: mappedRows.length };
         }
         if (parts[2] === 'commit' && method === 'POST') {
             const mapping = this.demoImportMappings.get(id);
@@ -736,8 +736,8 @@ export class DemoPreviewApi {
             if (body.connectionId === CLICKHOUSE_CLOUD_CONNECTION_ID) {
                 if (!getClickHouseCloudConnection())
                     throw new CloudRequestError('CLOUD_DISCONNECTED', 'Reconnect to ClickHouse Cloud before running a script.', 401);
-                if (!sql.trim() || sql.length > MAX_SCRIPT_SQL_LENGTH)
-                    throw new Error(`Enter a script under ${MAX_SCRIPT_SQL_LENGTH.toLocaleString()} characters.`);
+                if (!sql.trim() || sql.length > MAX_SQL_CHARS)
+                    throw new Error(`Enter a script under ${MAX_SQL_CHARS.toLocaleString()} characters.`);
                 if (statements.length === 0 || statements.length > MAX_SCRIPT_STATEMENTS)
                     throw new Error(`A script must contain 1–${MAX_SCRIPT_STATEMENTS} SQL statements.`);
                 if (Object.keys(record(body.parameters)).length)
@@ -843,7 +843,7 @@ export class DemoPreviewApi {
             const retained = result ?? resultFor(run);
             if (parts[2] === 'snapshot') return retained;
             const offset = Math.max(0, Number(url.searchParams.get('offset') ?? 0) || 0);
-            const count = Math.max(1, Math.min(500, Number(url.searchParams.get('count') ?? 200) || 200));
+            const count = Math.max(1, Math.min(500, Number(url.searchParams.get('count') ?? DEFAULT_RESULT_PAGE_ROWS) || DEFAULT_RESULT_PAGE_ROWS));
             return { ...retained, rows: retained.rows.slice(offset, offset + count), offset, totalRows: retained.rows.length, nextOffset: offset + count < retained.rows.length ? offset + count : null } satisfies ResultPage;
         }
         if (parts[2] === 'cancel' && method === 'POST') {

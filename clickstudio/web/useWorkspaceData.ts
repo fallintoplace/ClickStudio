@@ -1,3 +1,4 @@
+import { CLICKHOUSE_CLOUD_CONNECTION_ID } from '../shared/cloud-policy';
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { QueryDocument, Run, Schema } from '../shared/types';
 import { sameSavedContent } from '../shared/workspace-view';
@@ -155,7 +156,7 @@ export function useWorkspaceData({
 
     const loadMoreSchema = useCallback(async () => {
         const current = schema;
-        if (!current?.pagination || schemaLoadingMore || connectionId !== 'clickhouse-cloud' || !trustedRef.current) return undefined;
+        if (!current?.pagination || schemaLoadingMore || connectionId !== CLICKHOUSE_CLOUD_CONNECTION_ID || !trustedRef.current) return undefined;
         const requestId = ++schemaRequestRef.current;
         setSchemaLoadingMore(true);
         setSchemaError('');

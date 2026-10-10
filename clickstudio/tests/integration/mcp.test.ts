@@ -159,7 +159,9 @@ test('MCP publishes parameter limits and reserves waiting for result requests', 
         assert.equal(schema.additionalProperties, false);
     }
     assert.ok(tools.find(tool => tool.name === 'get_result')!.inputSchema.properties!.waitSeconds);
+    assert.equal((tools.find(tool => tool.name === 'get_result')!.inputSchema.properties!.count as { maximum: number }).maximum, 1000);
     for (const name of ['execute_sql', 'explain_query']) {
+        assert.equal((tools.find(tool => tool.name === name)!.inputSchema.properties!.sql as { maxLength: number }).maxLength, 200000);
         const parameters = tools.find(tool => tool.name === name)!.inputSchema.properties!.parameters as {
             maxProperties: number; propertyNames: { pattern: string }; additionalProperties: { type: string; maxLength: number };
         };
@@ -170,6 +172,17 @@ test('MCP publishes parameter limits and reserves waiting for result requests', 
         for (const name of ['value', '_value', 'a'.repeat(64)]) assert.equal(key.test(name), true);
         for (const name of ['', 'bad-name', '1value', 'a'.repeat(65), '__proto__', 'constructor', 'prototype']) assert.equal(key.test(name), false);
     }
+});
+
+test('MCP accepts SQL and result pages at their documented limits', async t => {
+    const s = await start(t);
+    const sql = 'SELECT 1'.padEnd(200000, ' ');
+    const result = await s.completed('execute_sql', query({ sql }));
+    assert.equal(result.data.run?.status, 'succeeded');
+    assert.equal(s.fixture.calls[0]?.sql, sql);
+    const page = await s.call('get_result', { runId: result.data.run!.id, count: 1000 });
+    assert.equal(page.data.result?.rows.length, 1);
+    assert.equal((await s.client.callTool({ name: 'get_result', arguments: { runId: result.data.run!.id, count: 1001 } })).isError, true);
 });
 
 test('MCP uses bearer authentication independently of browser cookies', async t => {

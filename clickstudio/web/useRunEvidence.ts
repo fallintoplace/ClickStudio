@@ -1,3 +1,4 @@
+import { DEFAULT_RESULT_PAGE_ROWS } from '../shared/query-limits';
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import type { ProfilePipeline, QueryProfile, Result, ResultPage, Run } from '../shared/types';
 import type { FlamegraphSnapshot } from '../shared/flamegraph';
@@ -54,7 +55,7 @@ export function useRunEvidence({ activeRunId, connectionId, loadHistory, setErro
     useEffect(() => {
         if (!activeRunId || !run || !terminal(run) || run.resultState !== 'reopenable') return;
         let cancelled = false;
-        void api<ResultPage>(`/runs/${encodeURIComponent(activeRunId)}/result?offset=${page * 200}&count=200`).then(next => {
+        void api<ResultPage>(`/runs/${encodeURIComponent(activeRunId)}/result?offset=${page * DEFAULT_RESULT_PAGE_ROWS}&count=${DEFAULT_RESULT_PAGE_ROWS}`).then(next => {
             if (!cancelled) setResultPageForRun(activeRunId, { page, value: next });
         }).catch(caught => { if (!cancelled) setError(message(caught)); });
         return () => { cancelled = true; };

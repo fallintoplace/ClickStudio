@@ -1,3 +1,4 @@
+import { IMPORT_FILE_SIZE_LABEL, IMPORT_ROW_LIMIT_LABEL, MAX_IMPORT_FILE_BYTES, MAX_IMPORT_ROWS, MAX_IMPORT_COLUMNS, MAX_IMPORT_COLUMN_NAME_CHARS, type ImportFormat } from '../shared/import-limits.js';
 import { randomUUID } from 'node:crypto';
 import type { Json, Principal, Schema, SchemaColumn } from '../shared/types.js';
 import { quoteIdentifier } from '../shared/sql.js';
@@ -14,14 +15,14 @@ export interface InputPreview {
     id: string;
     owner: string;
     name: string;
-    format: 'csv' | 'json' | 'ndjson';
+    format: ImportFormat;
     columns: string[];
     rows: Record<string, Json>[];
     createdAt: string;
     expiresAt: string;
 }
 /** RFC 4180-style CSV parser. Quoted newlines and escaped quotes are not split. */
-export function parseCsv(source: string, maxRows = 10000): {
+export function parseCsv(source: string, maxRows = MAX_IMPORT_ROWS): {
     columns: string[];
     rows: Record<string, Json>[];
 } {
@@ -68,7 +69,7 @@ export function parseCsv(source: string, maxRows = 10000): {
     if (field !== '' || row.length || afterQuote)
         pushRow();
     const columns = records.shift() ?? [];
-    requireThat(columns.length > 0 && columns.length <= 200 && columns.every(c => c.trim().length > 0 && c.length <= 256), 400, 'INVALID_HEADERS', 'CSV needs 1–200 nonempty column names');
+    requireThat(columns.length > 0 && columns.length <= MAX_IMPORT_COLUMNS && columns.every(c => c.trim().length > 0 && c.length <= MAX_IMPORT_COLUMN_NAME_CHARS), 400, 'INVALID_HEADERS', `CSV needs 1–${MAX_IMPORT_COLUMNS} nonempty column names`);
     requireThat(new Set(columns).size === columns.length, 400, 'DUPLICATE_HEADERS', 'Duplicate CSV column names');
     const rows = records.map((record, index) => {
         requireThat(record.length === columns.length, 400, 'CSV_WIDTH', `CSV row ${index + 2} has the wrong number of fields`);
@@ -83,7 +84,7 @@ export function parseCsv(source: string, maxRows = 10000): {
     return { columns, rows };
 }
 export function parseInput(source: string, format: InputPreview['format']) {
-    requireThat(Buffer.byteLength(source) <= 2000000, 413, 'IMPORT_BYTE_LIMIT', 'Import previews are limited to 2 MB');
+    requireThat(Buffer.byteLength(source) <= MAX_IMPORT_FILE_BYTES, 413, 'IMPORT_BYTE_LIMIT', `Import previews are limited to ${IMPORT_FILE_SIZE_LABEL}`);
     if (format === 'csv')
         return parseCsv(source);
     let parsed: unknown;
@@ -93,18 +94,18 @@ export function parseInput(source: string, format: InputPreview['format']) {
     catch {
         throw new AppError(400, 'INVALID_JSON', 'The uploaded JSON is invalid');
     }
-    requireThat(Array.isArray(parsed) && parsed.length > 0 && parsed.length <= 10000, 400, 'IMPORT_ROWS', 'Upload an array of 1–10,000 JSON objects');
+    requireThat(Array.isArray(parsed) && parsed.length > 0 && parsed.length <= MAX_IMPORT_ROWS, 400, 'IMPORT_ROWS', `Upload an array of 1–${IMPORT_ROW_LIMIT_LABEL} JSON objects`);
     const columns = new Set<string>();
     const rows = parsed.map(value => {
         const validated = validateJson(value);
         requireThat(isJsonObject(validated), 400, 'IMPORT_OBJECT', 'Every JSON row must be an object');
         for (const key of Object.keys(validated)) {
-            requireThat(key.length > 0 && key.length <= 256, 400, 'INVALID_HEADERS', 'Invalid JSON field name');
+            requireThat(key.length > 0 && key.length <= MAX_IMPORT_COLUMN_NAME_CHARS, 400, 'INVALID_HEADERS', 'Invalid JSON field name');
             columns.add(key);
         }
         return validated;
     });
-    requireThat(columns.size > 0 && columns.size <= 200, 400, 'IMPORT_COLUMNS', 'Import previews support 1–200 columns');
+    requireThat(columns.size > 0 && columns.size <= MAX_IMPORT_COLUMNS, 400, 'IMPORT_COLUMNS', `Import previews support 1–${MAX_IMPORT_COLUMNS} columns`);
     return { columns: [...columns], rows };
 }
 export interface ImportJob {

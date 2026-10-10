@@ -1,3 +1,4 @@
+import { MAX_SQL_CHARS } from '../shared/query-limits.js';
 import type { ChartConfig, QueryDocument } from '../shared/types.js';
 import type { SaveableDraft } from '../shared/workspace-view.js';
 export const SAMPLE_SQL = "SELECT\n    toDate('2026-01-01') + number AS day,\n    (number + 1) * 10 AS events\nFROM numbers(7)\nORDER BY day";
@@ -82,7 +83,7 @@ function recoveredCandlestick(value: unknown): ChartConfig['candlestick'] {
 
 /** Browser storage is untrusted input; preserve SQL while repairing optional metadata. */
 export function recoverDraft(value: unknown): Draft | undefined {
-    if (!record(value) || typeof value.sql !== 'string' || value.sql.length > 200000)
+    if (!record(value) || typeof value.sql !== 'string' || value.sql.length > MAX_SQL_CHARS)
         return undefined;
     const draft = newDraft(text(value.name, 'Recovered.sql'), value.sql);
     const chart = record(value.chart) ? value.chart : {};
@@ -121,7 +122,7 @@ export function recoverDraft(value: unknown): Draft | undefined {
         dependencies: strings(value.dependencies).filter(v => id(v)),
         invalidatedSource,
         checkpoints: array(value.checkpoints).flatMap((point): Checkpoint[] => {
-            if (!record(point) || typeof point.sql !== 'string' || point.sql.length > 200000)
+            if (!record(point) || typeof point.sql !== 'string' || point.sql.length > MAX_SQL_CHARS)
                 return [];
             const a = position(point.from, point.sql.length), b = position(point.to, point.sql.length);
             return [{ id: id(point.id) ?? crypto.randomUUID(), at: text(point.at), reason: text(point.reason, 'Recovered checkpoint'),

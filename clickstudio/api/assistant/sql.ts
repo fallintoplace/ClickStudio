@@ -1,3 +1,4 @@
+import { MAX_SQL_CHARS } from '../../shared/query-limits.js';
 import { randomUUID } from 'node:crypto';
 import type { Proposal } from '../../shared/types.js';
 import { ASSISTANT_REQUEST_TIMEOUT_MS, ASSISTANT_TIMEOUT_MESSAGE, buildContext, PROMPT_VERSION, validateAssistantConversation, validateProposal, type PreparedContext } from '../../core/assistant.js';
@@ -75,14 +76,14 @@ async function post(request: Request): Promise<Response> {
         const connectionId = field(body.connectionId, 'Connection ID', 128);
         const question = field(body.question, 'Question', 4_000);
         const conversation = validateAssistantConversation(body.conversation);
-        const sql = field(body.sql, 'SQL', 200_000, true);
+        const sql = field(body.sql, 'SQL', MAX_SQL_CHARS, true);
         const database = body.database === undefined ? undefined : field(body.database, 'Database', 128);
         const schema = schemaFrom(body.schema, connectionId);
         const includeRun = body.includeRun === true;
         if (includeRun) field(body.runId, 'Run ID', 200);
         const result = includeRun && body.result !== undefined ? resultFrom(body.result) : undefined;
         const evidenceSql = includeRun && body.evidenceSql !== undefined
-            ? field(body.evidenceSql, 'Selected run SQL', 200_000, true)
+            ? field(body.evidenceSql, 'Selected run SQL', MAX_SQL_CHARS, true)
             : undefined;
         const error = includeRun && body.error !== undefined
             ? field(body.error, 'Selected run error', 3_000, true)

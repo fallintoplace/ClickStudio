@@ -1,3 +1,6 @@
+import { MAX_SQL_CHARS, DEFAULT_RESULT_PAGE_ROWS } from '../shared/query-limits.js';
+import { IMPORT_FORMATS, MAX_IMPORT_SOURCE_CHARS, MAX_IMPORT_COLUMNS, MAX_IMPORT_COLUMN_NAME_CHARS, IMPORT_PREVIEW_ROWS } from '../shared/import-limits.js';
+import { CLICKHOUSE_CLOUD_CONNECTION_ID } from '../shared/cloud-policy.js';
 import express, { type ErrorRequestHandler, type Express, type Request, type Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
@@ -36,9 +39,7 @@ import { registerMcpRoutes } from './mcp.js';
 type Driver = QueryDriver & ImportDriver & Pick<ClickHouseDriver, 'connection' | 'connections' | 'test' | 'targets' | 'database' | 'createTable' | 'dropTable' | 'profileEvidence' | 'profilePipeline' | 'profileFlamegraph' | 'workload' | 'replication' | 'queryTree' | 'tableParts' | 'nativeExplorer' | 'searchDocumentation' | 'documentationEntry' | 'close'>;
 const MAX_WASM_PARSER_BYTES = 64 * 1024 * 1024;
 const ASSISTANT_ACTIONS = ['ask', 'generate', 'explain', 'repair', 'result', 'performance', 'review'] as const satisfies readonly AssistantAction[];
-const IMPORT_FORMATS = ['csv', 'json', 'ndjson'] as const;
 const MONITOR_CONDITIONS = ['changed', 'nonempty', 'failure'] as const;
-const CLIENT_CLOUD_CONNECTION_ID = 'clickhouse-cloud';
 let parserWasmCache: Promise<Uint8Array> | undefined;
 
 function registerAssistantSqlRoute(app: Express, dependencies: {
@@ -64,10 +65,10 @@ function registerAssistantSqlRoute(app: Express, dependencies: {
             const p = principal(res), v = body(req), connectionId = identifier(v.connectionId, 'connectionId');
             canWrite(p);
             requireThat(authorized(p, connectionId), 403, 'WORKSPACE_UNTRUSTED', 'Trust this connection before sharing context');
-            const browserCloud = connectionId === CLIENT_CLOUD_CONNECTION_ID;
+            const browserCloud = connectionId === CLICKHOUSE_CLOUD_CONNECTION_ID;
             if (browserCloud)
                 requireThat(Buffer.byteLength(JSON.stringify(v)) <= 300_000, 413, 'REQUEST_SIZE', 'The assistant request is too large.');
-            const question = text(v.question, 'question', 4000), sql = text(v.sql, 'SQL', 200000, true);
+            const question = text(v.question, 'question', 4000), sql = text(v.sql, 'SQL', MAX_SQL_CHARS, true);
             const conversation = validateAssistantConversation(v.conversation);
             const schema = browserCloud ? assistantSchemaFrom(v.schema, connectionId) : await driver.schema(connectionId);
             const reportedServerVersion = typeof v.serverVersion === 'string' && /^\d+(?:\.\d+){2,3}(?:[-+][A-Za-z0-9.-]+)?$/.test(v.serverVersion)
@@ -94,7 +95,7 @@ function registerAssistantSqlRoute(app: Express, dependencies: {
                 if (browserCloud) {
                     result = assistantResultFrom(v.result);
                     requireThat(!result || result.runId === runId, 409, 'CONNECTION_MISMATCH', 'Selected result belongs to another run');
-                    evidenceSql = v.evidenceSql === undefined ? undefined : text(v.evidenceSql, 'Selected run SQL', 200000, true);
+                    evidenceSql = v.evidenceSql === undefined ? undefined : text(v.evidenceSql, 'Selected run SQL', MAX_SQL_CHARS, true);
                     errorMessage = v.error === undefined ? undefined : text(v.error, 'Selected run error', 3000, true);
                 } else {
                     run = runs.get(p, runId);
@@ -152,7 +153,7 @@ function cachedClickHouseParserWasm(): Promise<Uint8Array> {
     });
     return parserWasmCache;
 }
-function mappingFields(value: unknown) { const fields = record(value, 'mapping'); requireThat(Object.keys(fields).length <= 200, 400, 'IMPORT_MAPPING', 'Too many mapping fields'); return Object.fromEntries(Object.entries(fields).map(([key, value]) => [text(key, 'source column', 256), text(value, 'destination column', 256)])); }
+function mappingFields(value: unknown) { const fields = record(value, 'mapping'); requireThat(Object.keys(fields).length <= MAX_IMPORT_COLUMNS, 400, 'IMPORT_MAPPING', 'Too many mapping fields'); return Object.fromEntries(Object.entries(fields).map(([key, value]) => [text(key, 'source column', MAX_IMPORT_COLUMN_NAME_CHARS), text(value, 'destination column', MAX_IMPORT_COLUMN_NAME_CHARS)])); }
 const body = (req: Request) => record(req.body), id = (req: Request, name = 'id') => identifier(req.params[name], name);
 function boolean(v: unknown, name: string) { requireThat(typeof v === 'boolean', 400, 'INVALID_REQUEST', `${name} must be a boolean`); return v; }
 function principal(res: Response): Principal { return res.locals.principal as Principal; }
@@ -342,7 +343,7 @@ function registerCloudApi(app: Express, config: Config, cloudSessions: CloudConn
 }
 
 function assistantConnectionAuthorized(authorized: (principal: Principal, connectionId: string) => boolean, principal: Principal, connectionId: string) {
-    return connectionId === CLIENT_CLOUD_CONNECTION_ID ? principal.role === 'owner' : authorized(principal, connectionId);
+    return connectionId === CLICKHOUSE_CLOUD_CONNECTION_ID ? principal.role === 'owner' : authorized(principal, connectionId);
 }
 
 function createSecretGuards(config: Config) {
@@ -415,7 +416,7 @@ export function createApp(config: Config, overrides: {
         const manifest = driver.connection(p, connectionId).manifest;
         const capability = manifest?.queryTree ?? manifest?.explain;
         requireThat(capability?.available !== false, 409, 'CAPABILITY_UNAVAILABLE', capability?.reason ?? 'ClickHouse query-tree analysis is unavailable for this connection');
-        const sql = text(value.sql, 'SQL', 200000), parameters = stringMap(value.parameters, 'parameters');
+        const sql = text(value.sql, 'SQL', MAX_SQL_CHARS), parameters = stringMap(value.parameters, 'parameters');
         guardSql(sql, parameters);
         res.json(await driver.queryTree(connectionId, sql, parameters));
     });
@@ -497,7 +498,7 @@ export function createApp(config: Config, overrides: {
         heartbeat = setInterval(() => { if (!sessions.principal(req.get('cookie')) || !res.write(': keepalive\n\n'))
             finish(); }, 15000);
     });
-    app.get('/api/runs/:id/result', (req, res) => res.json(runs.page(principal(res), id(req), number(req.query.offset, 0), number(req.query.count, 200))));
+    app.get('/api/runs/:id/result', (req, res) => res.json(runs.page(principal(res), id(req), number(req.query.offset, 0), number(req.query.count, DEFAULT_RESULT_PAGE_ROWS))));
     app.get('/api/runs/:id/snapshot', (req, res) => res.json(runs.result(principal(res), id(req))));
     app.get('/api/runs/:id/export', (req, res) => {
         const p = principal(res), run = runs.get(p, id(req)), result = runs.result(p, run.id);
@@ -595,7 +596,7 @@ export function createApp(config: Config, overrides: {
         const p = principal(res), v = body(req), connectionId = identifier(v.connectionId, 'connectionId');
         canWrite(p);
         requireThat(authorized(p, connectionId), 403, 'WORKSPACE_UNTRUSTED', 'Trust this connection before sharing context');
-        const action = choice(v.action, ASSISTANT_ACTIONS, 400, 'ASSISTANT_ACTION', 'Unknown assistant action'), sql = text(v.sql, 'SQL', 200000, true), question = text(v.question, 'question', 4000, true), schema: Schema = await driver.schema(connectionId);
+        const action = choice(v.action, ASSISTANT_ACTIONS, 400, 'ASSISTANT_ACTION', 'Unknown assistant action'), sql = text(v.sql, 'SQL', MAX_SQL_CHARS, true), question = text(v.question, 'question', 4000, true), schema: Schema = await driver.schema(connectionId);
         const connection = driver.connection(p, connectionId), documentation = await assistantReferenceDocs(driver, p, connectionId, question, sql, schema, connection.database);
         let run: Run | undefined;
         if (v.runId) {
@@ -615,7 +616,7 @@ export function createApp(config: Config, overrides: {
     registerAssistantSqlRoute(app, { config, driver, runs, ai, store, authorized: (p, c) => assistantConnectionAuthorized(authorized, p, c), secretFree });
     app.post('/api/assistant/proposals', async (req, res) => { const v = body(req); res.json(await ai.propose(principal(res), identifier(v.contextId, 'contextId'), v.consent === true)); });
     app.get('/api/assistant/proposals/:id', (req, res) => res.json(ai.get(principal(res), id(req))));
-    app.post('/api/assistant/proposals/:id/decision', (req, res) => { const v = body(req); requireThat(v.decision === 'accepted' || v.decision === 'rejected', 400, 'DECISION', 'Unknown proposal decision'); res.json(ai.decide(principal(res), id(req), v.decision, identifier(v.connectionId, 'connectionId'), text(v.currentSql, 'current SQL', 200000, true))); });
+    app.post('/api/assistant/proposals/:id/decision', (req, res) => { const v = body(req); requireThat(v.decision === 'accepted' || v.decision === 'rejected', 400, 'DECISION', 'Unknown proposal decision'); res.json(ai.decide(principal(res), id(req), v.decision, identifier(v.connectionId, 'connectionId'), text(v.currentSql, 'current SQL', MAX_SQL_CHARS, true))); });
     app.delete('/api/assistant/proposals/:id', (req, res) => { ai.remove(principal(res), id(req)); res.json({ ok: true }); });
     app.get('/api/imports', (req, res) => {
         const p = principal(res), connectionId = typeof req.query.connectionId === 'string' ? text(req.query.connectionId, 'connectionId', 128) : undefined;
@@ -624,8 +625,8 @@ export function createApp(config: Config, overrides: {
             driver.connection(p, connectionId);
         res.json(imports.listRecoverable(p, connectionId));
     });
-    app.post('/api/imports/preview', (req, res) => { const v = body(req), format = choice(v.format, IMPORT_FORMATS, 400, 'IMPORT_FORMAT', 'Use CSV, JSON, or NDJSON'); const input = imports.preview(principal(res), text(v.name, 'filename', 128), text(v.source, 'input', 2000000), format); res.status(201).json({ ...input, rows: input.rows.slice(0, 20), rowCount: input.rows.length }); });
-    app.post('/api/imports/:id/mapping', async (req, res) => { const v = body(req), deduplicationToken = v.deduplicationToken === null ? null : v.deduplicationToken === undefined ? undefined : text(v.deduplicationToken, 'deduplication token', 36), mapping = await imports.map(principal(res), id(req), identifier(v.connectionId, 'connectionId'), text(v.table, 'table', 256), mappingFields(v.fields), deduplicationToken); res.json({ ...mapping, ...(deduplicationToken === null ? { deduplicationToken: null } : {}), rows: mapping.rows.slice(0, 20), rowCount: mapping.rows.length }); });
+    app.post('/api/imports/preview', (req, res) => { const v = body(req), format = choice(v.format, IMPORT_FORMATS, 400, 'IMPORT_FORMAT', 'Use CSV, JSON, or NDJSON'); const input = imports.preview(principal(res), text(v.name, 'filename', 128), text(v.source, 'input', MAX_IMPORT_SOURCE_CHARS), format); res.status(201).json({ ...input, rows: input.rows.slice(0, IMPORT_PREVIEW_ROWS), rowCount: input.rows.length }); });
+    app.post('/api/imports/:id/mapping', async (req, res) => { const v = body(req), deduplicationToken = v.deduplicationToken === null ? null : v.deduplicationToken === undefined ? undefined : text(v.deduplicationToken, 'deduplication token', 36), mapping = await imports.map(principal(res), id(req), identifier(v.connectionId, 'connectionId'), text(v.table, 'table', 256), mappingFields(v.fields), deduplicationToken); res.json({ ...mapping, ...(deduplicationToken === null ? { deduplicationToken: null } : {}), rows: mapping.rows.slice(0, IMPORT_PREVIEW_ROWS), rowCount: mapping.rows.length }); });
     app.post('/api/imports/:id/commit', async (req, res) => res.json(await imports.commit(principal(res), id(req))));
     app.get('/api/imports/:id', (req, res) => res.json(imports.getJob(principal(res), id(req))));
     app.post('/api/imports/:id/reconcile', async (req, res) => res.json(await imports.reconcile(principal(res), id(req))));

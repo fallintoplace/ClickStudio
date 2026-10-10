@@ -1,3 +1,4 @@
+import { DEFAULT_RESULT_PAGE_ROWS } from '../../shared/query-limits';
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { displayValue, filterRows } from '../../shared/results';
@@ -134,7 +135,7 @@ export function ResultGrid({ run, page, pageIndex, loading, onPage, showPaginati
     const matchingRows = new Set(filterRows(page.rows, filter, searchableRows));
     const visibleRows = page.rows.flatMap((row, index) => matchingRows.has(row) ? [{ row, index }] : []);
     const columnGroups = page.columns.map(column => resultTypeGroup(column.type));
-    const pageCount = Math.max(1, Math.ceil(page.totalRows / 200));
+    const pageCount = Math.max(1, Math.ceil(page.totalRows / DEFAULT_RESULT_PAGE_ROWS));
     const rowRange = page.rows.length ? `${(page.offset + 1).toLocaleString()}–${(page.offset + page.rows.length).toLocaleString()}` : '0';
     const retainedRange = `${rowRange} of ${page.totalRows.toLocaleString()} retained rows`;
     const pageLabel = `Page ${pageIndex + 1} of ${pageCount}`;

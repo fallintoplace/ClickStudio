@@ -1,3 +1,6 @@
+import { MAX_SQL_CHARS } from '../shared/query-limits.js';
+import { IMPORT_FORMATS, IMPORT_FILE_SIZE_LABEL, MAX_IMPORT_FILE_BYTES, MAX_IMPORT_ROWS, MAX_IMPORT_COLUMNS, type ImportFormat } from '../shared/import-limits.js';
+import { CLICKHOUSE_CLOUD_CONNECTION_ID, CLOUD_QUERY_LIMITS, MAX_CLOUD_INSPECTOR_RESULT_ROWS, MAX_CLOUD_REFERENCE_RESULT_ROWS, CLOUD_SCHEMA_DATABASE_PAGE_ROWS, CLOUD_SCHEMA_TABLE_PAGE_ROWS, CLOUD_SCHEMA_COLUMN_PAGE_ROWS, CLOUD_REQUEST_TIMEOUT_MS, CLOUD_QUERY_TIMEOUT_MS, MAX_CLOUD_IMPORT_REQUEST_BYTES } from '../shared/cloud-policy.js';
 import { createClient } from '@clickhouse/client';
 import { randomUUID } from 'node:crypto';
 import { AppError } from '../core/errors.js';
@@ -19,20 +22,12 @@ import { loadNativeExplorer, type NativeExplorerRequest, type NativeExplorerSnap
 import { mergeTreePartsQuery, parseMergeTreeParts, type MergeTreePartsSnapshot } from '../shared/parts.js';
 
 type CloudCredentials = { host: string; database: string; username: string; password: string };
-const MAX_SQL_LENGTH = 200_000;
-const MAX_RESULT_ROWS = 1_000;
-const MAX_INSPECTOR_RESULT_ROWS = 2_000;
-const MAX_REFERENCE_RESULT_ROWS = 6_000;
-const MAX_RESULT_BYTES = 2_000_000;
-const MAX_EXECUTION_SECONDS = 45;
-const MAX_IMPORT_FILE_BYTES = 2_000_000;
-const MAX_IMPORT_REQUEST_BYTES = 4_000_000;
 const clickhouseSettings = {
-    max_execution_time: MAX_EXECUTION_SECONDS,
-    max_result_rows: String(MAX_RESULT_ROWS),
-    max_result_bytes: String(MAX_RESULT_BYTES),
+    max_execution_time: CLOUD_QUERY_LIMITS.seconds,
+    max_result_rows: String(CLOUD_QUERY_LIMITS.rows),
+    max_result_bytes: String(CLOUD_QUERY_LIMITS.bytes),
     result_overflow_mode: 'break' as const,
-    max_threads: 4 as const,
+    max_threads: CLOUD_QUERY_LIMITS.threads,
     output_format_json_quote_64bit_integers: 1 as const,
 };
 const clickhouseRunSettings = {
@@ -43,7 +38,7 @@ const clickhouseRunSettings = {
     output_format_json_quote_decimals: 1 as const,
 };
 
-type CloudImportJob = { id: string; connectionId: 'clickhouse-cloud'; table: string; queryId: string; deduplicationToken?: string; rows: number; createdAt: string; status: 'running' | 'succeeded' | 'unknown'; error?: string; reviewedAt?: string; reconciliationRequired?: boolean; tableCreated?: boolean; tableExists?: boolean };
+type CloudImportJob = { id: string; connectionId: typeof CLICKHOUSE_CLOUD_CONNECTION_ID; table: string; queryId: string; deduplicationToken?: string; rows: number; createdAt: string; status: 'running' | 'succeeded' | 'unknown'; error?: string; reviewedAt?: string; reconciliationRequired?: boolean; tableCreated?: boolean; tableExists?: boolean };
 
 function isSameOrigin(request: Request) {
     const origin = request.headers.get('origin');
@@ -103,7 +98,7 @@ function makeClient(credentials: CloudCredentials, url: string, sessionId?: stri
         password: credentials.password,
         ...(sessionId ? { session_id: sessionId } : {}),
         application: 'clickstudio-cloud',
-        request_timeout: 50_000,
+        request_timeout: CLOUD_REQUEST_TIMEOUT_MS,
         max_open_connections: 1,
     });
 }
@@ -119,14 +114,14 @@ function asString(value: unknown): string {
     return value === null || value === undefined ? '' : String(value);
 }
 
-export async function queryRows<T>(client: ReturnType<typeof makeClient>, query: string, queryParams: Record<string, string> = {}, timeoutMs = 48_000, maxExecutionSeconds = MAX_EXECUTION_SECONDS, maxResultRows = MAX_INSPECTOR_RESULT_ROWS): Promise<T[]> {
+export async function queryRows<T>(client: ReturnType<typeof makeClient>, query: string, queryParams: Record<string, string> = {}, timeoutMs = CLOUD_QUERY_TIMEOUT_MS, maxExecutionSeconds = CLOUD_QUERY_LIMITS.seconds, maxResultRows = MAX_CLOUD_INSPECTOR_RESULT_ROWS): Promise<T[]> {
     const result = await client.query({
         query,
         format: 'JSONEachRow',
         query_params: queryParams,
         query_id: `clickstudio-inspect-${randomUUID()}`,
         abort_signal: AbortSignal.timeout(timeoutMs),
-        clickhouse_settings: { ...clickhouseSettings, max_execution_time: maxExecutionSeconds, max_result_rows: String(maxResultRows), max_result_bytes: String(MAX_RESULT_BYTES), result_overflow_mode: 'throw' },
+        clickhouse_settings: { ...clickhouseSettings, max_execution_time: maxExecutionSeconds, max_result_rows: String(maxResultRows), max_result_bytes: String(CLOUD_QUERY_LIMITS.bytes), result_overflow_mode: 'throw' },
     });
     return await result.json<T>();
 }
@@ -217,11 +212,11 @@ async function readSchema(credentials: CloudCredentials, url: string, offsets: {
         };
         const [databaseRows, tableRows, columnRows] = await Promise.all([
             queryRows<Record<string, unknown>>(client,
-                "SELECT name FROM system.databases WHERE lower(name) NOT IN ('system', 'information_schema') ORDER BY (name = {database:String}) DESC, name LIMIT 1000 OFFSET {databaseOffset:UInt64}", pageParams).catch(() => []),
+                `SELECT name FROM system.databases WHERE lower(name) NOT IN ('system', 'information_schema') ORDER BY (name = {database:String}) DESC, name LIMIT ${CLOUD_SCHEMA_DATABASE_PAGE_ROWS} OFFSET {databaseOffset:UInt64}`, pageParams).catch(() => []),
             queryRows<Record<string, unknown>>(client,
-                "SELECT database, name, engine, sorting_key, primary_key, partition_key, sampling_key, total_rows, total_bytes FROM system.tables WHERE lower(database) NOT IN ('system', 'information_schema') AND is_temporary = 0 ORDER BY (database = {database:String}) DESC, database, name LIMIT 1000 OFFSET {tableOffset:UInt64}", pageParams),
+                `SELECT database, name, engine, sorting_key, primary_key, partition_key, sampling_key, total_rows, total_bytes FROM system.tables WHERE lower(database) NOT IN ('system', 'information_schema') AND is_temporary = 0 ORDER BY (database = {database:String}) DESC, database, name LIMIT ${CLOUD_SCHEMA_TABLE_PAGE_ROWS} OFFSET {tableOffset:UInt64}`, pageParams),
             queryRows<Record<string, unknown>>(client,
-                "SELECT database, table, name, type, default_kind, comment FROM system.columns WHERE lower(database) NOT IN ('system', 'information_schema') ORDER BY (database = {database:String}) DESC, database, table, position LIMIT 2000 OFFSET {columnOffset:UInt64}", pageParams),
+                `SELECT database, table, name, type, default_kind, comment FROM system.columns WHERE lower(database) NOT IN ('system', 'information_schema') ORDER BY (database = {database:String}) DESC, database, table, position LIMIT ${CLOUD_SCHEMA_COLUMN_PAGE_ROWS} OFFSET {columnOffset:UInt64}`, pageParams),
         ]);
         const tables: SchemaTable[] = tableRows.map(row => ({
             database: asString(row.database),
@@ -243,12 +238,12 @@ async function readSchema(credentials: CloudCredentials, url: string, offsets: {
             comment: asString(row.comment),
         }));
         const pagination = {
-            ...(databaseRows.length === 1000 ? { databases: offsets.databases + databaseRows.length } : {}),
-            ...(tableRows.length === 1000 ? { tables: offsets.tables + tableRows.length } : {}),
-            ...(columnRows.length === 2000 ? { columns: offsets.columns + columnRows.length } : {}),
+            ...(databaseRows.length === CLOUD_SCHEMA_DATABASE_PAGE_ROWS ? { databases: offsets.databases + databaseRows.length } : {}),
+            ...(tableRows.length === CLOUD_SCHEMA_TABLE_PAGE_ROWS ? { tables: offsets.tables + tableRows.length } : {}),
+            ...(columnRows.length === CLOUD_SCHEMA_COLUMN_PAGE_ROWS ? { columns: offsets.columns + columnRows.length } : {}),
         };
         return {
-            connectionId: 'clickhouse-cloud',
+            connectionId: CLICKHOUSE_CLOUD_CONNECTION_ID,
             fetchedAt: new Date().toISOString(),
             databases: [...new Set([credentials.database, ...databaseRows.map(row => asString(row.name)), ...tables.map(table => table.database)])].filter(name => name && !isSystemDatabaseName(name)),
             tables,
@@ -280,7 +275,7 @@ async function createCloudTable(credentials: CloudCredentials, url: string, body
     const queryId = `clickstudio-create-table-${randomUUID()}`;
     const client = makeClient(credentials, url);
     try {
-        await client.command({ query, query_id: queryId, abort_signal: AbortSignal.timeout(48_000), clickhouse_settings: clickhouseSettings });
+        await client.command({ query, query_id: queryId, abort_signal: AbortSignal.timeout(CLOUD_QUERY_TIMEOUT_MS), clickhouse_settings: clickhouseSettings });
     } finally {
         await client.close();
     }
@@ -299,7 +294,7 @@ async function dropCloudTable(credentials: CloudCredentials, url: string, body: 
             'SELECT engine FROM system.tables WHERE database = {database:String} AND name = {table:String} LIMIT 1', { database, table }))[0];
         if (target) {
             if (isViewEngine(target.engine)) throw new AppError(400, 'TABLE_DROP_KIND', 'Select a table, not a view.');
-            await client.command({ query: dropTableSql(database, table), query_id: queryId, abort_signal: AbortSignal.timeout(48_000), clickhouse_settings: clickhouseSettings });
+            await client.command({ query: dropTableSql(database, table), query_id: queryId, abort_signal: AbortSignal.timeout(CLOUD_QUERY_TIMEOUT_MS), clickhouse_settings: clickhouseSettings });
         }
         return { database, table, queryId };
     } finally {
@@ -337,8 +332,8 @@ function queryParameters(value: unknown): Record<string, string> {
 
 async function runSql(credentials: CloudCredentials, url: string, sql: string, sessionId?: string, requestedQueryId?: string, parameters: Record<string, string> = {}) {
     const statement = sql.trim();
-    if (!statement || statement.length > MAX_SQL_LENGTH)
-        throw new Error(`Enter one SQL statement under ${MAX_SQL_LENGTH.toLocaleString()} characters.`);
+    if (!statement || statement.length > MAX_SQL_CHARS)
+        throw new Error(`Enter one SQL statement under ${MAX_SQL_CHARS.toLocaleString()} characters.`);
     const statements = splitSql(statement);
     if (statements.length !== 1)
         throw new Error('Run one SQL statement at a time on ClickHouse Cloud.');
@@ -354,7 +349,7 @@ async function runSql(credentials: CloudCredentials, url: string, sql: string, s
                 query: statement,
                 query_id: queryId,
                 query_params: parameters,
-                abort_signal: AbortSignal.timeout(48_000),
+                abort_signal: AbortSignal.timeout(CLOUD_QUERY_TIMEOUT_MS),
                 clickhouse_settings: clickhouseSettings,
             });
             const writtenRows = safeRowCount(result.summary?.written_rows);
@@ -373,10 +368,10 @@ async function runSql(credentials: CloudCredentials, url: string, sql: string, s
             query: cloudResultStreamQuery(statements[0]!),
             query_id: queryId,
             query_params: parameters,
-            abort_signal: AbortSignal.timeout(48_000),
+            abort_signal: AbortSignal.timeout(CLOUD_QUERY_TIMEOUT_MS),
             clickhouse_settings: clickhouseRunSettings,
         });
-        const bounded = await collectCompactStream(result.stream, { rows: MAX_RESULT_ROWS, bytes: MAX_RESULT_BYTES });
+        const bounded = await collectCompactStream(result.stream, { rows: CLOUD_QUERY_LIMITS.rows, bytes: CLOUD_QUERY_LIMITS.bytes });
         if (bounded.truncated)
             void cancelCloudQuery(credentials, url, queryId).catch(() => undefined);
         const serverBytes = Number(result.summary?.read_bytes);
@@ -458,11 +453,11 @@ async function cloudReferenceSearch(credentials: CloudCredentials, url: string, 
     try {
         const built = buildReferenceSearchQuery(query, category, true);
         let rows: Omit<ClickHouseDocumentationSummary, 'origin'>[];
-        try { rows = await queryRows(client, built.sql, built.parameters, 12_000, 10, MAX_REFERENCE_RESULT_ROWS); }
+        try { rows = await queryRows(client, built.sql, built.parameters, 12_000, 10, MAX_CLOUD_REFERENCE_RESULT_ROWS); }
         catch (error) {
             if (!isMissingDocumentationSourceColumn(error)) throw error;
             const fallback = buildReferenceSearchQuery(query, category, false);
-            rows = await queryRows(client, fallback.sql, fallback.parameters, 12_000, 10, MAX_REFERENCE_RESULT_ROWS);
+            rows = await queryRows(client, fallback.sql, fallback.parameters, 12_000, 10, MAX_CLOUD_REFERENCE_RESULT_ROWS);
         }
         return rows.map(row => ({ ...row, origin: 'native' }));
     } finally { await client.close(); }
@@ -494,7 +489,7 @@ async function readWorkload(credentials: CloudCredentials, url: string, minutes:
             queryRows<Record<string, unknown>>(client, workloadFamiliesQuery(source), queryParams, 22_000, 20),
             queryRows<Record<string, unknown>>(client, workloadPointsQuery(source), queryParams, 22_000, 20),
         ]);
-        return parseWorkloadSnapshot('clickhouse-cloud', minutes, source, families, points);
+        return parseWorkloadSnapshot(CLICKHOUSE_CLOUD_CONNECTION_ID, minutes, source, families, points);
     } finally {
         await client.close();
     }
@@ -532,7 +527,7 @@ async function readReplication(credentials: CloudCredentials, url: string) {
         ]);
         if (!replicas.available && !queue.available)
             throw new Error('This user can no longer read system.replicas or system.replication_queue. Test the connection again.');
-        return parseReplicationSnapshot('clickhouse-cloud', { replicas: replicas.available, queue: queue.available }, replicas.rows, queue.rows);
+        return parseReplicationSnapshot(CLICKHOUSE_CLOUD_CONNECTION_ID, { replicas: replicas.available, queue: queue.available }, replicas.rows, queue.rows);
     } finally {
         await client.close();
     }
@@ -545,8 +540,8 @@ function parseFormJson<T>(form: FormData, key: string): T | undefined {
     catch { throw new AppError(400, 'IMPORT_REQUEST', `The ${key} field is not valid JSON.`); }
 }
 
-function isImportFormat(value: unknown): value is 'csv' | 'json' | 'ndjson' {
-    return value === 'csv' || value === 'json' || value === 'ndjson';
+function isImportFormat(value: unknown): value is ImportFormat {
+    return IMPORT_FORMATS.some(format => format === value);
 }
 
 function isImportIdentifier(value: unknown): value is string {
@@ -570,7 +565,7 @@ function parseImportTarget(value: unknown): { database: string; table: string } 
 }
 
 async function inspectCloudImport(credentials: CloudCredentials, url: string, queryId: string, table: string, rows: number, deduplicationToken?: string): Promise<CloudImportJob> {
-    const job: CloudImportJob = { id: queryId.slice('clickstudio-import-'.length), connectionId: 'clickhouse-cloud', table, queryId, ...(deduplicationToken ? { deduplicationToken } : {}), rows, createdAt: new Date().toISOString(), status: 'unknown', error: 'ClickHouse could not confirm the insert. The rows may already be there.' };
+    const job: CloudImportJob = { id: queryId.slice('clickstudio-import-'.length), connectionId: CLICKHOUSE_CLOUD_CONNECTION_ID, table, queryId, ...(deduplicationToken ? { deduplicationToken } : {}), rows, createdAt: new Date().toISOString(), status: 'unknown', error: 'ClickHouse could not confirm the insert. The rows may already be there.' };
     const client = makeClient(credentials, url);
     const createQueryId = `clickstudio-create-${job.id}`;
     const target = parseImportTarget(table);
@@ -614,7 +609,7 @@ async function tableExists(client: ReturnType<typeof makeClient>, database: stri
 async function commitCloudImport(form: FormData, credentials: CloudCredentials, url: string): Promise<CloudImportJob> {
     const file = form.get('file');
     if (!(file instanceof File)) throw new AppError(400, 'IMPORT_FILE', 'Choose a file to import.');
-    if (file.size > MAX_IMPORT_FILE_BYTES) throw new AppError(413, 'IMPORT_BYTE_LIMIT', 'Imports are limited to 2 MB.');
+    if (file.size > MAX_IMPORT_FILE_BYTES) throw new AppError(413, 'IMPORT_BYTE_LIMIT', `Imports are limited to ${IMPORT_FILE_SIZE_LABEL}.`);
     const format = form.get('format');
     if (!isImportFormat(format)) throw new AppError(400, 'IMPORT_FORMAT', 'Use a CSV, JSON, or NDJSON file.');
     const queryIdValue = form.get('queryId');
@@ -638,7 +633,7 @@ async function commitCloudImport(form: FormData, credentials: CloudCredentials, 
     let expectedColumns: { name: string; type: string; defaultKind: string }[] | undefined;
 
     if (creating) {
-        if (!createTable || (createTable.database !== undefined && (!isValidTableDatabase(createTable.database) || isSystemDatabaseName(createTable.database))) || !isImportIdentifier(createTable.name) || !Array.isArray(createTable.columns) || createTable.columns.length === 0 || createTable.columns.length > 200 ||
+        if (!createTable || (createTable.database !== undefined && (!isValidTableDatabase(createTable.database) || isSystemDatabaseName(createTable.database))) || !isImportIdentifier(createTable.name) || !Array.isArray(createTable.columns) || createTable.columns.length === 0 || createTable.columns.length > MAX_IMPORT_COLUMNS ||
             (createTable.generateId !== undefined && typeof createTable.generateId !== 'boolean'))
             throw new AppError(400, 'IMPORT_CREATE_TABLE', 'Enter a table name and at least one column.');
         tableDatabase = typeof createTable.database === 'string' ? createTable.database : credentials.database;
@@ -682,7 +677,7 @@ async function commitCloudImport(form: FormData, credentials: CloudCredentials, 
 
     const entries = Object.entries(fields);
     const destinations = entries.map(([, destination]) => destination);
-    if (!entries.length || entries.length > 200 || destinations.some(destination => typeof destination !== 'string') || new Set(destinations).size !== destinations.length)
+    if (!entries.length || entries.length > MAX_IMPORT_COLUMNS || destinations.some(destination => typeof destination !== 'string') || new Set(destinations).size !== destinations.length)
         throw new AppError(400, 'IMPORT_MAPPING', 'Map each destination column once.');
     for (const [sourceName, destination] of entries) {
         if (!parsed.columns.includes(sourceName) || typeof destination !== 'string' || !destinationColumns.some(column => column.name === destination && !['MATERIALIZED', 'ALIAS'].includes(column.defaultKind)))
@@ -707,7 +702,7 @@ async function commitCloudImport(form: FormData, credentials: CloudCredentials, 
             await client.command({
                 query: `CREATE TABLE ${quoteIdentifier(tableDatabase)}.${quoteIdentifier(tableName)} (${definitions}) ENGINE = MergeTree ORDER BY tuple()`,
                 query_id: `clickstudio-create-${queryId.slice('clickstudio-import-'.length)}`,
-                abort_signal: AbortSignal.timeout(48_000),
+                abort_signal: AbortSignal.timeout(CLOUD_QUERY_TIMEOUT_MS),
                 clickhouse_settings: clickhouseSettings,
             });
         }
@@ -716,19 +711,19 @@ async function commitCloudImport(form: FormData, credentials: CloudCredentials, 
             values: mappedRows,
             format: 'JSONEachRow',
             query_id: queryId,
-            abort_signal: AbortSignal.timeout(48_000),
+            abort_signal: AbortSignal.timeout(CLOUD_QUERY_TIMEOUT_MS),
             clickhouse_settings: { ...clickhouseSettings, input_format_defaults_for_omitted_fields: 1, input_format_null_as_default: 0, ...(deduplicationToken ? { insert_deduplication_token: deduplicationToken } : {}) },
         });
     } finally {
         await client.close();
     }
-    return { id: queryId.slice('clickstudio-import-'.length), connectionId: 'clickhouse-cloud', table: `${tableDatabase}.${tableName}`, queryId, ...(deduplicationToken ? { deduplicationToken } : {}), rows: parsed.rows.length, createdAt: new Date().toISOString(), status: 'succeeded', tableExists: true, ...(creating ? { tableCreated: true } : {}) };
+    return { id: queryId.slice('clickstudio-import-'.length), connectionId: CLICKHOUSE_CLOUD_CONNECTION_ID, table: `${tableDatabase}.${tableName}`, queryId, ...(deduplicationToken ? { deduplicationToken } : {}), rows: parsed.rows.length, createdAt: new Date().toISOString(), status: 'succeeded', tableExists: true, ...(creating ? { tableCreated: true } : {}) };
 }
 
 async function postCloudImport(request: Request): Promise<Response> {
     if (!isSameOrigin(request)) return fail('ORIGIN', 'This endpoint accepts requests from the ClickStudio site only.', 403);
     const length = Number(request.headers.get('content-length'));
-    if (Number.isFinite(length) && length > MAX_IMPORT_REQUEST_BYTES) return fail('REQUEST_SIZE', 'The Cloud import request is too large.', 413);
+    if (Number.isFinite(length) && length > MAX_CLOUD_IMPORT_REQUEST_BYTES) return fail('REQUEST_SIZE', 'The Cloud import request is too large.', 413);
     let form: FormData;
     try { form = await request.formData(); }
     catch { return fail('IMPORT_REQUEST', 'Could not read the import request.'); }
@@ -788,7 +783,7 @@ async function post(request: Request): Promise<Response> {
             return json(await readSchema(credentials, url, { databases: offset('databaseOffset'), tables: offset('tableOffset'), columns: offset('columnOffset') }));
         }
         if (body.action === 'query-tree') {
-            if (typeof body.sql !== 'string' || !body.sql.trim() || body.sql.length > MAX_SQL_LENGTH || splitSql(body.sql).length !== 1)
+            if (typeof body.sql !== 'string' || !body.sql.trim() || body.sql.length > MAX_SQL_CHARS || splitSql(body.sql).length !== 1)
                 return fail('QUERY_TREE_SQL', 'Enter one SQL statement to inspect.');
             if (!isExplainableReadQuery(body.sql.trim()))
                 return fail('QUERY_TREE_SQL', 'Query-tree inspection accepts one read query, such as SELECT or WITH.');
@@ -808,7 +803,7 @@ async function post(request: Request): Promise<Response> {
             return json(await cloudQueryLogEvidence(credentials, url, body.queryId, body.source));
         }
         if (body.action === 'pipeline') {
-            if (typeof body.sql !== 'string' || !body.sql.trim() || body.sql.length > MAX_SQL_LENGTH || splitSql(body.sql).length !== 1)
+            if (typeof body.sql !== 'string' || !body.sql.trim() || body.sql.length > MAX_SQL_CHARS || splitSql(body.sql).length !== 1)
                 return fail('PIPELINE_SQL', 'Enter one SQL statement to inspect.');
             if (!isExplainableReadQuery(body.sql.trim()))
                 return fail('PIPELINE_SQL', 'Pipeline inspection accepts one read query, such as SELECT or WITH.');
@@ -877,7 +872,7 @@ async function post(request: Request): Promise<Response> {
         if (body.action === 'import-status') {
             const targetTable = typeof body.table === 'string' ? body.table : '';
             if (!validImportQueryId(body.queryId) || !parseImportTarget(targetTable) ||
-                typeof body.rows !== 'number' || !Number.isSafeInteger(body.rows) || body.rows < 1 || body.rows > 10_000 ||
+                typeof body.rows !== 'number' || !Number.isSafeInteger(body.rows) || body.rows < 1 || body.rows > MAX_IMPORT_ROWS ||
                 (body.deduplicationToken !== undefined && !validImportDeduplicationToken(body.deduplicationToken)))
                 return fail('IMPORT_STATUS', 'The saved import details are invalid.');
             return json(await inspectCloudImport(credentials, url, body.queryId, targetTable, body.rows, body.deduplicationToken as string | undefined));
