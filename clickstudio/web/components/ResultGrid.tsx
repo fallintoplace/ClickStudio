@@ -135,11 +135,22 @@ export function ResultGrid({ run, page, pageIndex, loading, onPage, showPaginati
     const visibleRows = page.rows.flatMap((row, index) => matchingRows.has(row) ? [{ row, index }] : []);
     const columnGroups = page.columns.map(column => resultTypeGroup(column.type));
     const pageCount = Math.max(1, Math.ceil(page.totalRows / 200));
+    const rowRange = page.rows.length ? `${(page.offset + 1).toLocaleString()}–${(page.offset + page.rows.length).toLocaleString()}` : '0';
+    const retainedRange = `${rowRange} of ${page.totalRows.toLocaleString()} retained rows`;
+    const pageLabel = `Page ${pageIndex + 1} of ${pageCount}`;
     const rowCount = filter
         ? `${visibleRows.length.toLocaleString()} of ${page.rows.length.toLocaleString()} rows${pageCount > 1 ? ' on this page' : ''}`
-        : `${page.totalRows.toLocaleString()} ${pageCount > 1 ? 'retained ' : ''}${page.totalRows === 1 ? 'row' : 'rows'}`;
+        : pageCount > 1 ? `${rowRange} / ${page.totalRows.toLocaleString()} rows`
+        : `${page.totalRows.toLocaleString()} ${page.totalRows === 1 ? 'row' : 'rows'}`;
     const toolbar = (showPagination || page.completeness === 'truncated') && <div className="result-table-toolbar" inert={obscured || undefined}>
-        {showPagination && <span className="result-row-count" role="status" aria-live="polite">{rowCount}{previousRunLabel && <> · {previousRunLabel}</>}</span>}
+        {showPagination && <span className="result-row-count" role="status" aria-live="polite" title={pageCount > 1 ? retainedRange : undefined}>{rowCount}{previousRunLabel && <> · {previousRunLabel}</>}</span>}
+        {showPagination && pageCount > 1 && <nav className="result-pagination" aria-label="Result pagination">
+            <Button variant="ghost" aria-label="First page" title="First page" disabled={pageIndex === 0} onClick={() => onPage(0)}><Icon name="firstPage"/></Button>
+            <Button variant="ghost" aria-label="Previous page" title="Previous page" disabled={pageIndex === 0} onClick={() => onPage(pageIndex - 1)}><Icon name="previousPage"/></Button>
+            <span className="result-page-status" role="status" aria-label={pageLabel} title={pageLabel}>{pageIndex + 1}/{pageCount}</span>
+            <Button variant="ghost" aria-label="Next page" title="Next page" disabled={pageIndex + 1 >= pageCount} onClick={() => onPage(pageIndex + 1)}><Icon name="nextPage"/></Button>
+            <Button variant="ghost" aria-label="Last page" title="Last page" disabled={pageIndex + 1 >= pageCount} onClick={() => onPage(pageCount - 1)}><Icon name="lastPage"/></Button>
+        </nav>}
         {page.completeness === 'truncated' && <span className="result-completeness" title="Only the retained prefix is available. The query may have matched more rows."><span className="status-light is-warning"/>Retained prefix · truncated</span>}
         {showPagination && <div className="result-filter-controls">
             <button ref={filterButton} hidden={filterOpen} className="button-base button-secondary result-filter-toggle" type="button" aria-expanded={filterOpen} aria-controls={filterId} title="Filter the current page" onClick={() => setFilterOpen(true)}><Icon name="search"/>Filter</button>
@@ -173,15 +184,5 @@ export function ResultGrid({ run, page, pageIndex, loading, onPage, showPaginati
                 </table>
                 {page.rows.length === 0 ? <div className="no-rows" role="status">{emptyRowsMessage}</div> : visibleRows.length === 0 && <div className="no-rows">No rows match on this page.</div>}
             </div>}</ScrollEdgeFrame>
-        {showPagination && pageCount > 1 && <div className="table-pagination">
-            <span>{page.rows.length ? `${(page.offset + 1).toLocaleString()}–${(page.offset + page.rows.length).toLocaleString()}` : '0'} of {page.totalRows.toLocaleString()} retained rows</span>
-            <div className="table-pagination-controls">
-                <span>Page {pageIndex + 1} of {pageCount}</span>
-                <Button variant="secondary" disabled={pageIndex === 0} onClick={() => onPage(0)}>First</Button>
-                <Button variant="secondary" disabled={pageIndex === 0} onClick={() => onPage(pageIndex - 1)}>←</Button>
-                <Button variant="secondary" disabled={pageIndex + 1 >= pageCount} onClick={() => onPage(pageIndex + 1)}>→</Button>
-                <Button variant="secondary" disabled={pageIndex + 1 >= pageCount} onClick={() => onPage(pageCount - 1)}>Last</Button>
-            </div>
-        </div>}
     </div>;
 }

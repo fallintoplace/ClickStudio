@@ -143,7 +143,11 @@
     padding-inline: 12px;
   }
   :is(.editor-heading, .results-header)
-    :is(.panel-window-button, .panel-collapse-button) {
+    :is(
+      .panel-window-button,
+      .panel-collapse-button,
+      .result-pagination .button-base
+    ) {
     width: 28px;
     min-width: 28px;
     padding: 0;

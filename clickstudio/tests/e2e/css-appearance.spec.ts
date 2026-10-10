@@ -25,6 +25,18 @@ for (const theme of ['Light', 'Dark']) {
                 await expectReferenceStyles(page, info, 'query-results');
                 await page.getByRole('button', { name: 'Collapse SQL query', exact: true }).click();
                 await expectReferenceStyles(page, info, 'collapsed-query');
+                await page.route(url => url.pathname.endsWith('/result'), async route => {
+                    const response = await route.fetch();
+                    await route.fulfill({ response, json: {
+                        ...await response.json(),
+                        columns: [{ name: 'label', type: 'String' }],
+                        rows: Array.from({ length: 200 }, (_, index) => [`row-${index}`]),
+                        totalRows: 240, offset: 0, nextOffset: 200,
+                    } });
+                });
+                await runButton(page).click();
+                await expect(page.locator('.results-header .result-pagination')).toBeVisible();
+                await expectReferenceStyles(page, info, 'paged-results');
                 for (const viewport of [{ width: 900, height: 740 }, { width: 390, height: 844 }]) {
                     await page.setViewportSize(viewport);
                     await expectReferenceStyles(page, info, `responsive-${viewport.width}`);

@@ -193,9 +193,9 @@ test('Result view and page stay with their draft run', async ({ page }) => {
     const firstTab = page.getByRole('tablist', { name: 'SQL documents', exact: true }).getByRole('tab').first();
     const firstTabName = await firstTab.getAttribute('aria-label');
     const firstResults = page.locator('.results-surface');
-    await expect(firstResults.getByText('Page 1 of 2')).toBeVisible();
-    await firstResults.getByRole('button', { name: 'Last', exact: true }).click();
-    await expect(firstResults.getByText('Page 2 of 2')).toBeVisible();
+    await expect(firstResults.getByRole('status', { name: 'Page 1 of 2', exact: true })).toBeVisible();
+    await firstResults.getByRole('button', { name: 'Last page', exact: true }).click();
+    await expect(firstResults.getByRole('status', { name: 'Page 2 of 2', exact: true })).toBeVisible();
     await firstResults.getByRole('tab', { name: 'Chart', exact: true }).click();
     await expect(firstResults.locator('.chart-canvas svg[role="img"]')).toBeVisible();
 
@@ -206,7 +206,7 @@ test('Result view and page stay with their draft run', async ({ page }) => {
     await expect(firstResults.getByRole('tab', { name: 'Chart', exact: true })).toHaveAttribute('aria-selected', 'true');
     await expect(firstResults.locator('.chart-canvas svg[role="img"]')).toBeVisible();
     await firstResults.getByRole('tab', { name: 'Results', exact: true }).click();
-    await expect(firstResults.getByText('Page 2 of 2')).toBeVisible();
+    await expect(firstResults.getByRole('status', { name: 'Page 2 of 2', exact: true })).toBeVisible();
 });
 
 test('Run button submits the live CodeMirror document before React catches up', async ({ page }) => {
@@ -393,7 +393,7 @@ test('A running query shows its submitted SQL and keeps previous rows until it e
         await expect(progress.locator('.loading-orbit')).toBeVisible();
         await expect(progress).toContainText('Previous result');
         await expect(table).toContainText('2026-01-01');
-        await expect(results.locator('.table-pagination')).toHaveCount(0);
+        await expect(results.locator('.table-pagination, .result-pagination')).toHaveCount(0);
 
         await replaceSql(page, "SELECT 'edited after submit' AS value");
         await expect(progress).toContainText(submittedSql);
@@ -947,7 +947,7 @@ for (const mode of ['Standard', 'Experimental']) test(`${mode} query and results
     await expect(resultsPopup.locator('.results-surface')).toHaveCSS('border-radius', '4px');
     const popupFilter = await openResultFilter(resultsPopup.locator('.results-header'));
     await expect(resultsPopup.locator('.results-header .result-row-count')).toHaveText('7 rows');
-    await expect(resultsPopup.locator('.table-pagination')).toHaveCount(0);
+    await expect(resultsPopup.locator('.table-pagination, .result-pagination')).toHaveCount(0);
     await popupFilter.fill('2026-01-02');
     await expect(resultsPopup.locator('tbody tr')).toHaveCount(1);
     await expect(resultsPopup.locator('.result-row-count')).toHaveText('1 of 7 rows');
