@@ -37,11 +37,35 @@ export function useWorkspaceTabs(workspace: WorkspaceState, setWorkspace: Dispat
         if (reducedMotion) window.requestAnimationFrame(updateTabScrollState);
     }, [updateTabScrollState]);
 
+    const revealActiveTab = useCallback(() => {
+        const scroller = tabScrollerRef.current;
+        const tab = document.getElementById(`document-tab-${active.id}`);
+        if (!scroller || !tab) return;
+        const scrollerRect = scroller.getBoundingClientRect();
+        const tabRect = tab.getBoundingClientRect();
+        if (tabRect.left < scrollerRect.left)
+            scroller.scrollBy({ left: tabRect.left - scrollerRect.left - 6 });
+        else if (tabRect.right > scrollerRect.right)
+            scroller.scrollBy({ left: tabRect.right - scrollerRect.right + 6 });
+        updateTabScrollState();
+    }, [active.id, updateTabScrollState]);
+
     useEffect(() => {
-        const handleResize = () => updateTabScrollState();
+        const scroller = tabScrollerRef.current;
+        const handleResize = () => {
+            updateTabScrollState();
+            revealActiveTab();
+        };
+        const observer = scroller && typeof ResizeObserver !== 'undefined'
+            ? new ResizeObserver(handleResize)
+            : undefined;
+        if (scroller) observer?.observe(scroller);
         window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, [updateTabScrollState]);
+        return () => {
+            observer?.disconnect();
+            window.removeEventListener('resize', handleResize);
+        };
+    }, [revealActiveTab, updateTabScrollState]);
 
     useEffect(() => {
         const frame = window.requestAnimationFrame(updateTabScrollState);
@@ -49,20 +73,9 @@ export function useWorkspaceTabs(workspace: WorkspaceState, setWorkspace: Dispat
     }, [tabLayoutKey, updateTabScrollState]);
 
     useEffect(() => {
-        const frame = window.requestAnimationFrame(() => {
-            const scroller = tabScrollerRef.current;
-            const tab = document.getElementById(`document-tab-${active.id}`);
-            if (!scroller || !tab) return;
-            const scrollerRect = scroller.getBoundingClientRect();
-            const tabRect = tab.getBoundingClientRect();
-            if (tabRect.left < scrollerRect.left)
-                scroller.scrollBy({ left: tabRect.left - scrollerRect.left - 6 });
-            else if (tabRect.right > scrollerRect.right)
-                scroller.scrollBy({ left: tabRect.right - scrollerRect.right + 6 });
-            updateTabScrollState();
-        });
+        const frame = window.requestAnimationFrame(revealActiveTab);
         return () => window.cancelAnimationFrame(frame);
-    }, [active.id, active.name, updateTabScrollState]);
+    }, [active.id, active.name, revealActiveTab]);
 
     const beginTabRename = (draft: WorkspaceState['tabs'][number]) => {
         cancelTabRenameOnBlur.current = false;
@@ -100,6 +113,7 @@ export function useWorkspaceTabs(workspace: WorkspaceState, setWorkspace: Dispat
         tabScrollState,
         updateTabScrollState,
         scrollTabs,
+        revealActiveTab,
         renamingTabId,
         tabRenameValue,
         setTabRenameValue,

@@ -188,7 +188,7 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
     const workspaceRef = useRef(workspace);
     workspaceRef.current = workspace;
     const {
-        active, tabScrollerRef, tabScrollState, updateTabScrollState, scrollTabs,
+        active, tabScrollerRef, tabScrollState, updateTabScrollState, scrollTabs, revealActiveTab,
         renamingTabId, tabRenameValue, setTabRenameValue,
         beginTabRename, finishTabRename: updateTabRename, cancelTabRename,
     } = useWorkspaceTabs(workspace, setWorkspace);
@@ -239,7 +239,10 @@ export function Workspace({ connection, connectionLabel, connections, onSelectCo
         setHelpPanelOpen(false);
         if (restoreFocus) window.requestAnimationFrame(() => helpPanelOpenerRef.current?.focus());
     }, []);
-    const openExamples = useCallback((opener: HTMLButtonElement) => openHelpPanel('examples', opener), [openHelpPanel]);
+    const openExamples = useCallback((opener: HTMLButtonElement) => {
+        revealActiveTab();
+        openHelpPanel('examples', opener);
+    }, [openHelpPanel, revealActiveTab]);
     const openHelp = useCallback((opener: HTMLButtonElement) => openHelpPanel('tour', opener), [openHelpPanel]);
     const [busy, setBusy] = useState<BusyAction>('');
     const [cancelling, setCancelling] = useState(false);
