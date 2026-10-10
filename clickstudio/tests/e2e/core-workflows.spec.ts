@@ -1621,6 +1621,18 @@ test('SQL structure switches from logical flow to native AST', async ({ page }) 
     await expect(fn).toBeVisible();
     await fn.click();
     await expect(structure.locator('.ast-node-inspector')).toContainText('uniqExact');
+    await structure.locator('[data-ast-node-type="SelectWithUnionQuery"]').click();
+    await fn.press('Enter');
+    await expect(structure.locator('.ast-node-inspector')).toContainText('uniqExact');
+    await structure.getByRole('button', { name: 'Zoom in', exact: true }).click();
+    await expect(structure.getByLabel('Zoom level', { exact: true })).toHaveText('120%');
+    await flow.click();
+    await expect(structure.locator('[data-ast-node-type]')).toHaveCount(0);
+    await nativeAst.click();
+    await expect(structure.getByLabel('Zoom level', { exact: true })).toHaveText('100%');
+    await expect(structure.locator('.ast-node-inspector strong').first()).toContainText(
+        'SelectWithUnionQuery',
+    );
 });
 
 test('SQL structure loads the server analyzer tree', async ({ page }) => {
@@ -1644,6 +1656,12 @@ test('SQL structure loads the server analyzer tree', async ({ page }) => {
     const table = structure.locator('[data-query-tree-type="TABLE"]');
     await expect(table).toContainText('demo.events');
     await table.click();
+    await expect(structure.locator('.query-tree-node-inspector')).toContainText('demo.events');
+    await structure.getByRole('button', { name: 'Zoom in', exact: true }).click();
+    await expect(structure.getByLabel('Zoom level', { exact: true })).toHaveText('120%');
+    await structure.getByRole('button', { name: 'Logical flow', exact: true }).click();
+    await analyzer.click();
+    await expect(structure.getByLabel('Zoom level', { exact: true })).toHaveText('120%');
     await expect(structure.locator('.query-tree-node-inspector')).toContainText('demo.events');
 });
 
@@ -2903,3 +2921,69 @@ test('A query and its local draft recover after reload without rerunning', async
     expect(runRequests).toBe(1);
     await expect(results).toHaveCount(1);
 });
+
+for (const outcome of ['failed', 'pending'] as const) {
+    test(`Analyzer reloads earlier SQL after a ${outcome} request replaces its tree`, async ({
+        page,
+    }) => {
+        const firstSql = 'SELECT count() FROM demo.events';
+        const secondSql = 'SELECT sum(value) FROM demo.events';
+        let firstRequests = 0;
+        let secondRequested = false;
+        let pendingFinished = false;
+        let releasePending: (() => void) | undefined;
+        await page.route('**/api/connections/demo/query-tree', async route => {
+            const body = route.request().postDataJSON() as { sql: string };
+            if (body.sql === secondSql) {
+                secondRequested = true;
+                if (outcome === 'failed') {
+                    await route.fulfill({
+                        status: 400,
+                        json: { error: { code: 'QUERY_TREE', message: 'Forced analyzer failure' } },
+                    });
+                    return;
+                }
+                await new Promise<void>(resolve => {
+                    releasePending = resolve;
+                });
+                await route
+                    .fulfill({
+                        json: ['QUERY id: 0', '  TABLE id: 1, table_name: stale.events'],
+                    })
+                    .catch(() => {});
+                pendingFinished = true;
+                return;
+            }
+            if (body.sql === firstSql) firstRequests++;
+            await route.fulfill({
+                json: ['QUERY id: 0', '  TABLE id: 1, table_name: demo.events'],
+            });
+        });
+        try {
+            await trust(page);
+            await replaceSql(page, firstSql);
+            await runButton(page).click();
+            await page.getByRole('tab', { name: 'SQL map', exact: true }).click();
+            const structure = page.locator('.sql-flow-view');
+            await structure.getByRole('button', { name: 'Analyzer', exact: true }).click();
+            const table = structure.locator('[data-query-tree-type="TABLE"]');
+            await expect(table).toContainText('demo.events');
+            await replaceSql(page, secondSql);
+            await expect.poll(() => secondRequested).toBe(true);
+            if (outcome === 'failed')
+                await expect(structure.getByRole('alert')).toContainText('Forced analyzer failure');
+            else
+                await expect(structure.locator('.analyzer-tree-view')).toContainText(
+                    'Loading ClickHouse analyzer',
+                );
+            await replaceSql(page, firstSql);
+            await expect(table).toContainText('demo.events');
+            expect(firstRequests).toBeGreaterThanOrEqual(2);
+            releasePending?.();
+            if (outcome === 'pending') await expect.poll(() => pendingFinished).toBe(true);
+            await expect(table).toContainText('demo.events');
+        } finally {
+            releasePending?.();
+        }
+    });
+}

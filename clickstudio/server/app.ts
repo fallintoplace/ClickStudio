@@ -387,6 +387,7 @@ function configureHttp(
         }
         next();
     });
+    app.post('/api/imports/preview', express.json({ limit: MAX_IMPORT_SOURCE_CHARS * 6 + 1024 }));
     app.use(express.json({ limit: '3mb' }));
     app.use('/api', telemetry);
     app.get('/api/health', (_req, res) =>

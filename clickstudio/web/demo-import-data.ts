@@ -1,12 +1,5 @@
-import {
-    IMPORT_FILE_SIZE_LABEL,
-    IMPORT_ROW_LIMIT_LABEL,
-    MAX_IMPORT_FILE_BYTES,
-    MAX_IMPORT_ROWS,
-    MAX_IMPORT_COLUMNS,
-    MAX_IMPORT_COLUMN_NAME_CHARS,
-    type ImportFormat,
-} from '../shared/import-limits.js';
+import { ImportParseError, parseImportSource } from '../shared/import-parser.js';
+import { IMPORT_ROW_LIMIT_LABEL, type ImportFormat } from '../shared/import-limits.js';
 import type { Json } from '../shared/types.js';
 
 export type DemoImportFormat = ImportFormat;
@@ -32,117 +25,19 @@ const demoColumns: DemoImportColumn[] = [
     { name: 'revenue', type: 'Decimal(18, 2)' },
 ];
 
-function parseCsv(source: string) {
-    const input = source.replace(/^\uFEFF/, ''),
-        records: string[][] = [];
-    let row: string[] = [],
-        field = '',
-        quoted = false,
-        afterQuote = false;
-    const pushField = () => {
-        row.push(field);
-        field = '';
-        afterQuote = false;
-    };
-    const pushRow = () => {
-        pushField();
-        records.push(row);
-        row = [];
-        if (records.length > MAX_IMPORT_ROWS + 1)
-            throw new Error(`Imports are limited to ${IMPORT_ROW_LIMIT_LABEL} rows`);
-    };
-    for (let i = 0; i < input.length; i++) {
-        const ch = input[i]!;
-        if (quoted) {
-            if (ch === '"' && input[i + 1] === '"') {
-                field += '"';
-                i++;
-            } else if (ch === '"') {
-                quoted = false;
-                afterQuote = true;
-            } else field += ch;
-        } else if (ch === ',') pushField();
-        else if (ch === '\n' || ch === '\r') {
-            if (ch === '\r' && input[i + 1] === '\n') i++;
-            pushRow();
-        } else if (ch === '"') {
-            if (field !== '' || afterQuote) throw new Error('Quote in an unquoted field');
-            quoted = true;
-        } else {
-            if (afterQuote) throw new Error('Unexpected character after a closing quote');
-            field += ch;
-        }
-    }
-    if (quoted) throw new Error('Unclosed quoted CSV field');
-    if (field !== '' || row.length || afterQuote) pushRow();
-    const columns = records.shift() ?? [];
-    if (
-        !columns.length ||
-        columns.length > MAX_IMPORT_COLUMNS ||
-        columns.some(column => !column.trim() || column.length > MAX_IMPORT_COLUMN_NAME_CHARS)
-    )
-        throw new Error(`CSV needs 1–${MAX_IMPORT_COLUMNS} nonempty column names`);
-    if (new Set(columns).size !== columns.length) throw new Error('Duplicate CSV column names');
-    const rows = records.map((values, index) => {
-        if (values.length !== columns.length)
-            throw new Error(`CSV row ${index + 2} has the wrong number of fields`);
-        const result = Object.create(null) as DemoImportRow;
-        columns.forEach((column, columnIndex) => {
-            result[column] = values[columnIndex]!;
-        });
-        return result;
-    });
-    return { columns, rows };
-}
-
-function validateJson(value: unknown, depth = 0): Json {
-    if (depth > 30) throw new Error('JSON nesting is too deep');
-    if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
-    if (typeof value === 'number') {
-        if (!Number.isFinite(value) || (Number.isInteger(value) && !Number.isSafeInteger(value)))
-            throw new Error('Encode 64-bit integers as JSON strings to avoid precision loss');
-        return value;
-    }
-    if (Array.isArray(value)) return value.map(item => validateJson(item, depth + 1));
-    if (typeof value !== 'object') throw new Error('Unsupported JSON value');
-    const result = Object.create(null) as Record<string, Json>;
-    for (const [key, item] of Object.entries(value)) result[key] = validateJson(item, depth + 1);
-    return result;
-}
-
 export function parseImportFile(source: string, format: DemoImportFormat) {
-    if (new TextEncoder().encode(source).byteLength > MAX_IMPORT_FILE_BYTES)
-        throw new Error(`Import previews are limited to ${IMPORT_FILE_SIZE_LABEL}`);
-    if (format === 'csv') return parseCsv(source);
-    let parsed: unknown;
     try {
-        parsed =
-            format === 'ndjson'
-                ? source
-                      .split(/\r?\n/)
-                      .filter(line => line.trim())
-                      .map(line => JSON.parse(line))
-                : JSON.parse(source);
-    } catch {
-        throw new Error('The uploaded JSON is invalid');
+        return parseImportSource(source, format);
+    } catch (error) {
+        if (error instanceof ImportParseError)
+            throw new Error(
+                error.code === 'IMPORT_ROW_LIMIT'
+                    ? `Imports are limited to ${IMPORT_ROW_LIMIT_LABEL} rows`
+                    : error.message,
+                { cause: error },
+            );
+        throw error;
     }
-    if (!Array.isArray(parsed) || parsed.length === 0 || parsed.length > MAX_IMPORT_ROWS)
-        throw new Error(`Upload an array of 1–${IMPORT_ROW_LIMIT_LABEL} JSON objects`);
-    const columns = new Set<string>();
-    const rows = parsed.map(value => {
-        const row = validateJson(value);
-        if (row === null || Array.isArray(row) || typeof row !== 'object')
-            throw new Error('Every JSON row must be an object');
-        for (const key of Object.keys(row)) {
-            if (!key || key.length > MAX_IMPORT_COLUMN_NAME_CHARS)
-                throw new Error('Invalid JSON field name');
-            columns.add(key);
-        }
-        return row;
-    });
-    if (columns.size === 0 || columns.size > MAX_IMPORT_COLUMNS)
-        throw new Error(`Import previews support 1–${MAX_IMPORT_COLUMNS} columns`);
-    return { columns: [...columns], rows };
 }
 
 export const parseDemoImport = parseImportFile;

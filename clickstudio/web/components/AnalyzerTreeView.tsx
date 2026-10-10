@@ -42,6 +42,7 @@ export function AnalyzerTreeView({
     useEffect(() => {
         if (!active || !available || !sql.trim() || loadedKey.current === requestKey) return;
         const controller = new AbortController();
+        loadedKey.current = undefined;
         setState({ key: requestKey, loading: true });
         void api<string[]>('/connections/' + encodeURIComponent(connectionId) + '/query-tree', {
             method: 'POST',

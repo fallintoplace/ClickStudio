@@ -1,3 +1,4 @@
+import { ImportParseError, validateImportJson } from '../shared/import-parser.js';
 import { RUN_KINDS } from '../shared/run-types.js';
 import { MAX_SQL_CHARS } from '../shared/query-limits.js';
 import {
@@ -153,21 +154,11 @@ export function runRequest(value: unknown): RunRequest {
     };
 }
 export function validateJson(value: unknown, depth = 0): Json {
-    if (depth > 30) throw new AppError(400, 'INVALID_JSON', 'JSON nesting is too deep');
-    if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
-    if (typeof value === 'number') {
-        requireThat(
-            Number.isFinite(value) && (!Number.isInteger(value) || Number.isSafeInteger(value)),
-            400,
-            'UNSAFE_NUMBER',
-            'Encode 64-bit integers as JSON strings to avoid precision loss',
-        );
-        return value;
+    try {
+        return validateImportJson(value, depth);
+    } catch (error) {
+        if (error instanceof ImportParseError)
+            throw new AppError(error.status, error.code, error.message);
+        throw error;
     }
-    if (Array.isArray(value)) return value.map(v => validateJson(v, depth + 1));
-    const out: {
-        [key: string]: Json;
-    } = Object.create(null);
-    for (const [key, v] of Object.entries(record(value))) out[key] = validateJson(v, depth + 1);
-    return out;
 }

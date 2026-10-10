@@ -1,25 +1,18 @@
-import type { ImportJobStatus } from '../shared/import-status.js';
 import {
-    IMPORT_FILE_SIZE_LABEL,
-    IMPORT_ROW_LIMIT_LABEL,
-    MAX_IMPORT_FILE_BYTES,
-    MAX_IMPORT_ROWS,
-    MAX_IMPORT_COLUMNS,
-    MAX_IMPORT_COLUMN_NAME_CHARS,
-    type ImportFormat,
-} from '../shared/import-limits.js';
+    ImportParseError,
+    parseCsv as parseImportCsv,
+    parseImportSource,
+} from '../shared/import-parser.js';
+import type { ImportJobStatus } from '../shared/import-status.js';
+import { MAX_IMPORT_ROWS, type ImportFormat } from '../shared/import-limits.js';
 import { randomUUID } from 'node:crypto';
 import type { Json, Principal, Schema, SchemaColumn } from '../shared/types.js';
 import { quoteIdentifier } from '../shared/sql.js';
 import { AppError, requireThat, asError } from './errors.js';
 import { canWrite, mustOwn } from './guards.js';
 import { hash, audit, type Store } from './store.js';
-import { validateJson } from './validation.js';
 import { ImportMappingError, mapImportRows } from './import-mapping.js';
 
-function isJsonObject(value: Json): value is Record<string, Json> {
-    return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
 export interface InputPreview {
     id: string;
     owner: string;
@@ -30,161 +23,24 @@ export interface InputPreview {
     createdAt: string;
     expiresAt: string;
 }
-/** RFC 4180-style CSV parser. Quoted newlines and escaped quotes are not split. */
-export function parseCsv(
-    source: string,
-    maxRows = MAX_IMPORT_ROWS,
-): {
-    columns: string[];
-    rows: Record<string, Json>[];
-} {
-    const input = source.replace(/^\uFEFF/, ''),
-        records: string[][] = [];
-    let row: string[] = [],
-        field = '',
-        quoted = false,
-        afterQuote = false;
-    const pushField = () => {
-        row.push(field);
-        field = '';
-        afterQuote = false;
-    };
-    const pushRow = () => {
-        pushField();
-        records.push(row);
-        row = [];
-        requireThat(
-            records.length <= maxRows + 1,
-            413,
-            'IMPORT_ROW_LIMIT',
-            `Imports are limited to ${maxRows} rows`,
-        );
-    };
-    for (let i = 0; i < input.length; i++) {
-        const ch = input[i]!;
-        if (quoted) {
-            if (ch === '"' && input[i + 1] === '"') {
-                field += '"';
-                i++;
-            } else if (ch === '"') {
-                quoted = false;
-                afterQuote = true;
-            } else field += ch;
-        } else if (ch === ',') pushField();
-        else if (ch === '\n' || ch === '\r') {
-            if (ch === '\r' && input[i + 1] === '\n') i++;
-            pushRow();
-        } else if (ch === '"') {
-            requireThat(
-                field === '' && !afterQuote,
-                400,
-                'INVALID_CSV',
-                'Quote in an unquoted field',
-            );
-            quoted = true;
-        } else {
-            requireThat(
-                !afterQuote,
-                400,
-                'INVALID_CSV',
-                'Unexpected character after a closing quote',
-            );
-            field += ch;
-        }
-    }
-    requireThat(!quoted, 400, 'INVALID_CSV', 'Unclosed quoted CSV field');
-    if (field !== '' || row.length || afterQuote) pushRow();
-    const columns = records.shift() ?? [];
-    requireThat(
-        columns.length > 0 &&
-            columns.length <= MAX_IMPORT_COLUMNS &&
-            columns.every(c => c.trim().length > 0 && c.length <= MAX_IMPORT_COLUMN_NAME_CHARS),
-        400,
-        'INVALID_HEADERS',
-        `CSV needs 1–${MAX_IMPORT_COLUMNS} nonempty column names`,
-    );
-    requireThat(
-        new Set(columns).size === columns.length,
-        400,
-        'DUPLICATE_HEADERS',
-        'Duplicate CSV column names',
-    );
-    const rows = records.map((record, index) => {
-        requireThat(
-            record.length === columns.length,
-            400,
-            'CSV_WIDTH',
-            `CSV row ${index + 2} has the wrong number of fields`,
-        );
-        const parsed: Record<string, Json> = Object.create(null) as Record<string, Json>;
-        for (const [columnIndex, column] of columns.entries()) {
-            const field = record[columnIndex];
-            requireThat(
-                field !== undefined,
-                400,
-                'CSV_WIDTH',
-                `CSV row ${index + 2} has the wrong number of fields`,
-            );
-            parsed[column] = field;
-        }
-        return parsed;
-    });
-    return { columns, rows };
-}
-export function parseInput(source: string, format: InputPreview['format']) {
-    requireThat(
-        Buffer.byteLength(source) <= MAX_IMPORT_FILE_BYTES,
-        413,
-        'IMPORT_BYTE_LIMIT',
-        `Import previews are limited to ${IMPORT_FILE_SIZE_LABEL}`,
-    );
-    if (format === 'csv') return parseCsv(source);
-    let parsed: unknown;
+function parsedImport<T>(parse: () => T): T {
     try {
-        parsed =
-            format === 'ndjson'
-                ? source
-                      .split(/\r?\n/)
-                      .filter(l => l.trim())
-                      .map(l => JSON.parse(l))
-                : JSON.parse(source);
-    } catch {
-        throw new AppError(400, 'INVALID_JSON', 'The uploaded JSON is invalid');
+        return parse();
+    } catch (error) {
+        if (error instanceof ImportParseError)
+            throw new AppError(error.status, error.code, error.message);
+        throw error;
     }
-    requireThat(
-        Array.isArray(parsed) && parsed.length > 0 && parsed.length <= MAX_IMPORT_ROWS,
-        400,
-        'IMPORT_ROWS',
-        `Upload an array of 1–${IMPORT_ROW_LIMIT_LABEL} JSON objects`,
-    );
-    const columns = new Set<string>();
-    const rows = parsed.map(value => {
-        const validated = validateJson(value);
-        requireThat(
-            isJsonObject(validated),
-            400,
-            'IMPORT_OBJECT',
-            'Every JSON row must be an object',
-        );
-        for (const key of Object.keys(validated)) {
-            requireThat(
-                key.length > 0 && key.length <= MAX_IMPORT_COLUMN_NAME_CHARS,
-                400,
-                'INVALID_HEADERS',
-                'Invalid JSON field name',
-            );
-            columns.add(key);
-        }
-        return validated;
-    });
-    requireThat(
-        columns.size > 0 && columns.size <= MAX_IMPORT_COLUMNS,
-        400,
-        'IMPORT_COLUMNS',
-        `Import previews support 1–${MAX_IMPORT_COLUMNS} columns`,
-    );
-    return { columns: [...columns], rows };
 }
+
+export function parseCsv(source: string, maxRows = MAX_IMPORT_ROWS) {
+    return parsedImport(() => parseImportCsv(source, maxRows));
+}
+
+export function parseInput(source: string, format: InputPreview['format']) {
+    return parsedImport(() => parseImportSource(source, format));
+}
+
 export interface ImportJob {
     id: string;
     owner: string;

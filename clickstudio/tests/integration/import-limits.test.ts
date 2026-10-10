@@ -106,3 +106,106 @@ test('Import mapping still rejects duplicate destinations below the column limit
         { code: 'IMPORT_MAPPING' },
     );
 });
+
+const errorCases = [
+    ['csv', 'a,a\n1,2', 'DUPLICATE_HEADERS', 'Duplicate CSV column names'],
+    ['csv', 'a,b\n1', 'CSV_WIDTH', 'CSV row 2 has the wrong number of fields'],
+    ['csv', 'a\n"oops', 'INVALID_CSV', 'Unclosed quoted CSV field'],
+    ['csv', 'a\n"value"tail', 'INVALID_CSV', 'Unexpected character after a closing quote'],
+    ['csv', 'a\nval"ue', 'INVALID_CSV', 'Quote in an unquoted field'],
+    ['json', '{', 'INVALID_JSON', 'The uploaded JSON is invalid'],
+    ['json', '[]', 'IMPORT_ROWS', 'Upload an array of 1–10,000 JSON objects'],
+    ['ndjson', '\n \n', 'IMPORT_ROWS', 'Upload an array of 1–10,000 JSON objects'],
+    ['json', '[null]', 'IMPORT_OBJECT', 'Every JSON row must be an object'],
+    ['json', '[{}]', 'IMPORT_COLUMNS', 'Import previews support 1–200 columns'],
+    ['json', '[{"":1}]', 'INVALID_HEADERS', 'Invalid JSON field name'],
+    [
+        'json',
+        '[{"":9007199254740992}]',
+        'UNSAFE_NUMBER',
+        'Encode 64-bit integers as JSON strings to avoid precision loss',
+    ],
+] as const;
+
+for (const [format, source, code, message] of errorCases) {
+    test(`${format} parsing preserves the ${code} error contract`, () => {
+        assert.throws(() => parseInput(source, format), { status: 400, code, message });
+        assert.throws(
+            () => parseImportFile(source, format),
+            error => {
+                assert.ok(error instanceof Error);
+                assert.equal(error.message, message);
+                assert.equal('status' in error, false);
+                assert.equal('code' in error, false);
+                return true;
+            },
+        );
+    });
+}
+
+test('CSV row limits preserve custom server limits and distinct overflow messages', async () => {
+    const { parseCsv } = await import('../../core/imports.js');
+    assert.equal(parseCsv('a\n', 0).rows.length, 0);
+    assert.equal(parseCsv('a\n1', 1).rows.length, 1);
+    assert.throws(() => parseCsv('a\n1\n2', 1), {
+        status: 413,
+        code: 'IMPORT_ROW_LIMIT',
+        message: 'Imports are limited to 1 rows',
+    });
+    const source = 'a\n' + '1\n'.repeat(10001);
+    assert.throws(() => parseInput(source, 'csv'), {
+        status: 413,
+        code: 'IMPORT_ROW_LIMIT',
+        message: 'Imports are limited to 10000 rows',
+    });
+    assert.throws(() => parseImportFile(source, 'csv'), {
+        message: 'Imports are limited to 10,000 rows',
+    });
+});
+
+test('Header-only CSV remains valid at the parser boundary', () => {
+    for (const parse of Object.values(parsers))
+        assert.deepEqual(parse('a,b\n', 'csv'), { columns: ['a', 'b'], rows: [] });
+});
+
+for (const format of ['json', 'ndjson'] as const) {
+    test(`${format} parsing retains sparse rows, key order and null prototypes recursively`, () => {
+        const rows = ['{"z":1,"__proto__":{"constructor":{"safe":true}}}', '{"later":2}'];
+        const source = format === 'json' ? `[${rows.join(',')}]` : rows.join('\n');
+        for (const parse of Object.values(parsers)) {
+            const result = parse(source, format);
+            assert.deepEqual(result.columns, ['z', '__proto__', 'later']);
+            assert.equal(Object.hasOwn(result.rows[1]!, 'z'), false);
+            const row = result.rows[0]!;
+            assert.equal(Object.getPrototypeOf(row), null);
+            assert.equal(Object.getPrototypeOf(row.__proto__), null);
+            assert.equal(
+                Object.getPrototypeOf((row.__proto__ as Record<string, unknown>).constructor),
+                null,
+            );
+        }
+    });
+
+    test(`${format} parsing keeps the nesting depth boundary`, () => {
+        function source(depth: number) {
+            let value: unknown = 'leaf';
+            for (let index = 0; index < depth; index++) value = { child: value };
+            const row = JSON.stringify({ payload: value });
+            return format === 'json' ? `[${row}]` : row;
+        }
+        for (const parse of Object.values(parsers)) {
+            assert.equal(parse(source(29), format).rows.length, 1);
+            assert.throws(() => parse(source(30), format), { message: 'JSON nesting is too deep' });
+        }
+    });
+}
+
+test('Exported JSON validation preserves structured errors for unsupported values', async () => {
+    const { validateJson } = await import('../../core/validation.js');
+    for (const value of [undefined, Symbol('value'), () => undefined, 1n])
+        assert.throws(() => validateJson(value), {
+            status: 400,
+            code: 'INVALID_REQUEST',
+            message: 'request must be an object',
+        });
+});

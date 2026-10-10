@@ -1022,3 +1022,39 @@ test('Recoverable import endpoints expose only owned unresolved jobs and keep am
         [],
     );
 });
+
+for (const [name, source, valueLength] of [
+    ['quotes', 'a\n"' + '""'.repeat(999998) + '"', 999998],
+    ['controls', 'a\n' + '\u0000'.repeat(1999998), 1999998],
+] as const) {
+    test(`Import previews accept 2 MB CSV files with JSON-escaped ${name}`, async t => {
+        const app = await start();
+        t.after(() => app.stop());
+        assert.equal(Buffer.byteLength(source), 2000000);
+        const request = { name: `${name}.csv`, source, format: 'csv' };
+        assert.ok(Buffer.byteLength(JSON.stringify(request)) > 3 * 1024 * 1024);
+        const response = await app.call('/imports/preview', request);
+        assert.equal(response.status, 201);
+        const preview = await response.json();
+        assert.deepEqual(preview.columns, ['a']);
+        assert.equal(preview.rowCount, 1);
+        assert.equal(preview.rows[0].a.length, valueLength);
+    });
+}
+
+test('Import preview transport keeps the source byte limit and other JSON body limits', async t => {
+    const app = await start();
+    t.after(() => app.stop());
+    const source = 'a\n' + 'é'.repeat(999999) + 'a';
+    assert.equal(Buffer.byteLength(source), 2000001);
+    const preview = await app.call('/imports/preview', {
+        name: 'oversized.csv',
+        source,
+        format: 'csv',
+    });
+    assert.equal(preview.status, 413);
+    assert.equal((await preview.json()).error.code, 'IMPORT_BYTE_LIMIT');
+    const other = await app.call('/assistant/sql', { source: 'a'.repeat(3 * 1024 * 1024) });
+    assert.equal(other.status, 413);
+    assert.equal((await other.json()).error.message, 'request entity too large');
+});
