@@ -1,7 +1,7 @@
 import { THEMES, ACCENT_CHOICES, EXPERIENCE_LEVELS, type AccentChoice } from './appearance-types';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, message, post } from './api';
-import { Button, cx, Icon } from './components/ui';
+import { Button, cx, Icon, Spinner } from './components/ui';
 import { CloudConnectionDialog } from './components/CloudConnectionDialog';
 import {
     CLICKHOUSE_CLOUD_CONNECTION_ID,
@@ -281,7 +281,7 @@ function App() {
                         </>
                     ) : (
                         <div className="splash-status">
-                            <span className="loading-orbit" />
+                            <Spinner />
                             <p>{copy.auth.opening}</p>
                         </div>
                     )}

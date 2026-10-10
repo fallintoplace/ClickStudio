@@ -1,4 +1,4 @@
-import { Button, cx, Icon } from './ui';
+import { Button, cx, Icon, Spinner } from './ui';
 import { ObjectDetails } from './ObjectExplorerDetails';
 import type { ObjectExplorerProps } from './objects/object-explorer-types';
 import { useObjectExplorerState } from './objects/useObjectExplorerState';
@@ -163,7 +163,7 @@ export function ObjectExplorer(props: ObjectExplorerProps) {
                     )}
                     {schemaLoading && (
                         <div className="inspector-empty">
-                            <span className="loading-orbit" />
+                            <Spinner />
                             <p>{copy.readingSchema}</p>
                         </div>
                     )}

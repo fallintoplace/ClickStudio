@@ -8,7 +8,7 @@ import {
     type SavedCloudConnectionProfile,
 } from '../cloud-connection';
 import type { Connected } from '../workspace-types';
-import { Button, Icon } from './ui';
+import { Button, Icon, Spinner } from './ui';
 import { OverlayPortal } from './OverlayPortal';
 
 export function CloudConnectionDialog({
@@ -205,8 +205,7 @@ export function CloudConnectionDialog({
                             <Button variant="primary" type="submit" disabled={busy}>
                                 {busy ? (
                                     <>
-                                        <span className="loading-orbit" aria-hidden="true" />{' '}
-                                        Connecting…
+                                        <Spinner size={12} /> Connecting…
                                     </>
                                 ) : (
                                     'Connect service'

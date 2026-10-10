@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import { displayValue, filterRows } from '../../shared/results';
 import type { ResultPage, Run } from '../../shared/types';
 import { ScrollEdgeFrame } from './ScrollEdgeShadows';
-import { Button, cx, Icon, terminal } from './ui';
+import { Button, cx, Icon, Spinner, terminal } from './ui';
 import { statementOutcome } from '../statement-outcome';
 
 type ResultTypeGroup = 'number' | 'text' | 'temporal' | 'boolean' | 'complex' | 'other';
@@ -236,11 +236,7 @@ export function ResultGrid({
     if (run.resultState !== 'reopenable')
         return (
             <div className="result-empty-state">
-                {terminal(run) ? (
-                    <span className="empty-result-icon">!</span>
-                ) : (
-                    <span className="loading-orbit" />
-                )}
+                {terminal(run) ? <span className="empty-result-icon">!</span> : <Spinner />}
                 <strong>{terminal(run) ? 'No retained result' : 'Query is running'}</strong>
                 <p>
                     {terminal(run)
@@ -252,7 +248,7 @@ export function ResultGrid({
     if (loading || !page)
         return (
             <div className="result-loading">
-                <span className="loading-orbit" />
+                <Spinner />
                 <span>Loading retained rows…</span>
             </div>
         );

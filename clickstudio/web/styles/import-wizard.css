@@ -58,6 +58,11 @@
   border-color: var(--line);
   background: var(--page);
 }
+.import-loading-state {
+  display: flex;
+  justify-content: center;
+  padding: 16px;
+}
 .import-file-picker:focus-within {
   border-color: var(--focus-color);
   box-shadow: var(--focus-ring);

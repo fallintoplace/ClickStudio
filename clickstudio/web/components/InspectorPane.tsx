@@ -17,7 +17,7 @@ import type {
 } from '../../shared/types';
 import type { AssistantChat, AssistantChatTurn } from '../assistant-chat-state';
 import { AssistantWorkflow } from './AssistantWorkflow';
-import { Button, cx, formatBytes, Icon, inspectorLabel, Status } from './ui';
+import { Button, cx, formatBytes, Icon, inspectorLabel, Spinner, Status } from './ui';
 import type { Connected, ImportedTableTarget, Inspector } from '../workspace-types';
 import type { NativeParseSnapshot, NativeParserStatus } from '../../shared/native-parser';
 import { NativeParserInspector } from './NativeParserInspector';
@@ -583,7 +583,7 @@ function renderRevisionHistory({
             )}
             {revisionLoading && !revisions.length && (
                 <div className="inspector-empty">
-                    <span className="loading-orbit" />
+                    <Spinner />
                     <p>Loading saved versions…</p>
                 </div>
             )}

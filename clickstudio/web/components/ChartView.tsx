@@ -7,6 +7,7 @@ import { prepareChartSelection } from './chart/chart-selection';
 import { prepareChartView } from './chart/chart-view-model';
 import { renderCandlestickChart } from './chart/candlestick-chart-view';
 import { createChartSvgRenderer } from './chart/chart-svg-renderer';
+import { Spinner } from './ui';
 import { renderChartWorkspace } from './chart/chart-workspace';
 
 export function ChartView({
@@ -29,7 +30,7 @@ export function ChartView({
     if (loading || !result)
         return (
             <div className="result-loading">
-                <span className="loading-orbit" />
+                <Spinner />
                 <span>{chartCopy.preparing}</span>
             </div>
         );

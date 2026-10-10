@@ -475,8 +475,6 @@
     padding-top: 2px;
   }
   .cloud-connect-actions .loading-orbit {
-    width: 12px;
-    height: 12px;
     vertical-align: middle;
   }
   @media (max-width: 520px) {

@@ -1,6 +1,6 @@
 import type { NativeParseSnapshot, NativeParserStatus } from '../../shared/native-parser';
 import { nativeHighlightRanges } from '../../shared/native-parser';
-import { Button, cx, Icon } from './ui';
+import { Button, cx, Icon, Spinner } from './ui';
 
 type Props = {
     enabled: boolean;
@@ -84,7 +84,7 @@ export function NativeParserInspector({ enabled, status, snapshot, onRetry }: Pr
             )}
             {enabled && status === 'loading' && (
                 <div className="inspector-empty">
-                    <span className="loading-orbit" />
+                    <Spinner />
                     <strong>Loading parser</strong>
                     <p>SQL stays available while the native parser starts.</p>
                 </div>

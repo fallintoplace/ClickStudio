@@ -147,7 +147,6 @@ export function ImportWizard({ onImportQuery, importCopy, ...controllerProps }: 
                             <ImportWizardNotice
                                 {...{
                                     browserDemoImport,
-                                    browserCloudImport,
                                     error,
                                     recoveryState,
                                     errorAlertRef,

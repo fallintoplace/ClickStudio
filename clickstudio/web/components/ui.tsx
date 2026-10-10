@@ -358,6 +358,26 @@ export function Icon({ name, className = '' }: { name: IconName; className?: str
     );
 }
 
+export function Spinner({
+    size = 20,
+    label,
+    className = '',
+}: {
+    size?: 12 | 14 | 16 | 20;
+    label?: string;
+    className?: string;
+}) {
+    return (
+        <span
+            className={cx('loading-orbit', className)}
+            data-size={size}
+            role={label ? 'status' : undefined}
+            aria-label={label}
+            aria-hidden={label ? undefined : true}
+        />
+    );
+}
+
 export function Button({
     variant = 'secondary',
     className = '',

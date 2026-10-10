@@ -8,6 +8,7 @@
 @import "./styles/help-storage.css";
 @import "tailwindcss";
 @import "./styles/foundation.css";
+@import "./styles/spinner.css";
 @import "./styles/app-chrome.css";
 @import "./styles/editor.css";
 @import "./styles/results-core.css";

@@ -15,7 +15,7 @@ import { ExplainIndexesView } from './ExplainIndexesView';
 import { ExplainPlanView } from './ExplainPlanView';
 import { PipelineGraph } from './PipelineGraph';
 import { SqlFlowView } from './SqlFlowView';
-import { Button, cx, Icon } from './ui';
+import { Button, cx, Icon, Spinner } from './ui';
 import { ScriptResults } from './WorkspaceChrome';
 import { ScrollEdgeFrame } from './ScrollEdgeShadows';
 import { QueryFailureNotice } from './QueryFailureNotice';
@@ -216,7 +216,7 @@ export function WorkspaceResultsPanel({
                                 aria-busy="true"
                             >
                                 <div className="result-execution-heading">
-                                    <span className="loading-orbit" aria-hidden="true" />
+                                    <Spinner size={16} />
                                     <span role="status" aria-live="polite">
                                         {copy.common.statusRunning}
                                     </span>

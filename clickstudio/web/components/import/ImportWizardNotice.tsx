@@ -1,8 +1,8 @@
 import { useImportWizardController } from '../useImportWizardController';
+import { Spinner } from '../ui';
 
 export function ImportWizardNotice({
     browserDemoImport,
-    browserCloudImport,
     error,
     recoveryState,
     errorAlertRef,
@@ -11,7 +11,6 @@ export function ImportWizardNotice({
     step,
 }: {
     browserDemoImport: boolean;
-    browserCloudImport: boolean;
     error: string;
     recoveryState: ReturnType<typeof useImportWizardController>['recoveryState'];
     errorAlertRef: import('react').RefObject<HTMLParagraphElement | null>;
@@ -35,19 +34,6 @@ export function ImportWizardNotice({
                     </span>
                 </div>
             )}
-            {browserCloudImport && (
-                <div
-                    role="status"
-                    className="import-permission-note mb-4 flex items-start gap-3 rounded-xl border border-[var(--accent)]/25 bg-[var(--accent)]/5 p-3 text-xs leading-relaxed text-[var(--text-soft)]"
-                >
-                    <span className="mt-1 size-2 shrink-0 rounded-full bg-[var(--accent)]" />
-                    <span>
-                        <strong className="text-[var(--text)]">Cloud import.</strong> ClickHouse
-                        checks insert permission for an existing table and CREATE TABLE permission
-                        for a new table.
-                    </span>
-                </div>
-            )}
             {error && recoveryState !== 'failed' && (
                 <p
                     ref={errorAlertRef}
@@ -59,11 +45,8 @@ export function ImportWizardNotice({
                 </p>
             )}
             {recoveryState === 'checking' && (
-                <div
-                    role="status"
-                    className="rounded-xl border border-[var(--line)] bg-[var(--page)] p-4 text-sm text-[var(--text-soft)]"
-                >
-                    Checking for imports that need review before allowing another write…
+                <div className="import-loading-state">
+                    <Spinner label="Loading import" />
                 </div>
             )}
             {recoveryState === 'failed' && (
@@ -86,19 +69,13 @@ export function ImportWizardNotice({
                 </div>
             )}
             {recoveryState === 'ready' && busy === 'setup' && (
-                <div
-                    role="status"
-                    className="rounded-xl border border-[var(--line)] bg-[var(--page)] p-4 text-sm text-[var(--text-soft)]"
-                >
-                    Loading destination tables…
+                <div className="import-loading-state">
+                    <Spinner label="Loading destination tables" />
                 </div>
             )}
             {recoveryState === 'ready' && busy === 'recover' && step === 'status' && (
-                <div
-                    role="status"
-                    className="mb-4 rounded-xl border border-[var(--line)] bg-[var(--page)] p-3 text-xs text-[var(--text-soft)]"
-                >
-                    Checking the saved import status…
+                <div className="import-loading-state">
+                    <Spinner label="Checking import status" />
                 </div>
             )}
         </>

@@ -554,6 +554,8 @@ test('A running query shows its submitted SQL and keeps previous rows until it e
         await expect(progress).toBeVisible();
         await expect(progress).toContainText(submittedSql);
         await expect(progress.locator('.loading-orbit')).toBeVisible();
+        await expect(progress.locator('.loading-orbit')).toHaveCSS('width', '16px');
+        await expect(progress.locator('.loading-orbit')).toHaveAttribute('aria-hidden', 'true');
         await expect(progress).toContainText('Previous result');
         await expect(table).toContainText('2026-01-01');
         await expect(results.locator('.table-pagination, .result-pagination')).toHaveCount(0);
@@ -2561,6 +2563,9 @@ test('Ask AI shows a stop action while a response is in progress', async ({ page
 
         const stop = page.getByRole('button', { name: 'Stop assistant response', exact: true });
         await expect(stop).toBeVisible();
+        const spinner = page.locator('.assistant-pending .loading-orbit');
+        await expect(spinner).toHaveCSS('width', '14px');
+        await expect(spinner).toHaveAttribute('aria-hidden', 'true');
         await stop.click();
         await expect(page.locator('.assistant-turn-error')).toHaveText('Request cancelled.');
         await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeDisabled();

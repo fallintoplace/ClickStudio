@@ -626,10 +626,6 @@
     gap: 8px;
     font-size: 10px;
   }
-  .result-execution-heading .loading-orbit {
-    width: 16px;
-    height: 16px;
-  }
   .result-execution-heading [role="status"] {
     color: var(--text);
     font-weight: 680;

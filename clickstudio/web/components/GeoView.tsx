@@ -21,6 +21,7 @@ import { geoHueForValue } from '../geo-color';
 import type { Column, Result } from '../../shared/types';
 import type { Locale } from '../i18n';
 import { ScrollEdgeFrame } from './ScrollEdgeShadows';
+import { Spinner } from './ui';
 
 const WIDTH = 960;
 const HEIGHT = 470;
@@ -550,7 +551,7 @@ export function GeoView({
     if (loading || !result)
         return (
             <div className="result-loading">
-                <span className="loading-orbit" />
+                <Spinner />
                 <span>Preparing spatial result…</span>
             </div>
         );

@@ -16,7 +16,7 @@ import type { Proposal, ProposalAlternative } from '../../shared/types';
 import type { AssistantChat, AssistantChatTurn } from '../assistant-chat-state';
 import { AssistantChatHistory } from './AssistantChatHistory';
 import { ScrollEdgeFrame } from './ScrollEdgeShadows';
-import { Button, cx, Icon } from './ui';
+import { Button, cx, Icon, Spinner } from './ui';
 
 export type AssistantWorkflowProps = {
     mode: ExperienceLevel;
@@ -518,7 +518,7 @@ function AssistantOutput({
     if (turn.status === 'pending')
         return (
             <div className="assistant-pending" role="status">
-                <span className="loading-orbit" />
+                <Spinner size={14} />
                 Thinking…
             </div>
         );

@@ -15,7 +15,7 @@ import {
 } from '../reference-provider';
 import type { Connected } from '../workspace-types';
 import type { Copy } from '../i18n';
-import { Button, cx, Icon } from './ui';
+import { Button, cx, Icon, Spinner } from './ui';
 
 type ReferenceTarget = { name: string; type: string };
 const REFERENCE_PAGE_SIZE = 100;
@@ -364,7 +364,7 @@ export function ReferenceExplorer({
                             )}
                             {loading && (
                                 <div className="inspector-empty">
-                                    <span className="loading-orbit" />
+                                    <Spinner />
                                     <p>{copy.loading}</p>
                                 </div>
                             )}
@@ -630,7 +630,7 @@ function renderReferenceDetail({
             </button>
             {entryLoading && (
                 <div className="inspector-empty">
-                    <span className="loading-orbit" />
+                    <Spinner />
                     <p>{copy.loading}</p>
                 </div>
             )}
