@@ -1,5 +1,5 @@
 .workspace-content {
-  padding: 2px;
+  padding: 0 2px;
   gap: 0;
 }
 .workspace-content.has-panel-split {
