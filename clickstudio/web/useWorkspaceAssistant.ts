@@ -4,7 +4,7 @@ import { parseAssistantProposal } from '../shared/assistant-proposal';
 import type { AssistantConversationMessage, Result, Schema } from '../shared/types';
 import { isFrontendDemoPreview, message, post } from './api';
 import { useAssistantChats } from './useAssistantChats';
-import type { AssistantChatTurn } from './assistant-chat-state';
+import { pendingEditorProposal, type AssistantChatTurn } from './assistant-chat-state';
 import { checkpoint, type Draft, type WorkspaceState } from './workspace-state';
 
 function boundedAssistantResult(result?: Result): Result | undefined {
@@ -349,6 +349,7 @@ export function useWorkspaceAssistant({
         const now = new Date().toISOString();
         const turn: AssistantChatTurn = {
             id: turnId,
+            draftId,
             question,
             contextSql: active.sql,
             includeRun: requestIncludesRun,
@@ -499,7 +500,13 @@ export function useWorkspaceAssistant({
             !turn ||
             !proposal ||
             proposal.decision !== 'pending' ||
-            (decision === 'accepted' && proposal.baseSql !== active.sql)
+            proposal.connectionId !== connectionId ||
+            (decision === 'accepted' &&
+                (proposal.baseSql !== active.sql ||
+                    (turn.draftId !== undefined && turn.draftId !== active.id) ||
+                    proposal.quality?.status === 'fail' ||
+                    proposal.action === 'explain' ||
+                    proposal.action === 'review'))
         )
             return;
         if (activeRequestRef.current)
@@ -537,7 +544,7 @@ export function useWorkspaceAssistant({
                 setWorkspace(current => ({
                     ...current,
                     tabs: current.tabs.map(draft =>
-                        draft.id === draftId
+                        draft.id === draftId && draft.sql === proposal.baseSql
                             ? {
                                   ...checkpoint(draft, 'Before accepted AI proposal'),
                                   sql: reviewedSql,
@@ -559,6 +566,7 @@ export function useWorkspaceAssistant({
         assistantQuestion,
         changeAssistantQuestion,
         assistantTurns: activeChat.turns,
+        editorProposal: pendingEditorProposal(activeChat.turns, active.id, connectionId),
         assistantChats,
         activeAssistantChatId: activeChat.id,
         assistantChatStorageError,

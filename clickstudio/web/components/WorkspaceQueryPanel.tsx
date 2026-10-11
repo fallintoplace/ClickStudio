@@ -1,4 +1,4 @@
-import { useRef, type RefObject } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 import type { RunKind, Schema } from '../../shared/types';
 import type { NativeParseSnapshot, NativeParserStatus } from '../../shared/native-parser';
 import type { SqlParameter } from '../../shared/sql';
@@ -20,6 +20,9 @@ import { Button, cx, Icon } from './ui';
 import { RunActionGroup } from './WorkspaceChrome';
 import { WorkspaceInlineNotice } from './WorkspaceInlineNotice';
 import type { WorkspaceFeedback } from '../useWorkspaceNotifications';
+import type { pendingEditorProposal } from '../assistant-chat-state';
+import type { ProposalDecisionAction } from '../../shared/assistant-types';
+import { SqlProposalReview } from './SqlProposalReview';
 
 export type WorkspaceQueryPanelState = Readonly<{
     active: Draft;
@@ -39,10 +42,14 @@ export type WorkspaceQueryPanelState = Readonly<{
     executionPending: boolean;
     cancelling: boolean;
     draftFeedback?: WorkspaceFeedback;
+    editorProposal?: ReturnType<typeof pendingEditorProposal>;
+    proposalBusy?: boolean;
+    proposalError?: string;
 }>;
 
 export type WorkspaceQueryPanelActions = Readonly<{
     onPatch: (values: Partial<Draft>) => void;
+    onDecideProposal: (turnId: string, decision: ProposalDecisionAction) => Promise<void>;
     onOpenAssistant: () => void;
     onSave: (draft?: Draft) => Promise<void>;
     onFormat: (formatter: WorkspaceFormatter) => Promise<void>;
@@ -89,7 +96,16 @@ export function WorkspaceQueryPanel({
         parameters,
         busy,
         demoMode,
+        editorProposal,
     } = state;
+    const proposalId = editorProposal?.id;
+    const openedReview = useRef<string | undefined>(undefined);
+    const { revealPanelTemporarily } = panels;
+    useEffect(() => {
+        if (proposalId && openedReview.current !== proposalId)
+            revealPanelTemporarily('query', active.id);
+        openedReview.current = proposalId;
+    }, [proposalId, active.id, revealPanelTemporarily]);
     const { statementCount, editorErrorContext, editorErrorRange } = viewState;
     const selectedSql =
         active.to > active.from ? active.sql.slice(active.from, active.to) : undefined;
@@ -98,6 +114,7 @@ export function WorkspaceQueryPanel({
     const statementsToRun = safeStatementCount(sqlToRun);
     const runRequiresScript = statementsToRun !== undefined && statementsToRun > 1;
     const runDisabled =
+        Boolean(state.editorProposal) ||
         !trusted ||
         Boolean(busy) ||
         unsupportedParameters ||
@@ -144,7 +161,7 @@ export function WorkspaceQueryPanel({
             aria-keyshortcuts="Control+S Meta+S"
             title={`${copy.common.save} (Ctrl/Cmd+S)`}
             onClick={() => void actions.onSave(active)}
-            disabled={Boolean(busy) || !active.name.trim()}
+            disabled={Boolean(state.editorProposal) || Boolean(busy) || !active.name.trim()}
         >
             <Icon name="documents" />
             {copy.common.save}
@@ -221,7 +238,7 @@ export function WorkspaceQueryPanel({
                                     </Button>
                                 </div>
                             )}
-                        <div className="editor-frame">
+                        <div className="editor-frame" hidden={Boolean(state.editorProposal)}>
                             <SqlEditor
                                 key={active.id}
                                 ref={editorRef}
@@ -240,6 +257,18 @@ export function WorkspaceQueryPanel({
                                 onNativeParseSnapshot={actions.onNativeParseSnapshot}
                             />
                         </div>
+                        {editorProposal && (
+                            <SqlProposalReview
+                                proposal={editorProposal.proposal}
+                                currentSql={active.sql}
+                                dark={dark}
+                                busy={state.proposalBusy ?? false}
+                                error={state.proposalError ?? ''}
+                                onDecide={decision =>
+                                    actions.onDecideProposal(editorProposal.id, decision)
+                                }
+                            />
+                        )}
                         {unsupportedParameters ? (
                             <div className="callout mt-3" role="status">
                                 {connection.manifest?.parameters.reason ??
@@ -312,6 +341,7 @@ export function WorkspaceQueryPanel({
                                             id: 'explain',
                                             label: copy.common.explain,
                                             disabled:
+                                                Boolean(state.editorProposal) ||
                                                 !trusted ||
                                                 Boolean(busy) ||
                                                 unsupportedParameters ||
@@ -326,6 +356,7 @@ export function WorkspaceQueryPanel({
                                             id: 'explain-plan',
                                             label: copy.common.explainPlan,
                                             disabled:
+                                                Boolean(state.editorProposal) ||
                                                 !trusted ||
                                                 Boolean(busy) ||
                                                 unsupportedParameters ||
@@ -344,6 +375,7 @@ export function WorkspaceQueryPanel({
                                             id: 'explain-pipeline',
                                             label: copy.common.explainPipeline,
                                             disabled:
+                                                Boolean(state.editorProposal) ||
                                                 !trusted ||
                                                 Boolean(busy) ||
                                                 unsupportedParameters ||
@@ -362,6 +394,7 @@ export function WorkspaceQueryPanel({
                                             id: 'explain-analyze',
                                             label: copy.common.explainAnalyze,
                                             disabled:
+                                                Boolean(state.editorProposal) ||
                                                 !trusted ||
                                                 Boolean(busy) ||
                                                 unsupportedParameters ||
@@ -498,6 +531,7 @@ function renderQueryHeading({
                     data-testid="format-sql"
                     aria-label={copy.common.formatSql}
                     title={copy.common.formatSql}
+                    disabled={Boolean(state.editorProposal)}
                     onClick={() => void actions.onFormat(standardFormatter)}
                 >
                     {copy.common.format}

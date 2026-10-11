@@ -100,7 +100,9 @@ test('Trust, saving, and script completion stay quiet', async ({ page }) => {
     await expect(page.locator('.tab-unsaved')).toHaveCount(1);
     await replaceSql(page, 'SELECT 1; SELECT 2');
     await runButton(page).click();
-    await expect(page.locator('.script-results-summary')).toContainText('succeeded');
+    await expect(
+        page.getByRole('button', { name: 'Statement 2: succeeded', exact: true }),
+    ).toBeVisible();
     await expect(page.locator('.toast')).toHaveCount(0);
 });
 

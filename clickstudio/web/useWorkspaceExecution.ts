@@ -24,6 +24,7 @@ type WorkspaceExecutionOptions = {
     active: Draft;
     connection: Connected;
     trusted: boolean;
+    reviewingSql: boolean;
     experience: ExperienceLevel;
     demoMode: boolean;
     locale: Locale;
@@ -86,6 +87,7 @@ export function useWorkspaceExecution({
     active,
     connection,
     trusted,
+    reviewingSql,
     experience,
     locale,
     copy,
@@ -257,6 +259,7 @@ export function useWorkspaceExecution({
     };
 
     const execute = (kind: RunKind = 'query', sqlOverride?: string) => {
+        if (reviewingSql) return Promise.resolve();
         const editorSnapshot = editor.current?.snapshot() ?? {
             sql: active.sql,
             from: active.from,

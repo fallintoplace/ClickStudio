@@ -574,6 +574,48 @@
     overflow: auto;
     background: var(--page-raised);
   }
+  .editor-frame[hidden] {
+    display: none;
+  }
+  .sql-proposal-review {
+    --sql-diff-added: #21bf96;
+    --sql-diff-removed: #ff654f;
+    --sql-diff-added-background: #103d35;
+    --sql-diff-removed-background: #4f2722;
+
+    display: flex;
+    min-width: 0;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  :root[data-theme="click-light"] .sql-proposal-review {
+    --sql-diff-added-background: #ccfff0;
+    --sql-diff-removed-background: #ffe7e2;
+  }
+  .sql-proposal-review .sql-review-editor {
+    height: 0;
+    min-height: 0;
+    flex: 1;
+    overflow: hidden;
+  }
+  .sql-review-actions {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 7px 12px;
+    border-top: 1px solid var(--line);
+    background: var(--panel);
+  }
+  .sql-review-error {
+    flex: none;
+    padding: 7px 12px;
+    color: var(--red);
+    font-size: 11px;
+  }
   .sql-editor {
     position: relative;
     min-width: 0;

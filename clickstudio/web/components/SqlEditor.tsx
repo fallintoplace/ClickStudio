@@ -65,7 +65,7 @@ import {
 } from './editor-tools';
 import { clickHouseNativeParser } from '../clickhouse-native-parser';
 import { ScrollEdgeFrame } from './ScrollEdgeShadows';
-const sqlHighlightStyle = HighlightStyle.define([
+export const sqlHighlightStyle = HighlightStyle.define([
     { tag: tags.keyword, color: 'var(--editor-keyword)', fontWeight: '600' },
     { tag: tags.number, color: 'var(--editor-number)' },
     { tag: [tags.bool, tags.null], color: 'var(--editor-literal)' },
@@ -76,11 +76,39 @@ const sqlHighlightStyle = HighlightStyle.define([
     { tag: tags.typeName, color: 'var(--editor-type)' },
     { tag: [tags.operator, tags.punctuation], color: 'var(--text-soft)' },
 ]);
+export const sqlEditorTheme = (dark: boolean) =>
+    EditorView.theme(
+        {
+            '&': { height: '100%', backgroundColor: 'var(--panel)', color: 'var(--text)' },
+            '.cm-scroller': {
+                fontFamily: 'var(--font-mono)',
+                fontSize: '13px',
+                lineHeight: '1.55',
+                fontVariantLigatures: 'none',
+                fontVariantNumeric: 'tabular-nums',
+            },
+            '.cm-gutters': {
+                backgroundColor: 'var(--panel)',
+                color: 'var(--muted)',
+                border: 'none',
+                fontFamily: 'var(--font-mono)',
+                fontVariantNumeric: 'tabular-nums',
+            },
+            '.cm-content': { minHeight: '220px' },
+            '.cm-activeLine': { backgroundColor: 'var(--editor-active-line)' },
+            '.cm-activeLineGutter': { backgroundColor: 'var(--editor-active-gutter)' },
+            '.cm-cursor': { borderLeftColor: 'var(--text)' },
+            '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': {
+                backgroundColor: 'var(--editor-selection)',
+            },
+        },
+        { dark },
+    );
 const keywordCompletions = [...new Set(CLICKHOUSE_KEYWORDS.split(' '))].map(label => ({
     label,
     type: 'keyword',
 }));
-const clickhouse = SQLDialect.define({
+export const clickhouse = SQLDialect.define({
     keywords: CLICKHOUSE_KEYWORDS.toLowerCase().replace(/\bnull\b/g, ''),
     types: 'String Bool UInt8 UInt16 UInt32 UInt64 UInt128 UInt256 Int8 Int16 Int32 Int64 Int128 Int256 Float32 Float64 Date Date32 DateTime DateTime64 Nullable Array Tuple Map Decimal LowCardinality UUID JSON'.toLowerCase(),
     builtin:
@@ -406,34 +434,7 @@ export const SqlEditor = forwardRef<EditorHandle, SqlEditorProps>(function SqlEd
     const invalidateNativeValidation = useCallback(() => {
         validationRevision.current++;
     }, []);
-    const themeExtension = () =>
-        EditorView.theme(
-            {
-                '&': { height: '100%', backgroundColor: 'var(--panel)', color: 'var(--text)' },
-                '.cm-scroller': {
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: '13px',
-                    lineHeight: '1.55',
-                    fontVariantLigatures: 'none',
-                    fontVariantNumeric: 'tabular-nums',
-                },
-                '.cm-gutters': {
-                    backgroundColor: 'var(--panel)',
-                    color: 'var(--muted)',
-                    border: 'none',
-                    fontFamily: 'var(--font-mono)',
-                    fontVariantNumeric: 'tabular-nums',
-                },
-                '.cm-content': { minHeight: '220px' },
-                '.cm-activeLine': { backgroundColor: 'var(--editor-active-line)' },
-                '.cm-activeLineGutter': { backgroundColor: 'var(--editor-active-gutter)' },
-                '.cm-cursor': { borderLeftColor: 'var(--text)' },
-                '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': {
-                    backgroundColor: 'var(--editor-selection)',
-                },
-            },
-            { dark: current.current.dark },
-        );
+    const themeExtension = () => sqlEditorTheme(current.current.dark);
     useEffect(() => {
         if (!element.current) return;
         const p = current.current;

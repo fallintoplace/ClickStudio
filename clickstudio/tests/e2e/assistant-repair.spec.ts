@@ -115,7 +115,9 @@ for (const mode of ['beginner', 'expert'])
                 exact: true,
             })
             .click();
-        await expect(page.locator('.cm-content')).toHaveText(repairedSql);
+        await expect(page.getByRole('textbox', { name: 'SQL editor', exact: true })).toHaveText(
+            repairedSql,
+        );
         await page.getByTestId('run-button').click();
         await expect(page.locator('.execution-bar')).toHaveAttribute(
             'data-run-status',

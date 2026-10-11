@@ -703,25 +703,8 @@
     display: flex;
     min-width: 0;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-end;
     gap: 10px;
-  }
-  .script-results-summary {
-    display: flex;
-    min-width: 0;
-    align-items: baseline;
-    gap: 8px;
-  }
-  .script-results-heading strong {
-    color: var(--text-soft);
-    font-size: 9px;
-    font-weight: 650;
-    text-transform: capitalize;
-  }
-  .script-results-heading i {
-    padding: 0 3px;
-    color: var(--muted);
-    font-style: normal;
   }
   .script-results-heading .button-base {
     min-height: 24px;

@@ -291,6 +291,7 @@ export function useWorkspaceController({
         editor,
         nativeParserEnabled,
         nativeParserStatus,
+        Boolean(assistant.editorProposal),
     );
 
     const evidence = useRunEvidence({
@@ -321,6 +322,7 @@ export function useWorkspaceController({
 
     const executionView = useWorkspaceExecutionView({
         active,
+        reviewingSql: Boolean(assistant.editorProposal),
         connection,
         savingDraftIds,
         script,
@@ -361,6 +363,7 @@ export function useWorkspaceController({
 
     const saveDraft = useWorkspaceDocumentSave({
         active,
+        reviewingSql: Boolean(assistant.editorProposal),
         busy,
         connectionId: connection.id,
         workspaceRef,
@@ -462,7 +465,6 @@ export function useWorkspaceController({
         if (next === 'profile') void perform(loadProfile, 'save');
         if (next === 'pipeline') void perform(loadPipeline, 'save');
     };
-    const inspectorDocked = drawerOpen;
 
     const trustConnection = () =>
         perform(
@@ -536,7 +538,7 @@ export function useWorkspaceController({
         scriptFollowRef,
         scriptReadFeedback,
         update,
-        inspectorDocked,
+        inspectorDocked: drawerOpen,
         storageError,
         workspace,
         savingDraftIds,
@@ -905,6 +907,7 @@ function createRevisionRestorer({
 
 function useWorkspaceExecutionView({
     active,
+    reviewingSql,
     connection,
     savingDraftIds,
     script,
@@ -934,6 +937,7 @@ function useWorkspaceExecutionView({
     ui,
 }: {
     active: ReturnType<typeof useWorkspaceTabs>['active'];
+    reviewingSql: boolean;
     connection: WorkspaceProps['connection'];
     savingDraftIds: Record<string, boolean>;
     script: Script | undefined;
@@ -1045,6 +1049,7 @@ function useWorkspaceExecutionView({
         addDraft,
     } = useWorkspaceExecution({
         active,
+        reviewingSql,
         connection,
         trusted,
         experience,

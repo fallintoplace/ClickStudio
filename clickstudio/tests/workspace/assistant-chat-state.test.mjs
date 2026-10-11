@@ -4,12 +4,148 @@ import {
     assistantChatsStorageKey,
     createAssistantChatState,
     loadAssistantChatState,
+    pendingEditorProposal,
     recoverAssistantChatState,
+    supersededSqlProposalTurns,
 } from '../../.workspace-build/web/assistant-chat-state.js';
 
 test('Assistant chat storage is scoped to each connection', () => {
     assert.notEqual(assistantChatsStorageKey('local/one'), assistantChatsStorageKey('local/two'));
     assert.match(assistantChatsStorageKey('local/one'), /local%2Fone/);
+});
+
+function sqlTurn(overrides = {}) {
+    return {
+        id: 'turn',
+        draftId: 'draft',
+        question: 'Update this query',
+        contextSql: 'SELECT 1',
+        includeRun: false,
+        status: 'complete',
+        proposal: {
+            id: 'proposal',
+            owner: 'local-owner',
+            connectionId: 'demo',
+            action: 'ask',
+            createdAt: '2026-10-11T00:00:00.000Z',
+            baseSql: 'SELECT 1',
+            responseId: 'response',
+            model: 'fixture',
+            promptVersion: 'test',
+            contextSummary: [],
+            decision: 'pending',
+            sql: 'SELECT 2',
+            summary: 'Updated query',
+            assumptions: [],
+            tables: [],
+            caveats: [],
+            clarification: null,
+            findings: [],
+        },
+        ...overrides,
+    };
+}
+
+test('A newer SQL proposal supersedes older run actions regardless of its decision or SQL text', () => {
+    const first = sqlTurn();
+    for (const decision of ['pending', 'accepted', 'rejected']) {
+        const later = sqlTurn({
+            id: 'later',
+            proposal: { ...first.proposal, decision },
+        });
+        assert.deepEqual(supersededSqlProposalTurns([first, later]), new Set(['turn']));
+    }
+    const third = sqlTurn({ id: 'third' });
+    assert.deepEqual(
+        supersededSqlProposalTurns([first, sqlTurn({ id: 'later' }), third]),
+        new Set(['turn', 'later']),
+    );
+});
+
+test('Answers, inspections and unfinished or failed requests do not supersede SQL proposals', () => {
+    const first = sqlTurn();
+    for (const overrides of [
+        { status: 'pending' },
+        { status: 'failed' },
+        { status: 'cancelled' },
+        { proposal: undefined },
+        { proposal: { ...first.proposal, sql: null } },
+        { proposal: { ...first.proposal, action: 'explain' } },
+        { proposal: { ...first.proposal, action: 'review' } },
+    ])
+        assert.deepEqual(
+            supersededSqlProposalTurns([first, sqlTurn({ ...overrides, id: 'later' })]),
+            new Set(),
+        );
+});
+
+test('Proposal supersession stays scoped to its query and restores from chat history', () => {
+    const state = createAssistantChatState();
+    state.chats[0].turns = [
+        sqlTurn(),
+        sqlTurn({ id: 'other', draftId: 'other-draft' }),
+        sqlTurn({ id: 'legacy', draftId: undefined }),
+        sqlTurn({ id: 'later-legacy', draftId: undefined }),
+        sqlTurn({ id: 'later' }),
+    ];
+    const turns = recoverAssistantChatState(state).chats[0].turns;
+    assert.deepEqual(supersededSqlProposalTurns(turns), new Set(['turn', 'legacy']));
+});
+
+test('Editor proposals belong to the originating query and connection', () => {
+    const turn = sqlTurn();
+    assert.equal(pendingEditorProposal([turn], 'draft', 'demo').id, 'turn');
+    assert.equal(pendingEditorProposal([turn], 'other-draft', 'demo'), undefined);
+    assert.equal(pendingEditorProposal([turn], 'draft', 'other-connection'), undefined);
+    assert.equal(
+        pendingEditorProposal([sqlTurn({ draftId: undefined })], 'draft', 'demo'),
+        undefined,
+    );
+});
+
+test('Only complete, undecided SQL changes open an editor review', () => {
+    const turn = sqlTurn();
+    for (const status of ['pending', 'failed', 'cancelled'])
+        assert.equal(pendingEditorProposal([sqlTurn({ status })], 'draft', 'demo'), undefined);
+    for (const proposal of [
+        undefined,
+        { ...turn.proposal, decision: 'accepted' },
+        { ...turn.proposal, decision: 'rejected' },
+        { ...turn.proposal, sql: null },
+        { ...turn.proposal, sql: turn.proposal.baseSql },
+        { ...turn.proposal, action: 'explain' },
+        { ...turn.proposal, action: 'review' },
+    ])
+        assert.equal(pendingEditorProposal([sqlTurn({ proposal })], 'draft', 'demo'), undefined);
+    assert.equal(
+        pendingEditorProposal(
+            [sqlTurn({ proposal: { ...turn.proposal, sql: '' } })],
+            'draft',
+            'demo',
+        ).proposal.sql,
+        '',
+    );
+});
+
+test('Older proposals do not reopen after a later answer for the same query', () => {
+    const turn = sqlTurn();
+    const later = sqlTurn({ id: 'later', proposal: { ...turn.proposal, decision: 'accepted' } });
+    const otherDraft = sqlTurn({ id: 'other', draftId: 'other-draft' });
+    assert.equal(pendingEditorProposal([turn, later, otherDraft], 'draft', 'demo'), undefined);
+    assert.equal(pendingEditorProposal([turn, otherDraft], 'draft', 'demo').id, 'turn');
+    assert.equal(
+        pendingEditorProposal([turn, sqlTurn({ status: 'pending' })], 'draft', 'demo'),
+        undefined,
+    );
+});
+
+test('Restored proposals retain query ownership without assigning legacy turns', () => {
+    const state = createAssistantChatState();
+    state.chats[0].turns = [sqlTurn(), sqlTurn({ id: 'legacy', draftId: undefined })];
+    const turns = recoverAssistantChatState(state).chats[0].turns;
+    assert.equal(turns[0].draftId, 'draft');
+    assert.equal(Object.hasOwn(turns[1], 'draftId'), false);
+    assert.equal(pendingEditorProposal(turns, 'draft', 'demo').id, 'turn');
 });
 
 test('Assistant chats restore the selected thread and keep every conversation', () => {

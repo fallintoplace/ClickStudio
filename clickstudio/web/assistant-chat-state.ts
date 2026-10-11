@@ -13,6 +13,7 @@ export interface AssistantChatRunContext {
 
 export interface AssistantChatTurn {
     id: string;
+    draftId?: string;
     question: string;
     contextSql: string;
     includeRun: boolean;
@@ -35,6 +36,47 @@ export interface AssistantChatState {
     version: 1;
     activeChatId: string;
     chats: AssistantChat[];
+}
+
+export function supersededSqlProposalTurns(turns: readonly AssistantChatTurn[]): Set<string> {
+    const latestDrafts = new Set<string | undefined>();
+    const superseded = new Set<string>();
+    for (const turn of [...turns].reverse()) {
+        const proposal = turn.proposal;
+        if (
+            turn.status !== 'complete' ||
+            !proposal ||
+            proposal.sql === null ||
+            proposal.action === 'explain' ||
+            proposal.action === 'review'
+        )
+            continue;
+        if (latestDrafts.has(turn.draftId)) superseded.add(turn.id);
+        latestDrafts.add(turn.draftId);
+    }
+    return superseded;
+}
+
+export function pendingEditorProposal(
+    turns: readonly AssistantChatTurn[],
+    draftId: string,
+    connectionId: string,
+): (AssistantChatTurn & { proposal: Proposal & { sql: string } }) | undefined {
+    const turn = [...turns].reverse().find(item => item.draftId === draftId);
+    const proposal = turn?.proposal;
+    if (
+        !turn ||
+        turn.status !== 'complete' ||
+        !proposal ||
+        proposal.connectionId !== connectionId ||
+        proposal.decision !== 'pending' ||
+        proposal.sql === null ||
+        proposal.sql === proposal.baseSql ||
+        proposal.action === 'explain' ||
+        proposal.action === 'review'
+    )
+        return undefined;
+    return { ...turn, proposal: { ...proposal, sql: proposal.sql } };
 }
 
 export const MAX_ASSISTANT_CHAT_TITLE_LENGTH = 4_000;
@@ -135,6 +177,7 @@ function recoverTurn(value: unknown): AssistantChatTurn | undefined {
     };
     return {
         id: value.id,
+        ...(typeof value.draftId === 'string' ? { draftId: value.draftId } : {}),
         question: value.question,
         contextSql: value.contextSql,
         includeRun: value.includeRun,

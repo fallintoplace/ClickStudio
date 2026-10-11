@@ -2626,7 +2626,6 @@ test('Scripts show each statement outcome and open that statement’s retained r
     await runScript(page);
 
     const results = page.getByRole('region', { name: 'Query results', exact: true });
-    await expect(results.getByLabel('Script statement results')).toContainText('partial');
     const first = results.getByRole('button', { name: 'Statement 1: succeeded', exact: true });
     const second = results.getByRole('button', { name: 'Statement 2: failed', exact: true });
     await expect(first).toBeVisible();

@@ -13,7 +13,11 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { statementOutline, type SqlOperation } from '../../shared/editor-tools';
 import type { Proposal, ProposalAlternative } from '../../shared/types';
-import type { AssistantChat, AssistantChatTurn } from '../assistant-chat-state';
+import {
+    supersededSqlProposalTurns,
+    type AssistantChat,
+    type AssistantChatTurn,
+} from '../assistant-chat-state';
 import { AssistantChatHistory } from './AssistantChatHistory';
 import { ScrollEdgeFrame } from './ScrollEdgeShadows';
 import { Button, cx, Icon, Spinner } from './ui';
@@ -21,6 +25,7 @@ import { Button, cx, Icon, Spinner } from './ui';
 export type AssistantWorkflowProps = {
     mode: ExperienceLevel;
     sql: string;
+    draftId: string;
     question: string;
     onQuestionChange: (question: string) => void;
     chats: readonly AssistantChat[];
@@ -88,6 +93,7 @@ function sqlDiffRows(changes: readonly SqlDiffChange[]): SqlDiffRow[] {
 function AssistantSqlProposalDiff({
     proposal,
     currentSql,
+    belongsToDraft,
     busy,
     mode,
     turnId,
@@ -95,6 +101,7 @@ function AssistantSqlProposalDiff({
 }: {
     proposal: Proposal;
     currentSql: string;
+    belongsToDraft: boolean;
     busy: boolean;
     mode: AssistantWorkflowProps['mode'];
     turnId: string;
@@ -121,7 +128,7 @@ function AssistantSqlProposalDiff({
         [changes],
     );
     const rows = useMemo(() => (open ? sqlDiffRows(changes) : []), [changes, open]);
-    const stale = pending && proposal.baseSql !== currentSql;
+    const stale = pending && (!belongsToDraft || proposal.baseSql !== currentSql);
     const unsafe = proposal.quality?.status === 'fail';
     const inspectOnly = proposal.action === 'review' || proposal.action === 'explain';
     let status: 'Needs review' | 'Applied' | 'Rejected';
@@ -139,7 +146,9 @@ function AssistantSqlProposalDiff({
     }
     let reviewMessage: string;
 
-    if (stale) {
+    if (!belongsToDraft) {
+        reviewMessage = 'Open the original query to apply this proposal.';
+    } else if (stale) {
         reviewMessage = 'The SQL draft changed. Ask again to review the current draft.';
     } else if (unsafe) {
         reviewMessage = 'A required check failed. This proposal can’t be applied.';
@@ -495,7 +504,9 @@ function AssistantExecutionOption({
 function AssistantOutput({
     mode,
     sql,
+    draftId,
     turn,
+    superseded,
     busy,
     onDecideProposal,
     onRunQuery,
@@ -503,7 +514,9 @@ function AssistantOutput({
 }: {
     mode: AssistantWorkflowProps['mode'];
     sql: string;
+    draftId: string;
     turn: AssistantChatTurn;
+    superseded: boolean;
     busy: boolean;
     onDecideProposal: AssistantWorkflowProps['onDecideProposal'];
     onRunQuery: (sql: string) => void;
@@ -550,6 +563,11 @@ function AssistantOutput({
             Boolean(mainOutline?.error) ||
             proposalHasNoStatements);
     const stale = proposal.decision === 'accepted' && proposalSql !== sql;
+    const proposalRunDisabled = (querySql: string) => superseded || runDisabled(querySql);
+    const runProposalQuery = (querySql: string) => {
+        if (proposal.decision === 'accepted' && !busy && !proposalRunDisabled(querySql))
+            onRunQuery(querySql);
+    };
     const sources = (proposal.sources ?? []).flatMap(source => {
         try {
             const url = new URL(source.url);
@@ -600,6 +618,11 @@ function AssistantOutput({
 
         return 'Run this query';
     };
+    const getRunQueryTitle = () => {
+        if (superseded) return 'Replaced by a newer SQL proposal.';
+        if (stale) return 'Runs the SQL saved in this older assistant proposal.';
+        return undefined;
+    };
     return (
         <div className={cx('proposal-card', beginner && 'beginner-proposal-card')}>
             <div className="proposal-heading">
@@ -635,7 +658,7 @@ function AssistantOutput({
                     />
                 </div>
             </div>
-            {stale && (
+            {stale && !superseded && (
                 <p className="assistant-stale-proposal" role="status">
                     This accepted query comes from an earlier SQL draft. Running it uses the SQL
                     shown here.
@@ -711,6 +734,7 @@ function AssistantOutput({
                         key={`${proposal.id}:${proposal.decision}`}
                         proposal={proposal}
                         currentSql={sql}
+                        belongsToDraft={turn.draftId === undefined || turn.draftId === draftId}
                         busy={busy}
                         mode={mode}
                         turnId={turn.id}
@@ -724,8 +748,8 @@ function AssistantOutput({
                                 sql={proposalSql}
                                 accepted={proposal.decision === 'accepted'}
                                 busy={busy}
-                                runDisabled={runDisabled}
-                                onRunQuery={onRunQuery}
+                                runDisabled={proposalRunDisabled}
+                                onRunQuery={runProposalQuery}
                             />
                             {alternatives.map((option, index) => (
                                 <AssistantExecutionOption
@@ -735,8 +759,8 @@ function AssistantOutput({
                                     sql={option.sql}
                                     accepted={proposal.decision === 'accepted'}
                                     busy={busy}
-                                    runDisabled={runDisabled}
-                                    onRunQuery={onRunQuery}
+                                    runDisabled={proposalRunDisabled}
+                                    onRunQuery={runProposalQuery}
                                     alternative
                                 />
                             ))}
@@ -752,13 +776,9 @@ function AssistantOutput({
                             </span>
                             <Button
                                 variant={stale ? 'secondary' : 'primary'}
-                                title={
-                                    stale
-                                        ? 'Runs the SQL saved in this older assistant proposal.'
-                                        : undefined
-                                }
-                                onClick={() => onRunQuery(proposalSql)}
-                                disabled={runDisabled(proposalSql) || busy}
+                                title={getRunQueryTitle()}
+                                onClick={() => runProposalQuery(proposalSql)}
+                                disabled={proposalRunDisabled(proposalSql) || busy}
                             >
                                 <Icon name="play" />
                                 {getRunQueryLabel()}
@@ -775,6 +795,7 @@ export function AssistantWorkflow(props: AssistantWorkflowProps) {
     const {
         mode,
         sql,
+        draftId,
         question,
         onQuestionChange,
         chats,
@@ -803,6 +824,7 @@ export function AssistantWorkflow(props: AssistantWorkflowProps) {
     } = props;
     const transcriptViewport = useRef<HTMLDivElement>(null);
     const activeChat = chats.find(chat => chat.id === activeChatId);
+    const supersededTurns = useMemo(() => supersededSqlProposalTurns(turns), [turns]);
 
     useLayoutEffect(() => {
         const viewport = transcriptViewport.current;
@@ -907,7 +929,9 @@ export function AssistantWorkflow(props: AssistantWorkflowProps) {
                                         <AssistantOutput
                                             mode={mode}
                                             sql={sql}
+                                            draftId={draftId}
                                             turn={turn}
+                                            superseded={supersededTurns.has(turn.id)}
                                             busy={busy}
                                             onDecideProposal={onDecideProposal}
                                             onRunQuery={onRunQuery}

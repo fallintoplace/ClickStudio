@@ -12,9 +12,11 @@ export function useWorkspaceSqlFormatter(
     editor: RefObject<EditorHandle | null>,
     nativeParserEnabled: boolean,
     nativeParserStatus: NativeParserStatus,
+    reviewingSql = false,
 ) {
     return useCallback(
         async (formatter: WorkspaceFormatter) => {
+            if (reviewingSql) return;
             const draftId = active.id,
                 sourceSql = active.sql;
             const applyBuiltIn = () =>
@@ -38,6 +40,14 @@ export function useWorkspaceSqlFormatter(
             const result = await editor.current?.formatNative();
             if (result === 'unavailable' || result === 'fallback') applyBuiltIn();
         },
-        [active.id, active.sql, editor, nativeParserEnabled, nativeParserStatus, setWorkspace],
+        [
+            active.id,
+            active.sql,
+            editor,
+            nativeParserEnabled,
+            nativeParserStatus,
+            setWorkspace,
+            reviewingSql,
+        ],
     );
 }

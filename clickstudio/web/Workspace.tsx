@@ -210,9 +210,13 @@ export function Workspace({
                 executionPending: Boolean(pendingExecution.execution),
                 cancelling,
                 draftFeedback: model.draftFeedback,
+                editorProposal: model.assistant.editorProposal,
+                proposalBusy: model.assistant.assistantBusy,
+                proposalError: model.assistant.assistantError,
             }}
             actions={{
                 onPatch: patch,
+                onDecideProposal: model.assistant.decideAssistantProposal,
                 onOpenAssistant: () => showInspector('assistant'),
                 onSave: saveDraft,
                 onFormat: formatActiveSql,
@@ -504,6 +508,7 @@ function createInspectorProps({
         },
         connectionId: connection.id,
         sql: active.sql,
+        draftId: active.id,
         trusted,
         onRefreshDocuments: () => void loadDocuments().catch(() => undefined),
         onRefreshRevisions: () => void loadDocumentRevisions(active.serverId),
@@ -542,7 +547,7 @@ function createInspectorProps({
             void decideAssistantProposal(turnId, decision),
         onRunQuery: sql => void execute('query', sql),
         runDisabled: sql => {
-            if (!trusted || busy) return true;
+            if (!trusted || busy || model.assistant.editorProposal) return true;
             const statementCount = safeStatementCount(sql);
             if (
                 statementCount !== undefined &&

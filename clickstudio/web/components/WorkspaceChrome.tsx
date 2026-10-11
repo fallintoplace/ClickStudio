@@ -170,15 +170,9 @@ export function ScriptResults({
             className={cx('script-results', script.status !== 'running' && 'is-settled')}
             aria-label="Script statement results"
         >
-            <div className="script-results-heading">
-                <div className="script-results-summary">
-                    <span className="eyebrow">SCRIPT EXECUTION</span>
-                    <strong>
-                        {script.statements.length} statements <i>·</i> {script.status}
-                    </strong>
-                </div>
-                {script.status === 'running' &&
-                    (script.cancelled ? (
+            {script.status === 'running' && (
+                <div className="script-results-heading">
+                    {script.cancelled ? (
                         <span className="script-cancel-status" role="status">
                             {cancelAfterCurrentStatement
                                 ? 'Stopping after this query…'
@@ -195,8 +189,9 @@ export function ScriptResults({
                                 ? 'Stop after current statement'
                                 : 'Cancel script'}
                         </Button>
-                    ))}
-            </div>
+                    )}
+                </div>
+            )}
             <div
                 className="script-statement-list"
                 role="group"

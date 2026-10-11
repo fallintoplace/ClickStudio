@@ -9,6 +9,7 @@ import type { BusyAction, Inspector } from './workspace-types';
 type SaveDraftOptions = Readonly<{
     active: Draft;
     busy: BusyAction;
+    reviewingSql: boolean;
     connectionId: string;
     workspaceRef: { current: WorkspaceState };
     inspectorRef: { current: Inspector };
@@ -29,6 +30,7 @@ type SaveDraftOptions = Readonly<{
 export function useWorkspaceDocumentSave({
     active,
     busy,
+    reviewingSql,
     connectionId,
     workspaceRef,
     inspectorRef,
@@ -66,6 +68,7 @@ export function useWorkspaceDocumentSave({
             workspaceRef.current.tabs.find(draft => draft.id === workspaceRef.current.activeId) ??
             active;
         const requested = requestedDraft ?? currentActive;
+        if (reviewingSql && requested.id === active.id) return Promise.resolve();
         const resolveDraft = () => {
             const current = workspaceRef.current.tabs.find(draft => draft.id === requested.id);
             return current

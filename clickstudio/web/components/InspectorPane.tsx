@@ -77,6 +77,7 @@ export type InspectorPaneProps = {
     onOpenGraph: () => void;
     connectionId: string;
     sql: string;
+    draftId: string;
     trusted: boolean;
     onRefreshDocuments: () => void;
     onRefreshRevisions: () => void;
@@ -176,6 +177,7 @@ export function InspectorPane({
     onOpenGraph,
     connectionId,
     sql,
+    draftId,
     trusted,
     onRefreshDocuments,
     onRefreshRevisions,
@@ -496,6 +498,7 @@ export function InspectorPane({
                     <AssistantWorkflow
                         mode={expert ? 'expert' : 'beginner'}
                         sql={sql}
+                        draftId={draftId}
                         question={assistantQuestion}
                         onQuestionChange={onAssistantQuestion}
                         chats={assistantChats}
