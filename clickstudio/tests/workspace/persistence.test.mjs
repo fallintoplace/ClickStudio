@@ -3,8 +3,11 @@ import assert from 'node:assert/strict';
 import {
     createWorkspaceWriter,
     STORAGE_ERROR,
-} from '../../.workspace-build/web/workspace-persistence.js';
-import { newDraft, recover } from '../../.workspace-build/web/workspace-state.js';
+} from '../../.workspace-build/src/frontend/workspace/editor/drafts/workspace-persistence.js';
+import {
+    newDraft,
+    recover,
+} from '../../.workspace-build/src/frontend/workspace/editor/drafts/workspace-state.js';
 
 const state = sql => {
     const draft = newDraft('Work.sql', sql);

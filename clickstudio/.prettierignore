@@ -4,7 +4,7 @@ tests/fixtures/
 .core-build/
 .workspace-build/
 vendor/
-web/vendor/
+src/frontend/common/assets/vendor/
 playwright-report/
 test-results/
 .vercel/

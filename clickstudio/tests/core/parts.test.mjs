@@ -5,7 +5,7 @@ import {
     mergeTreePartsQuery,
     parseMergeTreeParts,
     scalePartMetrics,
-} from '../../.core-build/shared/parts.js';
+} from '../../.core-build/src/shared/database/explorer/storage/parts.js';
 
 const part = (overrides = {}) => ({
     is_active: '1',

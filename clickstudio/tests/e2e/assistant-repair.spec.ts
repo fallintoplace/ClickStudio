@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
-import type { ApiError, Proposal } from '../../shared/types.js';
+import type { ApiError } from '../../src/shared/common/errors.js';
+import type { Proposal } from '../../src/shared/assistant/types.js';
 import { jsonRecord, replaceSql, trust } from './helpers.js';
 
 async function installRepair(page: Page, repairedSql: string) {

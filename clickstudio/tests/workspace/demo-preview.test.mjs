@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DemoPreviewApi } from '../../.workspace-build/web/demo-preview.js';
+import { BrowserWorkspaceApi } from '../../.workspace-build/src/frontend/common/requests/browser-workspace.js';
 
 test('Static preview scripts keep semicolons inside strings and comments', async () => {
-    const api = new DemoPreviewApi();
+    const api = new BrowserWorkspaceApi();
     const sql =
         "SELECT 'first;value' AS label;\n-- the ; here is a comment\nSELECT 2 /* and ; this is a block comment */";
     const script = await api.request('/scripts', { method: 'POST', body: { sql } });
@@ -21,7 +21,7 @@ test('Static preview scripts keep semicolons inside strings and comments', async
 });
 
 test('New offline examples reopen with fixture rows matching their result columns', async () => {
-    const api = new DemoPreviewApi();
+    const api = new BrowserWorkspaceApi();
     const documents = await api.request('/documents?connectionId=demo');
     const byId = new Map(documents.map(document => [document.id, document]));
     const cases = [
@@ -54,7 +54,7 @@ test('New offline examples reopen with fixture rows matching their result column
 });
 
 test('Sample EXPLAIN ANALYZE is retained as a fixture result and never evaluates submitted SQL', async () => {
-    const api = new DemoPreviewApi();
+    const api = new BrowserWorkspaceApi();
     const run = await api.request('/runs', {
         method: 'POST',
         body: { connectionId: 'demo', kind: 'analyze', sql: 'SELECT fixture_error()' },
@@ -66,7 +66,7 @@ test('Sample EXPLAIN ANALYZE is retained as a fixture result and never evaluates
 });
 
 test('Sample MergeTree parts are partitioned and unavailable for unknown tables', async () => {
-    const api = new DemoPreviewApi();
+    const api = new BrowserWorkspaceApi();
     const snapshot = await api.request('/connections/demo/table-parts', {
         method: 'POST',
         body: { database: 'demo', table: 'events' },
@@ -97,7 +97,7 @@ test('Sample MergeTree parts are partitioned and unavailable for unknown tables'
 });
 
 test('Static routing preserves method guards, decoded paths, and unknown-route fallbacks', async () => {
-    const api = new DemoPreviewApi();
+    const api = new BrowserWorkspaceApi();
     for (const [path, method] of [
         ['/connections/demo/trust', 'GET'],
         ['/connections/demo/table-parts', 'GET'],
@@ -126,7 +126,7 @@ test('Static routing preserves method guards, decoded paths, and unknown-route f
 });
 
 test('Static routing keeps trust and provider errors ahead of request validation', async () => {
-    const api = new DemoPreviewApi();
+    const api = new BrowserWorkspaceApi();
     await api.request('/connections/demo/trust', { method: 'POST', body: { trusted: false } });
     await assert.rejects(
         api.request('/connections/demo/native-explorer', {
@@ -162,7 +162,7 @@ test('Static routing keeps trust and provider errors ahead of request validation
 });
 
 test('Cancelled static requests stop before changing documents or connection trust', async () => {
-    const api = new DemoPreviewApi();
+    const api = new BrowserWorkspaceApi();
     await api.request('/connections/demo/trust', { method: 'POST', body: { trusted: false } });
     const before = await api.request('/documents');
     const controller = new AbortController();
@@ -185,7 +185,7 @@ test('Cancelled static requests stop before changing documents or connection tru
 });
 
 test('Static saved versions preserve revision conflicts and trash restoration', async () => {
-    const api = new DemoPreviewApi();
+    const api = new BrowserWorkspaceApi();
     const first = await api.request('/documents', {
         method: 'POST',
         body: { name: 'Versioned', sql: 'SELECT 1', connectionId: 'demo' },
@@ -232,7 +232,7 @@ test('Static saved versions preserve revision conflicts and trash restoration', 
 });
 
 test('Static import commits once and rejects duplicate or unknown mappings', async () => {
-    const api = new DemoPreviewApi();
+    const api = new BrowserWorkspaceApi();
     const preview = await api.request('/imports/preview', {
         method: 'POST',
         body: { name: 'events.csv', format: 'csv', source: 'day,events\n2026-10-10,2' },
@@ -290,7 +290,7 @@ function previewStorage(t) {
 
 test('Static preview restores saved execution and document history after invalid entries', async t => {
     const storage = previewStorage(t);
-    const api = new DemoPreviewApi();
+    const api = new BrowserWorkspaceApi();
     const run = await api.request('/runs', { method: 'POST', body: { sql: 'SELECT 7' } });
     const document = await api.request('/documents', {
         method: 'POST',
@@ -306,7 +306,7 @@ test('Static preview restores saved execution and document history after invalid
     state.documents.unshift(null, {});
     state.revisions.unshift(null, ['invalid', {}], ['invalid', [null, { revision: -1 }]]);
     storage.set(key, JSON.stringify(state));
-    const reopened = new DemoPreviewApi();
+    const reopened = new BrowserWorkspaceApi();
     assert.equal((await reopened.request(`/runs/${run.id}`)).sql, run.sql);
     assert.ok((await reopened.request(`/runs/${run.id}/result`)).rows.length);
     assert.ok(
@@ -322,7 +322,7 @@ test('Static preview restores saved execution and document history after invalid
 
 test('Static preview expires restored Playground results without losing run history', async t => {
     const storage = previewStorage(t);
-    const api = new DemoPreviewApi();
+    const api = new BrowserWorkspaceApi();
     const run = await api.request('/runs', { method: 'POST', body: { sql: 'SELECT 7' } });
     const [key, value] = [...storage.entries()][0];
     const state = JSON.parse(value);
@@ -331,7 +331,7 @@ test('Static preview expires restored Playground results without losing run hist
     storedRun.resultState = 'reopenable';
     state.results.find(item => item.runId === run.id).expiresAt = '2000-01-01T00:00:00.000Z';
     storage.set(key, JSON.stringify(state));
-    const reopened = new DemoPreviewApi();
+    const reopened = new BrowserWorkspaceApi();
     assert.equal((await reopened.request(`/runs/${run.id}`)).resultState, 'expired');
     await assert.rejects(reopened.request(`/runs/${run.id}/result`), /no longer available/);
     assert.ok(

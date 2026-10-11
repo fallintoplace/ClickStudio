@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { queryRows } from '../../api/cloud.js';
-import { connectClickHouseCloud, disconnectClickHouseCloud } from '../../web/cloud-connection.js';
+import {
+    connectClickHouseCloud,
+    disconnectClickHouseCloud,
+} from '../../src/frontend/common/requests/sources/cloud-connection.js';
 
 test('Cloud connections advertise their query budget while inspector requests keep their larger row cap', async t => {
     t.mock.method(globalThis, 'fetch', async () =>

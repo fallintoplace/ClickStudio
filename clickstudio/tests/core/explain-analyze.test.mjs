@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseExplainAnalyze } from '../../.core-build/shared/explain-analyze.js';
+import { parseExplainAnalyze } from '../../.core-build/src/frontend/workspace/queries/inspection/performance/explain-analyze.js';
 
 const output = `┌─explain────────────────────────────────────────────────────────────┐
 │ Query summary:

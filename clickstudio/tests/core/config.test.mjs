@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loadConfig, publicProfile, redactor } from '../../.core-build/server/config.js';
+import {
+    loadConfig,
+    publicProfile,
+    redactor,
+} from '../../.core-build/src/backend/system/settings/config.js';
 test('Local startup binds loopback by default', () =>
     assert.equal(loadConfig({}).host, '127.0.0.1'));
 test('Local startup includes the public ClickHouse Playground with bounded read-only defaults', () => {
@@ -139,10 +143,12 @@ test('The ClickHouse identity can write without target allowlist configuration',
     assert.deepEqual(writer, { username: 'writer', password: 'writer-pass' });
 });
 test('Demo publications remain labeled fixtures outside the workspace', async () => {
-    const { DemoDriver } = await import('../../.core-build/server/demo.js');
-    const { MemoryStore } = await import('../../.core-build/core/store.js');
-    const { RunService } = await import('../../.core-build/core/runs.js');
-    const { ArtifactService } = await import('../../.core-build/core/artifacts.js');
+    const { DemoDriver } =
+        await import('../../.core-build/src/backend/database/clickhouse/sample-client.js');
+    const { MemoryStore } = await import('../../.core-build/src/backend/system/storage/store.js');
+    const { RunService } = await import('../../.core-build/src/backend/queries/execution/runs.js');
+    const { ArtifactService } =
+        await import('../../.core-build/src/backend/queries/saved-queries/documents.js');
     const { randomUUID } = await import('node:crypto');
     const store = new MemoryStore(),
         driver = new DemoDriver(),

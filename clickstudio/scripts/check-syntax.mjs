@@ -16,7 +16,7 @@ function files(path) {
 }
 let failed = 0;
 const paths = [
-    ...['shared', 'core', 'server', 'web', 'tests', 'scripts'].flatMap(p => files(p)),
+    ...['src', 'api', 'tests', 'scripts'].flatMap(p => files(p)),
     ...readdirSync('.').filter(p => p.endsWith('.ts')),
 ];
 for (const path of paths) {

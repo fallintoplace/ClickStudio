@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseCsv, parseInput, ImportService } from '../../.core-build/core/imports.js';
+import {
+    parseCsv,
+    parseInput,
+    ImportService,
+} from '../../.core-build/src/backend/database/imports/imports.js';
 import {
     AssistantService,
     buildContext,
@@ -8,20 +12,20 @@ import {
     validateAssistantConversation,
     validateImage,
     validateProposal,
-} from '../../.core-build/core/assistant.js';
+} from '../../.core-build/src/backend/assistant/proposals/assistant.js';
 import {
     evaluateProposal,
     runAssistantBenchmarks,
-} from '../../.core-build/core/assistant-evaluation.js';
-import { selectAssistantReferenceDocs } from '../../.core-build/shared/reference-data.js';
-import { MemoryStore, hash } from '../../.core-build/core/store.js';
+} from '../../.core-build/src/backend/assistant/evaluation/evaluation.js';
+import { selectAssistantReferenceDocs } from '../../.core-build/src/shared/database/reference/catalog.js';
+import { MemoryStore, hash } from '../../.core-build/src/backend/system/storage/store.js';
 import {
     exportCsv,
     chartNumber,
     filterRows,
     sampleChartRows,
     MAX_CHART_RENDER_POINTS,
-} from '../../.core-build/shared/results.js';
+} from '../../.core-build/src/shared/queries/results/results.js';
 import { owner, other, schema } from './helpers.mjs';
 const proposal = {
     sql: 'SELECT 1',

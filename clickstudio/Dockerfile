@@ -17,4 +17,4 @@ COPY --from=build --chown=node:node /app/scripts/seed.ts ./scripts/seed.ts
 RUN mkdir -p /app/.data && chown node:node /app/.data
 USER node
 EXPOSE 8080
-CMD ["node", "dist/server/index.js"]
+CMD ["node", "dist/src/backend/app/start.js"]

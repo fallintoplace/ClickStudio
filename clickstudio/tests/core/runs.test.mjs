@@ -8,8 +8,8 @@ import {
     DEFAULT_SCRIPT_RETENTION_MS,
     RunService,
     boundResult,
-} from '../../.core-build/core/runs.js';
-import { DEFAULT_LIMITS } from '../../.core-build/shared/types.js';
+} from '../../.core-build/src/backend/queries/execution/runs.js';
+import { DEFAULT_LIMITS } from '../../.core-build/src/shared/queries/execution/settings.js';
 import { fixture, owner, other, viewer, until, columns, connection } from './helpers.mjs';
 test('Lifecycle retains typed evidence and actual identity', async () => {
     const f = fixture(),

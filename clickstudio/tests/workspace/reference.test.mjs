@@ -8,12 +8,12 @@ import {
     isMissingDocumentationSourceColumn,
     isReferenceCategory,
     referenceId,
-} from '../../.workspace-build/shared/reference.js';
+} from '../../.workspace-build/src/shared/database/reference/reference.js';
 import {
     BUNDLED_REFERENCE,
     findBundledReference,
     searchBundledReference,
-} from '../../.workspace-build/web/reference-data.js';
+} from '../../.workspace-build/src/frontend/help/reference/reference-data.js';
 
 test('Reference categories stay explicit and reject unknown URL values', () => {
     assert.deepEqual(REFERENCE_CATEGORIES, [

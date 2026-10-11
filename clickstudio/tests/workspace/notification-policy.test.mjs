@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { documentFailureNotice } from '../../.workspace-build/web/workspace-notification-policy.js';
+import { documentFailureNotice } from '../../.workspace-build/src/frontend/workspace/layout/notifications/workspace-notification-policy.js';
 
 for (const operation of ['save', 'restore']) {
     test(`${operation} rejection preserves the draft and uses a timed error`, () => {

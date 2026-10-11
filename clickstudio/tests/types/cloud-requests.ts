@@ -1,4 +1,4 @@
-import type { CloudRequest } from '../../shared/cloud-requests.js';
+import type { CloudRequest } from '../../src/shared/database/connections/cloud-requests.js';
 
 const request = (input: CloudRequest) => input;
 request({ action: 'run', sql: 'SELECT 1' });

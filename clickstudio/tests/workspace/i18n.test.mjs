@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 const { allLocales, getCopy, resolveLocale, supportedLocales, themeOptions } =
-    await import('../../.workspace-build/web/i18n.js');
+    await import('../../.workspace-build/src/frontend/common/translations/i18n.js');
 
 const nonEnglishLocales = supportedLocales.filter(locale => locale !== 'en');
 

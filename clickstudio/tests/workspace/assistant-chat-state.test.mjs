@@ -7,7 +7,7 @@ import {
     pendingEditorProposal,
     recoverAssistantChatState,
     supersededSqlProposalTurns,
-} from '../../.workspace-build/web/assistant-chat-state.js';
+} from '../../.workspace-build/src/frontend/assistant/chat/assistant-chat-state.js';
 
 test('Assistant chat storage is scoped to each connection', () => {
     assert.notEqual(assistantChatsStorageKey('local/one'), assistantChatsStorageKey('local/two'));

@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { english } from '../../.workspace-build/web/i18n-english.js';
+import { english } from '../../.workspace-build/src/frontend/common/translations/i18n-english.js';
 import {
     categoryLabel,
     chartLabel,
     exampleText,
     helpSections,
-} from '../../.workspace-build/web/components/workspace-help-model.js';
+} from '../../.workspace-build/src/frontend/help/workspace-help-model.js';
 
 const copy = english.common;
 

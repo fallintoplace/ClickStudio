@@ -1,10 +1,10 @@
 /** Deterministic LIVE SQL fixture evaluation. Not a benchmark of model quality. */
 import { randomUUID } from 'node:crypto';
 import assert from 'node:assert/strict';
-import { loadConfig } from '../server/config.js';
-import { ClickHouseDriver } from '../server/clickhouse.js';
-import { MemoryStore } from '../core/store.js';
-import { RunService } from '../core/runs.js';
+import { loadConfig } from '../src/backend/system/settings/config.js';
+import { ClickHouseDriver } from '../src/backend/database/clickhouse/client.js';
+import { MemoryStore } from '../src/backend/system/storage/store.js';
+import { RunService } from '../src/backend/queries/execution/runs.js';
 const cases = [
     {
         name: 'calendar bucketing',

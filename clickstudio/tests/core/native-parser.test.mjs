@@ -6,8 +6,11 @@ import {
     parseNativeParseResult,
     sourcePositionFromUtf8ByteOffset,
     utf8ByteOffsetToUtf16Index,
-} from '../../.core-build/shared/native-parser.js';
-import { explainPrefixLength, sqlForRunKind } from '../../.core-build/shared/explain-plan.js';
+} from '../../.core-build/src/shared/sql/parser.js';
+import {
+    explainPrefixLength,
+    sqlForRunKind,
+} from '../../.core-build/src/shared/queries/inspection/explain-plan.js';
 
 const bytes = value => new TextEncoder().encode(value).length;
 

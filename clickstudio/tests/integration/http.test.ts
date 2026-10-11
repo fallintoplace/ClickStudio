@@ -3,23 +3,22 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { randomUUID } from 'node:crypto';
-import { createApp } from '../../server/app.js';
-import { loadConfig } from '../../server/config.js';
-import { ClickHouseDriver } from '../../server/clickhouse.js';
-import { MemoryStore } from '../../core/store.js';
-import { DemoDriver } from '../../server/demo.js';
-import type { AssistantDriver } from '../../core/assistant.js';
-import type { VoiceService } from '../../server/voice.js';
-import type { ImportJob } from '../../core/imports.js';
-import type { CreateTableColumn } from '../../core/table-creation.js';
+import { createApp } from '../../src/backend/app/app.js';
+import { loadConfig } from '../../src/backend/system/settings/config.js';
+import { ClickHouseDriver } from '../../src/backend/database/clickhouse/client.js';
+import { MemoryStore } from '../../src/backend/system/storage/store.js';
+import { DemoDriver } from '../../src/backend/database/clickhouse/sample-client.js';
+import type { AssistantDriver } from '../../src/backend/assistant/proposals/assistant.js';
+import type { VoiceService } from '../../src/backend/assistant/voice/voice.js';
+import type { ImportJob } from '../../src/backend/database/imports/imports.js';
+import type { CreateTableColumn } from '../../src/backend/database/tables/create-table.js';
 import type {
     ClickHouseDocumentationEntry,
     ClickHouseDocumentationSummary,
-    QueryDocument,
-    ReferenceCategory,
-    Run,
-    Published,
-} from '../../shared/types.js';
+} from '../../src/shared/database/reference/types.js';
+import type { QueryDocument, Published } from '../../src/shared/queries/saved-queries/types.js';
+import type { ReferenceCategory } from '../../src/shared/database/reference/reference.js';
+import type { Run } from '../../src/shared/queries/execution/types.js';
 type CloudApiStub = { fetch: (request: Request) => Promise<Response> };
 async function start(
     token?: string,

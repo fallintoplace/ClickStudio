@@ -2,9 +2,12 @@ import type {} from '../assistant-cancellation-harness.js';
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
-import { useWorkspaceAssistant } from '../../../web/useWorkspaceAssistant.js';
-import { newDraft, type WorkspaceState } from '../../../web/workspace-state.js';
-import type { Schema } from '../../../shared/types.js';
+import { useWorkspaceAssistant } from '../../../src/frontend/assistant/proposals/useWorkspaceAssistant.js';
+import {
+    newDraft,
+    type WorkspaceState,
+} from '../../../src/frontend/workspace/editor/drafts/workspace-state.js';
+import type { Schema } from '../../../src/shared/database/schema/types.js';
 
 const active = newDraft('Cancellation regression', 'SELECT 1');
 const workspaceRef = {

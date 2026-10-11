@@ -4,8 +4,8 @@ import {
     CREATE_TABLE_COLUMN_TYPES,
     TableCreationService,
     createTableSql,
-} from '../../.core-build/core/table-creation.js';
-import { MemoryStore } from '../../.core-build/core/store.js';
+} from '../../.core-build/src/backend/database/tables/create-table.js';
+import { MemoryStore } from '../../.core-build/src/backend/system/storage/store.js';
 import { owner, viewer } from './helpers.mjs';
 
 const columns = [

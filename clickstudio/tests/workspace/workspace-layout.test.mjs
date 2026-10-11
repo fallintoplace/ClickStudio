@@ -9,7 +9,7 @@ import {
     normalizePanelGeometry,
     normalizeWorkspacePanelLayout,
     recoverWorkspacePanelLayout,
-} from '../../.workspace-build/web/workspace-layout.js';
+} from '../../.workspace-build/src/frontend/workspace/layout/workspace-layout.js';
 
 const viewport = { width: 1440, height: 900 };
 

@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { isResult, parseRunEvent } from '../../.core-build/shared/run-wire.js';
-import { terminal } from '../../.core-build/core/runs.js';
+import {
+    isResult,
+    parseRunEvent,
+} from '../../.core-build/src/frontend/workspace/queries/execution/events.js';
+import { terminal } from '../../.core-build/src/backend/queries/execution/runs.js';
 
 const run = {
     dataSource: 'fixture',

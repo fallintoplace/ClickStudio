@@ -1,5 +1,11 @@
 {
   "extends": "./tsconfig.core.json",
-  "compilerOptions": { "outDir": "dist" },
-  "include": ["shared", "core", "server", "api"]
+  "compilerOptions": {
+    "outDir": "dist"
+  },
+  "include": [
+    "src/backend",
+    "src/shared",
+    "api"
+  ]
 }

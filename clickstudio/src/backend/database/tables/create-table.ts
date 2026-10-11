@@ -1,0 +1,133 @@
+import { randomUUID } from 'node:crypto';
+import type { Principal } from '../../../shared/common/identity.js';
+import {
+    CREATE_TABLE_COLUMN_TYPES,
+    isValidTableDatabase,
+    type CreateTableColumn,
+} from '../../../shared/database/tables/create-table.js';
+import { quoteIdentifier, quoteStringLiteral } from '../../../shared/sql/sql.js';
+import { isSystemDatabaseName } from '../../../shared/database/tables/delete-table.js';
+import { requireThat } from '../../system/requests/errors.js';
+import { canWrite } from '../../system/login/permissions.js';
+import { audit, type Store } from '../../system/storage/store.js';
+
+export { CREATE_TABLE_COLUMN_TYPES } from '../../../shared/database/tables/create-table.js';
+export type {
+    CreateTableColumn,
+    CreateTableColumnType,
+} from '../../../shared/database/tables/create-table.js';
+
+export interface CreateTableDriver {
+    createTable(
+        connectionId: string,
+        table: string,
+        columns: CreateTableColumn[],
+        orderBy: string,
+        queryId: string,
+    ): Promise<void>;
+}
+
+export function createTableSql(
+    table: string,
+    columns: CreateTableColumn[],
+    orderBy: string,
+): string {
+    const parts = table.split('.');
+    requireThat(
+        parts.length === 2 &&
+            isValidTableDatabase(parts[0]) &&
+            /^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(parts[1]!),
+        400,
+        'TABLE_NAME',
+        'Use a database.table name with valid identifiers',
+    );
+    requireThat(
+        columns.length > 0 && columns.length <= 50,
+        400,
+        'TABLE_COLUMNS',
+        'A table needs 1–50 columns',
+    );
+    requireThat(
+        columns.every(column => /^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(column.name)),
+        400,
+        'TABLE_COLUMN_NAME',
+        'Column names must use letters, numbers, and underscores',
+    );
+    requireThat(
+        new Set(columns.map(column => column.name)).size === columns.length,
+        400,
+        'TABLE_COLUMN_DUPLICATE',
+        'Column names must be unique',
+    );
+    requireThat(
+        columns.every(column => CREATE_TABLE_COLUMN_TYPES.includes(column.type)),
+        400,
+        'TABLE_COLUMN_TYPE',
+        'Choose a supported column type',
+    );
+    requireThat(
+        columns.every(
+            column => !column.generatedId || (column.name === 'id' && column.type === 'UInt64'),
+        ),
+        400,
+        'TABLE_GENERATED_ID',
+        'Only an id UInt64 column can use generated IDs',
+    );
+    requireThat(
+        columns.some(column => column.name === orderBy),
+        400,
+        'TABLE_ORDER_BY',
+        'Choose an existing column for the sorting key',
+    );
+    const [database, name] = parts;
+    const definitions = columns.map(column => {
+        const definition = `${quoteIdentifier(column.name)} ${column.type}`;
+        return column.generatedId
+            ? `${definition} DEFAULT generateSerialID(${quoteStringLiteral(`${database}.${name}`)})`
+            : definition;
+    });
+    return `CREATE TABLE ${quoteIdentifier(database!)}.${quoteIdentifier(name!)} (\n    ${definitions.join(',\n    ')}\n) ENGINE = MergeTree ORDER BY ${quoteIdentifier(orderBy)}`;
+}
+
+export class TableCreationService {
+    constructor(
+        private readonly store: Store,
+        private readonly driver: CreateTableDriver,
+        private readonly trusted: (principal: Principal, connectionId: string) => boolean,
+    ) {}
+
+    async create(
+        principal: Principal,
+        connectionId: string,
+        database: string,
+        name: string,
+        columns: CreateTableColumn[],
+        orderBy: string,
+    ) {
+        canWrite(principal);
+        requireThat(
+            this.trusted(principal, connectionId),
+            403,
+            'WORKSPACE_UNTRUSTED',
+            'Trust the destination connection first',
+        );
+        requireThat(
+            isValidTableDatabase(database) && !isSystemDatabaseName(database),
+            400,
+            'TABLE_DATABASE',
+            'Choose a valid non-system database',
+        );
+        requireThat(
+            /^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(name),
+            400,
+            'TABLE_NAME',
+            'Use a valid table name',
+        );
+        const table = `${database}.${name}`;
+        createTableSql(table, columns, orderBy);
+        const queryId = `clickstudio-create-table-${randomUUID()}`;
+        audit(this.store, principal, 'table.create', table);
+        await this.driver.createTable(connectionId, table, columns, orderBy, queryId);
+        return { database, table: name, columns, orderBy, queryId };
+    }
+}

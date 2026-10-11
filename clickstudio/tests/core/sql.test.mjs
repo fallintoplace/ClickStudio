@@ -9,9 +9,13 @@ import {
     formatSql,
     hasSqlComments,
     hasTopLevelOutputFormat,
-} from '../../.core-build/shared/sql.js';
-import { guardSql } from '../../.core-build/core/guards.js';
-import { limits, runRequest, validateJson } from '../../.core-build/core/validation.js';
+} from '../../.core-build/src/shared/sql/sql.js';
+import { guardSql } from '../../.core-build/src/backend/queries/execution/guards.js';
+import {
+    limits,
+    runRequest,
+    validateJson,
+} from '../../.core-build/src/backend/system/requests/validation.js';
 const cases = [
     ["SELECT ';'; SELECT 2", 2],
     ["SELECT 'it\\\'s;ok'; SELECT 2", 2],

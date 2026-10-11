@@ -1,6 +1,6 @@
 # ClickStudio styles
 
-All application styles enter through `clickstudio/web/tailwind.css`. Import order is part of the cascade: native and help feature styles load first, followed by Tailwind, shared tokens, component styles, responsive rules and panel chrome. Do not import styles from React components.
+All application styles enter through `clickstudio/src/frontend/common/styles/main.css`. Import order is part of the cascade: native and help feature styles load first, followed by Tailwind, shared tokens, component styles, responsive rules and panel chrome. Do not import styles from React components.
 
 `foundation.css` owns theme palettes, typography, spacing roles, borders, shadows and shared control tokens. Components consume these variables. Component-specific light rules and breakpoints live in their owning stylesheet. `responsive.css` contains only application layout and the global reduced-motion override; `animations.css` owns shared keyframes. `controls.css` owns the shared light input, focus, invalid and placeholder states; it loads last.
 

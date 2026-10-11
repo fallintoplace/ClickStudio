@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseExplainIndexAnalysis } from '../../.core-build/shared/explain-indexes.js';
+import { parseExplainIndexAnalysis } from '../../.core-build/src/frontend/workspace/queries/inspection/plans/explain-indexes.js';
 
 const output = [
     'ReadFromMergeTree (default.uk_price_paid)',

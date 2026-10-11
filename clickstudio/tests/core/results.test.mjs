@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { heatmapCellKey, prepareHeatmap } from '../../.core-build/shared/results.js';
+import {
+    heatmapCellKey,
+    prepareHeatmap,
+} from '../../.core-build/src/shared/queries/results/results.js';
 
 test('Heatmap sums duplicate X/Y cells from retained rows', () => {
     const prepared = prepareHeatmap(

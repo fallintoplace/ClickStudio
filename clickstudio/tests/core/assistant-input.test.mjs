@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { assistantRequestFrom } from '../../.core-build/core/assistant-input.js';
-import { MAX_SQL_CHARS } from '../../.core-build/shared/query-limits.js';
+import { assistantRequestFrom } from '../../.core-build/src/backend/assistant/context/input.js';
+import { MAX_SQL_CHARS } from '../../.core-build/src/shared/queries/execution/limits.js';
 
 test('Assistant requests keep ordinary chat as the default action', () => {
     assert.deepEqual(assistantRequestFrom(undefined, undefined), { action: 'ask' });

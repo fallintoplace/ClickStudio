@@ -6,7 +6,7 @@ import {
     sqlErrorRangeInDraft,
     sqlErrorLineColumn,
     sqlErrorContext,
-} from '../../.workspace-build/web/sql-error.js';
+} from '../../.workspace-build/src/frontend/workspace/editor/sql-error.js';
 
 const error = message => ({ code: 'CLICKHOUSE_62', message });
 

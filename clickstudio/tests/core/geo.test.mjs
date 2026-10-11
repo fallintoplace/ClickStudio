@@ -5,7 +5,7 @@ import {
     normalizeGeoGeometry,
     prepareGeoFeatures,
     recommendGeo,
-} from '../../.core-build/shared/geo.js';
+} from '../../.core-build/src/frontend/workspace/results/maps/geo.js';
 
 test('Geo recommends native ClickHouse geometry before numeric coordinates', () => {
     const columns = [

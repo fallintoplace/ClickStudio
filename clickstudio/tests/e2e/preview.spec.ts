@@ -848,7 +848,9 @@ test('ClickHouse Cloud import flags invalid mappings before review and inspects 
         'default.events',
     );
     await expect(
-        page.getByText(/default\.events in Objects\. Check whether the imported rows are there\./),
+        page.getByText(
+            'Import not confirmed. Check the rows in “default.events” before importing again.',
+        ),
     ).toBeVisible();
 
     await page.getByRole('button', { name: 'Import', exact: true }).last().click();

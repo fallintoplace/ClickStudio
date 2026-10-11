@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mapImportRows } from '../../.core-build/core/import-mapping.js';
+import { mapImportRows } from '../../.core-build/src/shared/database/imports/mapping.js';
 
 function mapValue(value, type) {
     return mapImportRows([{ source: value }], ['source'], { source: 'target' }, [

@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildQueryProfile, parsePipelineResult } from '../../.core-build/shared/profile.js';
+import {
+    buildQueryProfile,
+    parsePipelineResult,
+} from '../../.core-build/src/shared/queries/inspection/profile.js';
 
 const run = {
     id: 'run-1',

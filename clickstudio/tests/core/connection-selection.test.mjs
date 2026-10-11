@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveConnectionSelection } from '../../.core-build/shared/connection-selection.js';
+import { resolveConnectionSelection } from '../../.core-build/src/frontend/database/connections/selection.js';
 
 test('A fresh local workspace selects the public Playground', () => {
     assert.equal(

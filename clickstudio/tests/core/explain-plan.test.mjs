@@ -4,7 +4,7 @@ import {
     explainPrefixLength,
     parseExplainPlan,
     sqlForRunKind,
-} from '../../.core-build/shared/explain-plan.js';
+} from '../../.core-build/src/shared/queries/inspection/explain-plan.js';
 
 const response = JSON.stringify([
     {

@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { decodeClickHouseStringValue } from '../../.core-build/shared/playground-values.js';
-import { prepareGeoFeatures, recommendGeo } from '../../.core-build/shared/geo.js';
+import { decodeClickHouseStringValue } from '../../.core-build/src/frontend/common/requests/sources/playground-values.js';
+import {
+    prepareGeoFeatures,
+    recommendGeo,
+} from '../../.core-build/src/frontend/workspace/results/maps/geo.js';
 
 const NULL_MARKER = 'ᴺᵁᴸᴸ';
 

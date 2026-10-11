@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseAssistantProposal } from '../../.workspace-build/shared/assistant-proposal.js';
+import { parseAssistantProposal } from '../../.workspace-build/src/frontend/assistant/proposals/assistant-proposal.js';
 
 function validProposal(overrides = {}) {
     return {

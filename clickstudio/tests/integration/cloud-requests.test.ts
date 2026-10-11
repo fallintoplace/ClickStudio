@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import cloudApi from '../../api/cloud.js';
-import * as cloud from '../../web/cloud-connection.js';
+import * as cloud from '../../src/frontend/common/requests/sources/cloud-connection.js';
 
 const credentials = {
     host: 'service.clickhouse.cloud:8443',

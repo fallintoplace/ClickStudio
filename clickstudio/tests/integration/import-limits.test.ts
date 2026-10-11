@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseInput } from '../../core/imports.js';
-import { mapImportRows } from '../../core/import-mapping.js';
-import { parseImportFile } from '../../web/demo-import-data.js';
-import type { ImportFormat } from '../../shared/import-limits.js';
+import { parseInput } from '../../src/backend/database/imports/imports.js';
+import { mapImportRows } from '../../src/shared/database/imports/mapping.js';
+import { parseImportFile } from '../../src/frontend/common/requests/samples/demo-import-data.js';
+import type { ImportFormat } from '../../src/shared/database/imports/limits.js';
 
 const parsers = { server: parseInput, browser: parseImportFile };
 
@@ -144,7 +144,7 @@ for (const [format, source, code, message] of errorCases) {
 }
 
 test('CSV row limits preserve custom server limits and distinct overflow messages', async () => {
-    const { parseCsv } = await import('../../core/imports.js');
+    const { parseCsv } = await import('../../src/backend/database/imports/imports.js');
     assert.equal(parseCsv('a\n', 0).rows.length, 0);
     assert.equal(parseCsv('a\n1', 1).rows.length, 1);
     assert.throws(() => parseCsv('a\n1\n2', 1), {
@@ -201,7 +201,7 @@ for (const format of ['json', 'ndjson'] as const) {
 }
 
 test('Exported JSON validation preserves structured errors for unsupported values', async () => {
-    const { validateJson } = await import('../../core/validation.js');
+    const { validateJson } = await import('../../src/backend/system/requests/validation.js');
     for (const value of [undefined, Symbol('value'), () => undefined, 1n])
         assert.throws(() => validateJson(value), {
             status: 400,

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { getEventListeners } from 'node:events';
 import test from 'node:test';
 import { setImmediate } from 'node:timers/promises';
-import { startVisiblePolling } from '../../.workspace-build/web/visible-polling.js';
+import { startVisiblePolling } from '../../.workspace-build/src/frontend/common/browser/visible-polling.js';
 
 function environment(t, initialVisibility = 'visible') {
     const previous = Object.getOwnPropertyDescriptor(globalThis, 'document');

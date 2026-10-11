@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cloudResultStreamQuery } from '../../.core-build/core/cloud-query.js';
-import { splitSql } from '../../.core-build/shared/sql.js';
+import { cloudResultStreamQuery } from '../../.core-build/src/backend/database/clickhouse/query-format.js';
+import { splitSql } from '../../.core-build/src/shared/sql/sql.js';
 
 test('Cloud result format follows a normalized SQL statement', () => {
     for (const sql of ['SELECT 1;', 'SELECT 1; -- trailing comment', "SELECT ';'"]) {

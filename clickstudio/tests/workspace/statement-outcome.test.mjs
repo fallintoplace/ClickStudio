@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { statementOutcome } from '../../.workspace-build/web/statement-outcome.js';
+import { statementOutcome } from '../../.workspace-build/src/frontend/workspace/results/statement-outcome.js';
 
 function run(sql, overrides = {}) {
     return { sql, rowCount: 0, columns: [], writtenRows: undefined, ...overrides };

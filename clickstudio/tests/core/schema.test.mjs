@@ -5,7 +5,7 @@ import {
     enrichSchemaTables,
     formatPlaygroundMetadataWarning,
     isSchema,
-} from '../../.core-build/shared/schema.js';
+} from '../../.core-build/src/shared/database/schema/schema.js';
 
 const tables = [
     { database: 'analytics', name: 'events', engine: 'MergeTree' },

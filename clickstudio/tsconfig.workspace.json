@@ -1,7 +1,10 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2022", "DOM"],
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "strict": true,
@@ -16,28 +19,28 @@
     "noEmitOnError": true
   },
   "include": [
-    "web/workspace-state.ts",
-    "web/assistant-chat-state.ts",
-    "web/workspace-layout.ts",
-    "web/workspace-persistence.ts",
-    "web/statement-outcome.ts",
-    "web/workspace-notification-policy.ts",
-    "web/sql-error.ts",
-    "web/result-provenance.ts",
-    "web/visible-polling.ts",
-    "web/demo-preview.ts",
-    "web/cloud-import.ts",
-    "web/sql-examples.ts",
-    "web/sql-examples-locales.ts",
-    "web/components/workspace-help-model.ts",
-    "web/components/chart/chart-selection.ts",
-    "web/components/chart/chart-view-model.ts",
-    "web/i18n.ts",
-    "shared/evidence.ts",
-    "shared/workspace-view.ts",
-    "shared/object-explorer.ts",
-    "shared/table-deletion.ts",
-    "shared/reference.ts",
-    "web/reference-data.ts"
+    "src/frontend/workspace/editor/drafts/workspace-state.ts",
+    "src/frontend/assistant/chat/assistant-chat-state.ts",
+    "src/frontend/workspace/layout/workspace-layout.ts",
+    "src/frontend/workspace/editor/drafts/workspace-persistence.ts",
+    "src/frontend/workspace/results/statement-outcome.ts",
+    "src/frontend/workspace/layout/notifications/workspace-notification-policy.ts",
+    "src/frontend/workspace/editor/sql-error.ts",
+    "src/frontend/workspace/results/result-provenance.ts",
+    "src/frontend/common/browser/visible-polling.ts",
+    "src/frontend/common/requests/browser-workspace.ts",
+    "src/frontend/database/imports/state/cloud-import.ts",
+    "src/frontend/help/examples/sql-examples.ts",
+    "src/frontend/help/examples/sql-examples-locales.ts",
+    "src/frontend/help/workspace-help-model.ts",
+    "src/frontend/workspace/results/charts/controls/chart-selection.ts",
+    "src/frontend/workspace/results/charts/rendering/chart-view-model.ts",
+    "src/frontend/common/translations/i18n.ts",
+    "src/frontend/workspace/queries/history/evidence.ts",
+    "src/frontend/workspace/queries/saved-queries/draft-save.ts",
+    "src/frontend/database/explorer/objects/model.ts",
+    "src/shared/database/tables/delete-table.ts",
+    "src/shared/database/reference/reference.ts",
+    "src/frontend/help/reference/reference-data.ts"
   ]
 }

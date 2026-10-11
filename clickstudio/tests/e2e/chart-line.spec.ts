@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { PNG } from 'pngjs';
 import pixelmatch from 'pixelmatch';
-import type { Result } from '../../shared/types.js';
-import { GEO_HELP_CITIES } from '../../web/help-demos.js';
+import type { Result } from '../../src/shared/queries/results/types.js';
+import { GEO_HELP_CITIES } from '../../src/frontend/help/previews/help-demos.js';
 import { runButton, trust } from './helpers.js';
 
 const cityOrder = [

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import type { Result } from '../../shared/types.js';
+import type { Result } from '../../src/shared/queries/results/types.js';
 import { runButton, trust } from './helpers.js';
 
 const eventRows = [

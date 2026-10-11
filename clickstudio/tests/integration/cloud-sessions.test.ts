@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CloudConnectionSessions, CLOUD_SESSION_COOKIE } from '../../server/cloud-sessions.js';
+import {
+    CloudConnectionSessions,
+    CLOUD_SESSION_COOKIE,
+} from '../../src/backend/database/connections/cloud-sessions.js';
 
 const credentials = {
     host: 'service.region.provider.clickhouse.cloud:8443',

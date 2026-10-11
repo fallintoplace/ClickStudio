@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cloudImportQueryLogOutcome } from '../../.core-build/shared/cloud-import-status.js';
+import { cloudImportQueryLogOutcome } from '../../.core-build/src/shared/database/imports/cloud-status.js';
 
 test('Cloud import query logs treat a finish as success', () => {
     assert.equal(

@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import type { Proposal } from '../../shared/types.js';
+import type { Proposal } from '../../src/shared/assistant/types.js';
 import { jsonRecord, replaceSql, trust } from './helpers.js';
 
 const originalSql = 'SELECT 1 AS value';

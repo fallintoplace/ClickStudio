@@ -5,7 +5,7 @@ import {
     inferCloudImportColumns,
     inferCloudImportType,
     suggestCloudTableName,
-} from '../../.workspace-build/web/cloud-import.js';
+} from '../../.workspace-build/src/frontend/database/imports/state/cloud-import.js';
 
 test('Cloud import targets include tables and exclude view engines', () => {
     const schema = {

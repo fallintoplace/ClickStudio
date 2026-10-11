@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { AddressInfo } from 'node:net';
-import { createApp } from '../../server/app.js';
-import { loadConfig } from '../../server/config.js';
-import { CLOUD_SESSION_COOKIE } from '../../server/cloud-sessions.js';
-import { MemoryStore } from '../../core/store.js';
-import { DemoDriver } from '../../server/demo.js';
+import { createApp } from '../../src/backend/app/app.js';
+import { loadConfig } from '../../src/backend/system/settings/config.js';
+import { CLOUD_SESSION_COOKIE } from '../../src/backend/database/connections/cloud-sessions.js';
+import { MemoryStore } from '../../src/backend/system/storage/store.js';
+import { DemoDriver } from '../../src/backend/database/clickhouse/sample-client.js';
 
 const credentials = {
     host: 'service.region.provider.clickhouse.cloud:8443',

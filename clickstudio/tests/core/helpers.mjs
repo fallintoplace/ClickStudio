@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { MemoryStore } from '../../.core-build/core/store.js';
-import { RunService } from '../../.core-build/core/runs.js';
-import { DEFAULT_LIMITS } from '../../.core-build/shared/types.js';
+import { MemoryStore } from '../../.core-build/src/backend/system/storage/store.js';
+import { RunService } from '../../.core-build/src/backend/queries/execution/runs.js';
+import { DEFAULT_LIMITS } from '../../.core-build/src/shared/queries/execution/settings.js';
 export const owner = { id: 'local-owner', role: 'owner' };
 export const other = { id: 'other-owner', role: 'owner' };
 export const viewer = { id: 'local-owner', role: 'viewer' };

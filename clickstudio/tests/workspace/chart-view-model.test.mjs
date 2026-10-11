@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { getCopy } from '../../.workspace-build/web/i18n.js';
-import { prepareChartSelection } from '../../.workspace-build/web/components/chart/chart-selection.js';
-import { prepareChartView } from '../../.workspace-build/web/components/chart/chart-view-model.js';
+import { getCopy } from '../../.workspace-build/src/frontend/common/translations/i18n.js';
+import { prepareChartSelection } from '../../.workspace-build/src/frontend/workspace/results/charts/controls/chart-selection.js';
+import { prepareChartView } from '../../.workspace-build/src/frontend/workspace/results/charts/rendering/chart-view-model.js';
 import {
     heatmapCellKey,
     MAX_CHART_RENDER_POINTS,
     MAX_CHART_SERIES,
-} from '../../.workspace-build/shared/results.js';
+} from '../../.workspace-build/src/shared/queries/results/results.js';
 
 function result(columns, rows) {
     return {

@@ -6,18 +6,18 @@ import {
     MAX_FLAMEGRAPH_NODES,
     MAX_FLAMEGRAPH_STACKS,
     parseFlamegraphRows,
-} from '../../.core-build/shared/flamegraph.js';
+} from '../../.core-build/src/shared/queries/inspection/flamegraph.js';
 import {
     parseReplicationSnapshot,
     replicationQueueQuery,
     replicationReplicasQuery,
-} from '../../.core-build/shared/replication.js';
+} from '../../.core-build/src/shared/database/explorer/activity/replication.js';
 import {
     WORKLOAD_WINDOWS,
     parseWorkloadSnapshot,
     workloadFamiliesQuery,
     workloadPointsQuery,
-} from '../../.core-build/shared/workload.js';
+} from '../../.core-build/src/shared/database/explorer/activity/workload.js';
 
 test('workload SQL reads only the selected user query log and keeps both result sets bounded', () => {
     for (const source of ['user_query_log', 'query_log']) {

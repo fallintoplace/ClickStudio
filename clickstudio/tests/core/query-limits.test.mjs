@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { runRequest } from '../../.core-build/core/validation.js';
+import { runRequest } from '../../.core-build/src/backend/system/requests/validation.js';
 import { fixture, owner, until } from './helpers.mjs';
 
 test('SQL validation accepts 200,000 characters even when UTF-8 requires more bytes', () => {

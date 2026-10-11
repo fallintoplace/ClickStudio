@@ -1,5 +1,5 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
-import type { Result } from '../../shared/types.js';
+import type { Result } from '../../src/shared/queries/results/types.js';
 import { runButton, trust } from './helpers.js';
 
 test.beforeEach(async ({ page }) => {

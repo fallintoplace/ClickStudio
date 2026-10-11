@@ -9,7 +9,7 @@ import {
     newDraft,
     recover,
     reopenDraft,
-} from '../../.workspace-build/web/workspace-state.js';
+} from '../../.workspace-build/src/frontend/workspace/editor/drafts/workspace-state.js';
 
 const workspace = (...tabs) => ({ version: 1, tabs, activeId: tabs[0].id });
 const read = value => ({ getItem: () => JSON.stringify(value) });

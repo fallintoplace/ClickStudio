@@ -2,7 +2,7 @@
 
 ## What the catalog contains
 
-`web/offline-reference-catalog.json` contains short text excerpts and SQL examples adapted from the ClickHouse documentation by ClickHouse contributors. Each entry links to its source page.
+`src/shared/database/reference/offline-reference-catalog.json` contains short text excerpts and SQL examples adapted from the ClickHouse documentation by ClickHouse contributors. Each entry links to its source page.
 
 The app uses this catalog as an offline reference.
 

@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
-import type { Schema } from '../../shared/types.js';
-import type { CloudConnectionTest } from '../../web/cloud-connection.js';
+import type { Schema } from '../../src/shared/database/schema/types.js';
+import type { CloudConnectionTest } from '../../src/frontend/common/requests/sources/cloud-connection.js';
 
 export const previewCloudSchema: Schema = {
     connectionId: 'clickhouse-cloud',

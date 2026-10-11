@@ -68,9 +68,8 @@ export default defineConfig([
     },
     {
         files: [
-            'core/**/*.{ts,tsx}',
-            'server/**/*.{ts,tsx}',
-            'shared/**/*.{ts,tsx}',
+            'src/backend/**/*.{ts,tsx}',
+            'src/shared/**/*.{ts,tsx}',
             'scripts/**/*.{js,mjs,cjs,ts,tsx}',
         ],
         rules: {
@@ -82,7 +81,7 @@ export default defineConfig([
         },
     },
     {
-        files: ['web/**/*.{ts,tsx}'],
+        files: ['src/frontend/**/*.{ts,tsx}'],
         plugins: {
             'react-hooks': reactHooks,
         },
@@ -97,17 +96,80 @@ export default defineConfig([
         },
     },
     {
-        files: ['web/**/*.{ts,tsx}'],
-        ignores: ['web/main.tsx'],
+        files: [
+            'src/frontend/assistant/proposals/assistant-proposal.ts',
+            'src/frontend/database/connections/selection.ts',
+            'src/frontend/workspace/editor/tools.ts',
+            'src/frontend/workspace/queries/history/evidence.ts',
+            'src/frontend/workspace/queries/inspection/performance/explain-analyze.ts',
+            'src/frontend/workspace/queries/inspection/plans/explain-indexes.ts',
+            'src/frontend/workspace/results/maps/geo.ts',
+            'src/frontend/workspace/editor/parser/ast.ts',
+            'src/frontend/database/explorer/format.ts',
+            'src/frontend/database/explorer/objects/model.ts',
+            'src/frontend/common/requests/sources/playground-values.ts',
+            'src/frontend/workspace/queries/inspection/diagrams/query-tree.ts',
+            'src/frontend/workspace/queries/history/comparison.ts',
+            'src/frontend/workspace/queries/execution/events.ts',
+            'src/frontend/common/components/tree-model.ts',
+            'src/frontend/workspace/queries/saved-queries/draft-save.ts',
+        ],
+        rules: {
+            complexity: ['error', 50],
+            'max-lines-per-function': [
+                'error',
+                { max: 300, skipBlankLines: true, skipComments: true },
+            ],
+        },
+    },
+    {
+        files: ['src/backend/**/*.{ts,tsx}'],
         rules: {
             'no-restricted-imports': [
                 'error',
                 {
                     patterns: [
                         {
+                            group: ['**/frontend/**'],
+                            message: 'Backend code can import backend and shared modules.',
+                        },
+                    ],
+                },
+            ],
+        },
+    },
+    {
+        files: ['src/shared/**/*.{ts,tsx}'],
+        rules: {
+            'no-restricted-imports': [
+                'error',
+                {
+                    patterns: [
+                        {
+                            group: ['**/frontend/**', '**/backend/**', 'node:*'],
+                            message: 'Shared code must work in both the browser and the server.',
+                        },
+                    ],
+                },
+            ],
+        },
+    },
+    {
+        files: ['src/frontend/**/*.{ts,tsx}'],
+        ignores: ['src/frontend/app/main.tsx'],
+        rules: {
+            'no-restricted-imports': [
+                'error',
+                {
+                    patterns: [
+                        {
+                            group: ['**/backend/**', 'node:*'],
+                            message: 'Frontend code can import frontend and shared modules.',
+                        },
+                        {
                             group: ['**/*.css'],
                             message:
-                                'Import application styles through web/tailwind.css to keep cascade order explicit.',
+                                'Import application styles through src/frontend/common/styles/main.css to keep cascade order explicit.',
                         },
                     ],
                 },

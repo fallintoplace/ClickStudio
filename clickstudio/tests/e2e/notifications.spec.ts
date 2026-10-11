@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { openBlankSql, openWorkspacePanel, replaceSql, runButton, trust } from './helpers.js';
-import type { Script } from '../../shared/types.js';
-import { newDraft } from '../../web/workspace-state.js';
+import type { Script } from '../../src/shared/queries/execution/types.js';
+import { newDraft } from '../../src/frontend/workspace/editor/drafts/workspace-state.js';
 
 const popout = (page: Page) =>
     page.getByRole('button', { name: 'Open editor in a separate window', exact: true });

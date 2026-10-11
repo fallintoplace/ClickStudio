@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PLAYGROUND_STARTER_SQL } from '../../.workspace-build/web/playground.js';
-import { sqlExamplesFor } from '../../.workspace-build/web/sql-examples.js';
+import { PLAYGROUND_STARTER_SQL } from '../../.workspace-build/src/frontend/common/requests/sources/playground.js';
+import { sqlExamplesFor } from '../../.workspace-build/src/frontend/help/examples/sql-examples.js';
 import {
     hasSqlExampleTranslation,
     localizeSqlExample,
-} from '../../.workspace-build/web/sql-examples-locales.js';
-import { supportedLocales } from '../../.workspace-build/web/i18n.js';
+} from '../../.workspace-build/src/frontend/help/examples/sql-examples-locales.js';
+import { supportedLocales } from '../../.workspace-build/src/frontend/common/translations/i18n.js';
 
 test('SQL example catalogs match the selected Playground or fixture source', () => {
     const playground = sqlExamplesFor({ id: 'playground', dataSource: 'clickhouse' });

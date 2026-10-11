@@ -2,10 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { createClient } from '@clickhouse/client';
-import { loadConfig } from '../../server/config.js';
-import { ClickHouseDriver } from '../../server/clickhouse.js';
-import { MemoryStore } from '../../core/store.js';
-import { RunService } from '../../core/runs.js';
+import { loadConfig } from '../../src/backend/system/settings/config.js';
+import { ClickHouseDriver } from '../../src/backend/database/clickhouse/client.js';
+import { MemoryStore } from '../../src/backend/system/storage/store.js';
+import { RunService } from '../../src/backend/queries/execution/runs.js';
 const enabled = process.env.CLICKHOUSE_INTEGRATION === '1';
 const owner = { id: 'integration-owner', role: 'owner' } as const;
 test(

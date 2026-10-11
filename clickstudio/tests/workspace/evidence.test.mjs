@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { matchesDraft, sameParameters } from '../../.workspace-build/shared/evidence.js';
+import {
+    matchesDraft,
+    sameParameters,
+} from '../../.workspace-build/src/frontend/workspace/queries/history/evidence.js';
 
 for (const [title, left, right, expected] of [
     ['Empty parameters match', {}, {}, true],

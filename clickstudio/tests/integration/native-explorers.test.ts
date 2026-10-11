@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { AddressInfo } from 'node:net';
-import { createApp } from '../../server/app.js';
-import { loadConfig } from '../../server/config.js';
-import { MemoryStore } from '../../core/store.js';
+import { createApp } from '../../src/backend/app/app.js';
+import { loadConfig } from '../../src/backend/system/settings/config.js';
+import { MemoryStore } from '../../src/backend/system/storage/store.js';
 
 test('Native explorers require trust and validate bounded, fixed request types', async t => {
     const service = createApp(loadConfig({ DEMO_MODE: 'true' }), { store: new MemoryStore() });
@@ -49,7 +49,8 @@ test(
     'LIVE ClickHouse: native metadata queries work with the configured reader',
     { skip: process.env.CLICKHOUSE_INTEGRATION !== '1' },
     async t => {
-        const { ClickHouseDriver } = await import('../../server/clickhouse.js');
+        const { ClickHouseDriver } =
+            await import('../../src/backend/database/clickhouse/client.js');
         const config = loadConfig(),
             driver = new ClickHouseDriver(config);
         t.after(() => driver.close());

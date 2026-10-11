@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
-import type { QueryDocument, Run } from '../../shared/types.js';
+import type { QueryDocument } from '../../src/shared/queries/saved-queries/types.js';
+import type { Run } from '../../src/shared/queries/execution/types.js';
 import { openWorkspacePanel, runButton, trust } from './helpers.js';
 
 async function replaceSql(page: Page, sql: string) {

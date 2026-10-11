@@ -6,8 +6,8 @@ const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const parserVendor = resolve(packageRoot, 'vendor/clickhouse-parser');
 
 if (process.argv[2] === '--web-preview') {
-    const assets = resolve(packageRoot, 'dist/web/assets');
-    const license = resolve(packageRoot, 'dist/web/licenses/clickhouse-parser');
+    const assets = resolve(packageRoot, 'dist/frontend/assets');
+    const license = resolve(packageRoot, 'dist/frontend/licenses/clickhouse-parser');
     mkdirSync(assets, { recursive: true });
     mkdirSync(license, { recursive: true });
     cpSync(resolve(parserVendor, 'parser.wasm'), resolve(assets, 'clickhouse-parser.wasm'));

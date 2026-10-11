@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { initialExpanded, indexTree, visibleTree } from '../../.core-build/shared/tree-graph.js';
-import { buildNativeAstTree } from '../../.core-build/shared/native-ast.js';
-import { parseQueryTree } from '../../.core-build/shared/query-tree.js';
+import {
+    initialExpanded,
+    indexTree,
+    visibleTree,
+} from '../../.core-build/src/frontend/common/components/tree-model.js';
+import { buildNativeAstTree } from '../../.core-build/src/frontend/workspace/editor/parser/ast.js';
+import { parseQueryTree } from '../../.core-build/src/frontend/workspace/queries/inspection/diagrams/query-tree.js';
 
 function node(id, children = []) {
     return {

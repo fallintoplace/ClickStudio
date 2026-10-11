@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ArtifactService } from '../../.core-build/core/artifacts.js';
-import { MonitorService } from '../../.core-build/core/monitors.js';
+import { ArtifactService } from '../../.core-build/src/backend/queries/saved-queries/documents.js';
+import { MonitorService } from '../../.core-build/src/backend/queries/monitoring/monitors.js';
 import { fixture, owner, other, until } from './helpers.mjs';
 async function ready() {
     const f = fixture(),

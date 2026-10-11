@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { APIConnectionTimeoutError } from 'openai';
-import { OpenAIDriver } from '../../server/openai.js';
-import type { PreparedContext } from '../../core/assistant.js';
-import { AppError } from '../../core/errors.js';
+import { OpenAIDriver } from '../../src/backend/assistant/openai/client.js';
+import type { PreparedContext } from '../../src/backend/assistant/proposals/assistant.js';
+import { AppError } from '../../src/backend/system/requests/errors.js';
 
 function assistantContext(): PreparedContext {
     return {

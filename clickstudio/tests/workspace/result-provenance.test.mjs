@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { retainedResultChange } from '../../.workspace-build/web/result-provenance.js';
+import { retainedResultChange } from '../../.workspace-build/src/frontend/workspace/results/result-provenance.js';
 
 const run = Object.freeze({
     sql: 'SELECT 1',

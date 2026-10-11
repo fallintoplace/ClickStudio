@@ -5,27 +5,30 @@ import {
     metadataTime,
     metadataProgress,
     metadataFlag,
-} from '../../.core-build/shared/native-metadata.js';
-import { materializedViewDefinition } from '../../.core-build/shared/materialized-view-definition.js';
+} from '../../.core-build/src/shared/database/explorer/metadata.js';
+import { materializedViewDefinition } from '../../.core-build/src/shared/database/explorer/objects/view-definition.js';
 import {
     buildMaterializedViewLineage,
     layoutLineage,
     tableReferenceId,
-} from '../../.core-build/shared/materialized-view-lineage.js';
+} from '../../.core-build/src/shared/database/explorer/objects/view-lineage.js';
 import {
     loadNativeExplorer,
     lineageTablesQuery,
     mergeActivityQuery,
     mutationActivityQuery,
     refreshActivityQuery,
-} from '../../.core-build/shared/native-explorers.js';
-import { nativeExplorerFixture } from '../../.core-build/shared/native-explorer-fixtures.js';
+} from '../../.core-build/src/shared/database/explorer/explorers.js';
+import { nativeExplorerFixture } from '../../.core-build/src/shared/samples/explorers.js';
 import {
     parseMergeActivity,
     parseMutationActivity,
     mutationStatus,
-} from '../../.core-build/shared/storage-activity.js';
-import { nativeCount, nativeBytes } from '../../.core-build/shared/native-format.js';
+} from '../../.core-build/src/shared/database/explorer/storage/activity.js';
+import {
+    nativeCount,
+    nativeBytes,
+} from '../../.core-build/src/frontend/database/explorer/format.js';
 
 for (const value of [undefined, null, '', -1, '1.2', 'bad', Number.MAX_SAFE_INTEGER + 1])
     test(`Metadata does not invent a counter from ${String(value)}`, () =>

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { queryRows } from '../../api/cloud.ts';
+import { queryRows } from '../../src/backend/database/connections/cloud-api.ts';
 
 test('Cloud reference queries raise the row cap without changing other inspector queries', async () => {
     const settings: Array<{

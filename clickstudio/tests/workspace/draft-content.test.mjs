@@ -1,7 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { draftSaveStatus, sameSavedContent } from '../../.workspace-build/shared/workspace-view.js';
-import { draftFromDocument, recoverDraft } from '../../.workspace-build/web/workspace-state.js';
+import {
+    draftSaveStatus,
+    sameSavedContent,
+} from '../../.workspace-build/src/frontend/workspace/queries/saved-queries/draft-save.js';
+import {
+    draftFromDocument,
+    recoverDraft,
+} from '../../.workspace-build/src/frontend/workspace/editor/drafts/workspace-state.js';
 
 const candlestick = {
     open: 0,
