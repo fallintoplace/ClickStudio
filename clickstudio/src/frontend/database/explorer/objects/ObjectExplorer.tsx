@@ -21,6 +21,20 @@ import { metadataConnectionKey } from '../../schema/metadata-state';
 import { TableBrowseDialog } from './TableBrowseDialog';
 import type { ExplorerSelection } from './object-explorer-model';
 
+
+function TableBrowseLayer({
+    target, connection, onClose, onOpenSqlDraft,
+}: {
+    target?: Extract<ExplorerSelection, { kind: 'relation' }>;
+    connection: ObjectExplorerProps['connection'];
+    onClose: () => void;
+    onOpenSqlDraft: ObjectExplorerProps['onOpenSqlDraft'];
+}) {
+    if (!target) return null;
+    return <TableBrowseDialog key={target.id} table={target.table} columns={target.columns}
+        connection={connection} onClose={onClose} onOpenSqlDraft={onOpenSqlDraft} />;
+}
+
 function ObjectExplorerEmptySearch({
     query,
     copy,
@@ -309,12 +323,12 @@ export function ObjectExplorer(props: ObjectExplorerProps) {
                     onDeleted={functions.deleted}
                 />
             )}
-            {trusted && browseTarget && (
-                <TableBrowseDialog key={connectionKey + ':' + browseTarget.id}
-                    table={browseTarget.table} columns={browseTarget.columns}
-                    connection={connection} onClose={() => setBrowseTarget(undefined)}
-                    onOpenSqlDraft={onOpenSqlDraft} />
-            )}
+            <TableBrowseLayer
+                target={trusted ? browseTarget : undefined}
+                connection={connection}
+                onClose={() => setBrowseTarget(undefined)}
+                onOpenSqlDraft={onOpenSqlDraft}
+            />
             <ObjectExplorerDialogs
                 {...{
                     copy,

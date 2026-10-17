@@ -24,47 +24,52 @@ export interface TableBrowsePage {
     scope: 'live-table';
     warning: string;
 }
-
 export class BrowseValidationError extends Error {
     constructor(message: string) {
         super(message);
         this.name = 'BrowseValidationError';
     }
 }
-const validName = (value: unknown) =>
-    typeof value === 'string' && value.length >= 1 && value.length <= 128;
+
+function readBrowseName(value: unknown): string {
+    if (typeof value !== 'string' || value.length < 1 || value.length > 128)
+        throw new BrowseValidationError('Choose a valid table and column.');
+    return value;
+}
+function readBrowsePage(value: unknown): number {
+    if (typeof value !== 'number' || !Number.isSafeInteger(value) ||
+        value < 0 || value > MAX_BROWSE_PAGE)
+        throw new BrowseValidationError('Browse the first 25 pages, or narrow the table with a filter.');
+    return value;
+}
 export function parseTableBrowseRequest(value: unknown): TableBrowseRequest {
     if (!isRecord(value)) throw new BrowseValidationError('Invalid table browsing request.');
-    if (![value.database, value.table, value.orderColumn].every(validName))
-        throw new BrowseValidationError('Choose a valid table and sort column.');
-    if (value.direction !== 'asc' && value.direction !== 'desc')
+    const database = readBrowseName(value.database);
+    const table = readBrowseName(value.table);
+    const orderColumn = readBrowseName(value.orderColumn);
+    const page = readBrowsePage(value.page);
+    const direction = value.direction;
+    if (direction !== 'asc' && direction !== 'desc')
         throw new BrowseValidationError('Choose ascending or descending order.');
-    if (!Number.isSafeInteger(value.page) || (value.page as number) < 0 ||
-        (value.page as number) > MAX_BROWSE_PAGE)
-        throw new BrowseValidationError('Browse the first 25 pages, or narrow the table with a filter.');
     if ((value.filterColumn === undefined) !== (value.filterValue === undefined))
         throw new BrowseValidationError('Choose both a filter column and a value.');
-    if (value.filterColumn !== undefined && !validName(value.filterColumn))
-        throw new BrowseValidationError('Choose an existing filter column.');
-    if (value.filterValue !== undefined &&
-        (typeof value.filterValue !== 'string' || value.filterValue.length > 256))
+    const filterColumn = value.filterColumn === undefined
+        ? undefined : readBrowseName(value.filterColumn);
+    const filterValue = value.filterValue;
+    if (filterValue !== undefined &&
+        (typeof filterValue !== 'string' || filterValue.length > 256))
         throw new BrowseValidationError('Filter values must be at most 256 characters.');
     return {
-        database: value.database as string,
-        table: value.table as string,
-        orderColumn: value.orderColumn as string,
-        direction: value.direction,
-        page: value.page as number,
-        ...(typeof value.filterColumn === 'string' ? { filterColumn: value.filterColumn } : {}),
-        ...(typeof value.filterValue === 'string' ? { filterValue: value.filterValue } : {}),
+        database, table, orderColumn, direction, page,
+        ...(filterColumn !== undefined ? { filterColumn } : {}),
+        ...(typeof filterValue === 'string' ? { filterValue } : {}),
     };
 }
-
 export function browseColumnSupported(type: string): boolean {
     return /^(?:U?Int\d+|Float\d+|Decimal|String|FixedString|Date|DateTime|UUID|IPv[46]|Enum)/.test(baseType(type));
 }
 
-/** Generated from verified table columns, not from arbitrary SQL fragments. */
+/** Generated from verified table columns, not arbitrary SQL fragments. */
 export function buildTableBrowseSql(input: TableBrowseRequest, columns: readonly Column[]) {
     const request = parseTableBrowseRequest(input);
     if (columns.length === 0 || columns.length > MAX_BROWSE_COLUMNS)
@@ -85,29 +90,31 @@ export function buildTableBrowseSql(input: TableBrowseRequest, columns: readonly
     const sql = 'SELECT * FROM ' + table + where +
         ' ORDER BY ' + quoteIdentifier(order.name) + ' ' + request.direction.toUpperCase() +
         ' LIMIT ' + (BROWSE_PAGE_ROWS + 1) + ' OFFSET ' + (request.page * BROWSE_PAGE_ROWS);
-    return {
-        sql,
-        parameters: request.filterColumn ? { browseValue: request.filterValue ?? '' } : {},
-    };
+    return { sql, parameters: request.filterColumn ? { browseValue: request.filterValue ?? '' } : {} };
 }
 
-/** Make a standalone editable SQL draft, preserving typed execution for the API. */
+/** Standalone editable SQL uses safe quoting; API execution remains parameterized. */
 export function tableBrowseDraftSql(input: TableBrowseRequest, columns: readonly Column[]) {
     const { sql } = buildTableBrowseSql(input, columns);
-    return input.filterColumn
+    const display = input.filterColumn
         ? sql.replace('{browseValue:String}', quoteStringLiteral(input.filterValue ?? ''))
         : sql;
+    return display.replace(' LIMIT ' + (BROWSE_PAGE_ROWS + 1) + ' OFFSET ',
+        ' LIMIT ' + BROWSE_PAGE_ROWS + ' OFFSET ');
 }
 
 export function isTableBrowsePage(value: unknown): value is TableBrowsePage {
-    return isRecord(value) &&
-        Array.isArray(value.columns) && value.columns.length <= MAX_BROWSE_COLUMNS &&
-        value.columns.every(column => isRecord(column) && typeof column.name === 'string' && typeof column.type === 'string') &&
-        Array.isArray(value.rows) && value.rows.length <= BROWSE_PAGE_ROWS &&
-        value.rows.every(row => Array.isArray(row) && row.length === (value.columns as unknown[]).length && row.every(isJson)) &&
-        Number.isSafeInteger(value.page) && (value.page as number) >= 0 &&
-        typeof value.hasMore === 'boolean' &&
-        typeof value.queryId === 'string' &&
-        value.scope === 'live-table' &&
+    if (!isRecord(value)) return false;
+    const columns = value.columns;
+    const rows = value.rows;
+    if (!Array.isArray(columns) || columns.length > MAX_BROWSE_COLUMNS ||
+        !columns.every(column => isRecord(column) &&
+            typeof column.name === 'string' && typeof column.type === 'string')) return false;
+    if (!Array.isArray(rows) || rows.length > BROWSE_PAGE_ROWS ||
+        !rows.every(row => Array.isArray(row) && row.length === columns.length && row.every(isJson)))
+        return false;
+    return typeof value.page === 'number' && Number.isSafeInteger(value.page) &&
+        value.page >= 0 && typeof value.hasMore === 'boolean' &&
+        typeof value.queryId === 'string' && value.scope === 'live-table' &&
         typeof value.warning === 'string';
 }

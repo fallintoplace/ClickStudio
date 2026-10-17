@@ -19,6 +19,16 @@ import { useDialogFocus } from '../../../ui/focus/useDialogFocus';
 import { Button } from '../../../ui/components/primitives';
 import { CellInspector, type InspectedCell } from '../../../queries/results/CellInspector';
 
+function browseStatus(error: string, loading: boolean, result?: TableBrowsePage) {
+    if (error) return error;
+    if (loading) return 'Loading table page…';
+    if (!result) return 'No page loaded';
+    const first = result.page * BROWSE_PAGE_ROWS + 1;
+    const last = result.page * BROWSE_PAGE_ROWS + result.rows.length;
+    const suffix = result.hasMore ? ' · More available' : ' · End of result';
+    return 'Rows ' + first.toLocaleString() + '-' + last.toLocaleString() + suffix;
+}
+
 export function TableBrowseDialog({
     table, columns, connection, onClose, onOpenSqlDraft,
 }: {
@@ -129,7 +139,10 @@ export function TableBrowseDialog({
                     </label>
                     <label>Direction
                         <select aria-label="Browse sort direction" value={direction}
-                            onChange={event => { setDirection(event.target.value as 'asc' | 'desc'); setPending(true); }}>
+                            onChange={event => {
+                                setDirection(event.target.value === 'desc' ? 'desc' : 'asc');
+                                setPending(true);
+                            }}>
                             <option value="asc">Ascending</option>
                             <option value="desc">Descending</option>
                         </select>
@@ -158,10 +171,7 @@ export function TableBrowseDialog({
             </p>
             <div className="table-browse-actions">
                 <span role="status">
-                    {error || (loading ? 'Loading table page…'
-                        : result ? 'Rows ' + (result.page * BROWSE_PAGE_ROWS + 1).toLocaleString() +
-                            '-' + (result.page * BROWSE_PAGE_ROWS + result.rows.length).toLocaleString() +
-                            (result.hasMore ? ' · More available' : ' · End of result') : 'No page loaded')}
+                    {browseStatus(error, loading, result)}
                 </span>
                 <Button variant="secondary" onClick={openSql} disabled={!request}>Open as SQL</Button>
             </div>

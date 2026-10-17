@@ -115,6 +115,8 @@ export function ResultTableControls({
     onToggleColumn,
     onTogglePinned,
     onRestoreColumns,
+    selectionMode,
+    onToggleSelection,
 }: {
     filter: string;
     onFilter: (filter: string) => void;
@@ -133,6 +135,8 @@ export function ResultTableControls({
     onToggleColumn: (index: number) => void;
     onTogglePinned: (index: number) => void;
     onRestoreColumns: () => void;
+    selectionMode: boolean;
+    onToggleSelection: () => void;
 }) {
     const id = useId();
     const dock = useResultControlsDock();
@@ -325,6 +329,10 @@ export function ResultTableControls({
                             />
                         </div>
                         <div className="result-search-summary">
+                            <Button variant="ghost" aria-pressed={selectionMode}
+                                onClick={onToggleSelection}>
+                                {selectionMode ? 'Stop selecting cells' : 'Select cells'}
+                            </Button>
                             <span className="result-match-count" role="status" aria-live="polite">
                                 {loading
                                     ? 'Loading this page…'

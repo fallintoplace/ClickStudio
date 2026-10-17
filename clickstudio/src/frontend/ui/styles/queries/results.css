@@ -1447,7 +1447,20 @@
   cursor: pointer;
 }
 .result-grid-selection-tools button[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); }
-.result-column-insights-trigger { font-size: 9px; margin-top: 3px; width: fit-content; }
+.result-column-heading { position: relative; }
+.result-column-insights-trigger {
+  position: absolute;
+  right: 0;
+  top: 0;
+  font-size: 9px;
+  opacity: 0;
+  pointer-events: none;
+}
+th:hover .result-column-insights-trigger,
+th:focus-within .result-column-insights-trigger {
+  opacity: 1;
+  pointer-events: auto;
+}
 .result-cell-selected, .data-table tbody tr:nth-child(even) td.result-cell-selected {
   background: var(--active-surface);
   outline: 1px solid var(--accent);

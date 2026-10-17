@@ -1,4 +1,4 @@
-import type { Column, Row } from '../../common/values.js';
+import type { Column, Json, Row } from '../../common/values.js';
 import { isLargeCellReference } from './large-cells.js';
 import { chartNumber, numericType } from './results.js';
 
@@ -16,12 +16,26 @@ export interface ColumnStats {
     histogram: number[];
     common: Array<{ label: string; count: number }>;
 }
-
 const MAX_DISTINCT = 2000;
 const HISTOGRAM_BUCKETS = 10;
 
+function valueLabel(value: Json): string {
+    if (typeof value === 'string') return value.slice(0, 120);
+    if (Array.isArray(value)) return '[Array]';
+    if (typeof value === 'object') return '[Object]';
+    return String(value);
+}
+
+function bucketFor(value: number, minimum: number, maximum: number): number {
+    if (minimum === maximum) return 0;
+    return Math.min(HISTOGRAM_BUCKETS - 1,
+        Math.floor((value - minimum) / (maximum - minimum) * HISTOGRAM_BUCKETS));
+}
+
 /** Describes only the rows supplied by the caller, never an entire source table. */
-export function columnStats(rows: readonly Row[], column: Column, index: number, token?: string): ColumnStats {
+export function columnStats(
+    rows: readonly Row[], column: Column, index: number, token?: string,
+): ColumnStats {
     const counts = new Map<string, number>();
     let nulls = 0;
     let detached = 0;
@@ -32,6 +46,7 @@ export function columnStats(rows: readonly Row[], column: Column, index: number,
     let average = 0;
     let distinctCapped = false;
     const numbers: number[] = [];
+    const numeric = numericType(column.type);
     for (const row of rows) {
         const value = row[index];
         if (value === undefined || value === null) {
@@ -42,18 +57,13 @@ export function columnStats(rows: readonly Row[], column: Column, index: number,
             detached++;
             continue;
         }
-        const label = typeof value === 'string'
-            ? value.slice(0, 120)
-            : typeof value === 'object'
-                ? (Array.isArray(value) ? '[Array]' : '[Object]')
-                : String(value);
+        const label = valueLabel(value);
         if (counts.has(label)) counts.set(label, counts.get(label)! + 1);
         else if (counts.size < MAX_DISTINCT) counts.set(label, 1);
         else distinctCapped = true;
-
-        if (!numericType(column.type)) continue;
+        if (!numeric) continue;
         const n = chartNumber(value);
-        if (n === null || !Number.isFinite(n)) {
+        if (n === null) {
             nonRepresentable++;
             continue;
         }
@@ -64,22 +74,13 @@ export function columnStats(rows: readonly Row[], column: Column, index: number,
         average += (n - average) / numericCount;
     }
     const histogram = Array<number>(HISTOGRAM_BUCKETS).fill(0);
-    if (numericCount) {
-        for (const n of numbers) {
-            const index = maximum === minimum
-                ? 0
-                : Math.min(HISTOGRAM_BUCKETS - 1, Math.floor((n - minimum) / (maximum - minimum) * HISTOGRAM_BUCKETS));
-            histogram[index]!++;
-        }
+    for (const n of numbers) {
+        const bucket = bucketFor(n, minimum, maximum);
+        histogram[bucket] = (histogram[bucket] ?? 0) + 1;
     }
     return {
-        total: rows.length,
-        nulls,
-        detached,
-        distinct: counts.size,
-        distinctCapped,
-        numericCount,
-        nonRepresentable,
+        total: rows.length, nulls, detached,
+        distinct: counts.size, distinctCapped, numericCount, nonRepresentable,
         ...(numericCount ? { minimum, maximum, average } : {}),
         histogram,
         common: [...counts].sort((a, b) => b[1] - a[1]).slice(0, 5)
@@ -87,19 +88,21 @@ export function columnStats(rows: readonly Row[], column: Column, index: number,
     };
 }
 
-/** Quote tabs and line breaks to keep copied grid selections rectangular. */
+function selectedCellText(value: Json | undefined, token?: string): string {
+    if (value === null || value === undefined) return '';
+    if (isLargeCellReference(value, token)) return value.preview;
+    if (typeof value === 'object') return JSON.stringify(value);
+    return String(value);
+}
+function quotedTsv(value: string): string {
+    if (!/["\t\r\n]/.test(value)) return value;
+    return '"' + value.replaceAll('"', '""') + '"';
+}
+/** Copy a bounded selection, preserving row boundaries and lossless scalar strings. */
 export function selectedRowsTsv(
-    rows: readonly Row[],
-    columnIndexes: readonly number[],
-    largeCellToken?: string,
+    rows: readonly Row[], columnIndexes: readonly number[], largeCellToken?: string,
 ): string {
-    return rows.map(row => columnIndexes.map(index => {
-        const value = row[index];
-        const text = value === null || value === undefined
-            ? ''
-            : isLargeCellReference(value, largeCellToken)
-                ? value.preview
-                : typeof value === 'object' ? JSON.stringify(value) : String(value);
-        return /["\t\r\n]/.test(text) ? '"' + text.replaceAll('"', '""') + '"' : text;
-    }).join('\t')).join('\n');
+    return rows.map(row => columnIndexes
+        .map(index => quotedTsv(selectedCellText(row[index], largeCellToken)))
+        .join('\t')).join('\n');
 }
