@@ -347,6 +347,55 @@ async function copyGridCells(
     }
 }
 
+function SelectionSummary({
+    gridSelection, selectedCells, page,
+}: {
+    gridSelection: ReturnType<typeof useGridSelection>;
+    selectedCells: ReturnType<typeof selectedGridCells>;
+    page: ResultPage;
+}) {
+    if (!gridSelection.selectionMode) return null;
+    return (
+                <div className="result-grid-scope" role="status">
+                    <span>
+                        Selection uses visible rows on this page ·{' '}
+                        {page.completeness === 'truncated'
+                            ? 'Partial retained result'
+                            : 'Retained result'}
+                    </span>
+                    {selectedCells.count > 0 && (
+                        <div className="result-grid-selection-tools">
+                            <span>{selectedCells.count.toLocaleString()} cells selected</span>
+                            {selectedCells.numbers.length > 0 && (
+                                <span>
+                                    Sum {selectedCells.sum.toLocaleString()} · Avg{' '}
+                                    {(
+                                        selectedCells.sum / selectedCells.numbers.length
+                                    ).toLocaleString(undefined, { maximumFractionDigits: 4 })}
+                                </span>
+                            )}
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    void copyGridCells(
+                                        selectedCells.rows,
+                                        selectedCells.columns,
+                                        page.largeCellToken,
+                                        gridSelection.setCopyFeedback,
+                                    )
+                                }
+                            >
+                                Copy selection
+                            </button>
+                        </div>
+                    )}
+                    {gridSelection.copyFeedback && (
+                        <span role="status">{gridSelection.copyFeedback}</span>
+                    )}
+                </div>
+    );
+}
+
 export function ResultGrid({
     run,
     page,
@@ -530,45 +579,8 @@ export function ResultGrid({
             inert={obscured || undefined}
         >
             {renderInContainer(toolbar, toolbarContainer)}
-            {gridSelection.selectionMode && (
-                <div className="result-grid-scope" role="status">
-                    <span>
-                        Selection uses visible rows on this page ·{' '}
-                        {page.completeness === 'truncated'
-                            ? 'Partial retained result'
-                            : 'Retained result'}
-                    </span>
-                    {selectedCells.count > 0 && (
-                        <div className="result-grid-selection-tools">
-                            <span>{selectedCells.count.toLocaleString()} cells selected</span>
-                            {selectedCells.numbers.length > 0 && (
-                                <span>
-                                    Sum {selectedCells.sum.toLocaleString()} · Avg{' '}
-                                    {(
-                                        selectedCells.sum / selectedCells.numbers.length
-                                    ).toLocaleString(undefined, { maximumFractionDigits: 4 })}
-                                </span>
-                            )}
-                            <button
-                                type="button"
-                                onClick={() =>
-                                    void copyGridCells(
-                                        selectedCells.rows,
-                                        selectedCells.columns,
-                                        page.largeCellToken,
-                                        gridSelection.setCopyFeedback,
-                                    )
-                                }
-                            >
-                                Copy selection
-                            </button>
-                        </div>
-                    )}
-                    {gridSelection.copyFeedback && (
-                        <span role="status">{gridSelection.copyFeedback}</span>
-                    )}
-                </div>
-            )}
+            <SelectionSummary gridSelection={gridSelection}
+                selectedCells={selectedCells} page={page} />
             {pageLoading ? (
                 <div className="result-loading" role="status">
                     <Spinner />

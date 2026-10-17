@@ -29,6 +29,73 @@ function browseStatus(error: string, loading: boolean, result?: TableBrowsePage)
     return 'Rows ' + first.toLocaleString() + '-' + last.toLocaleString() + suffix;
 }
 
+function BrowsePageRows({
+    result, columnStart, onInspectCell,
+}: {
+    result?: TableBrowsePage;
+    columnStart: number;
+    onInspectCell: (cell: InspectedCell) => void;
+}) {
+    if (!result) return null;
+    const visible = result.columns.slice(columnStart, columnStart + 12);
+    return (
+                <div
+                    className="table-browse-data-scroll"
+                    role="region"
+                    tabIndex={0}
+                    aria-label="Browsed table rows"
+                >
+                    <table className="data-table" aria-label="Live table page">
+                        <thead>
+                            <tr>
+                                <th scope="col">#</th>
+                                {visible.map((column, i) => (
+                                    <th scope="col" key={columnStart + i}>
+                                        {column.name}
+                                        <small className="result-type-badge">{column.type}</small>
+                                    </th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {result.rows.map((row, rowIndex) => (
+                                <tr key={rowIndex}>
+                                    <td>{result.page * BROWSE_PAGE_ROWS + rowIndex + 1}</td>
+                                    {visible.map((column, columnIndex) => {
+                                        const idx = columnStart + columnIndex;
+                                        return (
+                                            <td key={idx}>
+                                                <button
+                                                    className="result-cell-trigger"
+                                                    type="button"
+                                                    title={previewResultCell(row[idx])}
+                                                    onClick={() =>
+                                                        onInspectCell({
+                                                            columnName: column.name,
+                                                            columnType: column.type,
+                                                            columnIndex: idx,
+                                                            rowNumber:
+                                                                result.page * BROWSE_PAGE_ROWS +
+                                                                rowIndex +
+                                                                1,
+                                                            value: row[idx],
+                                                        })
+                                                    }
+                                                >
+                                                    {previewResultCell(row[idx])}
+                                                </button>
+                                            </td>
+                                        );
+                                    })}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                    {result.rows.length === 0 && <p>No rows match this filter.</p>}
+                </div>
+    );
+}
+
 export function TableBrowseDialog({
     table,
     columns,
@@ -133,7 +200,6 @@ export function TableBrowseDialog({
         );
         onClose();
     };
-    const visible = result?.columns.slice(columnStart, columnStart + 12) ?? [];
     const eligible = sortable.length > 0;
     const isLastPage = request?.page === MAX_BROWSE_PAGE;
     return (
@@ -275,62 +341,8 @@ export function TableBrowseDialog({
                     </Button>
                 </div>
             )}
-            {result && (
-                <div
-                    className="table-browse-data-scroll"
-                    role="region"
-                    tabIndex={0}
-                    aria-label="Browsed table rows"
-                >
-                    <table className="data-table" aria-label="Live table page">
-                        <thead>
-                            <tr>
-                                <th scope="col">#</th>
-                                {visible.map((column, i) => (
-                                    <th scope="col" key={columnStart + i}>
-                                        {column.name}
-                                        <small className="result-type-badge">{column.type}</small>
-                                    </th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {result.rows.map((row, rowIndex) => (
-                                <tr key={rowIndex}>
-                                    <td>{result.page * BROWSE_PAGE_ROWS + rowIndex + 1}</td>
-                                    {visible.map((column, columnIndex) => {
-                                        const idx = columnStart + columnIndex;
-                                        return (
-                                            <td key={idx}>
-                                                <button
-                                                    className="result-cell-trigger"
-                                                    type="button"
-                                                    title={previewResultCell(row[idx])}
-                                                    onClick={() =>
-                                                        setInspectedCell({
-                                                            columnName: column.name,
-                                                            columnType: column.type,
-                                                            columnIndex: idx,
-                                                            rowNumber:
-                                                                result.page * BROWSE_PAGE_ROWS +
-                                                                rowIndex +
-                                                                1,
-                                                            value: row[idx],
-                                                        })
-                                                    }
-                                                >
-                                                    {previewResultCell(row[idx])}
-                                                </button>
-                                            </td>
-                                        );
-                                    })}
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                    {result.rows.length === 0 && <p>No rows match this filter.</p>}
-                </div>
-            )}
+            <BrowsePageRows result={result} columnStart={columnStart}
+                onInspectCell={setInspectedCell} />
             <footer className="table-browse-pages">
                 <span>
                     Page {(request?.page ?? 0) + 1} of at most {MAX_BROWSE_PAGE + 1}
