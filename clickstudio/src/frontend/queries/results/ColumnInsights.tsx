@@ -163,6 +163,11 @@ export function ColumnInsights({
                     avoid precision loss.
                 </p>
             )}
+            {stats.distinctCapped && (
+                <p className="result-insights-notice">
+                    Distinct count is capped. Most common values are unavailable at this limit.
+                </p>
+            )}
             {stats.common.length > 0 && (
                 <section aria-label="Most common values">
                     <strong>Most common values</strong>
@@ -174,9 +179,6 @@ export function ColumnInsights({
                             </li>
                         ))}
                     </ol>
-                    {stats.distinctCapped && (
-                        <small>Distinct values are capped for memory safety.</small>
-                    )}
                 </section>
             )}
         </dialog>

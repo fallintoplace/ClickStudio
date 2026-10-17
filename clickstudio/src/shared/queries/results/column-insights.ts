@@ -1,6 +1,6 @@
 import type { Column, Json, Row } from '../../common/values.js';
 import { isLargeCellReference } from './large-cells.js';
-import { chartNumber, numericType } from './results.js';
+import { baseType, chartNumber, numericType } from './results.js';
 
 export interface ColumnStats {
     total: number;
@@ -16,7 +16,8 @@ export interface ColumnStats {
     histogram: number[];
     common: Array<{ label: string; count: number }>;
 }
-const MAX_DISTINCT = 2000;
+// The retained SQL result hard limit is 20,000 rows, so normal insights can be exact.
+const MAX_DISTINCT = 20_000;
 const HISTOGRAM_BUCKETS = 10;
 
 function valueLabel(value: Json): string {
@@ -98,7 +99,9 @@ export function columnStats(
         nonRepresentable,
         ...(numericCount ? { minimum, maximum, average } : {}),
         histogram,
-        common: [...counts.values()].sort((a, b) => b.count - a.count).slice(0, 5),
+        common: distinctCapped
+            ? []
+            : [...counts.values()].sort((a, b) => b.count - a.count).slice(0, 5),
     };
 }
 
@@ -125,4 +128,53 @@ export function selectedRowsTsv(
                 .join('\t'),
         )
         .join('\n');
+}
+
+/** Exact integer sums, including UInt64/Int128 strings. Float/Decimal sums are marked approximate. */
+export function selectedNumericSummary(
+    rows: readonly Row[],
+    columnIndexes: readonly number[],
+    columns: readonly Column[],
+): { count: number; sum: string; average: string } {
+    let count = 0;
+    let exact = 0n;
+    let floating = 0;
+    let approximate = false;
+    for (const row of rows) {
+        for (const index of columnIndexes) {
+            const type = columns[index]?.type ?? '';
+            if (!numericType(type)) continue;
+            const value = row[index];
+            if (value === null || value === undefined || typeof value === 'object') continue;
+            if (/^U?Int\d+$/.test(baseType(type)) && /^[+-]?\d+$/.test(String(value))) {
+                if (typeof value === 'number' && !Number.isSafeInteger(value)) continue;
+                exact += BigInt(value as string | number);
+                count++;
+                continue;
+            }
+            const number = chartNumber(value);
+            if (number === null) continue;
+            floating += number;
+            count++;
+            approximate = true;
+        }
+    }
+    if (!count) return { count, sum: '', average: '' };
+    if (approximate) {
+        const total = Number(exact) + floating;
+        const format = (value: number) =>
+            '≈' + value.toLocaleString(undefined, { maximumFractionDigits: 4 });
+        return { count, sum: format(total), average: format(total / count) };
+    }
+    const denominator = BigInt(count);
+    const negative = exact < 0n;
+    const absolute = negative ? -exact : exact;
+    const rounded = (absolute * 10_000n + denominator / 2n) / denominator;
+    const fraction = (rounded % 10_000n).toString().padStart(4, '0').replace(/0+$/, '');
+    const whole = (rounded / 10_000n).toLocaleString();
+    return {
+        count,
+        sum: exact.toLocaleString(),
+        average: (negative ? '-' : '') + whole + (fraction ? '.' + fraction : ''),
+    };
 }

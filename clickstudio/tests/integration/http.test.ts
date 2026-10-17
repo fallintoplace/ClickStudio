@@ -1370,6 +1370,9 @@ test('Table browsing is scoped to trusted connections and validates page inputs'
         async browseTable(_id: string, input: TableBrowseRequest) {
             return {
                 columns: [{ name: 'id', type: 'UInt64' }],
+                totalColumns: 1,
+                columnStart: 0,
+                draftSql: 'SELECT id FROM demo.events LIMIT 200',
                 rows: [[String(input.page)]],
                 page: input.page,
                 hasMore: false,

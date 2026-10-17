@@ -8,6 +8,7 @@ import {
     BROWSE_PAGE_ROWS,
     BrowseValidationError,
     buildTableBrowseSql,
+    tableBrowseDraftSql,
 } from '../../../shared/database/browse/table-browse.js';
 import { collectCompactStream } from './result-stream.js';
 import { AppError } from '../../system/requests/errors.js';
@@ -47,7 +48,8 @@ export async function executeTableBrowse(
     const columns = await metadata.json<{ name: string; type: string }>();
     if (!columns.length)
         throw new BrowseValidationError('Table columns are unavailable for browsing.');
-    const { sql, parameters } = buildTableBrowseSql(request, columns);
+    const { sql, parameters, columnStart, totalColumns } = buildTableBrowseSql(request, columns);
+    const draftSql = tableBrowseDraftSql(request, columns);
     const response = await client.exec({
         query: sql + '\nFORMAT JSONCompactEachRowWithNamesAndTypes',
         query_params: parameters,
@@ -72,6 +74,9 @@ export async function executeTableBrowse(
         );
     return {
         columns: result.columns,
+        totalColumns,
+        columnStart,
+        draftSql,
         rows: result.rows.slice(0, BROWSE_PAGE_ROWS),
         page: request.page,
         hasMore: result.rows.length > BROWSE_PAGE_ROWS,

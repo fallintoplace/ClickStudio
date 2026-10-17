@@ -55,3 +55,49 @@ test('table browser requires column and value together', () => {
     assert.throws(() => parseTableBrowseRequest({ ...req, filterColumn: 'message' }));
     assert.throws(() => parseTableBrowseRequest({ ...req, filterValue: 'x' }));
 });
+
+test('table browser projects only the requested column window', () => {
+    const wide = Array.from({ length: 30 }, (_, index) => ({
+        name: 'col_' + index,
+        type: 'String',
+    }));
+    const input = {
+        database: 'analytics',
+        table: 'wide_events',
+        orderColumn: 'col_0',
+        direction: 'asc',
+        page: 1,
+        columnStart: 12,
+    };
+    const generated = buildTableBrowseSql(input, wide);
+    assert.equal(generated.columnStart, 12);
+    assert.equal(generated.totalColumns, 30);
+    assert.match(generated.sql, /^SELECT `col_12`, `col_13`/);
+    assert.match(generated.sql, /`col_23` FROM/);
+    assert.doesNotMatch(generated.sql, /SELECT \*/);
+    assert.doesNotMatch(generated.sql, /`col_24`/);
+    assert.match(generated.sql, /ORDER BY `col_0` ASC LIMIT 201 OFFSET 200/);
+    assert.throws(
+        () => buildTableBrowseSql({ ...input, columnStart: 30 }, wide),
+        /column window/,
+    );
+    assert.throws(
+        () => parseTableBrowseRequest({ ...input, columnStart: 501 }),
+        /column window/,
+    );
+});
+test('editable SQL keeps pagination text inside filter values unchanged', () => {
+    const input = {
+        database: 'db',
+        table: 'events',
+        orderColumn: 'event_id',
+        direction: 'asc',
+        page: 0,
+        filterColumn: 'message',
+        filterValue: 'alpha LIMIT 201 OFFSET beta',
+    };
+    const draft = tableBrowseDraftSql(input, columns);
+    assert.ok(draft.includes("'alpha LIMIT 201 OFFSET beta'"));
+    assert.match(draft, /LIMIT 200 OFFSET 0$/);
+    assert.equal((draft.match(/LIMIT 201 OFFSET/g) ?? []).length, 1);
+});

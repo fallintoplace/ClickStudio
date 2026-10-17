@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
     columnStats,
     selectedRowsTsv,
+    selectedNumericSummary,
 } from '../../.core-build/src/shared/queries/results/column-insights.js';
 
 test('column insights respect nulls and only count safe numeric values', () => {
@@ -61,4 +62,40 @@ test('distinct counts do not collide on truncated labels or object previews', ()
     );
     const objects = columnStats([[{ x: 1 }], [{ x: 2 }]], { name: 'payload', type: 'JSON' }, 0);
     assert.equal(objects.distinct, 2);
+});
+
+test('late common values remain visible after 2,000 earlier unique values', () => {
+    const values = Array.from({ length: 2000 }, (_, i) => ['early-' + i]);
+    values.push(...Array.from({ length: 500 }, () => ['frequent']));
+    const stats = columnStats(values, { name: 'label', type: 'String' }, 0);
+    assert.equal(stats.distinct, 2001);
+    assert.equal(stats.distinctCapped, false);
+    assert.deepEqual(stats.common[0], { label: 'frequent', count: 500 });
+});
+test('insights suppress common values instead of providing inaccurate capped rankings', () => {
+    const values = Array.from({ length: 20001 }, (_, i) => [String(i)]);
+    const stats = columnStats(values, { name: 'label', type: 'String' }, 0);
+    assert.equal(stats.distinct, 20000);
+    assert.equal(stats.distinctCapped, true);
+    assert.deepEqual(stats.common, []);
+});
+test('selected integer totals preserve precision above Number.MAX_SAFE_INTEGER', () => {
+    const columns = [{ name: 'value', type: 'UInt64' }];
+    const rows = Array.from({ length: 3 }, () => ['9007199254740991']);
+    const summary = selectedNumericSummary(rows, [0], columns);
+    assert.equal(summary.count, 3);
+    assert.equal(summary.sum.replaceAll(',', ''), '27021597764222973');
+    assert.equal(summary.average.replaceAll(',', ''), '9007199254740991');
+    const wide = selectedNumericSummary([['18446744073709551615']], [0], columns);
+    assert.equal(wide.sum.replaceAll(',', ''), '18446744073709551615');
+});
+test('selected floating-point totals are clearly labeled approximate', () => {
+    const stats = selectedNumericSummary(
+        [[1.2, '18446744073709551615']],
+        [0, 1],
+        [{ name: 'f', type: 'Float64' }, { name: 'n', type: 'UInt64' }],
+    );
+    assert.equal(stats.count, 2);
+    assert.ok(stats.sum.startsWith('≈'));
+    assert.ok(stats.average.startsWith('≈'));
 });

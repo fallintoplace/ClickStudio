@@ -19,7 +19,7 @@ ClickStudio has two different ways to inspect data. They should not be confused.
 - Optionally filter another scalar column by its exact string representation.
 - Click **Apply** to query ClickHouse, or **Open as SQL** to edit the resulting statement.
 - Pages contain at most 200 rows, with one extra row used to detect whether another page is available.
-- The browser shows a window of up to 12 columns and lets you move horizontally through the column windows.
+- The browser fetches only the visible window of up to 12 columns. Moving between column windows runs another bounded SQL query.
 - Each page is an independent, read-only SQL query, with bounded time, memory and result bytes.
 - Up to 25 pages are allowed for a browsing session. The public Playground does not expose this feature.
 
@@ -31,7 +31,7 @@ Live table browsing uses ordered, bounded **LIMIT/OFFSET** queries. It is **not*
 - Inserts, updates and deletes during browsing can change later pages.
 - Sorting by a column not aligned with a ClickHouse table's sorting key can be expensive.
 - Deep offsets are deliberately capped. There is no promise of infinite, gap-free browsing.
-- Up to 500 source columns are supported. A single page is subject to a 2 MB output budget.
+- Up to 500 source columns are supported. Each projected 12-column page is subject to a 2 MB output budget. A single very large cell can still exceed this limit.
 - Unsupported sort/filter types and inaccessible table metadata are rejected.
 - All table/column identifiers are validated against system metadata, quoted, and filters are supplied as typed query parameters.
 

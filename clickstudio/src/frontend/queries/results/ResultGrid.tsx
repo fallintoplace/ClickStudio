@@ -3,7 +3,6 @@ import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import {
     displayValue,
-    numericType,
     filterRows,
     previewResultCell,
 } from '../../../shared/queries/results/results';
@@ -21,8 +20,10 @@ import { statementOutcome } from './statement-outcome';
 import { resultTypeGroup, type ResultTypeGroup } from './result-type-group';
 import { largeCellUrl } from './large-cell-actions';
 import { ColumnInsights } from './ColumnInsights';
-import { chartNumber } from '../../../shared/queries/results/results';
-import { selectedRowsTsv } from '../../../shared/queries/results/column-insights';
+import {
+    selectedRowsTsv,
+    selectedNumericSummary,
+} from '../../../shared/queries/results/column-insights';
 
 function ResultColumnHeader({
     name,
@@ -276,10 +277,13 @@ function useGridSelection() {
     const [selectionMode, setSelectionMode] = useState(false);
     const [selection, setSelection] = useState<GridSelection>();
     const [copyFeedback, setCopyFeedback] = useState('');
-    const toggleSelection = () => {
-        setSelectionMode(value => !value);
+    const clearSelection = () => {
         setSelection(undefined);
         setCopyFeedback('');
+    };
+    const toggleSelection = () => {
+        setSelectionMode(value => !value);
+        clearSelection();
     };
     const selectCell = (offset: number, row: number, col: number, extend: boolean) => {
         setCopyFeedback('');
@@ -289,7 +293,15 @@ function useGridSelection() {
                 : { offset, firstRow: row, lastRow: row, firstCol: col, lastCol: col },
         );
     };
-    return { selectionMode, selection, copyFeedback, setCopyFeedback, toggleSelection, selectCell };
+    return {
+        selectionMode,
+        selection,
+        copyFeedback,
+        setCopyFeedback,
+        toggleSelection,
+        clearSelection,
+        selectCell,
+    };
 }
 function selectedGridCells(
     page: ResultPage,
@@ -313,15 +325,7 @@ function selectedGridCells(
               Math.max(active.firstCol, active.lastCol) + 1,
           )
         : [];
-    const numbers = rows.flatMap(row =>
-        columns.flatMap(index => {
-            const value = numericType(page.columns[index]?.type ?? '')
-                ? chartNumber(row[index])
-                : null;
-            return value === null ? [] : [value];
-        }),
-    );
-    const sum = numbers.reduce((acc, value) => acc + value, 0);
+    const numeric = selectedNumericSummary(rows, columns, page.columns);
     const count = rows.length * columns.length;
     const isSelected = (row: number, col: number) =>
         Boolean(
@@ -331,7 +335,7 @@ function selectedGridCells(
             col >= Math.min(active.firstCol, active.lastCol) &&
             col <= Math.max(active.firstCol, active.lastCol),
         );
-    return { rows, columns, numbers, sum, count, isSelected };
+    return { rows, columns, numeric, count, isSelected };
 }
 async function copyGridCells(
     rows: ResultPage['rows'],
@@ -366,13 +370,9 @@ function SelectionSummary({
             {selectedCells.count > 0 && (
                 <div className="result-grid-selection-tools">
                     <span>{selectedCells.count.toLocaleString()} cells selected</span>
-                    {selectedCells.numbers.length > 0 && (
+                    {selectedCells.numeric.count > 0 && (
                         <span>
-                            Sum {selectedCells.sum.toLocaleString()} · Avg{' '}
-                            {(selectedCells.sum / selectedCells.numbers.length).toLocaleString(
-                                undefined,
-                                { maximumFractionDigits: 4 },
-                            )}
+                            Sum {selectedCells.numeric.sum} · Avg {selectedCells.numeric.average}
                         </span>
                     )}
                     <button
@@ -446,21 +446,26 @@ export function ResultGrid({
         pinnedColumns,
     );
 
-    const toggleHiddenColumn = (index: number) =>
+    const toggleHiddenColumn = (index: number) => {
+        gridSelection.clearSelection();
         setHiddenColumns(previous => {
             const next = new Set(previous);
             if (next.has(index)) next.delete(index);
             else next.add(index);
             return next;
         });
-    const togglePinnedColumn = (index: number) =>
+    };
+    const togglePinnedColumn = (index: number) => {
+        gridSelection.clearSelection();
         setPinnedColumns(previous => {
             const next = new Set(previous);
             if (next.has(index)) next.delete(index);
             else next.add(index);
             return next;
         });
+    };
     const restoreColumns = () => {
+        gridSelection.clearSelection();
         setHiddenColumns(new Set());
         setPinnedColumns(new Set());
     };

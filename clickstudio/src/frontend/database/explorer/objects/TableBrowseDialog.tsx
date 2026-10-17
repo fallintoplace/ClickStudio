@@ -4,6 +4,7 @@ import type { Connected } from '../../../workspace/workspace-types';
 import type { OpenSqlDraft } from '../../../queries/execution/sql-draft-observer';
 import {
     BROWSE_PAGE_ROWS,
+    BROWSE_PAGE_COLUMNS,
     MAX_BROWSE_PAGE,
     browseColumnSupported,
     isTableBrowsePage,
@@ -23,6 +24,7 @@ function browseStatus(error: string, loading: boolean, result?: TableBrowsePage)
     if (error) return error;
     if (loading) return 'Loading table page…';
     if (!result) return 'No page loaded';
+    if (result.rows.length === 0) return 'No matching rows on this page';
     const first = result.page * BROWSE_PAGE_ROWS + 1;
     const last = result.page * BROWSE_PAGE_ROWS + result.rows.length;
     const suffix = result.hasMore ? ' · More available' : ' · End of result';
@@ -31,15 +33,13 @@ function browseStatus(error: string, loading: boolean, result?: TableBrowsePage)
 
 function BrowsePageRows({
     result,
-    columnStart,
     onInspectCell,
 }: {
     result?: TableBrowsePage;
-    columnStart: number;
     onInspectCell: (cell: InspectedCell) => void;
 }) {
     if (!result) return null;
-    const visible = result.columns.slice(columnStart, columnStart + 12);
+    const visible = result.columns;
     return (
         <div
             className="table-browse-data-scroll"
@@ -52,7 +52,7 @@ function BrowsePageRows({
                     <tr>
                         <th scope="col">#</th>
                         {visible.map((column, i) => (
-                            <th scope="col" key={columnStart + i}>
+                            <th scope="col" key={result.columnStart + i}>
                                 {column.name}
                                 <small className="result-type-badge">{column.type}</small>
                             </th>
@@ -64,13 +64,13 @@ function BrowsePageRows({
                         <tr key={rowIndex}>
                             <td>{result.page * BROWSE_PAGE_ROWS + rowIndex + 1}</td>
                             {visible.map((column, columnIndex) => {
-                                const idx = columnStart + columnIndex;
+                                const idx = result.columnStart + columnIndex;
                                 return (
                                     <td key={idx}>
                                         <button
                                             className="result-cell-trigger"
                                             type="button"
-                                            title={previewResultCell(row[idx])}
+                                            title={previewResultCell(row[columnIndex])}
                                             onClick={() =>
                                                 onInspectCell({
                                                     columnName: column.name,
@@ -80,11 +80,11 @@ function BrowsePageRows({
                                                         result.page * BROWSE_PAGE_ROWS +
                                                         rowIndex +
                                                         1,
-                                                    value: row[idx],
+                                                    value: row[columnIndex],
                                                 })
                                             }
                                         >
-                                            {previewResultCell(row[idx])}
+                                            {previewResultCell(row[columnIndex])}
                                         </button>
                                     </td>
                                 );
@@ -126,13 +126,14 @@ export function TableBrowseDialog({
                   orderColumn: sortable[0]!.name,
                   direction: 'asc',
                   page: 0,
+                  columnStart: 0,
               }
             : undefined,
     );
     const [result, setResult] = useState<TableBrowsePage>();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
-    const [columnStart, setColumnStart] = useState(0);
+    const [totalColumns, setTotalColumns] = useState(columns.length);
     const [inspectedCell, setInspectedCell] = useState<InspectedCell>();
     const [pending, setPending] = useState(false);
 
@@ -162,7 +163,10 @@ export function TableBrowseDialog({
                   );
         void promise
             .then(page => {
-                if (current) setResult(page);
+                if (current) {
+                    setResult(page);
+                    setTotalColumns(page.totalColumns);
+                }
             })
             .catch(caught => {
                 if (current) setError(message(caught));
@@ -178,32 +182,40 @@ export function TableBrowseDialog({
 
     const apply = () => {
         if (!orderColumn) return;
-        setColumnStart(0);
+        setInspectedCell(undefined);
         setRequest({
             database: table.database,
             table: table.name,
             orderColumn,
             direction,
             page: 0,
+            columnStart: 0,
             ...(filterColumn ? { filterColumn, filterValue } : {}),
         });
         setPending(false);
     };
     const move = (next: number) => {
         if (!request || next < 0 || next > MAX_BROWSE_PAGE) return;
+        setInspectedCell(undefined);
         setRequest({ ...request, page: next });
+    };
+    const moveColumns = (next: number) => {
+        if (!request || loading || next < 0 || next >= totalColumns) return;
+        setInspectedCell(undefined);
+        setRequest({ ...request, columnStart: next });
     };
     const openSql = () => {
         if (!request) return;
         onOpenSqlDraft(
             'Browse ' + table.name + '.sql',
-            tableBrowseDraftSql(request, columns),
+            result?.draftSql ?? tableBrowseDraftSql(request, columns),
             false,
         );
         onClose();
     };
     const eligible = sortable.length > 0;
     const isLastPage = request?.page === MAX_BROWSE_PAGE;
+    const columnStart = request?.columnStart ?? 0;
     return (
         <dialog
             ref={dialog}
@@ -316,38 +328,38 @@ export function TableBrowseDialog({
             </p>
             <div className="table-browse-actions">
                 <span role="status">{browseStatus(error, loading, result)}</span>
-                <Button variant="secondary" onClick={openSql} disabled={!request}>
+                <Button
+                    variant="secondary"
+                    onClick={openSql}
+                    disabled={!request || (!result && columnStart >= columns.length)}
+                >
                     Open as SQL
                 </Button>
             </div>
-            {result && (
+            {eligible && totalColumns > BROWSE_PAGE_COLUMNS && (
                 <div className="table-browse-column-nav">
                     <span>
                         Columns {columnStart + 1}-
-                        {Math.min(result.columns.length, columnStart + 12)}
-                        of {result.columns.length}
+                        {Math.min(totalColumns, columnStart + BROWSE_PAGE_COLUMNS)}
+                        of {totalColumns}
                     </span>
                     <Button
                         variant="ghost"
-                        disabled={columnStart === 0}
-                        onClick={() => setColumnStart(Math.max(0, columnStart - 12))}
+                        disabled={loading || columnStart === 0}
+                        onClick={() => moveColumns(Math.max(0, columnStart - BROWSE_PAGE_COLUMNS))}
                     >
                         Previous columns
                     </Button>
                     <Button
                         variant="ghost"
-                        disabled={columnStart + 12 >= result.columns.length}
-                        onClick={() => setColumnStart(columnStart + 12)}
+                        disabled={loading || columnStart + BROWSE_PAGE_COLUMNS >= totalColumns}
+                        onClick={() => moveColumns(columnStart + BROWSE_PAGE_COLUMNS)}
                     >
                         Next columns
                     </Button>
                 </div>
             )}
-            <BrowsePageRows
-                result={result}
-                columnStart={columnStart}
-                onInspectCell={setInspectedCell}
-            />
+            <BrowsePageRows result={result} onInspectCell={setInspectedCell} />
             <footer className="table-browse-pages">
                 <span>
                     Page {(request?.page ?? 0) + 1} of at most {MAX_BROWSE_PAGE + 1}

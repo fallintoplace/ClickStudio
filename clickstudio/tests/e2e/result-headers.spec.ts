@@ -217,3 +217,42 @@ test('Very long result types keep full metadata in a native tooltip in a narrow 
         page.getByRole('searchbox', { name: 'Search this page', exact: true }),
     ).toBeFocused();
 });
+
+test('pinning a column clears a previously selected cell rather than copying another value', async ({
+    page,
+}) => {
+    await page.route(
+        url => url.pathname.endsWith('/result'),
+        async route => {
+            const response = await route.fetch();
+            const result = await response.json();
+            await route.fulfill({
+                response,
+                json: {
+                    ...result,
+                    columns: [
+                        { name: 'A', type: 'String' },
+                        { name: 'B', type: 'String' },
+                        { name: 'C', type: 'String' },
+                    ],
+                    rows: [['a', 'b', 'c']],
+                    offset: 0,
+                    totalRows: 1,
+                    nextOffset: null,
+                    completeness: 'complete',
+                },
+            });
+        },
+    );
+    await trust(page);
+    await runButton(page).click();
+    await page.getByRole('button', { name: 'Search rows' }).click();
+    await page.getByRole('button', { name: 'Select cells' }).click();
+    await page.locator('.data-table tbody .result-cell-trigger').first().click();
+    await expect(page.getByText('1 cells selected')).toBeVisible();
+    await page.getByRole('button', { name: 'Close search and pages' }).click();
+    await page.getByRole('button', { name: 'Columns: 3 of 3 shown' }).click();
+    await page.getByRole('button', { name: 'Pin C to the left' }).click();
+    await expect(page.getByText('1 cells selected')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Copy selection' })).toHaveCount(0);
+});
