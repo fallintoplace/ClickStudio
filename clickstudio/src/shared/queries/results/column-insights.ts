@@ -130,7 +130,27 @@ export function selectedRowsTsv(
         .join('\n');
 }
 
-/** Exact integer sums, including UInt64/Int128 strings. Float/Decimal sums are marked approximate. */
+function selectionNumericValue(value: Json | undefined, type: string): bigint | number | null {
+    if (!numericType(type) || (typeof value !== 'string' && typeof value !== 'number'))
+        return null;
+    if (/^U?Int\d+$/.test(baseType(type)) && /^[+-]?\d+$/.test(String(value))) {
+        if (typeof value === 'number' && !Number.isSafeInteger(value)) return null;
+        return BigInt(value);
+    }
+    return chartNumber(value);
+}
+
+function formatExactAverage(sum: bigint, count: number): string {
+    const denominator = BigInt(count);
+    const negative = sum < 0n;
+    const absolute = negative ? -sum : sum;
+    const rounded = (absolute * 10_000n + denominator / 2n) / denominator;
+    const fraction = (rounded % 10_000n).toString().padStart(4, '0').replace(/0+$/, '');
+    const whole = (rounded / 10_000n).toLocaleString();
+    return (negative ? '-' : '') + whole + (fraction ? '.' + fraction : '');
+}
+
+/** Exact integer sums; floats and decimals are explicitly approximate. */
 export function selectedNumericSummary(
     rows: readonly Row[],
     columnIndexes: readonly number[],
@@ -142,21 +162,14 @@ export function selectedNumericSummary(
     let approximate = false;
     for (const row of rows) {
         for (const index of columnIndexes) {
-            const type = columns[index]?.type ?? '';
-            if (!numericType(type)) continue;
-            const value = row[index];
-            if (value === null || value === undefined || typeof value === 'object') continue;
-            if (/^U?Int\d+$/.test(baseType(type)) && /^[+-]?\d+$/.test(String(value))) {
-                if (typeof value === 'number' && !Number.isSafeInteger(value)) continue;
-                exact += BigInt(value as string | number);
-                count++;
-                continue;
-            }
-            const number = chartNumber(value);
-            if (number === null) continue;
-            floating += number;
+            const value = selectionNumericValue(row[index], columns[index]?.type ?? '');
+            if (value === null) continue;
             count++;
-            approximate = true;
+            if (typeof value === 'bigint') exact += value;
+            else {
+                floating += value;
+                approximate = true;
+            }
         }
     }
     if (!count) return { count, sum: '', average: '' };
@@ -166,15 +179,9 @@ export function selectedNumericSummary(
             '≈' + value.toLocaleString(undefined, { maximumFractionDigits: 4 });
         return { count, sum: format(total), average: format(total / count) };
     }
-    const denominator = BigInt(count);
-    const negative = exact < 0n;
-    const absolute = negative ? -exact : exact;
-    const rounded = (absolute * 10_000n + denominator / 2n) / denominator;
-    const fraction = (rounded % 10_000n).toString().padStart(4, '0').replace(/0+$/, '');
-    const whole = (rounded / 10_000n).toLocaleString();
     return {
         count,
         sum: exact.toLocaleString(),
-        average: (negative ? '-' : '') + whole + (fraction ? '.' + fraction : ''),
+        average: formatExactAverage(exact, count),
     };
 }
