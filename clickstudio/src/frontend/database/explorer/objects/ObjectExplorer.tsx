@@ -18,6 +18,8 @@ import { CreatePythonFunctionDialog } from '../../functions/CreatePythonFunction
 import { PythonFunctionDetails } from '../../functions/PythonFunctionDetails';
 import { DeleteDatabaseDialog } from '../../databases/DeleteDatabaseDialog';
 import { metadataConnectionKey } from '../../schema/metadata-state';
+import { TableBrowseDialog } from './TableBrowseDialog';
+import type { ExplorerSelection } from './object-explorer-model';
 
 function ObjectExplorerEmptySearch({
     query,
@@ -40,6 +42,7 @@ function refreshObjectMetadata(...catalogs: { refresh: () => void }[]) {
 
 export function ObjectExplorer(props: ObjectExplorerProps) {
     const state = useObjectExplorerState(props);
+    const [browseTarget, setBrowseTarget] = useState<Extract<ExplorerSelection, { kind: 'relation' }>>();
     const [deleteDatabaseTarget, setDeleteDatabaseTarget] = useState<{
         database: string;
         connectionKey: string;
@@ -47,7 +50,7 @@ export function ObjectExplorer(props: ObjectExplorerProps) {
     const connectionKey = metadataConnectionKey(props.connection);
     const currentConnectionKey = useRef(connectionKey);
     currentConnectionKey.current = connectionKey;
-    useEffect(() => setDeleteDatabaseTarget(undefined), [connectionKey, props.trusted]);
+    useEffect(() => { setDeleteDatabaseTarget(undefined); setBrowseTarget(undefined); }, [connectionKey, props.trusted]);
     const [functionExpansion, setFunctionExpansion] = useState({
         functions: true,
         sql: true,
@@ -247,6 +250,8 @@ export function ObjectExplorer(props: ObjectExplorerProps) {
                         onInsert={onInsert}
                         onCopy={copyText}
                         onOpenSqlDraft={onOpenSqlDraft}
+                        onBrowseTable={setBrowseTarget}
+                        canBrowse={connection.dataSource !== 'fixture'}
                         onOpenReference={onOpenReference}
                         onOpenParts={setPartsTable}
                         onSelect={selectObject}
@@ -257,6 +262,7 @@ export function ObjectExplorer(props: ObjectExplorerProps) {
             {!functionDetails && !showCompactDetails && (
                 <ObjectExplorerBrowser
                     state={state}
+                    onBrowseTable={setBrowseTarget}
                     onDeleteDatabase={database =>
                         setDeleteDatabaseTarget({ database, connectionKey })
                     }
@@ -303,6 +309,12 @@ export function ObjectExplorer(props: ObjectExplorerProps) {
                     onDeleted={functions.deleted}
                 />
             )}
+            {trusted && browseTarget && (
+                <TableBrowseDialog key={connectionKey + ':' + browseTarget.id}
+                    table={browseTarget.table} columns={browseTarget.columns}
+                    connection={connection} onClose={() => setBrowseTarget(undefined)}
+                    onOpenSqlDraft={onOpenSqlDraft} />
+            )}
             <ObjectExplorerDialogs
                 {...{
                     copy,
@@ -348,6 +360,7 @@ function functionRefreshErrors(
 
 function ObjectExplorerBrowser({
     state,
+    onBrowseTable,
     onDeleteDatabase,
     functionsSlot,
     functionsVisible,
@@ -356,6 +369,7 @@ function ObjectExplorerBrowser({
     onRefreshFunctions,
 }: {
     state: ReturnType<typeof useObjectExplorerState>;
+    onBrowseTable: (selection: Extract<ExplorerSelection, { kind: 'relation' }>) => void;
     onDeleteDatabase: (database: string) => void;
     functionsSlot?: ReactNode;
     functionsVisible: boolean;
@@ -504,6 +518,8 @@ function ObjectExplorerBrowser({
                             onInsert={onInsert}
                             onCopy={copyText}
                             onOpenSqlDraft={onOpenSqlDraft}
+                            onBrowseTable={onBrowseTable}
+                            canBrowse={state.connection.dataSource !== 'fixture'}
                             onOpenReference={onOpenReference}
                             onOpenParts={setPartsTable}
                             onSelect={selectObject}

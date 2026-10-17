@@ -37,6 +37,8 @@ type ObjectDetailsProps = {
     onOpenParts: (table: SchemaTable) => void;
     onSelect: (id: string) => void;
     search: string;
+    onBrowseTable?: (selection: Extract<ExplorerSelection, { kind: 'relation' }>) => void;
+    canBrowse?: boolean;
 };
 
 export function ObjectDetails({
@@ -54,6 +56,8 @@ export function ObjectDetails({
     onOpenParts,
     onSelect,
     search,
+    onBrowseTable,
+    canBrowse,
 }: ObjectDetailsProps) {
     if (selection.kind === 'relation') {
         return (
@@ -72,6 +76,8 @@ export function ObjectDetails({
                 onOpenParts={onOpenParts}
                 onSelect={onSelect}
                 search={search}
+                onBrowseTable={onBrowseTable}
+                canBrowse={canBrowse}
             />
         );
     }
@@ -275,6 +281,8 @@ function RelationDetails({
     onOpenParts,
     onSelect,
     search,
+    onBrowseTable,
+    canBrowse,
 }: RelationDetailsProps) {
     const { table, columns } = selection;
     const qualified = qualifiedTableName(table);
@@ -343,6 +351,14 @@ function RelationDetails({
                         <Icon name="table" />
                         {copy.previewRows}
                     </Button>
+                    {selection.relationKind === 'table' && canBrowse && onBrowseTable && (
+                        <Button variant="secondary" className="toolbar-small" disabled={!trusted}
+                            title={!trusted ? copy.runActionTrustRequired : 'Browse bounded live table pages'}
+                            onClick={() => onBrowseTable(selection)}>
+                            <Icon name="table" />
+                            Browse table
+                        </Button>
+                    )}
                     <Button
                         variant="ghost"
                         className="toolbar-small object-copy-name-action"

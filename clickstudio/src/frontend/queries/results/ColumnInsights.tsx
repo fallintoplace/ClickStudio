@@ -4,7 +4,6 @@ import type { Run } from '../../../shared/queries/execution/types';
 import { columnStats } from '../../../shared/queries/results/column-insights';
 import { api, apiResponses, message } from '../../api/client';
 import { useDialogFocus } from '../../ui/focus/useDialogFocus';
-import { Button } from '../../ui/components/primitives';
 
 export function ColumnInsights({
     run, page, columnIndex, onClose,
@@ -65,9 +64,8 @@ export function ColumnInsights({
                         {column.type} · {scope} only
                     </p>
                 </div>
-                <Button variant="ghost" ref={closeButton} onClick={onClose} aria-label="Close column insights">
-                    Close
-                </Button>
+                <button className="button-base button-ghost" type="button" ref={closeButton}
+                    onClick={onClose} aria-label="Close column insights">Close</button>
             </header>
             {!snapshot && !error && <p role="status">Loading retained rows…</p>}
             {error && <p role="status">Could not load all retained rows. Showing this page only: {error}</p>}
