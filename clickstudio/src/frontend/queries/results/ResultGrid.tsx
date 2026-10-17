@@ -316,7 +316,8 @@ function selectedGridCells(
     const numbers = rows.flatMap(row =>
         columns.flatMap(index => {
             const value = numericType(page.columns[index]?.type ?? '')
-            ? chartNumber(row[index]) : null;
+                ? chartNumber(row[index])
+                : null;
             return value === null ? [] : [value];
         }),
     );

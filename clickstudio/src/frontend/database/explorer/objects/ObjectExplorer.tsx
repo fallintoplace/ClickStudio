@@ -67,8 +67,16 @@ function refreshObjectMetadata(...catalogs: { refresh: () => void }[]) {
 
 function compactTableWriteActions(state: ReturnType<typeof useObjectExplorerState>) {
     const {
-        connection, insertableTable, deletableTable, tablePermissions, trusted,
-        copy, showCompactDetails, selectedTable, setInsertRowTarget, setDeleteTableTarget,
+        connection,
+        insertableTable,
+        deletableTable,
+        tablePermissions,
+        trusted,
+        copy,
+        showCompactDetails,
+        selectedTable,
+        setInsertRowTarget,
+        setDeleteTableTarget,
     } = state;
     const canInsertSelectedTable =
         connection.dataSource !== 'fixture' &&
@@ -283,7 +291,10 @@ export function ObjectExplorer(props: ObjectExplorerProps) {
                         onCopy={copyText}
                         onOpenSqlDraft={onOpenSqlDraft}
                         onBrowseTable={setBrowseTarget}
-                        canBrowse={connection.dataSource !== 'fixture' && connection.id !== PLAYGROUND_CONNECTION_ID}
+                        canBrowse={
+                            connection.dataSource !== 'fixture' &&
+                            connection.id !== PLAYGROUND_CONNECTION_ID
+                        }
                         onOpenReference={onOpenReference}
                         onOpenParts={setPartsTable}
                         onSelect={selectObject}
@@ -551,7 +562,10 @@ function ObjectExplorerBrowser({
                             onCopy={copyText}
                             onOpenSqlDraft={onOpenSqlDraft}
                             onBrowseTable={onBrowseTable}
-                            canBrowse={state.connection.dataSource !== 'fixture' && state.connection.id !== PLAYGROUND_CONNECTION_ID}
+                            canBrowse={
+                                state.connection.dataSource !== 'fixture' &&
+                                state.connection.id !== PLAYGROUND_CONNECTION_ID
+                            }
                             onOpenReference={onOpenReference}
                             onOpenParts={setPartsTable}
                             onSelect={selectObject}

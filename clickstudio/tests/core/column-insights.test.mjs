@@ -47,16 +47,18 @@ test('copy selected cells preserves TSV boundaries and large-number strings', ()
     assert.equal(tsv, '18446744073709551615\t"line\\nwith tab\tand ""quote"""');
 });
 
-
 test('distinct counts do not collide on truncated labels or object previews', () => {
     const prefix = 'x'.repeat(130);
     const stats = columnStats(
         [[prefix + 'a'], [prefix + 'b'], [prefix + 'a']],
-        { name: 'name', type: 'String' }, 0,
+        { name: 'name', type: 'String' },
+        0,
     );
     assert.equal(stats.distinct, 2);
-    assert.deepEqual(stats.common.map(value => value.count), [2, 1]);
-    const objects = columnStats([[{ x: 1 }], [{ x: 2 }]],
-        { name: 'payload', type: 'JSON' }, 0);
+    assert.deepEqual(
+        stats.common.map(value => value.count),
+        [2, 1],
+    );
+    const objects = columnStats([[{ x: 1 }], [{ x: 2 }]], { name: 'payload', type: 'JSON' }, 0);
     assert.equal(objects.distinct, 2);
 });

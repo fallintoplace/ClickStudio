@@ -62,9 +62,10 @@ export function columnStats(
             detached++;
             continue;
         }
-        const key = typeof value === 'object'
-            ? 'object:' + JSON.stringify(value)
-            : typeof value + ':' + String(value);
+        const key =
+            typeof value === 'object'
+                ? 'object:' + JSON.stringify(value)
+                : typeof value + ':' + String(value);
         const existing = counts.get(key);
         if (existing) existing.count++;
         else if (counts.size < MAX_DISTINCT)
@@ -97,9 +98,7 @@ export function columnStats(
         nonRepresentable,
         ...(numericCount ? { minimum, maximum, average } : {}),
         histogram,
-        common: [...counts.values()]
-            .sort((a, b) => b.count - a.count)
-            .slice(0, 5),
+        common: [...counts.values()].sort((a, b) => b.count - a.count).slice(0, 5),
     };
 }
 

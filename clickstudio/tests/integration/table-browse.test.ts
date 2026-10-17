@@ -21,21 +21,27 @@ test('table browser returns exactly 200 rows with a lookahead and bound SQL para
     Object.defineProperty(client, 'query', {
         value: async (options: unknown) => {
             if (isRecord(options)) statements.push(options);
-            return { json: async () => [
-                { name: 'id', type: 'UInt64' },
-                { name: 'event', type: 'String' },
-            ] };
+            return {
+                json: async () => [
+                    { name: 'id', type: 'UInt64' },
+                    { name: 'event', type: 'String' },
+                ],
+            };
         },
     });
     Object.defineProperty(client, 'exec', {
         value: async (options: unknown) => {
             if (isRecord(options)) statements.push(options);
-            return { stream: Readable.from([
-                JSON.stringify(['id', 'event']) + '\n',
-                JSON.stringify(['UInt64', 'String']) + '\n',
-                ...Array.from({ length: 201 }, (_, i) =>
-                    JSON.stringify([String(i), 'safe']) + '\n'),
-            ]) };
+            return {
+                stream: Readable.from([
+                    JSON.stringify(['id', 'event']) + '\n',
+                    JSON.stringify(['UInt64', 'String']) + '\n',
+                    ...Array.from(
+                        { length: 201 },
+                        (_, i) => JSON.stringify([String(i), 'safe']) + '\n',
+                    ),
+                ]),
+            };
         },
     });
     const page = await executeTableBrowse(client, request);
@@ -58,7 +64,9 @@ test('table browser rejects SQL requests for missing sort columns', async () => 
         value: async () => ({ json: async () => [{ name: 'id', type: 'UInt64' }] }),
     });
     Object.defineProperty(client, 'exec', {
-        value: async () => { throw new Error('Must not execute unverified SQL'); },
+        value: async () => {
+            throw new Error('Must not execute unverified SQL');
+        },
     });
     await assert.rejects(
         () => executeTableBrowse(client, { ...request, orderColumn: 'unverified' }),
