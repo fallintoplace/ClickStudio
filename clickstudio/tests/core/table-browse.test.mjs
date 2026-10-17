@@ -77,14 +77,8 @@ test('table browser projects only the requested column window', () => {
     assert.doesNotMatch(generated.sql, /SELECT \*/);
     assert.doesNotMatch(generated.sql, /`col_24`/);
     assert.match(generated.sql, /ORDER BY `col_0` ASC LIMIT 201 OFFSET 200/);
-    assert.throws(
-        () => buildTableBrowseSql({ ...input, columnStart: 30 }, wide),
-        /column window/,
-    );
-    assert.throws(
-        () => parseTableBrowseRequest({ ...input, columnStart: 501 }),
-        /column window/,
-    );
+    assert.throws(() => buildTableBrowseSql({ ...input, columnStart: 30 }, wide), /column window/);
+    assert.throws(() => parseTableBrowseRequest({ ...input, columnStart: 501 }), /column window/);
 });
 test('editable SQL keeps pagination text inside filter values unchanged', () => {
     const input = {

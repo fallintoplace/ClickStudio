@@ -89,6 +89,7 @@ export function columnStats(
         const bucket = bucketFor(n, minimum, maximum);
         histogram[bucket] = (histogram[bucket] ?? 0) + 1;
     }
+    const common = distinctCapped ? [] : [...counts.values()];
     return {
         total: rows.length,
         nulls,
@@ -99,9 +100,7 @@ export function columnStats(
         nonRepresentable,
         ...(numericCount ? { minimum, maximum, average } : {}),
         histogram,
-        common: distinctCapped
-            ? []
-            : [...counts.values()].sort((a, b) => b.count - a.count).slice(0, 5),
+        common: common.sort((a, b) => b.count - a.count).slice(0, 5),
     };
 }
 
@@ -131,8 +130,8 @@ export function selectedRowsTsv(
 }
 
 function selectionNumericValue(value: Json | undefined, type: string): bigint | number | null {
-    if (!numericType(type) || (typeof value !== 'string' && typeof value !== 'number'))
-        return null;
+    if (typeof value !== 'string' && typeof value !== 'number') return null;
+    if (!numericType(type)) return null;
     if (/^U?Int\d+$/.test(baseType(type)) && /^[+-]?\d+$/.test(String(value))) {
         if (typeof value === 'number' && !Number.isSafeInteger(value)) return null;
         return BigInt(value);

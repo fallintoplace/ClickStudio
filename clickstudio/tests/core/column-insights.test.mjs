@@ -90,11 +90,11 @@ test('selected integer totals preserve precision above Number.MAX_SAFE_INTEGER',
     assert.equal(wide.sum.replaceAll(',', ''), '18446744073709551615');
 });
 test('selected floating-point totals are clearly labeled approximate', () => {
-    const stats = selectedNumericSummary(
-        [[1.2, '18446744073709551615']],
-        [0, 1],
-        [{ name: 'f', type: 'Float64' }, { name: 'n', type: 'UInt64' }],
-    );
+    const columns = [
+        { name: 'f', type: 'Float64' },
+        { name: 'n', type: 'UInt64' },
+    ];
+    const stats = selectedNumericSummary([[1.2, '18446744073709551615']], [0, 1], columns);
     assert.equal(stats.count, 2);
     assert.ok(stats.sum.startsWith('≈'));
     assert.ok(stats.average.startsWith('≈'));
