@@ -19,6 +19,9 @@ import { terminal } from '../execution/status';
 import { statementOutcome } from './statement-outcome';
 import { resultTypeGroup, type ResultTypeGroup } from './result-type-group';
 import { largeCellUrl } from './large-cell-actions';
+import { ColumnInsights } from './ColumnInsights';
+import { chartNumber } from '../../../shared/queries/results/results';
+import { selectedRowsTsv } from '../../../shared/queries/results/column-insights';
 
 function ResultColumnHeader({
     name,
@@ -27,6 +30,7 @@ function ResultColumnHeader({
     index,
     pinned,
     left,
+    onInsights,
 }: {
     name: string;
     type: string;
@@ -34,6 +38,7 @@ function ResultColumnHeader({
     index: number;
     pinned: boolean;
     left?: number;
+    onInsights: () => void;
 }) {
     return (
         <th
@@ -49,6 +54,10 @@ function ResultColumnHeader({
                 <small className="result-type-badge" data-overflow-text data-type-group={group}>
                     {type}
                 </small>
+                <button type="button" className="result-column-insights-trigger"
+                    aria-label={"Insights for " + name} title="Inspect retained column statistics" onClick={onInsights}>
+                    Stats
+                </button>
             </div>
         </th>
     );
@@ -131,6 +140,9 @@ function ResultRows({
     pinnedColumns,
     pinnedOffsets,
     onInspectCell,
+    selectionMode,
+    isSelected,
+    onSelectCell,
 }: {
     run: Run;
     page: ResultPage;
@@ -140,6 +152,9 @@ function ResultRows({
     pinnedColumns: Set<number>;
     pinnedOffsets: Record<number, number>;
     onInspectCell: (cell: InspectedCell) => void;
+    selectionMode: boolean;
+    isSelected: (row: number, column: number) => boolean;
+    onSelectCell: (row: number, column: number, extend: boolean) => void;
 }) {
     return (
         <tbody>
@@ -149,7 +164,7 @@ function ResultRows({
                     style={{ animationDelay: `${Math.min(rowIndex, 12) * 16}ms` }}
                 >
                     <td className="row-number">{page.offset + rowIndex + 1}</td>
-                    {orderedColumnIndices.map(columnIndex => {
+                    {orderedColumnIndices.map((columnIndex, position) => {
                         const value = row[columnIndex];
                         const largeCell = isLargeCellReference(value, page.largeCellToken)
                             ? value
@@ -175,7 +190,7 @@ function ResultRows({
                                         : undefined
                                 }
                                 data-type-group={columnGroups[columnIndex] ?? 'other'}
-                                className={value === null ? 'cell-null' : ''}
+                                className={cx(value === null && 'cell-null', selectionMode && isSelected(rowIndex, position) && 'result-cell-selected')}
                             >
                                 <button
                                     type="button"
@@ -185,8 +200,13 @@ function ResultRows({
                                             ? `${preview}\n${(largeCell.bytes / 1_000_000).toFixed(1)} MB`
                                             : preview
                                     }
-                                    aria-label={accessibleLabel}
-                                    onClick={() =>
+                                    aria-label={selectionMode ? "Select " + accessibleLabel : accessibleLabel}
+                                    aria-pressed={selectionMode ? isSelected(rowIndex, position) : undefined}
+                                    onClick={event => {
+                                        if (selectionMode) {
+                                            onSelectCell(rowIndex, position, event.shiftKey);
+                                            return;
+                                        }
                                         onInspectCell({
                                             columnName: column.name,
                                             columnType: column.type,
@@ -205,8 +225,8 @@ function ResultRows({
                                                       ),
                                                   }
                                                 : {}),
-                                        })
-                                    }
+                                        });
+                                    }}
                                 >
                                     {largeCell ? (
                                         <>
@@ -256,6 +276,10 @@ export function ResultGrid({
     const [hiddenColumns, setHiddenColumns] = useState<Set<number>>(() => new Set());
     const [pinnedColumns, setPinnedColumns] = useState<Set<number>>(() => new Set());
     const [inspectedCell, setInspectedCell] = useState<InspectedCell | null>(null);
+    const [insightsColumn, setInsightsColumn] = useState<number>();
+    const [selectionMode, setSelectionMode] = useState(false);
+    const [selection, setSelection] = useState<{ offset: number; firstRow: number; lastRow: number; firstCol: number; lastCol: number }>();
+    const [copyFeedback, setCopyFeedback] = useState('');
     const [retainedPage, setRetainedPage] = useState(page);
     if (page && page !== retainedPage) setRetainedPage(page);
     const loadedPage = page;
@@ -352,7 +376,43 @@ export function ResultGrid({
     else if (orderedColumnIndices.length === 0)
         noRowsText = 'All columns are hidden. Open Manage columns to show them.';
     else if (visibleRows.length === 0) noRowsText = 'No rows match on this page.';
-    const rowCount = `${page.totalRows.toLocaleString()} ${page.totalRows === 1 ? 'row' : 'rows'}`;
+    const selected = selection?.offset === page.offset ? selection : undefined;
+    const selectedRows = selected ? visibleRows.filter(item =>
+        item.index >= Math.min(selected.firstRow, selected.lastRow) &&
+        item.index <= Math.max(selected.firstRow, selected.lastRow),
+    ).map(item => item.row) : [];
+    const selectedColumns = selected
+        ? orderedColumnIndices.slice(Math.min(selected.firstCol, selected.lastCol), Math.max(selected.firstCol, selected.lastCol) + 1)
+        : [];
+    const selectedNumbers = selectedRows.flatMap(row => selectedColumns.flatMap(index => {
+        const value = chartNumber(row[index]);
+        return value === null ? [] : [value];
+    }));
+    const selectedSum = selectedNumbers.reduce((sum, value) => sum + value, 0);
+    const selectedCount = selectedRows.length * selectedColumns.length;
+    const copySelection = async () => {
+        if (!selectedCount) return;
+        try {
+            await navigator.clipboard.writeText(selectedRowsTsv(selectedRows, selectedColumns, page.largeCellToken));
+            setCopyFeedback('Copied ' + selectedCount.toLocaleString() + ' cells.');
+        } catch {
+            setCopyFeedback('Clipboard unavailable.');
+        }
+    };
+    const selectCell = (row: number, col: number, extend: boolean) => {
+        setCopyFeedback('');
+        setSelection(previous => extend && previous?.offset === page.offset
+            ? { ...previous, lastRow: row, lastCol: col }
+            : { offset: page.offset, firstRow: row, lastRow: row, firstCol: col, lastCol: col });
+    };
+    const isSelected = (row: number, col: number) => Boolean(selected &&
+        row >= Math.min(selected.firstRow, selected.lastRow) &&
+        row <= Math.max(selected.firstRow, selected.lastRow) &&
+        col >= Math.min(selected.firstCol, selected.lastCol) &&
+        col <= Math.max(selected.firstCol, selected.lastCol));
+    const rowCount = String(page.totalRows.toLocaleString()) + ' retained ' +
+        (page.totalRows === 1 ? 'row' : 'rows') +
+        (page.completeness === 'truncated' ? ' · Incomplete result' : ' · Complete result');
     const rowCountLabel = (
         <span
             className="result-row-count"
@@ -399,6 +459,19 @@ export function ResultGrid({
             inert={obscured || undefined}
         >
             {renderInContainer(toolbar, toolbarContainer)}
+            <div className="result-grid-scope" role="status">
+                <span>{page.rows.length.toLocaleString()} displayed · {page.totalRows.toLocaleString()} retained{page.completeness === 'truncated' ? ' · Truncated' : ' · Complete'}</span>
+                <div className="result-grid-selection-tools">
+                    <button type="button" aria-pressed={selectionMode} onClick={() => { setSelectionMode(!selectionMode); setSelection(undefined); setCopyFeedback(''); }}>
+                        {selectionMode ? 'Exit selection' : 'Select cells'}
+                    </button>
+                    {selectionMode && selectedCount > 0 && <>
+                        <span>{selectedCount.toLocaleString()} cells selected{selectedNumbers.length ? ' · Sum ' + selectedSum.toLocaleString() + ' · Avg ' + (selectedSum / selectedNumbers.length).toLocaleString(undefined, { maximumFractionDigits: 4 }) : ''}</span>
+                        <button type="button" onClick={() => void copySelection()}>Copy selection</button>
+                    </>}
+                    {copyFeedback && <span role="status">{copyFeedback}</span>}
+                </div>
+            </div>
             {pageLoading ? (
                 <div className="result-loading" role="status">
                     <Spinner />
@@ -439,6 +512,7 @@ export function ResultGrid({
                                                     index={index}
                                                     pinned={pinned}
                                                     left={pinnedOffsets[index]}
+                                                    onInsights={() => setInsightsColumn(index)}
                                                 />
                                             );
                                         })}
@@ -453,6 +527,9 @@ export function ResultGrid({
                                     pinnedColumns={pinnedColumns}
                                     pinnedOffsets={pinnedOffsets}
                                     onInspectCell={setInspectedCell}
+                                    selectionMode={selectionMode}
+                                    isSelected={isSelected}
+                                    onSelectCell={selectCell}
                                 />
                             </NativeTable>
                             {noRowsText && (
@@ -466,6 +543,10 @@ export function ResultGrid({
             )}
             {inspectedCell && (
                 <CellInspector cell={inspectedCell} onClose={() => setInspectedCell(null)} />
+            )}
+            {insightsColumn !== undefined && (
+                <ColumnInsights key={run.id + ':' + insightsColumn} run={run} page={page} columnIndex={insightsColumn}
+                    onClose={() => setInsightsColumn(undefined)} />
             )}
         </div>
     );
