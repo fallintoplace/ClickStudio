@@ -3,6 +3,7 @@ import type { FlamegraphSource } from '../../queries/inspection/flamegraph.js';
 import type { NativeExplorerRequest } from '../explorer/explorers.js';
 import type { CreateTableColumn } from '../tables/create-table.js';
 import type { QueryLogSource, WorkloadWindow } from '../explorer/activity/workload.js';
+import type { TableBrowseRequest } from '../browse/table-browse.js';
 
 export const CLOUD_ACTIONS = {
     functions: 'functions',
@@ -24,6 +25,7 @@ export const CLOUD_ACTIONS = {
     tablePermissions: 'table-permissions',
     run: 'run',
     fullExport: 'full-export',
+    browseTable: 'browse-table',
     workload: 'workload',
     replication: 'replication',
     createTable: 'create-table',
@@ -70,6 +72,7 @@ type CloudRequestPayloads = {
     [CLOUD_ACTIONS.tablePermissions]: { database: string; table?: string };
     [CLOUD_ACTIONS.run]: QueryInput & { sessionId?: string; queryId?: string };
     [CLOUD_ACTIONS.fullExport]: QueryInput & { previewLimit?: string };
+    [CLOUD_ACTIONS.browseTable]: TableBrowseRequest;
     [CLOUD_ACTIONS.workload]: { minutes: WorkloadWindow; source: QueryLogSource };
     [CLOUD_ACTIONS.replication]: object;
     [CLOUD_ACTIONS.createTable]: {

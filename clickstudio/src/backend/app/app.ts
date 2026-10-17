@@ -28,6 +28,7 @@ import { registerExplorerRoutes } from '../database/explorer/routes.js';
 import { registerDocumentationRoutes } from '../database/explorer/reference-routes.js';
 import { registerTableRoutes } from '../database/tables/routes.js';
 import { registerRunRoutes } from '../queries/execution/routes.js';
+import { registerTableBrowseRoutes } from '../queries/browse/routes.js';
 import { registerDocumentRoutes } from '../queries/saved-queries/routes.js';
 import { registerAssistantRoutes } from '../assistant/proposals/routes.js';
 import { registerImportRoutes } from '../database/imports/routes.js';
@@ -106,6 +107,7 @@ export function createApp(
     registerDocumentationRoutes({ authorized, driver, app });
     registerTableRoutes({ app, tableCreation, tableDeletion, driver, authorized });
     registerDatabaseRoutes({ app, databaseDeletion, driver, runs });
+    registerTableBrowseRoutes(app, driver, authorized);
     registerRunRoutes({
         app,
         runs,

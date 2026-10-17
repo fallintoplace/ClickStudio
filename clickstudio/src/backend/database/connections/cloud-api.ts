@@ -38,6 +38,8 @@ import { AppError } from '../../system/requests/errors.js';
 import { fail, json } from '../../system/requests/responses.js';
 import { cloudResultStreamQuery } from '../clickhouse/query-format.js';
 import { collectCompactStream } from '../clickhouse/result-stream.js';
+import { executeTableBrowse } from '../clickhouse/table-browse.js';
+import { BrowseValidationError, parseTableBrowseRequest } from '../../../shared/database/browse/table-browse.js';
 import {
     CLOUD_LARGE_CELL_TTL_MS,
     cloudCellOwnerKey,
@@ -2067,6 +2069,15 @@ async function post(request: Request, runtime?: CloudApiRuntime): Promise<Respon
                 return await handleCloudRun(body, credentials, url, runtime?.largeCells);
             case CLOUD_ACTIONS.fullExport:
                 return await handleCloudFullExport(body, credentials, url, request.signal);
+            case CLOUD_ACTIONS.browseTable:
+                try {
+                    return json(await withCloudClient(credentials, url, client =>
+                        executeTableBrowse(client, parseTableBrowseRequest(body), request.signal)));
+                } catch (error) {
+                    if (error instanceof BrowseValidationError)
+                        return fail('BROWSE_INVALID', error.message, 400);
+                    throw error;
+                }
             case CLOUD_ACTIONS.workload:
                 return await handleCloudWorkload(body, credentials, url);
             case CLOUD_ACTIONS.replication:

@@ -54,6 +54,8 @@ import {
 } from '../../../shared/database/reference/reference.js';
 import { AppError, requireThat } from '../../system/requests/errors.js';
 import { collectCompactStream } from './result-stream.js';
+import { executeTableBrowse } from './table-browse.js';
+import { BrowseValidationError, type TableBrowseRequest } from '../../../shared/database/browse/table-browse.js';
 import type { QueryDriver } from '../../queries/execution/runs.js';
 import type { LargeCellContext } from '../../queries/execution/large-cells.js';
 import type { ImportDriver } from '../imports/imports.js';
@@ -190,6 +192,16 @@ export class ClickHouseDriver implements QueryDriver, ImportDriver, CreateTableD
             });
             return await set.json<T>();
         } catch (error) {
+            throw this.safeError(error);
+        }
+    }
+    async browseTable(id: string, input: TableBrowseRequest, signal?: AbortSignal) {
+        if (this.profile(id).publicPlayground && input.page > 4)
+            throw new AppError(403, 'BROWSE_PAGE_LIMIT', 'Public Playground browsing is limited to five pages.');
+        try {
+            return await executeTableBrowse(this.client(id), input, signal);
+        } catch (error) {
+            if (error instanceof AppError || error instanceof BrowseValidationError) throw error;
             throw this.safeError(error);
         }
     }
