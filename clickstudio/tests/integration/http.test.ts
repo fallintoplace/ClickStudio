@@ -22,6 +22,7 @@ import type {
 import { isQueryDocument } from '../../src/shared/queries/saved-queries/validation.js';
 import type { ReferenceCategory } from '../../src/shared/database/reference/reference.js';
 import type { Run } from '../../src/shared/queries/execution/types.js';
+import type { TableBrowseRequest } from '../../src/shared/database/browse/table-browse.js';
 import { isRun } from '../../src/frontend/queries/execution/execution-validation.js';
 import * as apiResponses from '../../src/frontend/api/response-guards.js';
 import {
@@ -1362,4 +1363,36 @@ test('Import preview transport keeps the source byte limit and other JSON body l
     const other = await app.call('/assistant/context', { source: 'a'.repeat(3 * 1024 * 1024) });
     assert.equal(other.status, 413);
     assert.equal((await other.json()).error.message, 'request entity too large');
+});
+
+
+test('Table browsing is scoped to trusted connections and validates page inputs', async t => {
+    class BrowserDriver extends DemoDriver {
+        async browseTable(_id: string, input: TableBrowseRequest) {
+            return {
+                columns: [{ name: 'id', type: 'UInt64' }],
+                rows: [[String(input.page)]],
+                page: input.page,
+                hasMore: false,
+                queryId: 'browse-fixture',
+                scope: 'live-table' as const,
+                warning: 'Live pages can change.',
+            };
+        }
+    }
+    const app = await start(undefined, undefined, new BrowserDriver());
+    t.after(() => app.stop());
+    const input = {
+        connectionId: 'demo', database: 'demo', table: 'events',
+        orderColumn: 'id', direction: 'asc', page: 0,
+    };
+    const untrusted = await app.call('/browse/table', input);
+    assert.equal(untrusted.status, 403);
+    await app.call('/connections/demo/trust', { trusted: true, confirmation: 'demo' });
+    const page = await app.call('/browse/table', input);
+    assert.equal(page.status, 200);
+    assert.deepEqual((await page.json() as { rows: unknown }).rows, [['0']]);
+    const invalid = await app.call('/browse/table', { ...input, page: 100 });
+    assert.equal(invalid.status, 400);
+    assert.equal(await responseErrorCode(invalid), 'BROWSE_INVALID');
 });
