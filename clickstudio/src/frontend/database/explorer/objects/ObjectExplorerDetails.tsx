@@ -351,22 +351,6 @@ function RelationDetails({
                         <Icon name="table" />
                         {copy.previewRows}
                     </Button>
-                    {selection.relationKind === 'table' && canBrowse && onBrowseTable && (
-                        <Button
-                            variant="secondary"
-                            className="toolbar-small"
-                            disabled={!trusted}
-                            title={
-                                !trusted
-                                    ? copy.runActionTrustRequired
-                                    : 'Browse bounded live table pages'
-                            }
-                            onClick={() => onBrowseTable(selection)}
-                        >
-                            <Icon name="table" />
-                            Browse table
-                        </Button>
-                    )}
                     <Button
                         variant="ghost"
                         className="toolbar-small object-copy-name-action"
@@ -377,6 +361,22 @@ function RelationDetails({
                     </Button>
                 </div>
                 {tableActions}
+                {selection.relationKind === 'table' && canBrowse && onBrowseTable && (
+                    <Button
+                        variant="secondary"
+                        className="toolbar-small"
+                        disabled={!trusted}
+                        title={
+                            !trusted
+                                ? copy.runActionTrustRequired
+                                : 'Browse bounded live table pages'
+                        }
+                        onClick={() => onBrowseTable(selection)}
+                    >
+                        <Icon name="table" />
+                        Browse table
+                    </Button>
+                )}
             </div>
             {expert && (table.engine.endsWith('MergeTree') || table.database === 'system') && (
                 <div className="object-reference-actions">

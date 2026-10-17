@@ -49,21 +49,21 @@ function ResultColumnHeader({
             data-pinned-column={pinned || undefined}
             style={pinned ? { left: `${left ?? 48}px` } : undefined}
             data-overflow-title={`${name}\n${type}`}
+            tabIndex={0}
+            aria-description="Open retained column insights using Enter"
+            onClick={onInsights}
+            onKeyDown={event => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    onInsights();
+                }
+            }}
         >
             <div className="result-column-heading">
                 <span data-overflow-text>{name}</span>
                 <small className="result-type-badge" data-overflow-text data-type-group={group}>
                     {type}
                 </small>
-                <button
-                    type="button"
-                    className="result-column-insights-trigger"
-                    aria-label={'Insights for ' + name}
-                    title="Inspect retained column statistics"
-                    onClick={onInsights}
-                >
-                    Stats
-                </button>
             </div>
         </th>
     );
