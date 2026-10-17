@@ -1365,7 +1365,6 @@ test('Import preview transport keeps the source byte limit and other JSON body l
     assert.equal((await other.json()).error.message, 'request entity too large');
 });
 
-
 test('Table browsing is scoped to trusted connections and validates page inputs', async t => {
     class BrowserDriver extends DemoDriver {
         async browseTable(_id: string, input: TableBrowseRequest) {
@@ -1383,15 +1382,19 @@ test('Table browsing is scoped to trusted connections and validates page inputs'
     const app = await start(undefined, undefined, new BrowserDriver());
     t.after(() => app.stop());
     const input = {
-        connectionId: 'demo', database: 'demo', table: 'events',
-        orderColumn: 'id', direction: 'asc', page: 0,
+        connectionId: 'demo',
+        database: 'demo',
+        table: 'events',
+        orderColumn: 'id',
+        direction: 'asc',
+        page: 0,
     };
     const untrusted = await app.call('/browse/table', input);
     assert.equal(untrusted.status, 403);
     await app.call('/connections/demo/trust', { trusted: true, confirmation: 'demo' });
     const page = await app.call('/browse/table', input);
     assert.equal(page.status, 200);
-    assert.deepEqual((await page.json() as { rows: unknown }).rows, [['0']]);
+    assert.deepEqual(((await page.json()) as { rows: unknown }).rows, [['0']]);
     const invalid = await app.call('/browse/table', { ...input, page: 100 });
     assert.equal(invalid.status, 400);
     assert.equal(await responseErrorCode(invalid), 'BROWSE_INVALID');

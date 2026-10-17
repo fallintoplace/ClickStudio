@@ -54,8 +54,13 @@ function ResultColumnHeader({
                 <small className="result-type-badge" data-overflow-text data-type-group={group}>
                     {type}
                 </small>
-                <button type="button" className="result-column-insights-trigger"
-                    aria-label={"Insights for " + name} title="Inspect retained column statistics" onClick={onInsights}>
+                <button
+                    type="button"
+                    className="result-column-insights-trigger"
+                    aria-label={'Insights for ' + name}
+                    title="Inspect retained column statistics"
+                    onClick={onInsights}
+                >
                     Stats
                 </button>
             </div>
@@ -190,7 +195,12 @@ function ResultRows({
                                         : undefined
                                 }
                                 data-type-group={columnGroups[columnIndex] ?? 'other'}
-                                className={cx(value === null && 'cell-null', selectionMode && isSelected(rowIndex, position) && 'result-cell-selected')}
+                                className={cx(
+                                    value === null && 'cell-null',
+                                    selectionMode &&
+                                        isSelected(rowIndex, position) &&
+                                        'result-cell-selected',
+                                )}
                             >
                                 <button
                                     type="button"
@@ -200,8 +210,14 @@ function ResultRows({
                                             ? `${preview}\n${(largeCell.bytes / 1_000_000).toFixed(1)} MB`
                                             : preview
                                     }
-                                    aria-label={selectionMode ? "Select " + accessibleLabel : accessibleLabel}
-                                    aria-pressed={selectionMode ? isSelected(rowIndex, position) : undefined}
+                                    aria-label={
+                                        selectionMode
+                                            ? 'Select ' + accessibleLabel
+                                            : accessibleLabel
+                                    }
+                                    aria-pressed={
+                                        selectionMode ? isSelected(rowIndex, position) : undefined
+                                    }
                                     onClick={event => {
                                         if (selectionMode) {
                                             onSelectCell(rowIndex, position, event.shiftKey);
@@ -248,7 +264,6 @@ function ResultRows({
     );
 }
 
-
 type GridSelection = {
     offset: number;
     firstRow: number;
@@ -267,9 +282,11 @@ function useGridSelection() {
     };
     const selectCell = (offset: number, row: number, col: number, extend: boolean) => {
         setCopyFeedback('');
-        setSelection(previous => extend && previous?.offset === offset
-            ? { ...previous, lastRow: row, lastCol: col }
-            : { offset, firstRow: row, lastRow: row, firstCol: col, lastCol: col });
+        setSelection(previous =>
+            extend && previous?.offset === offset
+                ? { ...previous, lastRow: row, lastCol: col }
+                : { offset, firstRow: row, lastRow: row, firstCol: col, lastCol: col },
+        );
     };
     return { selectionMode, selection, copyFeedback, setCopyFeedback, toggleSelection, selectCell };
 }
@@ -280,29 +297,43 @@ function selectedGridCells(
     selection: GridSelection | undefined,
 ) {
     const active = selection?.offset === page.offset ? selection : undefined;
-    const rows = active ? visibleRows.filter(item =>
-        item.index >= Math.min(active.firstRow, active.lastRow) &&
-        item.index <= Math.max(active.firstRow, active.lastRow),
-    ).map(item => item.row) : [];
-    const columns = active ? orderedColumnIndices.slice(
-        Math.min(active.firstCol, active.lastCol),
-        Math.max(active.firstCol, active.lastCol) + 1,
-    ) : [];
-    const numbers = rows.flatMap(row => columns.flatMap(index => {
-        const value = chartNumber(row[index]);
-        return value === null ? [] : [value];
-    }));
+    const rows = active
+        ? visibleRows
+              .filter(
+                  item =>
+                      item.index >= Math.min(active.firstRow, active.lastRow) &&
+                      item.index <= Math.max(active.firstRow, active.lastRow),
+              )
+              .map(item => item.row)
+        : [];
+    const columns = active
+        ? orderedColumnIndices.slice(
+              Math.min(active.firstCol, active.lastCol),
+              Math.max(active.firstCol, active.lastCol) + 1,
+          )
+        : [];
+    const numbers = rows.flatMap(row =>
+        columns.flatMap(index => {
+            const value = chartNumber(row[index]);
+            return value === null ? [] : [value];
+        }),
+    );
     const sum = numbers.reduce((acc, value) => acc + value, 0);
     const count = rows.length * columns.length;
-    const isSelected = (row: number, col: number) => Boolean(active &&
-        row >= Math.min(active.firstRow, active.lastRow) &&
-        row <= Math.max(active.firstRow, active.lastRow) &&
-        col >= Math.min(active.firstCol, active.lastCol) &&
-        col <= Math.max(active.firstCol, active.lastCol));
+    const isSelected = (row: number, col: number) =>
+        Boolean(
+            active &&
+            row >= Math.min(active.firstRow, active.lastRow) &&
+            row <= Math.max(active.firstRow, active.lastRow) &&
+            col >= Math.min(active.firstCol, active.lastCol) &&
+            col <= Math.max(active.firstCol, active.lastCol),
+        );
     return { rows, columns, numbers, sum, count, isSelected };
 }
 async function copyGridCells(
-    rows: ResultPage['rows'], columns: number[], token: string | undefined,
+    rows: ResultPage['rows'],
+    columns: number[],
+    token: string | undefined,
     report: (message: string) => void,
 ) {
     try {
@@ -440,12 +471,14 @@ export function ResultGrid({
         noRowsText = 'All columns are hidden. Open Manage columns to show them.';
     else if (visibleRows.length === 0) noRowsText = 'No rows match on this page.';
     const selectedCells = selectedGridCells(
-        page, visibleRows, orderedColumnIndices, gridSelection.selection,
+        page,
+        visibleRows,
+        orderedColumnIndices,
+        gridSelection.selection,
     );
     const selectCell = (row: number, col: number, extend: boolean) =>
         gridSelection.selectCell(page.offset, row, col, extend);
-    const rowCount = page.totalRows.toLocaleString() +
-        (page.totalRows === 1 ? ' row' : ' rows');
+    const rowCount = page.totalRows.toLocaleString() + (page.totalRows === 1 ? ' row' : ' rows');
     const rowCountLabel = (
         <span
             className="result-row-count"
@@ -494,27 +527,45 @@ export function ResultGrid({
             inert={obscured || undefined}
         >
             {renderInContainer(toolbar, toolbarContainer)}
-            {gridSelection.selectionMode && <div className="result-grid-scope" role="status">
-                <span>Selection uses visible rows on this page · {page.completeness === 'truncated'
-                    ? 'Partial retained result' : 'Retained result'}</span>
-                {selectedCells.count > 0 && (
-                    <div className="result-grid-selection-tools">
-                        <span>{selectedCells.count.toLocaleString()} cells selected</span>
-                        {selectedCells.numbers.length > 0 && (
-                            <span>Sum {selectedCells.sum.toLocaleString()} · Avg {
-                                (selectedCells.sum / selectedCells.numbers.length).toLocaleString(
-                                    undefined, { maximumFractionDigits: 4 },
-                                )
-                            }</span>
-                        )}
-                        <button type="button" onClick={() => void copyGridCells(
-                            selectedCells.rows, selectedCells.columns,
-                            page.largeCellToken, gridSelection.setCopyFeedback,
-                        )}>Copy selection</button>
-                    </div>
-                )}
-                {gridSelection.copyFeedback && <span role="status">{gridSelection.copyFeedback}</span>}
-            </div>}
+            {gridSelection.selectionMode && (
+                <div className="result-grid-scope" role="status">
+                    <span>
+                        Selection uses visible rows on this page ·{' '}
+                        {page.completeness === 'truncated'
+                            ? 'Partial retained result'
+                            : 'Retained result'}
+                    </span>
+                    {selectedCells.count > 0 && (
+                        <div className="result-grid-selection-tools">
+                            <span>{selectedCells.count.toLocaleString()} cells selected</span>
+                            {selectedCells.numbers.length > 0 && (
+                                <span>
+                                    Sum {selectedCells.sum.toLocaleString()} · Avg{' '}
+                                    {(
+                                        selectedCells.sum / selectedCells.numbers.length
+                                    ).toLocaleString(undefined, { maximumFractionDigits: 4 })}
+                                </span>
+                            )}
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    void copyGridCells(
+                                        selectedCells.rows,
+                                        selectedCells.columns,
+                                        page.largeCellToken,
+                                        gridSelection.setCopyFeedback,
+                                    )
+                                }
+                            >
+                                Copy selection
+                            </button>
+                        </div>
+                    )}
+                    {gridSelection.copyFeedback && (
+                        <span role="status">{gridSelection.copyFeedback}</span>
+                    )}
+                </div>
+            )}
             {pageLoading ? (
                 <div className="result-loading" role="status">
                     <Spinner />
@@ -588,8 +639,13 @@ export function ResultGrid({
                 <CellInspector cell={inspectedCell} onClose={() => setInspectedCell(null)} />
             )}
             {insightsColumn !== undefined && (
-                <ColumnInsights key={run.id + ':' + insightsColumn} run={run} page={page} columnIndex={insightsColumn}
-                    onClose={() => setInsightsColumn(undefined)} />
+                <ColumnInsights
+                    key={run.id + ':' + insightsColumn}
+                    run={run}
+                    page={page}
+                    columnIndex={insightsColumn}
+                    onClose={() => setInsightsColumn(undefined)}
+                />
             )}
         </div>
     );

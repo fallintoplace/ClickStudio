@@ -15,7 +15,10 @@ import {
 } from '../../../shared/database/connections/cloud-requests.js';
 import type { ImportJobStatus } from '../../../shared/database/imports/status.js';
 import type { ImportFormat } from '../../../shared/database/imports/limits.js';
-import { isTableBrowsePage, type TableBrowseRequest } from '../../../shared/database/browse/table-browse.js';
+import {
+    isTableBrowsePage,
+    type TableBrowseRequest,
+} from '../../../shared/database/browse/table-browse.js';
 import {
     CLICKHOUSE_CLOUD_CONNECTION_ID,
     CLOUD_QUERY_LIMITS,
@@ -498,8 +501,11 @@ export async function disconnectClickHouseCloud() {
 
 export async function browseClickHouseCloudTable(input: TableBrowseRequest, signal?: AbortSignal) {
     const cloud = requireCloudConnection('Reconnect to ClickHouse Cloud to browse a table.');
-    return await requestCloud({ action: CLOUD_ACTIONS.browseTable, credentials: cloud.credentials, ...input },
-        isTableBrowsePage, signal);
+    return await requestCloud(
+        { action: CLOUD_ACTIONS.browseTable, credentials: cloud.credentials, ...input },
+        isTableBrowsePage,
+        signal,
+    );
 }
 
 export async function runClickHouseCloudSql(

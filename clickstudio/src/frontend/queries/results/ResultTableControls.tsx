@@ -329,8 +329,11 @@ export function ResultTableControls({
                             />
                         </div>
                         <div className="result-search-summary">
-                            <Button variant="ghost" aria-pressed={selectionMode}
-                                onClick={onToggleSelection}>
+                            <Button
+                                variant="ghost"
+                                aria-pressed={selectionMode}
+                                onClick={onToggleSelection}
+                            >
                                 {selectionMode ? 'Stop selecting cells' : 'Select cells'}
                             </Button>
                             <span className="result-match-count" role="status" aria-live="polite">

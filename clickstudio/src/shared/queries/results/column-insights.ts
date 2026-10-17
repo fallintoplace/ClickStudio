@@ -28,13 +28,18 @@ function valueLabel(value: Json): string {
 
 function bucketFor(value: number, minimum: number, maximum: number): number {
     if (minimum === maximum) return 0;
-    return Math.min(HISTOGRAM_BUCKETS - 1,
-        Math.floor((value - minimum) / (maximum - minimum) * HISTOGRAM_BUCKETS));
+    return Math.min(
+        HISTOGRAM_BUCKETS - 1,
+        Math.floor(((value - minimum) / (maximum - minimum)) * HISTOGRAM_BUCKETS),
+    );
 }
 
 /** Describes only the rows supplied by the caller, never an entire source table. */
 export function columnStats(
-    rows: readonly Row[], column: Column, index: number, token?: string,
+    rows: readonly Row[],
+    column: Column,
+    index: number,
+    token?: string,
 ): ColumnStats {
     const counts = new Map<string, number>();
     let nulls = 0;
@@ -79,11 +84,18 @@ export function columnStats(
         histogram[bucket] = (histogram[bucket] ?? 0) + 1;
     }
     return {
-        total: rows.length, nulls, detached,
-        distinct: counts.size, distinctCapped, numericCount, nonRepresentable,
+        total: rows.length,
+        nulls,
+        detached,
+        distinct: counts.size,
+        distinctCapped,
+        numericCount,
+        nonRepresentable,
         ...(numericCount ? { minimum, maximum, average } : {}),
         histogram,
-        common: [...counts].sort((a, b) => b[1] - a[1]).slice(0, 5)
+        common: [...counts]
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5)
             .map(([label, count]) => ({ label, count })),
     };
 }
@@ -100,9 +112,15 @@ function quotedTsv(value: string): string {
 }
 /** Copy a bounded selection, preserving row boundaries and lossless scalar strings. */
 export function selectedRowsTsv(
-    rows: readonly Row[], columnIndexes: readonly number[], largeCellToken?: string,
+    rows: readonly Row[],
+    columnIndexes: readonly number[],
+    largeCellToken?: string,
 ): string {
-    return rows.map(row => columnIndexes
-        .map(index => quotedTsv(selectedCellText(row[index], largeCellToken)))
-        .join('\t')).join('\n');
+    return rows
+        .map(row =>
+            columnIndexes
+                .map(index => quotedTsv(selectedCellText(row[index], largeCellToken)))
+                .join('\t'),
+        )
+        .join('\n');
 }

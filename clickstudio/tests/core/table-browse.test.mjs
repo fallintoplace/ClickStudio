@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-    parseTableBrowseRequest, buildTableBrowseSql, tableBrowseDraftSql, MAX_BROWSE_PAGE,
+    parseTableBrowseRequest,
+    buildTableBrowseSql,
+    tableBrowseDraftSql,
+    MAX_BROWSE_PAGE,
 } from '../../.core-build/src/shared/database/browse/table-browse.js';
 
 const columns = [
@@ -12,7 +15,11 @@ const columns = [
 
 test('table browser validates paging and sorts only verified scalar columns', () => {
     const page = parseTableBrowseRequest({
-        database: 'analytics', table: 'events', orderColumn: 'event_id', direction: 'desc', page: 2,
+        database: 'analytics',
+        table: 'events',
+        orderColumn: 'event_id',
+        direction: 'desc',
+        page: 2,
     });
     const result = buildTableBrowseSql(page, columns);
     assert.match(result.sql, /ORDER BY .*event_id.* DESC LIMIT 201 OFFSET 400/);
@@ -22,8 +29,15 @@ test('table browser validates paging and sorts only verified scalar columns', ()
     assert.throws(() => parseTableBrowseRequest({ ...page, page: MAX_BROWSE_PAGE + 1 }));
 });
 test('table browser quotes identifiers and binds user input, never interpolates values', () => {
-    const req = { database: 'db', table: 'tab', orderColumn: 'event_id', direction: 'asc', page: 0,
-        filterColumn: 'message', filterValue: "a' OR 1=1 --" };
+    const req = {
+        database: 'db',
+        table: 'tab',
+        orderColumn: 'event_id',
+        direction: 'asc',
+        page: 0,
+        filterColumn: 'message',
+        filterValue: "a' OR 1=1 --",
+    };
     const query = buildTableBrowseSql(req, columns);
     assert.match(query.sql, /toString\(.*message.*\) = \{browseValue:String\}/);
     assert.ok(!query.sql.includes('OR 1=1'));
@@ -31,7 +45,13 @@ test('table browser quotes identifiers and binds user input, never interpolates 
     assert.ok(tableBrowseDraftSql(req, columns).includes("a\\' OR 1=1 --"));
 });
 test('table browser requires column and value together', () => {
-    const req = { database: 'db', table: 'tab', orderColumn: 'event_id', direction: 'asc', page: 0 };
+    const req = {
+        database: 'db',
+        table: 'tab',
+        orderColumn: 'event_id',
+        direction: 'asc',
+        page: 0,
+    };
     assert.throws(() => parseTableBrowseRequest({ ...req, filterColumn: 'message' }));
     assert.throws(() => parseTableBrowseRequest({ ...req, filterValue: 'x' }));
 });

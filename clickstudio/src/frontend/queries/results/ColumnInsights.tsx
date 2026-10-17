@@ -6,7 +6,10 @@ import { api, apiResponses, message } from '../../api/client';
 import { useDialogFocus } from '../../ui/focus/useDialogFocus';
 
 export function ColumnInsights({
-    run, page, columnIndex, onClose,
+    run,
+    page,
+    columnIndex,
+    onClose,
 }: {
     run: Run;
     page: ResultPage;
@@ -28,14 +31,23 @@ export function ColumnInsights({
     useEffect(() => {
         let current = true;
         const controller = new AbortController();
-        void api('/runs/' + encodeURIComponent(run.id) + '/snapshot', apiResponses.isResultResponse, {
-            signal: controller.signal,
-        }).then(result => {
-            if (current) setSnapshot(result);
-        }).catch(caught => {
-            if (current) setError(message(caught));
-        });
-        return () => { current = false; controller.abort(); };
+        void api(
+            '/runs/' + encodeURIComponent(run.id) + '/snapshot',
+            apiResponses.isResultResponse,
+            {
+                signal: controller.signal,
+            },
+        )
+            .then(result => {
+                if (current) setSnapshot(result);
+            })
+            .catch(caught => {
+                if (current) setError(message(caught));
+            });
+        return () => {
+            current = false;
+            controller.abort();
+        };
     }, [run.id]);
 
     const source = snapshot ?? page;
@@ -45,15 +57,22 @@ export function ColumnInsights({
     );
     const scope = snapshot ? 'retained result' : 'current page';
     const fmt = (value: number | undefined) =>
-        value === undefined ? 'Unavailable' : value.toLocaleString('en-US', { maximumFractionDigits: 4 });
+        value === undefined
+            ? 'Unavailable'
+            : value.toLocaleString('en-US', { maximumFractionDigits: 4 });
     const maxBar = Math.max(1, ...stats.histogram);
     return (
         <dialog
             ref={dialog}
             className="transfer-dialog result-column-insights"
             aria-labelledby="result-column-insights-title"
-            onCancel={event => { event.preventDefault(); onClose(); }}
-            onClick={event => { if (event.target === dialog.current) onClose(); }}
+            onCancel={event => {
+                event.preventDefault();
+                onClose();
+            }}
+            onClick={event => {
+                if (event.target === dialog.current) onClose();
+            }}
         >
             <header className="transfer-dialog-header">
                 <div>
@@ -64,41 +83,84 @@ export function ColumnInsights({
                         {column.type} · {scope} only
                     </p>
                 </div>
-                <button className="button-base button-ghost" type="button" ref={closeButton}
-                    onClick={onClose} aria-label="Close column insights">Close</button>
+                <button
+                    className="button-base button-ghost"
+                    type="button"
+                    ref={closeButton}
+                    onClick={onClose}
+                    aria-label="Close column insights"
+                >
+                    Close
+                </button>
             </header>
             {!snapshot && !error && <p role="status">Loading retained rows…</p>}
-            {error && <p role="status">Could not load all retained rows. Showing this page only: {error}</p>}
+            {error && (
+                <p role="status">
+                    Could not load all retained rows. Showing this page only: {error}
+                </p>
+            )}
             <p className="result-insights-notice">
                 {source.completeness === 'truncated'
                     ? 'This result is truncated. These statistics do not describe the full query output.'
-                    : 'These statistics describe the ' + scope + ', not necessarily the source table.'}
+                    : 'These statistics describe the ' +
+                      scope +
+                      ', not necessarily the source table.'}
             </p>
             <div className="result-insights-summary">
-                <span>Rows <strong>{fmt(stats.total)}</strong></span>
-                <span>Null <strong>{fmt(stats.nulls)}</strong></span>
-                <span>Distinct <strong>{stats.distinctCapped ? '≥ ' : ''}{fmt(stats.distinct)}</strong></span>
-                <span>Large cells <strong>{fmt(stats.detached)}</strong></span>
+                <span>
+                    Rows <strong>{fmt(stats.total)}</strong>
+                </span>
+                <span>
+                    Null <strong>{fmt(stats.nulls)}</strong>
+                </span>
+                <span>
+                    Distinct{' '}
+                    <strong>
+                        {stats.distinctCapped ? '≥ ' : ''}
+                        {fmt(stats.distinct)}
+                    </strong>
+                </span>
+                <span>
+                    Large cells <strong>{fmt(stats.detached)}</strong>
+                </span>
             </div>
             {stats.numericCount > 0 && (
                 <section aria-label="Numeric statistics">
                     <div className="result-insights-summary">
-                        <span>Min <strong>{fmt(stats.minimum)}</strong></span>
-                        <span>Max <strong>{fmt(stats.maximum)}</strong></span>
-                        <span>Average <strong>{fmt(stats.average)}</strong></span>
-                        <span>Numeric values <strong>{fmt(stats.numericCount)}</strong></span>
+                        <span>
+                            Min <strong>{fmt(stats.minimum)}</strong>
+                        </span>
+                        <span>
+                            Max <strong>{fmt(stats.maximum)}</strong>
+                        </span>
+                        <span>
+                            Average <strong>{fmt(stats.average)}</strong>
+                        </span>
+                        <span>
+                            Numeric values <strong>{fmt(stats.numericCount)}</strong>
+                        </span>
                     </div>
-                    <div className="result-insights-histogram" role="img" aria-label="Numeric values across ten buckets">
+                    <div
+                        className="result-insights-histogram"
+                        role="img"
+                        aria-label="Numeric values across ten buckets"
+                    >
                         {stats.histogram.map((count, index) => (
-                            <span key={index} title={String(count) + ' values'}
-                                style={{ height: String(Math.max(2, count / maxBar * 100)) + '%' }} />
+                            <span
+                                key={index}
+                                title={String(count) + ' values'}
+                                style={{
+                                    height: String(Math.max(2, (count / maxBar) * 100)) + '%',
+                                }}
+                            />
                         ))}
                     </div>
                 </section>
             )}
             {stats.nonRepresentable > 0 && (
                 <p className="result-insights-notice">
-                    {fmt(stats.nonRepresentable)} numeric values were excluded from arithmetic to avoid precision loss.
+                    {fmt(stats.nonRepresentable)} numeric values were excluded from arithmetic to
+                    avoid precision loss.
                 </p>
             )}
             {stats.common.length > 0 && (
@@ -106,10 +168,15 @@ export function ColumnInsights({
                     <strong>Most common values</strong>
                     <ol className="result-insights-common">
                         {stats.common.map((entry, index) => (
-                            <li key={index}><span title={entry.label}>{entry.label}</span><strong>{fmt(entry.count)}</strong></li>
+                            <li key={index}>
+                                <span title={entry.label}>{entry.label}</span>
+                                <strong>{fmt(entry.count)}</strong>
+                            </li>
                         ))}
                     </ol>
-                    {stats.distinctCapped && <small>Distinct values are capped for memory safety.</small>}
+                    {stats.distinctCapped && (
+                        <small>Distinct values are capped for memory safety.</small>
+                    )}
                 </section>
             )}
         </dialog>

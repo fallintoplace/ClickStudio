@@ -352,9 +352,17 @@ function RelationDetails({
                         {copy.previewRows}
                     </Button>
                     {selection.relationKind === 'table' && canBrowse && onBrowseTable && (
-                        <Button variant="secondary" className="toolbar-small" disabled={!trusted}
-                            title={!trusted ? copy.runActionTrustRequired : 'Browse bounded live table pages'}
-                            onClick={() => onBrowseTable(selection)}>
+                        <Button
+                            variant="secondary"
+                            className="toolbar-small"
+                            disabled={!trusted}
+                            title={
+                                !trusted
+                                    ? copy.runActionTrustRequired
+                                    : 'Browse bounded live table pages'
+                            }
+                            onClick={() => onBrowseTable(selection)}
+                        >
                             <Icon name="table" />
                             Browse table
                         </Button>

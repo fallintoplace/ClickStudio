@@ -37,9 +37,15 @@ function readBrowseName(value: unknown): string {
     return value;
 }
 function readBrowsePage(value: unknown): number {
-    if (typeof value !== 'number' || !Number.isSafeInteger(value) ||
-        value < 0 || value > MAX_BROWSE_PAGE)
-        throw new BrowseValidationError('Browse the first 25 pages, or narrow the table with a filter.');
+    if (
+        typeof value !== 'number' ||
+        !Number.isSafeInteger(value) ||
+        value < 0 ||
+        value > MAX_BROWSE_PAGE
+    )
+        throw new BrowseValidationError(
+            'Browse the first 25 pages, or narrow the table with a filter.',
+        );
     return value;
 }
 export function parseTableBrowseRequest(value: unknown): TableBrowseRequest {
@@ -53,20 +59,25 @@ export function parseTableBrowseRequest(value: unknown): TableBrowseRequest {
         throw new BrowseValidationError('Choose ascending or descending order.');
     if ((value.filterColumn === undefined) !== (value.filterValue === undefined))
         throw new BrowseValidationError('Choose both a filter column and a value.');
-    const filterColumn = value.filterColumn === undefined
-        ? undefined : readBrowseName(value.filterColumn);
+    const filterColumn =
+        value.filterColumn === undefined ? undefined : readBrowseName(value.filterColumn);
     const filterValue = value.filterValue;
-    if (filterValue !== undefined &&
-        (typeof filterValue !== 'string' || filterValue.length > 256))
+    if (filterValue !== undefined && (typeof filterValue !== 'string' || filterValue.length > 256))
         throw new BrowseValidationError('Filter values must be at most 256 characters.');
     return {
-        database, table, orderColumn, direction, page,
+        database,
+        table,
+        orderColumn,
+        direction,
+        page,
         ...(filterColumn !== undefined ? { filterColumn } : {}),
         ...(typeof filterValue === 'string' ? { filterValue } : {}),
     };
 }
 export function browseColumnSupported(type: string): boolean {
-    return /^(?:U?Int\d+|Float\d+|Decimal|String|FixedString|Date|DateTime|UUID|IPv[46]|Enum)/.test(baseType(type));
+    return /^(?:U?Int\d+|Float\d+|Decimal|String|FixedString|Date|DateTime|UUID|IPv[46]|Enum)/.test(
+        baseType(type),
+    );
 }
 
 /** Generated from verified table columns, not arbitrary SQL fragments. */
@@ -87,10 +98,22 @@ export function buildTableBrowseSql(input: TableBrowseRequest, columns: readonly
     const where = request.filterColumn
         ? ' WHERE toString(' + quoteIdentifier(request.filterColumn) + ') = {browseValue:String}'
         : '';
-    const sql = 'SELECT * FROM ' + table + where +
-        ' ORDER BY ' + quoteIdentifier(order.name) + ' ' + request.direction.toUpperCase() +
-        ' LIMIT ' + (BROWSE_PAGE_ROWS + 1) + ' OFFSET ' + (request.page * BROWSE_PAGE_ROWS);
-    return { sql, parameters: request.filterColumn ? { browseValue: request.filterValue ?? '' } : {} };
+    const sql =
+        'SELECT * FROM ' +
+        table +
+        where +
+        ' ORDER BY ' +
+        quoteIdentifier(order.name) +
+        ' ' +
+        request.direction.toUpperCase() +
+        ' LIMIT ' +
+        (BROWSE_PAGE_ROWS + 1) +
+        ' OFFSET ' +
+        request.page * BROWSE_PAGE_ROWS;
+    return {
+        sql,
+        parameters: request.filterColumn ? { browseValue: request.filterValue ?? '' } : {},
+    };
 }
 
 /** Standalone editable SQL uses safe quoting; API execution remains parameterized. */
@@ -99,22 +122,40 @@ export function tableBrowseDraftSql(input: TableBrowseRequest, columns: readonly
     const display = input.filterColumn
         ? sql.replace('{browseValue:String}', quoteStringLiteral(input.filterValue ?? ''))
         : sql;
-    return display.replace(' LIMIT ' + (BROWSE_PAGE_ROWS + 1) + ' OFFSET ',
-        ' LIMIT ' + BROWSE_PAGE_ROWS + ' OFFSET ');
+    return display.replace(
+        ' LIMIT ' + (BROWSE_PAGE_ROWS + 1) + ' OFFSET ',
+        ' LIMIT ' + BROWSE_PAGE_ROWS + ' OFFSET ',
+    );
 }
 
 export function isTableBrowsePage(value: unknown): value is TableBrowsePage {
     if (!isRecord(value)) return false;
     const columns = value.columns;
     const rows = value.rows;
-    if (!Array.isArray(columns) || columns.length > MAX_BROWSE_COLUMNS ||
-        !columns.every(column => isRecord(column) &&
-            typeof column.name === 'string' && typeof column.type === 'string')) return false;
-    if (!Array.isArray(rows) || rows.length > BROWSE_PAGE_ROWS ||
-        !rows.every(row => Array.isArray(row) && row.length === columns.length && row.every(isJson)))
+    if (
+        !Array.isArray(columns) ||
+        columns.length > MAX_BROWSE_COLUMNS ||
+        !columns.every(
+            column =>
+                isRecord(column) &&
+                typeof column.name === 'string' &&
+                typeof column.type === 'string',
+        )
+    )
         return false;
-    return typeof value.page === 'number' && Number.isSafeInteger(value.page) &&
-        value.page >= 0 && typeof value.hasMore === 'boolean' &&
-        typeof value.queryId === 'string' && value.scope === 'live-table' &&
-        typeof value.warning === 'string';
+    if (
+        !Array.isArray(rows) ||
+        rows.length > BROWSE_PAGE_ROWS ||
+        !rows.every(row => Array.isArray(row) && row.length === columns.length && row.every(isJson))
+    )
+        return false;
+    return (
+        typeof value.page === 'number' &&
+        Number.isSafeInteger(value.page) &&
+        value.page >= 0 &&
+        typeof value.hasMore === 'boolean' &&
+        typeof value.queryId === 'string' &&
+        value.scope === 'live-table' &&
+        typeof value.warning === 'string'
+    );
 }

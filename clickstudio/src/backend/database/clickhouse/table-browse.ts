@@ -1,8 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import type { ClickHouseClient } from '@clickhouse/client';
-import type { TableBrowseRequest, TableBrowsePage } from '../../../shared/database/browse/table-browse.js';
+import type {
+    TableBrowseRequest,
+    TableBrowsePage,
+} from '../../../shared/database/browse/table-browse.js';
 import {
-    BROWSE_PAGE_ROWS, BrowseValidationError, buildTableBrowseSql,
+    BROWSE_PAGE_ROWS,
+    BrowseValidationError,
+    buildTableBrowseSql,
 } from '../../../shared/database/browse/table-browse.js';
 import { collectCompactStream } from './result-stream.js';
 import { AppError } from '../../system/requests/errors.js';
@@ -31,7 +36,8 @@ export async function executeTableBrowse(
         result_overflow_mode: 'throw' as const,
     };
     const metadata = await client.query({
-        query: 'SELECT name, type FROM system.columns WHERE database = {browseDb:String} ' +
+        query:
+            'SELECT name, type FROM system.columns WHERE database = {browseDb:String} ' +
             'AND table = {browseTable:String} ORDER BY position LIMIT 501',
         query_params: { browseDb: request.database, browseTable: request.table },
         format: 'JSONEachRow',
@@ -59,8 +65,11 @@ export async function executeTableBrowse(
         bytes: BROWSE_BYTES,
     });
     if (result.truncated)
-        throw new AppError(413, 'BROWSE_PAGE_TOO_WIDE',
-            'This page exceeds 2 MB. Narrow the table query or inspect fewer rows.');
+        throw new AppError(
+            413,
+            'BROWSE_PAGE_TOO_WIDE',
+            'This page exceeds 2 MB. Narrow the table query or inspect fewer rows.',
+        );
     return {
         columns: result.columns,
         rows: result.rows.slice(0, BROWSE_PAGE_ROWS),
@@ -68,6 +77,7 @@ export async function executeTableBrowse(
         hasMore: result.rows.length > BROWSE_PAGE_ROWS,
         queryId,
         scope: 'live-table',
-        warning: 'Live OFFSET pages are bounded to 25 pages. Duplicate sort values or table changes may overlap or skip rows.',
+        warning:
+            'Live OFFSET pages are bounded to 25 pages. Duplicate sort values or table changes may overlap or skip rows.',
     };
 }

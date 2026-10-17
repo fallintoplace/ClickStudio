@@ -21,9 +21,11 @@ import { metadataConnectionKey } from '../../schema/metadata-state';
 import { TableBrowseDialog } from './TableBrowseDialog';
 import type { ExplorerSelection } from './object-explorer-model';
 
-
 function TableBrowseLayer({
-    target, connection, onClose, onOpenSqlDraft,
+    target,
+    connection,
+    onClose,
+    onOpenSqlDraft,
 }: {
     target?: Extract<ExplorerSelection, { kind: 'relation' }>;
     connection: ObjectExplorerProps['connection'];
@@ -31,8 +33,16 @@ function TableBrowseLayer({
     onOpenSqlDraft: ObjectExplorerProps['onOpenSqlDraft'];
 }) {
     if (!target) return null;
-    return <TableBrowseDialog key={target.id} table={target.table} columns={target.columns}
-        connection={connection} onClose={onClose} onOpenSqlDraft={onOpenSqlDraft} />;
+    return (
+        <TableBrowseDialog
+            key={target.id}
+            table={target.table}
+            columns={target.columns}
+            connection={connection}
+            onClose={onClose}
+            onOpenSqlDraft={onOpenSqlDraft}
+        />
+    );
 }
 
 function ObjectExplorerEmptySearch({
@@ -56,7 +66,8 @@ function refreshObjectMetadata(...catalogs: { refresh: () => void }[]) {
 
 export function ObjectExplorer(props: ObjectExplorerProps) {
     const state = useObjectExplorerState(props);
-    const [browseTarget, setBrowseTarget] = useState<Extract<ExplorerSelection, { kind: 'relation' }>>();
+    const [browseTarget, setBrowseTarget] =
+        useState<Extract<ExplorerSelection, { kind: 'relation' }>>();
     const [deleteDatabaseTarget, setDeleteDatabaseTarget] = useState<{
         database: string;
         connectionKey: string;
@@ -64,7 +75,10 @@ export function ObjectExplorer(props: ObjectExplorerProps) {
     const connectionKey = metadataConnectionKey(props.connection);
     const currentConnectionKey = useRef(connectionKey);
     currentConnectionKey.current = connectionKey;
-    useEffect(() => { setDeleteDatabaseTarget(undefined); setBrowseTarget(undefined); }, [connectionKey, props.trusted]);
+    useEffect(() => {
+        setDeleteDatabaseTarget(undefined);
+        setBrowseTarget(undefined);
+    }, [connectionKey, props.trusted]);
     const [functionExpansion, setFunctionExpansion] = useState({
         functions: true,
         sql: true,
