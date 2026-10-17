@@ -250,7 +250,6 @@ test('pinning a column clears a previously selected cell rather than copying ano
     await page.getByRole('button', { name: 'Select cells' }).click();
     await page.locator('.data-table tbody .result-cell-trigger').first().click();
     await expect(page.getByText('1 cells selected')).toBeVisible();
-    await page.getByRole('button', { name: 'Close search and pages' }).click();
     await page.getByRole('button', { name: 'Columns: 3 of 3 shown' }).click();
     await page.getByRole('button', { name: 'Pin C to the left' }).click();
     await expect(page.getByText('1 cells selected')).toHaveCount(0);
