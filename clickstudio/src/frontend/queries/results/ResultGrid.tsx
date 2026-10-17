@@ -3,6 +3,7 @@ import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import {
     displayValue,
+    numericType,
     filterRows,
     previewResultCell,
 } from '../../../shared/queries/results/results';
@@ -314,7 +315,8 @@ function selectedGridCells(
         : [];
     const numbers = rows.flatMap(row =>
         columns.flatMap(index => {
-            const value = chartNumber(row[index]);
+            const value = numericType(page.columns[index]?.type ?? '')
+            ? chartNumber(row[index]) : null;
             return value === null ? [] : [value];
         }),
     );

@@ -41,7 +41,7 @@ export function columnStats(
     index: number,
     token?: string,
 ): ColumnStats {
-    const counts = new Map<string, number>();
+    const counts = new Map<string, { label: string; count: number }>();
     let nulls = 0;
     let detached = 0;
     let numericCount = 0;
@@ -62,9 +62,13 @@ export function columnStats(
             detached++;
             continue;
         }
-        const label = valueLabel(value);
-        if (counts.has(label)) counts.set(label, counts.get(label)! + 1);
-        else if (counts.size < MAX_DISTINCT) counts.set(label, 1);
+        const key = typeof value === 'object'
+            ? 'object:' + JSON.stringify(value)
+            : typeof value + ':' + String(value);
+        const existing = counts.get(key);
+        if (existing) existing.count++;
+        else if (counts.size < MAX_DISTINCT)
+            counts.set(key, { label: valueLabel(value), count: 1 });
         else distinctCapped = true;
         if (!numeric) continue;
         const n = chartNumber(value);
@@ -93,10 +97,9 @@ export function columnStats(
         nonRepresentable,
         ...(numericCount ? { minimum, maximum, average } : {}),
         histogram,
-        common: [...counts]
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 5)
-            .map(([label, count]) => ({ label, count })),
+        common: [...counts.values()]
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 5),
     };
 }
 

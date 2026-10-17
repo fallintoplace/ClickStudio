@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { CLICKHOUSE_CLOUD_CONNECTION_ID } from '../../../../shared/database/connections/cloud-policy';
+import { PLAYGROUND_CONNECTION_ID } from '../../../../shared/database/connections/playground';
 import { useSqlFunctions } from '../../functions/useSqlFunctions';
 import { FunctionGroupsTree } from '../../functions/FunctionGroupsTree';
 import { SqlFunctionDetails } from '../../functions/SqlFunctionDetails';
@@ -64,6 +65,62 @@ function refreshObjectMetadata(...catalogs: { refresh: () => void }[]) {
     for (const catalog of catalogs) catalog.refresh();
 }
 
+function compactTableWriteActions(state: ReturnType<typeof useObjectExplorerState>) {
+    const {
+        connection, insertableTable, deletableTable, tablePermissions, trusted,
+        copy, showCompactDetails, selectedTable, setInsertRowTarget, setDeleteTableTarget,
+    } = state;
+    const canInsertSelectedTable =
+        connection.dataSource !== 'fixture' &&
+        Boolean(insertableTable) &&
+        tablePermissions.insert !== false;
+    const canDeleteSelectedTable =
+        connection.dataSource !== 'fixture' &&
+        Boolean(deletableTable) &&
+        tablePermissions.drop !== false;
+    const tableActionDisabledReason = trusted ? undefined : copy.runActionTrustRequired;
+    const compactTableActions =
+        showCompactDetails &&
+        selectedTable &&
+        (canInsertSelectedTable || canDeleteSelectedTable) ? (
+            <div className="object-utility-actions object-table-write-actions">
+                {canInsertSelectedTable && (
+                    <Button
+                        variant="ghost"
+                        className="toolbar-small"
+                        disabled={!trusted}
+                        title={tableActionDisabledReason}
+                        onClick={() => {
+                            if (insertableTable)
+                                setInsertRowTarget({
+                                    table: insertableTable.table,
+                                    columns: insertableTable.columns,
+                                });
+                        }}
+                    >
+                        <Icon name="plus" />
+                        {copy.insertRow}
+                    </Button>
+                )}
+                {canDeleteSelectedTable && (
+                    <Button
+                        variant="danger"
+                        className="toolbar-small"
+                        disabled={!trusted}
+                        title={tableActionDisabledReason}
+                        onClick={() => {
+                            if (deletableTable) setDeleteTableTarget(deletableTable);
+                        }}
+                    >
+                        <Icon name="trash" />
+                        {copy.deleteTable}
+                    </Button>
+                )}
+            </div>
+        ) : undefined;
+    return compactTableActions;
+}
+
 export function ObjectExplorer(props: ObjectExplorerProps) {
     const state = useObjectExplorerState(props);
     const [browseTarget, setBrowseTarget] =
@@ -87,17 +144,11 @@ export function ObjectExplorer(props: ObjectExplorerProps) {
     const {
         compact,
         showCompactDetails,
-        selectedTable,
-        tablePermissions,
         connection,
         trusted,
         copy,
         createTableDatabase,
         setCreateTableDatabase,
-        insertableTable,
-        setInsertRowTarget,
-        deletableTable,
-        setDeleteTableTarget,
         browseObjects,
         selected,
         expert,
@@ -161,54 +212,7 @@ export function ObjectExplorer(props: ObjectExplorerProps) {
                 }}
             />
         ) : undefined;
-    const canInsertSelectedTable =
-        connection.dataSource !== 'fixture' &&
-        Boolean(insertableTable) &&
-        tablePermissions.insert !== false;
-    const canDeleteSelectedTable =
-        connection.dataSource !== 'fixture' &&
-        Boolean(deletableTable) &&
-        tablePermissions.drop !== false;
-    const tableActionDisabledReason = trusted ? undefined : copy.runActionTrustRequired;
-    const compactTableActions =
-        showCompactDetails &&
-        selectedTable &&
-        (canInsertSelectedTable || canDeleteSelectedTable) ? (
-            <div className="object-utility-actions object-table-write-actions">
-                {canInsertSelectedTable && (
-                    <Button
-                        variant="ghost"
-                        className="toolbar-small"
-                        disabled={!trusted}
-                        title={tableActionDisabledReason}
-                        onClick={() => {
-                            if (insertableTable)
-                                setInsertRowTarget({
-                                    table: insertableTable.table,
-                                    columns: insertableTable.columns,
-                                });
-                        }}
-                    >
-                        <Icon name="plus" />
-                        {copy.insertRow}
-                    </Button>
-                )}
-                {canDeleteSelectedTable && (
-                    <Button
-                        variant="danger"
-                        className="toolbar-small"
-                        disabled={!trusted}
-                        title={tableActionDisabledReason}
-                        onClick={() => {
-                            if (deletableTable) setDeleteTableTarget(deletableTable);
-                        }}
-                    >
-                        <Icon name="trash" />
-                        {copy.deleteTable}
-                    </Button>
-                )}
-            </div>
-        ) : undefined;
+    const compactTableActions = compactTableWriteActions(state);
     return (
         <section
             className={cx(
@@ -279,7 +283,7 @@ export function ObjectExplorer(props: ObjectExplorerProps) {
                         onCopy={copyText}
                         onOpenSqlDraft={onOpenSqlDraft}
                         onBrowseTable={setBrowseTarget}
-                        canBrowse={connection.dataSource !== 'fixture'}
+                        canBrowse={connection.dataSource !== 'fixture' && connection.id !== PLAYGROUND_CONNECTION_ID}
                         onOpenReference={onOpenReference}
                         onOpenParts={setPartsTable}
                         onSelect={selectObject}
@@ -547,7 +551,7 @@ function ObjectExplorerBrowser({
                             onCopy={copyText}
                             onOpenSqlDraft={onOpenSqlDraft}
                             onBrowseTable={onBrowseTable}
-                            canBrowse={state.connection.dataSource !== 'fixture'}
+                            canBrowse={state.connection.dataSource !== 'fixture' && state.connection.id !== PLAYGROUND_CONNECTION_ID}
                             onOpenReference={onOpenReference}
                             onOpenParts={setPartsTable}
                             onSelect={selectObject}

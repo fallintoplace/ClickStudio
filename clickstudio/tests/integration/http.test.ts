@@ -1394,7 +1394,8 @@ test('Table browsing is scoped to trusted connections and validates page inputs'
     await app.call('/connections/demo/trust', { trusted: true, confirmation: 'demo' });
     const page = await app.call('/browse/table', input);
     assert.equal(page.status, 200);
-    assert.deepEqual(((await page.json()) as { rows: unknown }).rows, [['0']]);
+    const response = jsonRecord(await page.json(), 'browse page');
+    assert.deepEqual(response.rows, [['0']]);
     const invalid = await app.call('/browse/table', { ...input, page: 100 });
     assert.equal(invalid.status, 400);
     assert.equal(await responseErrorCode(invalid), 'BROWSE_INVALID');
